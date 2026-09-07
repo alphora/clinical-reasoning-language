@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
 /**
  * CRL → FHIR Library emit (Todo 2a sub-lane).
  *
@@ -240,7 +241,7 @@ function defaultClock(): Date {
  * canonicalBase + publisher/status/etc. (shared across the policy package).
  *
  * VERSION BY DESIGN (#187): a catalog Library carries the CATALOG CQL-HEADER
- * version (CRLCommon 0.2.0 / CaseFeatureCommon 1.0.0), NOT the policy's package
+ * version (CRLCommon 0.3.0 / CaseFeatureCommon 1.0.0), NOT the policy's package
  * version — these are fixed emitter assets independent of any policy, so their
  * FHIR Library version matches their own CQL content. Every OTHER emitted Library
  * (the policy layers) carries the package version via `emitLibrary`. A focused
@@ -251,8 +252,9 @@ function defaultClock(): Date {
  * (`<canonicalBase>/Library/CRLCommon`), so each emitted policy package is
  * self-contained (it ships its own catalog Library copy). A combined-IG consumer
  * that loads MANY policies at once would see N same-name / different-url copies of
- * CRLCommon/CaseFeatureCommon; cqf resolves `include` by NAME so execution is
- * unaffected, but canonical-url uniqueness across a merged bundle is a known
+ * CRLCommon/CaseFeatureCommon. Name-based unversioned includes do not isolate catalog
+ * versions: replacing a catalog can break old callers when symbols change. Deploy
+ * regenerated affected artifact sets together. Canonical-url uniqueness is a known
  * constraint tracked for the #72 companion-package distribution model (a shared
  * catalog canonical would live there, not in the per-policy emit).
  */

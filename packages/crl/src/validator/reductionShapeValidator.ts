@@ -11,6 +11,7 @@ import {
   type Location,
 } from "../ast/types";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
+import { bmiRetirementReason } from "../template-match/bmiPublication";
 import { isLocalBooleanPublication, publicationAdmissionReason, readPublicationMembership } from "../emit/publicationProgram";
 
 import type { SourceContext } from "../imports/scopes";
@@ -162,6 +163,12 @@ export class ReductionShapeValidator {
       this.warn("publication-value-domain-placement", concept.name,
         "An interpreted value domain is currently admitted only on an explicitly selected Record Observation<CodeableConcept> publication.",
         concept.valueDomain.location, attribution, errors, "error");
+    }
+    // REFACTOR:grounded (#320, plan595): retired BMI gets migration guidance even without shape reduction.
+    const bmiRetirement = bmiRetirementReason(concept);
+    if (bmiRetirement !== undefined) {
+      this.warn("bmi-form-retired", concept.name, bmiRetirement, concept.location, attribution, errors, "error");
+      return;
     }
     if (concept.shapeReduction !== undefined) {
       const reason = publicationAdmissionReason(concept);
@@ -542,33 +549,9 @@ export class ReductionShapeValidator {
 }
 
 /**
- * Does a concept definition lead with a narrative `most recent …` selection? Detects the UN-folded
- * `most recent "X"` form (which stays a DefinitionIsDefinition — only `most recent this` folds to a
- * Reduction, IMPL 1), so a `shape is Record` selecting from a named RecordSet is not false-flagged as
- * "does not select a record." Structural (leading `[NWord "most", NWord "recent"]`) — it does not
- * reach into the catalog matcher (which owns whether the tail resolves to a real record set).
- */
-/**
- * True iff `def` is a definition whose RESULT is a single value/record rather than a set.
- *
- * ⭐ This is what "authoring into the `shape is Record` contract" means for the non-selection forms:
- * a threshold (`"BMI" at least 30 'kg/m2'`), a calculation (`body mass index of "Weight" and "Height"`)
- * and an existence reduction each produce exactly ONE value. Only a set-producing form leaves the
- * contract unmet.
- *
- * Keyed off the SHARED catalog return-shape table so this cannot drift from the emitter's own view:
- * `list` is the only set-producing shape; `instance` / `boolean` / `other` are single.
- * A narrative whose pattern does not resolve is treated as NOT single — fail-closed, so an unknown
- * form gets the author-time prompt rather than silent acceptance.
- */
-/**
- * True iff `def` is a narrative that resolves to a REAL catalog pattern.
- *
- * ⚠ `matchNarrative` does NOT return `undefined` for text it cannot match — it hands back the raw
- * narrative source as the `pattern` name. So "did it match?" is "is the returned name a key of the
- * shared return-shape table?", never a null check. Getting that wrong sent an unmatched calculation
- * (`body mass index of "Weight" and "Height"`) down the "yields a SET" branch and printed the wrong
- * cause at the author.
+ * Legacy non-publication narratives must match a real catalog pattern before
+ * their return shape is inspected. Explicit publications have separate admission.
+ * A soft-compile placeholder is not a known producer or a record-set result.
  */
 function isMatchedCatalogPattern(def: ConceptDefinition | undefined): boolean {
   if (def?.type !== "DefinitionIsDefinition") return false;

@@ -50,26 +50,8 @@ export function matchNarrative(clause: NarrativeClause): CanonicalPatternCall {
   // folded, so composition costs one matcher per stage rather than one per PAIR — 16 comparators × 6
   // reductions would be 96 hand-written matchers for two-stage alone, before three-stage.
   //
-  // ⚠⚠ REFACTOR:suspect (#189 P2) — THE FOLD BELOW IS THE PATIENT, AND ITS OLD COMMENT WAS FALSE.
-  //
-  // It claimed: "each later stage takes the accumulated call as its FIRST argument … That yields
-  // OUTER-`MostRecent` — `most recent` reduces the concept's arms." MEASURED, it does the opposite:
-  //
-  //     body mass index of "A" and "B", then most recent this
-  //         -->  MostRecent( BodyMassIndex(A, B) )
-  //
-  // `BodyMassIndex` returns a Quantity, so stage 2 reduces STAGE 1'S VALUE, not the concept's arms — the
-  // recorded and answered arms are silently dropped, which is exactly what `policy.crl`'s own comment warns
-  // the PREFIX spelling does, and the pipeline spelling exists to avoid. It does not even translate:
-  // "Could not resolve call to operator MostRecent with signature (System.Quantity)".
-  //
-  // ⭐ THE RULE the fix restores: `this` in a stage ALWAYS denotes THE SPACE handed to it — the previous
-  // stage's output — and NEVER a scalar. A PRODUCER's output is its input PLUS its constructed candidate,
-  // so a reduction after a producer reduces `S0 ∪ {candidate}`, not the candidate alone. Until the
-  // un-collapse lands, do NOT read this fold as intent (`tmp/_old/DESIGN-P2-pipeline-uncollapse.md`).
-  //
-  // ⚠ A pipeline whose stages do not ALL match is unknown as a whole. Reporting a partial chain would claim
-  // more than was understood, and half-matched logic that validates is the failure this work exists to remove.
+  // REFACTOR:suspect (#320): this legacy fold remains for generic patterns; publication
+  // producers bypass it. It is not authority for arm-local semantics.
   const split = splitPipeline(els);
   if (split.kind === "malformed") return softCompileUnknown(clause);
   if (split.kind === "pipeline") {
@@ -386,25 +368,7 @@ const componentOf: PatternMatcher = (els, loc) => {
   return makeCall("ComponentOf", [conceptRefArg(els[3]), conceptRefArg(els[0])], loc);
 };
 
-/**
- * `body mass index of <Weight> and <Height>` → BodyMassIndex(weight, height) — #189.
- *
- * The goal fixture's calculation, and the first PRODUCER pattern in the catalog beyond `Calculate`: it
- * computes a NEW value from its named operands rather than selecting or filtering an existing record.
- * Narrative order is (weight, height) and so is the canonical call — the two are NOT interchangeable and a
- * silent swap would invert the result, so keep them aligned.
- */
-const bodyMassIndex: PatternMatcher = (els, loc) => {
-  if (els.length !== 7) return null;
-  if (!isWord(els[0], "body")) return null;
-  if (!isWord(els[1], "mass")) return null;
-  if (!isWord(els[2], "index")) return null;
-  if (!isWord(els[3], "of")) return null;
-  if (!isConceptRef(els[4])) return null;
-  if (!isWord(els[5], "and")) return null;
-  if (!isConceptRef(els[6])) return null;
-  return makeCall("BodyMassIndex", [conceptRefArg(els[4]), conceptRefArg(els[6])], loc);
-};
+// REFACTOR:grounded (#320, plan595): BMI is prepared as a publication, never a legacy catalog call.
 
 /** `<X> active during <Y>` → Active(X, [during: Y]) */
 const activeDuring: PatternMatcher = (els, loc) => {
@@ -1146,7 +1110,6 @@ const PATTERNS: PatternMatcher[] = [
   activeDuring,                    // 4 (post-catalog-v0.7: `<X> active during <Y>`)
   documentedAs,                    // 4
   justifiedBy,                     // 4
-  bodyMassIndex,                   // 7 (#189 — the goal fixture's calculation)
   componentOf,                     // 4
   atLeast,                         // 4
   atMost,                          // 4

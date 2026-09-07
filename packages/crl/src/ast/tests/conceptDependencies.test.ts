@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): dependency walking uses current explicit BMI syntax.
 import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
@@ -49,10 +50,10 @@ describe("conceptDependencies — every definition form is an edge", () => {
       depsOf(
         LEAVES +
           'concept "D":\n- shape is Record.\n- type is Observation.\n- value type is Quantity.\n' +
-          '- definition is body mass index of "A" and "B".\n',
+          '- definition is body mass index of "A" and "B" using validity of "A".\n',
         "D",
       ),
-    ).toEqual(["A", "B"]);
+    ).toEqual(["A", "B", "A"]);
   });
 
   it("⭐ `definition is` narrative — a single ref argument", () => {
@@ -98,9 +99,9 @@ describe("conceptDependencies — every definition form is an edge", () => {
       depsOf(
         LEAVES +
           'concept "D":\n- shape is Record.\n- type is Observation.\n- value type is Quantity.\n' +
-          '- definition is body mass index of "A" and "A".\n',
+          '- definition is body mass index of "A" and "A" using validity of "A".\n',
         "D",
       ),
-    ).toEqual(["A", "A"]);
+    ).toEqual(["A", "A", "A"]);
   });
 });

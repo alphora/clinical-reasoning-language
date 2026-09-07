@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
 // #189 — THE CONCEPT DEPENDENCY EDGE. Which concepts does a concept's definition read?
 //
 // ── Why this exists ─────────────────────────────────────────────────────────────────────────────────────
@@ -88,7 +89,7 @@ function narrativeElementRefs(el: NarrativeElement): ReferenceName[] {
  *
  * A both-representation merge twin's `definition` is a SYNTHETIC `most recent <self>` — the authored
  * pipeline does not survive lowering. So a concept whose real dependency is a PRODUCER stage
- * (`body mass index of "Weight" and "Height", then most recent this`) reports only its own name from the
+ * (`"Weight" at least 30 'kg', then most recent this`) reports only its own name from the
  * definition, and its operands live on `__recencyProducerSpecs`.
  *
  * ⚠ MEASURED, and it was a REGRESSION the moment producers started lowering: the case-feature walk over the

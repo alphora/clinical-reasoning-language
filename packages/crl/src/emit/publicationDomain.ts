@@ -36,7 +36,7 @@ export function readFinitePublicationTerminology(
       kind: "error",
       code: "publication-domain-not-finite",
       message:
-        "A referenced ValueSet, including one mixed with explicit codes, does not establish a complete finite interpretation domain.",
+        "A referenced ValueSet, including one mixed with explicit codes, does not establish a complete finite interpretation domain. Opaque ValueSet resolution is not supported on this publication path. This path requires a complete explicit code set; substituting arbitrary codes changes its meaning.",
       location: unresolved.location,
     };
   let system: string | undefined;

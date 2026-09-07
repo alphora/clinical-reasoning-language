@@ -1,4 +1,4 @@
-library CRLCommon version '0.2.0'
+library CRLCommon version '0.3.0'
 
 /*
  * CRLCommon — the CRL→CQL emitter's target library.
@@ -571,7 +571,7 @@ define function "Highest"(X List<Observation>, scope Interval<DateTime>):
  * `FHIRHelpers.ToQuantity` unwraps the FHIR datum to a System.Quantity so the comparison is like-for-like.
  *
  * ⚠ THE SAME QUALIFICATION IS WHY `(System.Quantity, System.Quantity)` overloads exist beside the scalar
- * ones: a COMPUTED value (`BodyMassIndex`, quantity arithmetic) is a System.Quantity, and the unqualified
+ * ones: a COMPUTED value (quantity arithmetic) is a System.Quantity, and the unqualified
  * `(Quantity, Quantity)` pair is FHIR.Quantity, which never binds it. MEASURED: "Could not resolve call to
  * operator AtLeast with signature (System.Quantity, System.Quantity)". The pre-existing
  * `(Integer, System.Quantity)` overload is the same lesson already learned once — the age path returns an
@@ -600,32 +600,7 @@ define function "High"(rec Observation, threshold System.Quantity):
 define function "Low"(rec Observation, threshold System.Quantity):
   FHIRHelpers.ToQuantity(rec.value as Quantity) < threshold
 
-/*
- * BodyMassIndex(weight, height) — #189, the goal fixture's calculation.
- *
- * BMI = mass / height², and CQL quantity arithmetic carries the units. The AUTHOR is responsible for the
- * operands' units being kg and m; nothing here converts, because a silent conversion is exactly the kind of
- * invented semantics the charter forbids.
- *
- * ⚠ THE RESULT UNIT IS NOT `kg/m2`. MEASURED against the cqf CQL engine: 90 'kg' / (1.7 'm' * 1.7 'm')
- * evaluates to `31100 'g.m-2'` — the engine normalises the mass unit and prints the exponent form. An earlier
- * version of this comment claimed the arithmetic "yields `kg/m2` and a threshold written `30 'kg/m2'` compares
- * like-for-like". The CONCLUSION holds but the REASON did not: it is the COMPARISON that normalises, not the
- * arithmetic. Verified both ways, so the threshold is not accidentally satisfied:
- *
- *     20000 'g.m-2' >= 30 'kg/m2'  ->  false      (20 < 30)
- *     40000 'g.m-2' >= 30 'kg/m2'  ->  true       (40 > 30)
- *
- * So `"BMI" at least 30 'kg/m2'` is correct over this result. What is NOT safe is assuming the unit STRING is
- * `kg/m2` — anything that displays, round-trips or string-matches this value sees `g.m-2`.
- *
- * ⚠ NULL-PROPAGATING, deliberately: either operand absent ⇒ null BMI ⇒ the determination over it stays
- * UNKNOWN rather than becoming a stated `false`. That is what lets "no height and no weight" PAUSE instead
- * of denying (charter §4).
- */
-define function "BodyMassIndex"(weight Observation, height Observation):
-  FHIRHelpers.ToQuantity(weight.value as Quantity)
-    / (FHIRHelpers.ToQuantity(height.value as Quantity) * FHIRHelpers.ToQuantity(height.value as Quantity))
+// REFACTOR:grounded (#320, plan595): BMI arithmetic is emitted by its explicit publication producer.
 
 /**
  * AtLeastN / Consecutive — INHERENTLY BOOLEAN count predicates.

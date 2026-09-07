@@ -12,15 +12,8 @@ import type { Concept } from "../../ast/types";
 import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
 import { conceptRefsOfConcept, conceptRefsOfDefinition } from "../../ast/conceptDependencies";
 
-/**
- * ⭐ #189 — the PRODUCER stage's constructed candidate, and the refusals that guard it.
- *
- * ⚠ THE HAPPY PATH IS EXECUTION-VERIFIED ELSEWHERE, NOT HERE. `tmp/nullprobe/bmiexec/` runs the emitted
- * layered library against the real cqf CQL engine: 90 kg / (1.7 m)^2 yields a constructed candidate valued
- * `31100 'g.m-2'` stamped MAY (the `Max` of Weight-May and Height-Feb, §5b), carrying the case-feature
- * profile url, and the threshold over it constructs a second candidate `true` at that stamp. This file
- * covers what a running engine CANNOT show: that the shapes we refuse are refused, and refused LOUDLY.
- */
+// REFACTOR:grounded (#320, plan595): generic producer construction/refusal/dependency tests use AtLeast.
+// Explicit two-input BMI has its own publication tests and native evidence.
 
 const BASE = { canonicalBase: "http://example.org/crl/pc", localDomainId: "pc", policyId: "pc" };
 
@@ -37,7 +30,7 @@ terminology "H VS":
 terminology "W VS":
 - valueset is \`http://example.org/vitals/ValueSet/weight\`.
 terminology "B VS":
-- valueset is \`http://example.org/vitals/ValueSet/bmi\`.
+- valueset is \`http://example.org/vitals/ValueSet/threshold\`.
 `;
 
 const leaf = (name: string, code: string, vs: string, shape = "Record"): string => `
@@ -51,13 +44,13 @@ ${shape === "Record" ? "- definition is most recent this.\n" : ""}- source repre
   - coded from "${vs}".
 `;
 
-const bmi = `
-concept "BMI":
+const threshold = `
+concept "Threshold":
 - shape is Record.
 - type is Observation.
-- value type is Quantity.
-- code is \`bmi\`.
-- definition is body mass index of "Weight" and "Height", then most recent this.
+- value type is boolean.
+- code is \`threshold\`.
+- definition is "Weight" at least 30 'kg', then most recent this.
 - source representation:
   - type is Observation.
   - coded from "B VS".
@@ -75,7 +68,7 @@ const msgOf = (r: { errors?: { message?: string }[] }, needle: string): string =
   (r.errors ?? []).map((e) => e.message ?? "").find((m) => m.includes(needle)) ?? "";
 
 describe("#189 — a producer stage's constructed candidate", () => {
-  const good = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS") + bmi;
+  const good = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS") + threshold;
 
   it("⭐ the producer's candidate REACHES THE EMITTED SPACE — constructor defined, called, unioned in", () => {
     // ⚠ THIS ASSERTED ONLY THAT ONE ERROR KIND WAS ABSENT, which a panel arm correctly called a non-test: a
@@ -89,24 +82,20 @@ describe("#189 — a producer stage's constructed candidate", () => {
     expect(r.success).toBe(true);
     const cql = (r.cqlByLibrary ?? []).map((l) => l.cql ?? "").join(String.fromCharCode(10));
     // 1. the constructor FUNCTION is defined — it had NO production caller at all before this slice
-    expect(cql).toContain("define function CRLConstructObservationQuantity(");
-    // 2. and its boolean sibling, so both value modes are covered
     expect(cql).toContain("define function CRLConstructObservationBoolean(");
-    // 3. the producer's computation is IN the emitted text. Its silent ABSENCE under `success: true` is the
+        // 3. the producer's computation is IN the emitted text. Its silent ABSENCE under `success: true` is the
     //    exact failure this slice exists to make impossible — measured once on this very shape.
-    expect(cql).toContain("CRLCommon.BodyMassIndex(");
+    expect(cql).not.toContain("CRLCommon.BodyMassIndex(");
     expect(cql).toContain("CRLCommon.AtLeast(");
-    // 4. §5b — all-or-nothing, and a `Max` only where there is more than one determinant
-    expect(cql).toContain("then null as System.DateTime");
-    expect(cql).toContain("Max({");
+    // The singleton operand's record supplies validity; generic stamp helpers have separate tests.
     // 5. the candidate is a THIRD arm of the space the terminal selection reads, beside local and source
-    const bmi = cql.slice(cql.indexOf('define "BMI":'));
-    expect(bmi).toContain("LocalPrimitives");
-    expect(bmi).toContain("ExternalPrimitives");
-    expect(bmi).toContain("CRLConstructObservationQuantity(");
-    expect(bmi).toContain("where C is not null");
+    const thresholdText = cql.slice(cql.indexOf('define "Threshold":'));
+    expect(thresholdText).toContain("LocalPrimitives");
+    expect(thresholdText).toContain("ExternalPrimitives");
+    expect(thresholdText).toContain("CRLConstructObservationBoolean(");
+    expect(thresholdText).toContain("where C is not null");
     // 6. and it is stamped with the case-feature profile url the FHIR lane emits (parity, not a lookalike)
-    expect(bmi).toContain("'http://example.org/producerwire/StructureDefinition/producerwire-bmi'");
+    expect(thresholdText).toContain("'http://example.org/producerwire/StructureDefinition/producerwire-threshold'");
   });
 
   it("⚠ REFUSES a member-existence interface over a PRODUCER-BEARING referent", () => {
@@ -134,14 +123,14 @@ describe("#189 — a producer stage's constructed candidate", () => {
   });
 
   it("⚠ REFUSES a RecordSet operand — a history has no one value and no one timestamp", () => {
-    // The catalog grounds `BodyMassIndex` against two SINGLETON Observations. A `shape is RecordSet` operand
+    // The catalog grounds `AtLeast` against one SINGLETON Observation. A `shape is RecordSet` operand
     // binds a different overload or none, and `componentStampCql`'s record read has nothing to read. How to
     // PAIR two histories is an open question, not an omission — so this refuses with that reason rather than
     // emitting CQL that dies in the translator. Panel round 1, both arms.
-    const src = HEADER + leaf("Height", "height", "H VS", "RecordSet") + leaf("Weight", "weight", "W VS") + bmi;
+    const src = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS", "RecordSet") + threshold;
     const r = emit(src);
     expect(r.success).toBe(false);
-    expect(msgOf(r, "Height")).toContain("SINGLE RECORD per operand");
+    expect(msgOf(r, "Weight")).toContain("SINGLE RECORD per operand");
   });
 });
 
@@ -208,13 +197,13 @@ describe("#189 — a producer edge is a DEPENDENCY edge", () => {
   //
   // THE RULE: moving an edge off `definition` does not move it out of the graph.
   it("survives lowering — the case-feature walk still reaches THROUGH a producer", () => {
-    const src = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS") + bmi + `
+    const src = HEADER + leaf("Height", "height", "H VS") + leaf("Weight", "weight", "W VS") + threshold + `
 concept "Big":
 - shape is Scalar.
 - type is Observation.
 - value type is boolean.
 - code is \`big\`.
-- defined as exists ("BMI").
+- defined as exists ("Threshold").
 `;
     const built = buildCRL(src) as unknown as { result?: { statements: Concept[] } };
     const lowered = lowerLocalCodes(built.result as never, {
@@ -224,13 +213,13 @@ concept "Big":
     }) as unknown as { ast: { statements: Concept[] } };
 
     const merge = lowered.ast.statements.find(
-      (s) => s.name === "BMI" && (s as Concept).__loweringRole === "public-determination",
+      (s) => s.name === "Threshold" && (s as Concept).__loweringRole === "public-determination",
     ) as Concept;
 
     // The definition alone reports only the synthetic self-reference...
-    expect(conceptRefsOfDefinition(merge.definition).map(String)).toEqual(["BMI"]);
+    expect(conceptRefsOfDefinition(merge.definition).map(String)).toEqual(["Threshold"]);
     // ...while the WHOLE concept still names the operands the derivation actually depends on.
-    expect(conceptRefsOfConcept(merge).map(String).sort()).toEqual(["BMI", "Height", "Weight"]);
+    expect(conceptRefsOfConcept(merge).map(String).sort()).toEqual(["Threshold", "Weight"]);
   });
 });
 

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
@@ -77,7 +78,7 @@ function readCatalog(fileName: string): string {
 export function loadCRLCommon(): CatalogLibrary {
   return {
     libraryName: "CRLCommon",
-    version: "0.2.0",
+    version: "0.3.0",
     outputFilename: "CRLCommon.cql",
     cql: readCatalog("CRLCommon.cql"),
   };

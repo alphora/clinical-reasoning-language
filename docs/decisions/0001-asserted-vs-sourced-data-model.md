@@ -88,11 +88,10 @@ never joins distinct decision criteria, which is the decision tree's job, #168).
   value. A fresh user assertion wins by being newest; a newer source value supersedes an older
   assertion (provenance — origin + timestamp — carries the reasoning). Default is **KE-overridable** per
   concept; the only place precedence beyond recency may enter, by explicit KE choice.
-- **A calculated value's as-of time = the oldest (min) timestamp of the asserted values used**
-  (transitively, over the leaf asserted inputs) — a derived value is only as fresh as its stalest
-  dependency, so a newer assertion correctly wins and a recompute does not silently defeat an override.
-  Consequently a recompute supersedes an older assertion **only when all inputs it uses are newer than
-  that assertion**. (Wall-clock evaluation time may be provenance, never the selection timestamp.)
+- **Each producer owns its validity behavior.** BMI explicitly names one selected operand with
+  `using validity of`; its candidate inherits that operand's validity. The independent
+  `shape reduction is most recent` selects among candidates. There is no universal oldest-input
+  or evaluation-time timestamp rule. Patient age has its own daily calculation/assertion semantics.
 
 ### 6. Three-tier de-duplication
 - **Source dedup — CRL's responsibility.** The source set is deduped by
@@ -191,42 +190,69 @@ concept "Up To Date On Mammography":
 groupings are read-only. A local/user assertion lands on the concept's own `code is`; records are not
 deduped by CRL.
 
-## Example B — BMI (inference cascade; locally codable at every level)
+## Example B — BMI (explicit publication and independent selection)
+
+The source codes below are synthetic demonstration codes, not a replacement for a clinical ValueSet.
+
 ```crl
-terminology "Height VS":    - valueset is `http://example.org/vitals/ValueSet/height`.
-terminology "Weight VS":    - valueset is `http://example.org/vitals/ValueSet/weight`.
-terminology "Clinical BMI": - valueset is `http://example.org/vitals/ValueSet/bmi`.
+terminology "Height VS":
+- system is `http://example.org/synthetic-measurements`.
+- code is `height`.
+terminology "Weight VS":
+- system is `http://example.org/synthetic-measurements`.
+- code is `weight`.
+terminology "Clinical BMI":
+- system is `http://example.org/synthetic-measurements`.
+- code is `bmi`.
 
 concept "Height":
-- type is Observation.
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
+- type is Observation.
 - code is `height`.
-- source representation: - coded from "Height VS".
+- source representation:
+  - type is Observation.
+  - coded from "Height VS".
 
 concept "Weight":
-- type is Observation.
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
+- type is Observation.
 - code is `weight`.
-- source representation: - coded from "Weight VS".
+- source representation:
+  - type is Observation.
+  - coded from "Weight VS".
 
 concept "BMI":
-- type is Observation.
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
+- type is Observation.
 - code is `bmi`.
-- definition is body mass index of "Weight" and "Height".
-- source representation: - coded from "Clinical BMI".
+- definition is body mass index of "Weight" and "Height" using validity of "Weight".
+- source representation:
+  - type is Observation.
+  - coded from "Clinical BMI".
 
 concept "High BMI":
-- type is Observation.
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
+- type is Observation.
 - code is `high-bmi`.
 - definition is "BMI" at least 30 'kg/m2'.
+
 ```
-Cascade `High BMI ← BMI ← {Height, Weight}`. Each level has a `code is`, so it is assertable; `BMI` may
-be **computed** (from Height/Weight), **retrieved** (the clinical-BMI source representation), or
-**asserted** (local code) — most-recent wins. A later source recompute supersedes an older assertion
-**only when all inputs it uses are newer** (calc as-of = oldest input). `BMI`/`High BMI` are mixed
-concepts (§8).
+Cascade `High BMI ← BMI ← {Height, Weight}`. Each local code enables an answer representation.
+BMI candidates may be calculated, externally sourced, or locally asserted. The calculated candidate
+inherits the selected Weight's validity because that operand is explicitly authored as the anchor.
+The final selector compares candidates by the publication selection contract. A newer assertion
+can win; a calculation can win when its authored validity is newer. Missing input yields no numeric
+candidate, and explicit unknown remains distinct from false. The current executable bounds are in
+[CRL-NORTH-STAR.md](../CRL-NORTH-STAR.md); this conceptual ADR is not a claim that all historical
+examples or broader history/Condition variants have executable lowering.
 
 ## Consequences
 - A CEL `fact` is the existence proof for B: one `defined by` slot — it cannot name an "asserted

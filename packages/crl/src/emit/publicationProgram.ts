@@ -1,4 +1,5 @@
 import type { Concept, CRL, Location, ReferenceName } from "../ast/types";
+import { bmiRetirementReason } from "../template-match/bmiPublication";
 import type { CRLError } from "../types/errors";
 import { localCodeSystemUrl, caseFeatureUrlFromPolicyId } from "../fhir-emitter/slug";
 import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
@@ -372,8 +373,22 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
       return undefined;
     } finally { visiting.delete(hit.identity.key); }
   };
-  for (const library of declarations.getLibraries()) for (const concept of library.ast.statements)
-    if (concept.type === "Concept" && concept.shapeReduction !== undefined && concept.__publication === undefined) prepare(library, concept);
+  // REFACTOR:grounded (#320, plan595): prepared closures reject old BMI even when no publication was declared.
+  for (const library of declarations.getLibraries()) for (const concept of library.ast.statements) {
+    if (concept.type !== "Concept") continue;
+    const retirement = bmiRetirementReason(concept);
+    if (retirement !== undefined) {
+      const item = diagnostic(`${library.libraryName} (${library.sourceIdentity}): ${retirement}`, concept.location, "emit-bmi-form-retired");
+      diagnostics.push(item);
+      const hit = declarations.lookupConcept(library.sourceIdentity, concept.name, concept.location);
+      if (hit.kind === "hit") rejected.set(hit.identity.key, item);
+    }
+  }
+  // Establish every retirement before recursive preparation, independent of declaration order.
+  for (const library of declarations.getLibraries()) for (const concept of library.ast.statements) {
+    if (concept.type !== "Concept") continue;
+    if (concept.shapeReduction !== undefined && concept.__publication === undefined) prepare(library, concept);
+  }
   return Object.freeze({
     declarations,
     diagnostics: Object.freeze(diagnostics),

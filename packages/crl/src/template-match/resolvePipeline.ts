@@ -1,8 +1,8 @@
 // #189 P2 (design D6) — THE SHARED PIPELINE RESOLVER. One reading of a concept's program, for all lanes.
 //
 // ⚠⚠ WHAT THIS IS FOR. `matchNarrative` FOLDS a pipeline into ONE call by prepending each stage as the next
-// stage's first argument, so `body mass index of "W" and "H", then most recent this` becomes
-// `MostRecent(BodyMassIndex(W, H))` — stage 2 reducing stage 1's VALUE instead of the concept's space, which
+// stage's first argument, so `"W" at least 30 'kg', then most recent this` becomes
+// `MostRecent(AtLeast(W, threshold))` — stage 2 reducing stage 1's VALUE instead of the concept's space, which
 // silently drops the asserted and recorded arms and does not even translate. That fold is the PATIENT
 // (`REFACTOR:suspect`); this module is the ground truth that replaces it.
 //
@@ -586,7 +586,7 @@ function deriveEffect(
   // ⚠⚠ EXACT, AND IT WAS A PRESENCE CHECK (`sig.valueType !== undefined`). A presence check is not a type
   // check: it let `shape is Scalar` + `value type is Quantity` + `exists this` publish a boolean as a
   // Quantity, and — because `returnShape: "other"` covers Period, Quantity, Interval and DateTime alike — it
-  // let a record concept declaring `value type is date` take a `BodyMassIndex` producer and resolve clean.
+  // let a record concept declaring `value type is date` take a `AtLeast` producer and resolve clean.
   // `resultType` on the grounded entry is what makes the comparison exact.
   //
   // ⚠ FAIL CLOSED when a grounded value pattern declares none: that is a catalog gap, and treating it as

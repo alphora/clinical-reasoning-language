@@ -329,7 +329,8 @@ export type {
 // verification is now a set, with test-bound fhir-emit evidence alongside CRE/historical engine proof.
 // REFACTOR:grounded (#320): schemaVersion 1.30 → "1.31" teaches CEL pause assertions and native acceptance.
 // REFACTOR:grounded (#320, plan583): schemaVersion 1.32 → "1.33" retires legacy age and adds explicit uncoded publication.
-const SCHEMA_VERSION = "1.33";
+// REFACTOR:grounded (#320, plan595): schemaVersion 1.33 → "1.34": explicit BMI validity, legacy retirement and native verification limits.
+const SCHEMA_VERSION = "1.34";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -640,6 +641,19 @@ const RULES: KitRule[] = [
         force: "validator-enforced",
       },
     ],
+  },
+  {
+    "id": "bmi-publication",
+    "edge": "cpg",
+    "category": "concept-model",
+    "rule": "BMI uses explicit Record/Observation/Quantity publications for Weight, Height and BMI, each with shape reduction is most recent. Author definition is body mass index of \"Weight\" and \"Height\" using validity of \"Weight\". Choose either selected operand as the validity anchor; no timestamp is invented. Both measurements determine the value; only the named operand supplies validity. The separate final selector arbitrates local, sourced and calculated BMI. Add code is only for a local answer representation. Legacy BMI without this contract, including prefix or then-most-recent pipelines, is retired with emit-bmi-form-retired (validator rule bmi-form-retired). Those identifiers also report incomplete new BMI publications; use the message to distinguish missing contract fields from retired syntax. When touching existing content, migrate the relevant dependency closure and re-emit its CQL/FHIR together; unrelated policies need no bulk rewrite. CRLCommon is now version 0.3.0 and removes BodyMassIndex. Migrate touched CRL and regenerate the complete artifact set; do not retain or mix the old catalog to preserve the retired path. At deployment, check for previously generated policies sharing unversioned catalog names: replacing a catalog can break old callers, so regenerate affected deployed artifacts together.",
+    "why": "The author must choose derived validity and final selection explicitly. A calculation must not silently replace answers or inherit an invented timestamp.",
+    "ref": "#320; docs/CRL-NORTH-STAR.md; publicationBMI.ts",
+    "clauses": [
+      { "text": "Absent operands produce no candidate; selected unknown values produce an unknown candidate. Invalid measurements remain errors even when the other operand is missing. Positive kg/g and m/cm inputs are supported; output is kg/m2 truncated to eight decimals. Inputs admit magnitude at most 10^6 and eight decimal places; height in centimetres admits at most four decimal places; output magnitude is at most 10^6. These are implementation bounds, not clinical ranges.", "force": "default" },
+      { "text": "Prepared imported publication operands are supported, including a threshold over calculated BMI. Foreign legacy expressions, delegated decisions and CEL-only publications outside emit closure are unsupported. Source coding currently requires finite explicit codes; an opaque ValueSet URL is not a supported source membership resolver for this publication path. This restriction applies to Weight, Height and BMI publication sources. Content depending on opaque ValueSets cannot yet migrate to this path; retain that as a migration blocker, never substitute arbitrary codes. Synthetic finite codes in the reference demonstrate syntax, not replacement membership for a clinical ValueSet.", "force": "default" },
+      { "text": "CRE predicts outcomes; emitted native $apply is authoritative. Verify actual activities, values, null-condition witnesses and errors. Package/shadow CRE tests do not certify package artifact identity. Full generated QuestionnaireResponse resubmission for coded BMI remains open because untouched defaults can be extracted as new assertions; direct-data and edited-item session tests do not certify that flow or a renderer.", "force": "default" }
+    ]
   },
   {
     "id": "patient-age-projection",

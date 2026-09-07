@@ -300,8 +300,7 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
     }
 
     // ── OPERAND RESOLUTION ────────────────────────────────────────────────────────────────────────────
-    // ⚠ The catalog grounds each producer against a SINGLETON-RECORD overload (`BodyMassIndex(weight
-    // Observation, height Observation)`, `AtLeast(rec Observation, target System.Quantity)`). An operand
+    // ⚠ The catalog grounds each producer against a SINGLETON-RECORD overload (`AtLeast(rec Observation, target System.Quantity)`). An operand
     // that publishes something else binds a DIFFERENT overload or none at all — and `componentStampCql`'s
     // record read needs the same guarantee. So the shape is checked here, before any text is rendered.
     const complexArg = stage.call.args.find((a) => !SIMPLE_ARG_TYPES.has(a.type));
@@ -361,8 +360,7 @@ export function resolveProducerCandidates(inputs: ProducerCandidateInputs): Prod
         );
       }
       // ⚠⚠ THE GROUNDED OVERLOAD IS TYPED, so "publishes a Record" is not enough. `CRLCommon` grounds
-      // `BodyMassIndex(weight Observation, height Observation)` and `AtLeast(rec Observation, target
-      // System.Quantity)` — both read `rec.value as Quantity` off an OBSERVATION. Two `Condition` operands
+      // `AtLeast(rec Observation, target System.Quantity)` — it reads `rec.value as Quantity` off an OBSERVATION. A `Condition` operand
       // would pass a shape-only check and then have NO CQL overload (a translator failure, which design D1
       // forbids); an Observation whose declared datum is `string` would pass, translate, and quietly return
       // null through the `as Quantity` cast — turning an ESTABLISHED computation into a pause, which is worse.

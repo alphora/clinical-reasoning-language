@@ -267,7 +267,6 @@ function computeLocalDatum(
     // records and reads no datum. Both goal spellings are the same cell:
     //
     //   `most recent this`                                      -> [selection]
-    //   `body mass index of "W" and "H", then most recent this`  -> [producer, selection]
     //
     // ⚠ Asked of the SHARED `resolveConceptPipeline` (which `cre/run.ts` also consumes), NOT re-derived from
     // the AST. The old test poked at `ReductionDefinition` directly, so a PIPELINE — whose node is a

@@ -1,59 +1,5 @@
-// ===========================================================================
-// ⭐ THE CANONICAL TARGET for the Obese/BMI chain (#189). One policy, one
-// truth, driven by `src/tests/obesityTarget.test.ts` across every lane.
-//
-// ⚠ It is the TARGET, not a description of what works: the model here is the
-// CORRECT one and the implementation catches up to it. Never reshape a concept
-// to make a lane pass — the test pins each lane's CURRENT shortfall with the
-// value it must reach, so closing one is a visible, deliberate edit.
-//
-// The acceptance criterion (operator, 2026-08-29):
-//
-//     Obese = true        -> Approve
-//     Obese = false       -> Deny
-//     Obese = unanswered  -> NO recommendation: pause and ask
-//
-// ⭐ A Deny requires an ESTABLISHED false. If "unanswered" reaches a Deny by any
-// path, the chain is not done.
-//
-// ⚠ ESTABLISHED means ANY of the three arms produced the value — ASSERTION,
-// RECORD, or COMPUTATION (charter "VOCABULARY"). This line once read "a STATED
-// false", which was misread as "asserted by a human" and used to argue that a
-// computed false must not deny. It must: a height and a weight giving a BMI of
-// 25 makes `at least 30` a real `false`, and that DENIES, with nobody having
-// stated anything. What never denies is ABSENCE, which is not established.
-//
-// RECORD version. A complete, runnable policy.
-//
-// Every concept HERE carries a local `code is` AND `shape is Record`, so every
-// one is a QUESTION the user may answer at any level: assert obesity directly,
-// give a BMI, or give height and weight. Four questions.
-//
-// ⚠ THAT IS THIS FIXTURE, NOT A RULE. An earlier phrasing read as though a
-// concept must carry both, and it misled a design round: `code is` is the gate
-// and `shape is Record` is not part of it. The accurate chain:
-//
-//   `code is`  =>  QUESTION  =>  ANSWERABLE  =>  CASE FEATURE
-//
-// with two carve-outs the chain does NOT extend through:
-//   - a `shape is RecordSet` case feature is ASKED but gets NO
-//     `cpg-featureExpression` — answering APPENDS a record, so there is nothing
-//     to pre-fill (`caseFeatureRecord.ts`). So case-feature != pre-fillable.
-//   - the uncoded Patient arm is SUPPLIED, not gathered — no SD at all, and
-//     that is not an error (charter §2).
-//
-// ⭐ ANSWERABLE and PRE-FILLABLE are DIFFERENT PROPERTIES. `code is` decides the
-// first; where the `cpg-featureExpression` points decides the second. The whole
-// of #317 lives in that gap — a concept that IS a case feature and IS asked,
-// whose featureExpression aims at answer records nobody writes.
-//
-// ⭐ WHY `shape is Record` STILL EARNS ITS PLACE here: it is not what makes a
-// concept answerable, it is what gives it ONE record for a featureExpression to
-// target. That is the reason, not "answerables are Records".
-//
-// Every concept here publishes ONE record, so every one owes a reduction that
-// merges its arms — the derived arm and the source-representation arm.
-// ===========================================================================
+// REFACTOR:grounded (#320, plan595): retired BMI syntax, retained only as migration/refusal input.
+// Condition-source/history-pairing capabilities remain #320 work; this is not an authoring example.
 library "Obesity Coverage (Record)".
 
 terminology "Obese VS":
@@ -65,11 +11,6 @@ terminology "Height VS":
 terminology "Weight VS":
 - valueset is `http://example.org/vitals/ValueSet/weight`.
 
-// QUESTION + CONDITION (boolean-valued, so a `when` may gate on it).
-// Arms: the threshold computed over BMI, existence of a coded Condition, and
-// answers on the local code. ⚠ THREE, not two — the local code is an arm like
-// any other, and the easiest to overlook because NO LINE OF THE DEFINITION
-// NAMES IT. `, then most recent this` selects the one record across all three.
 concept "Obese":
 - shape is Record.
 - type is Observation.
@@ -81,14 +22,6 @@ concept "Obese":
   - coded from "Obese VS".
   - value projection is exists this.
 
-// QUESTION, not a condition (not boolean).
-// Arms: the calculation over Height and Weight, recorded BMI observations, and
-// answers on the local code. ⚠ The reduction is `, then most recent this` —
-// LEFT TO RIGHT (compute, THEN select) and reducing over THIS concept's own
-// records, so all three arms merge. The prefix spelling `most recent body mass
-// index of …` composes the same two operations with the second written first,
-// and reduces only the calculation's output — silently dropping the recorded
-// and answered arms.
 concept "BMI":
 - shape is Record.
 - type is Observation.
@@ -99,8 +32,6 @@ concept "BMI":
   - type is Observation.
   - coded from "Clinical BMI VS".
 
-// QUESTION, not a condition. A leaf — nothing derives it, so its arms are the
-// local answers and the recorded observations.
 concept "Height":
 - shape is Record.
 - type is Observation.
@@ -111,7 +42,6 @@ concept "Height":
   - type is Observation.
   - coded from "Height VS".
 
-// QUESTION, not a condition. A leaf, as Height.
 concept "Weight":
 - shape is Record.
 - type is Observation.
@@ -130,8 +60,6 @@ activity "Deny Bariatric Surgery":
 - request CPGCommunicationRequest.
 - with `NOT APPROVED`.
 
-// Obesity is the coverage criterion. If it cannot be established from data,
-// the tree PAUSES and the questionnaire asks — that is the point of the chain.
 decision "Bariatric Surgery Coverage":
 first:
 - when "Obese" then recommend activity "Approve Bariatric Surgery".

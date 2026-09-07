@@ -80,7 +80,6 @@ export function resolveRecencyValueConcept(concept: Concept): RecencyValueResolu
   // goal uses, because they differ only in whether anything runs before the selection:
   //
   //   `most recent this`                                  -> [selection]            (Height, Weight)
-  //   `body mass index of "W" and "H", then most recent this` -> [producer, selection]  (BMI)
   //   `"BMI" at least 30 'kg/m2', then most recent this`      -> [producer, selection]  (Obese)
   //
   // The REQUIREMENT is only that the pipeline ENDS in a selection over the space: that is what makes the

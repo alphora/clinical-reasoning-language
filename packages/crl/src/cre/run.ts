@@ -132,6 +132,7 @@ import { walkIncludes } from "../imports/resolver";
 import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
+import { bmiRetirementReason } from "../template-match/bmiPublication";
 import type { ResolvedStage } from "../template-match/resolvePipeline";
 import { cannotDirectlyAssertConcept } from "../emit/conceptDatumSignals";
 import {
@@ -516,7 +517,7 @@ interface Frame {
 //
 // ⚠⚠ WHY THIS IS NOT A RECORD-EXISTENCE EVALUATOR, AND MUST NOT BECOME ONE. A general
 // "does this concept's pipeline produce at least one record" query cannot be answered from presence:
-// `BodyMassIndex(W, H)` needs usable DATA, not records named W and H; a filter can take a non-empty space
+// `AtLeast(W, threshold)` needs usable DATA, not a record named W; a filter can take a non-empty space
 // and return empty; a source projection's candidate is its projection OUTPUT, not the retrieved resource.
 // Answering it anyway would be the partial/completeness model the CRE is forbidden to grow
 // (`feedback_cre-is-mechanical-not-runtime`).
@@ -2054,6 +2055,7 @@ function runCase(
   collisionDiagnostic?: string,
   pauseValidationErrors: readonly string[] = [],
   publication?: { program?: PublicationProgram; resources?: readonly EmittedResource[]; error?: string; celLibrary: string },
+  authoringErrors: readonly string[] = [],
 ): CaseRun {
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
@@ -2071,6 +2073,8 @@ function runCase(
     : null;
   const caseDates = resolveCaseFactDates(c, facts, now);
   const inputErrors = caseDates.diagnostics.map((d) => `${d.kind}: ${d.message}`);
+  // REFACTOR:grounded (#320, plan595): retirement applies to activity expectations as well as pauses.
+  inputErrors.push(...authoringErrors);
   if (c.body.some((b) => b.type === "CELResultField" && b.value.type === "CELPauseResult")) {
     inputErrors.push(...pauseValidationErrors.filter((d) => !collisionDiagnostic || !d.endsWith(collisionDiagnostic)));
   }
@@ -2771,11 +2775,27 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   }
   const visitedConcepts = new Set<string>();
   const publicationPaths = new Set<string>();
+  // REFACTOR:grounded (#320, plan595): check emitted/consumed sources, not unrelated registry siblings.
+  const bmiAuthoringErrors = new Set<string>();
+  const checkedBmiSources = new Set<string>();
+  const checkBmiSource = (entry: RegistryEntry): void => {
+    for (const owner of walkIncludes(entry, registry).resolvedLibraries) {
+      if (checkedBmiSources.has(owner.filePath)) continue;
+      checkedBmiSources.add(owner.filePath);
+      for (const node of owner.ast.statements) if (node.type === "Concept") {
+        const reason = bmiRetirementReason(node);
+        if (reason !== undefined) bmiAuthoringErrors.add(`emit-bmi-form-retired: ${owner.name} (${owner.filePath}): ${reason}`);
+      }
+    }
+  };
+  checkBmiSource(graph.coversTarget);
   while (pendingConcepts.length > 0) {
     const pending = pendingConcepts.pop()!;
     const hit = declarations.lookupConcept(pending.from, pending.ref);
     if (hit.kind !== "hit" || visitedConcepts.has(hit.identity.key)) continue;
     visitedConcepts.add(hit.identity.key);
+    const bmiOwner = entriesByPath.get(hit.identity.sourceIdentity);
+    if (bmiOwner !== undefined) checkBmiSource(bmiOwner);
     if (hit.node.shapeReduction !== undefined) publicationPaths.add(hit.identity.sourceIdentity);
     for (const ref of conceptRefsOfConcept(hit.node)) pendingConcepts.push({ from: hit.identity.sourceIdentity, ref });
   }
@@ -2896,6 +2916,7 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
         collisionDiagnostic,
         pauseValidationErrors,
         hasPublication ? { program: publicationProgram, resources: emittedPublicationCase?.resources, error: casePublicationError, celLibrary: graph.cel.library.name } : undefined,
+        [...bmiAuthoringErrors],
       ),
     );
   }

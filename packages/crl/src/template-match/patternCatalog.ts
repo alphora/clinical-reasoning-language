@@ -125,10 +125,9 @@ export type PatternStage =
        * The CONCRETE value a VALUE-returning grounded pattern yields — one of the `conceptValueTypes`.
        *
        * ⚠⚠ REQUIRED ON A GROUNDED `boolean`/`other` PATTERN, because `returnShape` cannot do this job:
-       * `"other"` covers Period, Quantity, Interval and DateTime alike, so it cannot tell
-       * `BodyMassIndex → Quantity` from a Period-returning pattern. Without it the resolver could only ask
-       * "did the author declare SOME value type", which let a record concept declaring `value type is date`
-       * take a `BodyMassIndex` producer and resolve clean.
+       * `"other"` covers Period, Quantity, Interval and DateTime alike. Concrete
+       * result metadata prevents accepting a producer solely because the author
+       * declared some unrelated value type.
        *
        * ⚠ Meaningless on a `list`/`instance` pattern — those yield records, not values.
        */
@@ -306,11 +305,7 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // claim caught by that test on its first run, after `Exists` and `Matches`.
   StartOf: { returnShape: "other", slot: "any", stage: { grounded: false }, realization: "native" },
   Calculate: any("other"),
-  // #189 — a PRODUCER: computes a new Quantity (kg/m2) from two record operands. "other" because the value
-  // it yields is neither a member of its input nor a boolean — the concept declares what it publishes.
-  // GROUNDED: `BodyMassIndex(weight Observation, height Observation)` (:615) — two singleton operands,
-  // yielding a Quantity. Named operands, so PRODUCER.
-  BodyMassIndex: groundedStage("other", "operands", { resultType: "Quantity" }),
+  // REFACTOR:grounded (#320, plan595): BMI production uses the explicit publication program.
   // No `AgeInMonths` entry BY DESIGN (#257 T2): the months compute fn only ever appears NESTED inside a
   // top-level comparator (`AtLeast`/`AtMost`/`Below`), never as the top-level pattern.
   // ⚠ An older note claimed a `?? "list"` default made a stray lookup "fail loudly". It did not — it produced

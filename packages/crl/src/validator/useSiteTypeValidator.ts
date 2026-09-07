@@ -35,7 +35,8 @@ import {
 } from "../template-match/operandConstraints";
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
-import { publicationAdmissionReason, readPublicationMembership } from "../emit/publicationProgram";
+import { publicationAdmissionReason, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
+import { readPublicationBMI } from "../emit/publicationBMI";
 import type {
   UseSiteOperandUntypedWarning,
   UseSiteTypeMismatchError,
@@ -202,6 +203,32 @@ export class UseSiteTypeValidator {
     errors: ValidationError[],
   ): void {
     const def = concept.definition;
+    // REFACTOR:grounded (#320, plan595): explicit numeric producers consume selected Quantity publications.
+    // Their dependencies and validity are checked by preparation, not legacy narrative matching.
+    if (concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined) {
+      const bmi = readPublicationBMI(concept), threshold = readPublicationThreshold(concept);
+      const operands = bmi ? [bmi.weight, bmi.height] : threshold ? [threshold.operand] : [];
+      if (operands.length) {
+        const resolveOperand = (ref: ReferenceName) =>
+          resolveLib(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx)?.types.concepts.get(getRefName(ref));
+        if (bmi !== undefined) {
+          const anchor = resolveOperand(bmi.validity);
+          if (anchor === undefined || !operands.some(ref => resolveOperand(ref) === anchor)) {
+            errors.push({ ...publicationContextMismatch(concept.name, getRefName(bmi.validity), "BMI validity", bmi.location, attribution),
+              expected: "one of the two resolved BMI operands", actual: getRefName(bmi.validity),
+              message: `Concept "${concept.name}": BMI validity must name one of its two operands.` });
+          }
+        }
+        for (const ref of operands) {
+          const name = getRefName(ref);
+          const resolved = resolveOperand(ref);
+          if (resolved !== undefined && (resolved.publication === undefined ||
+              publicationAdmissionReason(resolved.publication) !== undefined || resolved.publication.valueTypes[0] !== "Quantity"))
+            errors.push(publicationContextMismatch(concept.name, name, "numeric production requires a selected Quantity publication", concept.location, attribution));
+        }
+        return;
+      }
+    }
     // REFACTOR:grounded (#320, review 562): the only admitted producer consumes a selected coded
     // publication. Domain/classification is resolved once in raw preparation, not by legacy pipelines.
     const membership = concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined

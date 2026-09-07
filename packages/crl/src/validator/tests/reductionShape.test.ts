@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): retired BMI syntax has an actionable shape diagnostic.
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -514,10 +515,10 @@ describe("`most recent` must not MASK what it wraps (#189, 2026-08-29)", () => {
   // BOTH spellings. This is the goal fixture's own form, and it pins that adding `body mass index` actually
   // took — the two tests above used it as their "uncatalogued" example until 2026-08-30 precisely because it
   // matched nothing, so this asserts the state that replaced it.
-  it("a CATALOGUED calculation validates clean, prefix and pipeline spellings alike", () => {
-    expect(errKinds(RECORD('definition is body mass index of "A" and "A".'))).toEqual([]);
+  it("legacy BMI is rejected in lone and pipeline spellings", () => {
+    expect(errKinds(RECORD('definition is body mass index of "A" and "A".'))).toEqual(["reduction-shape"]);
     expect(errKinds(RECORD('definition is body mass index of "A" and "A", then most recent this.'))).toEqual(
-      [],
+      ["reduction-shape"],
     );
   });
 });

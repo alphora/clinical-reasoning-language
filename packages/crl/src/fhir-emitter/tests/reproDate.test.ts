@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
 import * as path from "path";
 
 import { describe, expect, it } from "vitest";
@@ -116,7 +117,7 @@ describe("capability gate — version always, date only at publishable+", () => 
     for (const res of r.resources) {
       const body = res.resource as Record<string, unknown>;
       // #187 — the shared catalog Libraries (CRLCommon/CaseFeatureCommon) carry
-      // their FIXED catalog CQL-header version (0.2.0 / 1.0.0), NOT the package
+      // their FIXED catalog CQL-header version (0.3.0 / 1.0.0), NOT the package
       // version, since they are fixed emitter assets independent of the policy.
       // They still respect the capability date gate (no date at shareable).
       if (res.resourceType !== "Library" || !CATALOG_LIB_IDS.has(body.id as string)) {

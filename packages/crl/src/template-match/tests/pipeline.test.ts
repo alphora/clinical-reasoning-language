@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): generic pipeline structure uses a supported threshold, not retired BMI.
 import { describe, expect, it } from "vitest";
 
 import { buildCRL } from "../../index";
@@ -37,11 +38,11 @@ function stagesOf(definition: string) {
   return split.stages;
 }
 
-const GOAL = 'definition is body mass index of "A" and "B", then most recent this.';
+const GOAL = 'definition is "A" at least 30 \'kg/m2\', then most recent this.';
 
 describe("splitPipeline", () => {
   it("reports `not-a-pipeline` for an ordinary single-stage narrative", () => {
-    expect(splitPipeline(elementsOf('definition is body mass index of "A" and "B".')).kind).toBe(
+    expect(splitPipeline(elementsOf('definition is "A" at least 30 \'kg/m2\'.')).kind).toBe(
       "not-a-pipeline",
     );
   });
@@ -67,7 +68,7 @@ describe("splitPipeline", () => {
 
   it("bare `then` delimits too — the comma reads correctly but is not load-bearing", () => {
     const withComma = stagesOf(GOAL);
-    const without = stagesOf('definition is body mass index of "A" and "B" then most recent this.');
+    const without = stagesOf('definition is "A" at least 30 \'kg/m2\' then most recent this.');
     expect(without.length).toBe(withComma.length);
     expect(without[1].elements.map((e) => (e as { value?: unknown }).value)).toEqual(
       withComma[1].elements.map((e) => (e as { value?: unknown }).value),
@@ -77,7 +78,7 @@ describe("splitPipeline", () => {
   it("⚠ a MALFORMED pipeline names WHICH mistake — never a partial chain", () => {
     // Reporting a partial chain would claim more than was understood. But a bare `undefined` was not enough
     // either: the author needs to know WHICH malformation, because the fix differs for each.
-    const split = splitPipeline(elementsOf('definition is body mass index of "A" and "B", then.'));
+    const split = splitPipeline(elementsOf('definition is "A" at least 30 \'kg/m2\', then.'));
     expect(split.kind).toBe("malformed");
     expect(split.kind === "malformed" ? split.problem : null).toBe("dangling-then");
   });
@@ -110,12 +111,12 @@ describe("isPipeline", () => {
   it("⭐ answers a DIFFERENT question from splitPipeline — authored-as vs well-formed", () => {
     // A dangling `then` IS authored as a pipeline but does not split. Collapsing the two is how a malformed
     // pipeline gets reported as an ordinary unmatched narrative instead of as the pipeline error it is.
-    const dangling = elementsOf('definition is body mass index of "A" and "B", then.');
+    const dangling = elementsOf('definition is "A" at least 30 \'kg/m2\', then.');
     expect(isPipeline(dangling)).toBe(true);
     expect(splitPipeline(dangling).kind).toBe("malformed");
   });
 
   it("is false for an ordinary narrative", () => {
-    expect(isPipeline(elementsOf('definition is body mass index of "A" and "B".'))).toBe(false);
+    expect(isPipeline(elementsOf('definition is "A" at least 30 \'kg/m2\'.'))).toBe(false);
   });
 });

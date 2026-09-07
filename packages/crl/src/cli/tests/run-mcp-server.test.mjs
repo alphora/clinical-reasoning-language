@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): both BMI kit payloads are versioned and verified through MCP.
 // REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // Integration test: spawn dist/cli/run-mcp-server.js as a real MCP stdio
 // server and drive it with the SDK client. Mirrors extension/src/mcp-server.test.mjs
@@ -259,8 +260,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.33"); // pattern-owned age publication and determination method
-    assert.equal(kit.contentHash, "2aadd7985be1f254d3f326ed67f0c84fd5ac39f98e175279aad2bcb498244718");
+    assert.equal(kit.schemaVersion, "1.34"); // pattern-owned age publication and determination method
+    assert.equal(kit.contentHash, "69ed9b2f29f19ee0b6d85535c4646d3ea537f5d2948aeb066b115c694eb5ca6f");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -275,9 +276,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.33");
+    assert.equal(kit.schemaVersion, "1.34");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "681b3cf460b26ca415244e0b65211516bfa401ab4728565a71bf6a4c6bba5fe0");
+    assert.equal(kit.contentHash, "84e3c1682b150ca663df913862188f5859b8eb461721e12a529f1ca50202e038");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

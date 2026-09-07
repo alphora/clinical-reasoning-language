@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): BMI subsection emits; mammography exemption remains explicit.
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,8 +46,8 @@ const bareNonObservationAnswers = (source: string) => parseInput(source).stateme
 const NON_EMITTING: Readonly<Record<string, string>> = {
   "representation-reference.crl":
     "teaches the representation MODEL at the grammar/validator surface; its `code is` concepts " +
-    "pair a local code with top-level DefinitionIsDefinition forms (Up To Date On Mammography, BMI, " +
-    "High BMI) that still produce emit-mixed-code-and-definition. Stamped validate-only, and it satisfies that stamp.",
+    "pair a local code with a top-level DefinitionIsDefinition (Up To Date On Mammography) " +
+    "that still produces emit-mixed-code-and-definition. BMI and High BMI now emit independently. Stamped validate-only.",
 };
 
 const PROJECT = {
@@ -107,8 +108,8 @@ describe("every kit reference artifact does what its stamp claims", () => {
         // Pinned so the exemption is a decision, not a silence. If this artifact starts emitting, this
         // test fails and the exemption gets removed deliberately.
         const r = emitArtifact(a.name, a.source);
-        expect(r.hardErrors).toHaveLength(3);
-        for (const name of ["Up To Date On Mammography", "BMI", "High BMI"]) {
+        expect(r.hardErrors).toHaveLength(1);
+        for (const name of ["Up To Date On Mammography"]) {
           expect(r.hardErrors).toEqual(expect.arrayContaining([
             expect.objectContaining({ kind: "emit-mixed-code-and-definition", message: expect.stringContaining(`"${name}"`) }),
           ]));

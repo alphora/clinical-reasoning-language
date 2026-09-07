@@ -27,7 +27,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/CRLCommon",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "CRLCommon",
   "title": "CRLCommon",
   "status": "draft",

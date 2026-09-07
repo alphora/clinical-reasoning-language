@@ -157,6 +157,29 @@ BMI is emitted in UCUM kg/m2, truncated to eight decimal places with a published
 This precision preserves `at least` comparisons against supported thresholds; no four-place rounding occurs.
 No timestamp is invented and the producer does not assign a persistence id.
 
+Legacy BMI definitions without this explicit publication contract are retired, including
+sequential and prefix reduction forms. Validation, emission and CRE report migration errors
+for participating source libraries. The emitted include closure is the migration unit, including
+unused declarations in an explicitly included library; a non-included registry sibling is outside
+that unit. When editing a policy, migrate that closure and re-emit the complete artifact set.
+Other policy projects need no bulk rewrite.
+CRLCommon 0.3.0 removes the legacy BodyMassIndex symbol. The operator explicitly rejects
+retaining the old catalog for backward compatibility: KEs migrate CRL as they touch it.
+Regenerate the touched artifact set together; keeping an old helper would preserve a retired
+path and confuse the authoring instruction. This does not require bulk editing unrelated CRL.
+Deployment must account for old generated callers sharing unversioned catalog names: replacing
+a catalog can break those callers. Regenerate affected deployed artifact sets together.
+
+Opaque ValueSet sources remain unsupported for all Quantity publications, including Weight,
+Height and BMI. Existing content needing that membership cannot yet migrate; replacing its
+ValueSet with arbitrary finite codes is not a valid migration. This repository's three legacy obesity fixtures depend on that ValueSet membership.
+Their RecordSet-option rows and Condition-projection merge also lack new-contract replacements.
+The CRL language lead owns these #320 debts: finite/opaque ValueSet membership, RecordSet history
+pairing, and Condition source projection/merge. The fixtures remain refusal inputs until those
+capabilities have executable replacements; their historical activity expectations are not oracles.
+Close the relevant gaps before delivering retirement to affected users. This source preparation
+does not claim all old capabilities have been replaced.
+
 The coded BMI full-QuestionnaireResponse session is **not yet supported end to end**. The current
 generated questionnaire/extraction path also turns untouched BMI defaults or blanks into local
 Observations with the response timestamp. When Height/Weight are answered in that same response,

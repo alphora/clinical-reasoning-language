@@ -27,7 +27,7 @@
     }
   ],
   "url": "http://example.org/crl/coded-question/Library/CRLCommon",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "CRLCommon",
   "title": "CRLCommon",
   "status": "draft",

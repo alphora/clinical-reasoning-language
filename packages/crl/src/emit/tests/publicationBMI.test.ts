@@ -103,7 +103,7 @@ describe("BMI publication", () => {
       "publication-bmi-operand-unsupported",
     ],
     ['using validity of "Weight"', 'using validity of "BMI"', "publication-bmi-validity-operand"],
-    [' using validity of "Weight"', "", "publication-unsupported-form"],
+    [' using validity of "Weight"', "", "emit-bmi-form-retired"],
   ])("rejects unsupported authoring %s", (from, to, kind) =>
     expect(prepare(text.replace(from, to)).program.diagnostics.some((d) => d.kind === kind)).toBe(
       true,

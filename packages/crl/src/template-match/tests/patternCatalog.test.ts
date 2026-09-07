@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): legacy BMI has no executable catalog entry.
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 
@@ -155,16 +156,16 @@ describe("pattern catalog totality", () => {
 
   it("⭐ a grounded VALUE-returning pattern declares its concrete result type", () => {
     // `returnShape: "other"` covers Period, Quantity, Interval and DateTime alike, so it cannot tell
-    // `BodyMassIndex → Quantity` from a Period-returning pattern. Without `resultType` the resolver could
+    // `AtLeast → boolean` from a Period-returning pattern. Without `resultType` the resolver could
     // only ask "did the author declare SOME value type", which let a record concept declaring
-    // `value type is date` take a `BodyMassIndex` producer and resolve clean.
+    // `value type is date` take an `AtLeast` producer and resolve clean.
     const ungrounded = classifiedPatterns()
       .map((p) => [p, patternEntry(p)!] as const)
       .filter(([, e]) => e.stage.grounded && (e.returnShape === "boolean" || e.returnShape === "other"))
       .filter(([, e]) => (e.stage as { resultType?: string }).resultType === undefined)
       .map(([p]) => p);
     expect(ungrounded).toEqual([]);
-    expect((patternEntry("BodyMassIndex")!.stage as { resultType?: string }).resultType).toBe("Quantity");
+    expect(patternEntry("BodyMassIndex")).toBeUndefined();
     expect((patternEntry("AtLeast")!.stage as { resultType?: string }).resultType).toBe("boolean");
   });
 

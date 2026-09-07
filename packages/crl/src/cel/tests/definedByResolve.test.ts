@@ -29,6 +29,7 @@ function graphWith(libName: string, stmts: Statement[]): ResolvedCelGraph {
 }
 
 describe("resolveDefinedByTarget (C2c-2)", () => {
+  // REFACTOR:grounded (#320, review594): exact source identity accompanies both concept and activity resolution.
   const graph = graphWith("Lib", [decl("Concept", "Diabetes"), decl("Activity", "Approve")]);
 
   it("a qualified ref to a Concept → {lib,name,kind:'concept'}", () => {

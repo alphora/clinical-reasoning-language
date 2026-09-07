@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -99,14 +100,14 @@ describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)"
   });
 
   it("#187: ONLY the catalog Libraries carry the catalog CQL-header version; all other Libraries carry the package version", () => {
-    // Version-exemption guard: CRLCommon → 0.2.0 and CaseFeatureCommon → 1.0.0
+    // Version-exemption guard: CRLCommon → 0.3.0 and CaseFeatureCommon → 1.0.0
     // (their fixed CQL-header versions), while EVERY other emitted Library carries
     // the package version (cc-screening package.json version = 0.0.0). A future
     // helper accidentally taking the package version — or a policy layer
     // accidentally taking a catalog version — flips this test.
     const result = emitFhirDefFromPath(FIXTURE, { clock: FIXED_CLOCK });
     const EXPECTED_CATALOG_VERSION: Record<string, string> = {
-      CRLCommon: "0.2.0",
+      CRLCommon: "0.3.0",
       CaseFeatureCommon: "1.0.0",
     };
     let sawCRLCommon = false;

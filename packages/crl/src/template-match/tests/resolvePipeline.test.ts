@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): retain generic stage contracts using a unary threshold.
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 
@@ -100,15 +101,15 @@ describe("resolveConceptPipeline — the effect matrix", () => {
   });
 
   it("⭐ a PRODUCER's output is a SPACE, not its raw value — the collapse this module removes", () => {
-    // ⚠ LOAD-BEARING. `BodyMassIndex` returns a Quantity; if that raw value were the stage's output, the next
+    // ⚠ LOAD-BEARING. `AtLeast` returns a Boolean; if that raw value were the stage's output, the next
     // `most recent` would appear to receive a scalar — which is exactly what the FOLD does today, and why it
-    // does not translate ("Could not resolve call to operator MostRecent with signature (System.Quantity)").
+    // does not translate ("Could not resolve call to operator MostRecent with signature (System.Boolean)").
     const r = resolve([
       "- shape is Record.",
       "- type is Observation.",
-      "- value type is Quantity.",
+      "- value type is boolean.",
       "- code is `c`.",
-      '- definition is body mass index of "W" and "H", then most recent this.',
+      '- definition is "W" at least 30 \'kg/m2\', then most recent this.',
     ]);
     expect(effects(r)).toEqual(["producer", "selection"]);
     const [producer, selection] = r.kind === "resolved" ? r.stages : [];
@@ -258,14 +259,14 @@ describe("resolveConceptPipeline — the effect matrix", () => {
   });
 
   it("⚠ a value stage whose CONCRETE result type disagrees is refused", () => {
-    // `returnShape: "other"` cannot tell `BodyMassIndex → Quantity` from a Period-returning pattern, so the
+    // `returnShape: "other"` cannot tell `AtLeast → boolean` from a Period-returning pattern, so the
     // old presence check let this resolve clean.
     const r = resolve([
       "- shape is Record.",
       "- type is Observation.",
       "- value type is date.",
       "- code is `c`.",
-      '- definition is body mass index of "W" and "H", then most recent this.',
+      '- definition is "W" at least 30 \'kg/m2\', then most recent this.',
     ]);
     expect(diagnostics(r)).toEqual(["value-incompatible"]);
   });
@@ -362,14 +363,14 @@ describe("resolveConceptPipeline — the effect matrix", () => {
       "- type is Observation.",
       "- value type is Quantity.",
       "- code is `c`.",
-      '- definition is body mass index of "W" and "H", then.',
+      '- definition is "W" at least 30 \'kg/m2\', then.',
     ]);
     expect(diagnostics(r)).toEqual(["malformed"]);
   });
 });
 
 describe("resolveConceptPipeline — the GOAL fixture", () => {
-  it("⭐ resolves every concept in the canonical target", () => {
+  it("⭐ keeps generic source stages but no longer matches legacy BMI", () => {
     // ⚠ The acceptance check for D6: the resolver must handle BOTH spellings, because `Height`/`Weight` are
     // structural `ReductionDefinition`s while `BMI`/`Obese` are narrative pipelines. A resolver reading only
     // narratives would resolve HALF the target.
@@ -386,7 +387,7 @@ describe("resolveConceptPipeline — the GOAL fixture", () => {
     );
     expect(byName).toEqual({
       Obese: ["producer", "selection"],
-      BMI: ["producer", "selection"],
+      BMI: ["INVALID:invalid"],
       Height: ["selection"],
       Weight: ["selection"],
     });

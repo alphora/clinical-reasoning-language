@@ -23,6 +23,7 @@ export function buildDefinedByCandidates(stmts: Statement[]): Map<string, Statem
 }
 
 export interface DefinedByTarget {
+  // REFACTOR:grounded (#320, review594): declaration kind and source identity travel together to CRE.
   /** The qualifier library name (always non-null here — the resolver returns undefined when the qualifier is absent). */
   lib: string;
   /** The declaration name. */

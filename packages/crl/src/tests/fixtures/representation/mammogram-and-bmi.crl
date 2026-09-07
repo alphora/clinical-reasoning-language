@@ -1,13 +1,10 @@
 # Representation-model reference — Mammogram (multi-source) + BMI (cascade)
-// Canonical `concept-layer-model` exemplar (authoring-kit). The v3 concept model, reconciled
-// with both KE teams. This exact artifact is validated, not runtime-proven.
-// External representations (#257) and record-existence reach-through (#270) have shipped
-// elsewhere; that does not establish this artifact's emission or engine behavior. Its local
-// code + top-level definition forms remain unlowered. Shipped as `verification: ["validate-only"]`.
-// Learn the value-preserving sem-or union and addressability discipline; execute each actual
-// form before treating it as a runtime template.
-// NOTE: when the concept-form addressability clause lands, this header's discipline duplicates it
-// and this artifact is byte-pinned — reconcile the two then (cite the clause; #257).
+// Whole-artifact verification is validate-only: the mammography section illustrates grammar
+// and addressability, but uses unsupported opaque-ValueSet sourcing. It is not an executable
+// policy template; do not copy it as emit-ready CRL.
+// The Height/Weight/BMI/High BMI subsection uses the current explicit publication contract.
+// That isolated subsection validates, emits and has separate direct-data native controls;
+// its success does not establish the mammography section or full QR resubmission behavior.
 //
 // ── Addressability discipline (split on ADDRESSABILITY, not provenance alone) ──────────────
 // A `source representation` is an alternative SHAPE of ONE datum — not independently nameable.
@@ -38,11 +35,14 @@ terminology "Mammogram DiagnosticReport VS":
 terminology "Mammogram Billing VS":
 - valueset is `http://example.org/screening/ValueSet/mammogram-billing`.
 terminology "Height VS":
-- valueset is `http://example.org/vitals/ValueSet/height`.
+- system is `http://example.org/synthetic-measurements`.
+- code is `height`.
 terminology "Weight VS":
-- valueset is `http://example.org/vitals/ValueSet/weight`.
+- system is `http://example.org/synthetic-measurements`.
+- code is `weight`.
 terminology "Clinical BMI":
-- valueset is `http://example.org/vitals/ValueSet/bmi`.
+- system is `http://example.org/synthetic-measurements`.
+- code is `bmi`.
 
 // ============ Mammogram — split by ADDRESSABILITY (clinical vs administrative), source-rep-only ============
 // The performed study: ImagingStudy/DiagnosticReport prove the study HAPPENED. Serviced-not-created,
@@ -97,8 +97,11 @@ concept "Up To Date On Mammography":
 - code is `up-to-date-on-mammography`.
 - definition is "Most Recent Mammogram" within last 27 months.
 
+// REFACTOR:grounded (#320, plan595): synthetic finite source codes demonstrate explicit BMI publication.
 // ============ BMI cascade — Height (no split) contrasts with Mammogram (split) ============
 concept "Height":
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
 - type is Observation.
 - code is `height`.
@@ -107,6 +110,8 @@ concept "Height":
   - coded from "Height VS".
 
 concept "Weight":
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
 - type is Observation.
 - code is `weight`.
@@ -115,15 +120,19 @@ concept "Weight":
   - coded from "Weight VS".
 
 concept "BMI":
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
 - type is Observation.
 - code is `bmi`.
-- definition is body mass index of "Weight" and "Height".
+- definition is body mass index of "Weight" and "Height" using validity of "Weight".
 - source representation:
   - type is Observation.
   - coded from "Clinical BMI".
 
 concept "High BMI":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is `high-bmi`.

@@ -1,4 +1,5 @@
 import type { CRL, Concept, Location } from "../ast/types";
+import { bmiRetirementReason } from "../template-match/bmiPublication";
 import type { SourceContext } from "../imports/scopes";
 import { matchNarrativeStages, narrativeText } from "../template-match/matcher";
 import {
@@ -97,6 +98,8 @@ export class PipelineStageValidator {
   }
 
   private checkConcept(concept: Concept, attribution: Attribution, errors: ValidationError[]): void {
+    // REFACTOR:grounded (#320, plan595): the shared retirement diagnostic owns obsolete BMI forms.
+    if (bmiRetirementReason(concept) !== undefined) return;
     // Every narrative a concept can carry: the concept-level derivation AND each representation's
     // projection. Both can be authored as pipelines, and a stage rule covering only one would leave the
     // trap open in the other.

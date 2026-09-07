@@ -560,6 +560,8 @@ export interface UseSiteOperandUntypedWarning extends ValidationErrorBase {
  *   - "count-threshold-trivial"      — a `count … at least N` with N < 1 (trivially true).
  */
 export type ReductionShapeRule =
+  // REFACTOR:grounded (#320, plan595): legacy BMI requires explicit publication migration.
+  | "bmi-form-retired"
   | "legacy-boolean-publication-absence"
   // REFACTOR:grounded (#320): admission is shared with the executable publication program.
   | "publication-unsupported-form"

@@ -95,6 +95,7 @@
  */
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
+import { bmiRetirementReason } from "../template-match/bmiPublication";
 import type {
   CRL,
   Concept,
@@ -2094,6 +2095,9 @@ export function lowerLocalCodes(
 export function preLowerAge(ast: CRL): { ast: CRL; errors: CRLError[] } {
  const errors: CRLError[] = [];
  for (const stmt of ast.statements) if (stmt.type === "Concept") {
+   // REFACTOR:grounded (#320, plan595): every raw emit entry shares BMI retirement admission.
+   const bmi = bmiRetirementReason(stmt);
+   if (bmi !== undefined) errors.push(mkError("emit-bmi-form-retired", bmi, stmt.location));
    const age = resolveAgeConcept(stmt);
    if (age.kind === "error") errors.push(mkError(age.errorKind, age.message, stmt.location));
  }

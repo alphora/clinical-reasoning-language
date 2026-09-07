@@ -1,3 +1,4 @@
+// REFACTOR:grounded (#320, plan595): generic pipeline structure uses a supported threshold, not retired BMI.
 import { describe, expect, it } from "vitest";
 
 import { validateCRL } from "../../index";
@@ -37,7 +38,7 @@ describe("pipeline stage rules — D10", () => {
   it("⭐ an UNMATCHED stage is an ERROR, not a silent soft-compile", () => {
     // `, then at least 30 'kg/m2'` elides the operand: nothing to compare, so the stage matches no form.
     // Before D10 this validated clean.
-    const found = stageErrors("definition is body mass index of \"A\" and \"B\", then at least 30 'kg/m2'.");
+    const found = stageErrors("definition is \"A\" at least 30 \'kg/m2\', then at least 30 \'kg/m2\'.");
     expect(found).toHaveLength(1);
     expect(found[0].message).toContain("matches no known form");
   });
@@ -53,7 +54,7 @@ describe("pipeline stage rules — D10", () => {
   });
 
   it("⚠ a MALFORMED pipeline says WHICH mistake", () => {
-    const dangling = stageErrors('definition is body mass index of "A" and "B", then.');
+    const dangling = stageErrors('definition is "A" at least 30 \'kg/m2\', then.');
     expect(dangling).toHaveLength(1);
     expect(dangling[0].message).toContain("trailing `then`");
   });
@@ -112,8 +113,8 @@ describe("pipeline stage rules — D10", () => {
     expect(stageErrors("definition is most recent this, then exists this.")).toEqual([]);
   });
 
-  it("the goal's own pipeline is CLEAN — the rules must not reject the target", () => {
-    expect(stageErrors('definition is body mass index of "A" and "B", then most recent this.')).toEqual([]);
+  it("a supported unary producer followed by selection has no stage errors", () => {
+    expect(stageErrors('definition is "A" at least 30 \'kg/m2\', then most recent this.')).toEqual([]);
   });
 
   it("an ordinary single-stage narrative is untouched", () => {
