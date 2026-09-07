@@ -62,6 +62,58 @@ Run outputs inside the workspace are admitted only under `tmp/`; outputs outside
 
 The final summary separately reports `nativeAccepted`, `creAccepted`, their pass counts, infrastructure failures and native acceptance mismatches. `accepted` is the paired verdict and requires both plus complete coverage. CRE exceptions, malformed results and missing predictions remain failures in their own column and do not prevent valid emitted inputs from reaching native execution. `sourceDirty` is surfaced in the summary: working-tree development runs are supported because code must be tested before commit. A green development run is not evidence of review, release or installation.
 
-## Limits
+## Full QuestionnaireResponse session acceptance
+
+Run the separate four-step native operation gate with:
+
+```sh
+npm run test:native:bleph-session -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7.0.jar --out /existing/parent/new-session
+```
+
+This command builds the core and uses the same pinned jar. It starts with `missing-cosmetic`, submits
+the entire returned Questionnaire and QuestionnaireResponse with cosmetic=false, changes the complaint
+to `none-of-the-listed-complaints`, then clears cosmetic.answer. The target is pause → Met → Unmet →
+pause, always before any leaf activity when paused. `session.json` pins this sequence and its question
+sets; clinical outcomes reuse the independent direct-data expectations. The full form gains two
+documentation questions after the initial pause and retains them on clearing. Question retention is
+not evidence that a renderer shows all retained questions at once.
+
+Each submission preserves the complete previous response except the selected answer and authored time.
+No answer Observations are injected by the runner. Native extraction must preserve explicit false,
+complete Coding values, local codes, subject and authored timestamps. Initial clinical data remains
+fixed; stored Observation queries and repository-input snapshots must remain unchanged. Request
+Questionnaires can expand/reversion during apply; submitted responses must remain intact. Returned
+activities, routes, null witnesses, questions and typed answers receive the existing native checks.
+
+The original4.7 engine loses Coding answers in this path; that is a failed acceptance result, never an
+expected-failure pass. To measure the already reviewed CQFramework patches, explicitly pass
+`--engine-overlay /path/to/combined-4.7.0-overlay.jar`. Only SHA256
+`3d7c2ff9492006ad06e8d61e7e5f5aff9a2c3c062b9579611f1361c05a98c6f8` is admitted. This is a local test
+instrument, not a released or installed engine. Both configurations have identical clinical targets;
+the summary returns failure if any stage or extraction check fails. Actual class origins distinguish
+the pinned nested engine dependencies from the selected overlay. See [patch provenance](../../../../../patches/cqframework/README.md).
+
+Verification on2026-09-07: the final public command passes all4 stages with the reviewed overlay in
+70 seconds, including extraction and non-persistence checks. The original engine completes the same
+sequence in68 seconds but passes only the initial stage and exits1. Final checker replay preserves
+both verdicts. All67 checker tests pass, including rejection of engine errors after a brace in stdout;
+this helper writes result JSON to files, so its entire stdout is treated as logs.
+
+The session helper is test-only; the production ApplyDriver remains unchanged. Its committed Java17
+class and source hashes are checked at runtime. Maintainers rebuild with
+`node packages/crl/scripts/native-acceptance/build-session.cjs ENGINE_JAR EXISTING_SCRATCH_PARENT JDK_BIN`.
+That build extracts only into a fresh child of the specified scratch directory and cleans its own files.
+Running the test requires no compiler or extraction. Four dependent calls run sequentially with fresh
+repositories, each bounded to120 seconds,768MiB heap and32MiB per process output stream. The output
+directory must be new. Inputs, engine mutations, full results, logs, hashes and individual verdicts
+are retained. Target mismatches remain failures while later stages continue where a unique Q/QR exists.
+
+This measures the native operation API with a request dataBundle. It does not certify HTTP wiring,
+visible client rendering, deletion of previously persisted answers, Patient age, requested-code value
+overrides, packaged customer installation or all of #320. The clear step starts with cosmetic absent
+from the original repository; it does not remove a persisted prior answer. The116-case gate remains
+separate and does not include this currently failing original-engine path.
+
+## Direct-data suite limits
 
 This suite is direct-data acceptance. It does not certify QuestionnaireResponse edit/resubmit, `$extract`, persisted/session merging, repository side effects, client rendering, Patient age projection, requested-code value override, arbitrary action guards, installed VSIX/npm artifacts, or all of #320. Patient is the subject here. Request concepts are Boolean determinations, not editable requested-code values. No fixture run alone establishes release readiness or full narrative coverage. Those remaining integration and packaged-artifact gates are separate.

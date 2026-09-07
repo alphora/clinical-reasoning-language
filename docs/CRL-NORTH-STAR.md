@@ -117,10 +117,15 @@ Measured CQFramework4.7.0 behavior is recorded in
 [discussion559](../.vibe-tools/discussions/559-native-apply-experiment.md). Native extraction exposes
 answer resources to CQL for the request without automatically persisting them. Repository and request
 retrieves are combined without automatic identity replacement or newest-record selection. This input
-plumbing is distinct from CRL's contribution arms. The full Bleph QR experiment currently fails: a blank
-service group can be mistaken for an affirmative request, populated choices lose their values during
-extraction, and repeated boolean defaults expose unselected lists to population. These are acceptance
-defects, not permanent language rules or requirements to redesign the client's questionnaire workflow.
+plumbing is distinct from CRL's contribution arms. The earlier full Bleph QR experiment exposed blank
+service groups becoming affirmative requests, Coding values lost during extraction, and repeated
+boolean defaults reaching population. These findings are acceptance defects, not permanent language
+rules or requirements to redesign the client's questionnaire workflow. Current migrated Bleph uses
+Boolean request determinations and selected answer publication. The2026-09-07 full-response comparison
+reproduces Coding loss with the original4.7 engine; the reviewed local4.7 overlay preserves the answers
+and supports pause → Met → Unmet → pause on the same emitted artifacts. This is native operation API
+evidence, not client rendering or an installed-engine claim. See the separate
+[session acceptance contract](../packages/crl/test/acceptance/bleph/README.md#full-questionnaireresponse-session-acceptance).
 
 Operator-accepted absence rule (2026-09-06): missing evidence for an answerable determination leaves it
 unknown. False requires an explicit negative answer or a computation that establishes the negative.

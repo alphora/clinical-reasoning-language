@@ -30,6 +30,24 @@ function sample(activity = false) {
   return { contract, entry, subject, q, qr, group, resources, result: { resourceType: 'Parameters', parameter: [{ name: 'return', resource: { resourceType: 'Bundle', entry: resources.map(resource => ({ resource })) } }] } };
 }
 const check = s => checkNative(s.result, s.entry, s.contract, s.subject, s.entry.expected.kind === 'pause' ? 'Condition expression example expression returned null' : '');
+
+test('session file-output helper checks logs after braces', () => {
+  const {sessionVerdict}=require('./session-check.cjs'),s=sample(true);
+  s.contract.unknownQuestionPresence={};s.entry.suite='unknowns';
+  const step={expected:s.entry.expected,questions:Object.keys(s.contract.bindings)};
+  const clean={exitCode:0,stdout:'INFO context={}\n',stderr:''};
+  assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,clean).passed,true);
+  const bad=sessionVerdict(s.result,s.entry,s.contract,step,s.subject,{...clean,stdout:clean.stdout+'ERROR extraction failed'});
+  assert.equal(bad.passed,false);assert.equal(bad.failureKind,'infrastructure');
+});
+test('session pause witnesses after log braces remain visible', () => {
+  const {sessionVerdict}=require('./session-check.cjs'),s=sample();
+  s.contract.unknownQuestionPresence={};s.entry.suite='unknowns';s.entry.expected.pauseInputs=['P'];
+  const step={expected:s.entry.expected,questions:Object.keys(s.contract.bindings)};
+  const p={exitCode:0,stdout:'INFO context={}\nCondition expression example expression returned null',stderr:''};
+  assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,p).passed,true);
+  assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,{...p,stdout:'INFO context={}'}).passed,false);
+});
 test('positive native pause/activity controls preserve false and typed coding', () => {
   assert.equal(check(sample()).passed, true); assert.equal(check(sample(true)).passed, true);
 });

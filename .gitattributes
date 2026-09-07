@@ -1,3 +1,5 @@
 packages/crl/src/results/driver/ApplyDriver.class binary
 packages/crl/scripts/native-acceptance/batch-classes/*.class binary
 packages/crl/scripts/native-acceptance/BatchApplyDriver.java text eol=lf
+packages/crl/scripts/native-acceptance/ApplySessionDriver.java text eol=lf
+packages/crl/scripts/native-acceptance/session-classes/*.class binary

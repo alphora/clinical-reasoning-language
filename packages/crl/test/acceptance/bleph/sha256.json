@@ -13,5 +13,6 @@
   "supplemental-frozen.json": "3692d27863000baa1ca343959408ac78fd061c9346e607ac09b3f64476d7c734",
   "emitted-inputs.json": "02172932278655a03fc407638c769d47a3839414867fff4ce92e115f2288a54a",
   "unknowns-frozen.json": "2b0b88ef86d20b1a6b3f0b134b44fa4435e13e44988d71f0ecdd21037c240177",
-  "src/cel/unknowns.cel": "5d3c9beb4bcf786a6b3478d549e15b442cebee4bfe25848f8414371672819fd2"
+  "src/cel/unknowns.cel": "5d3c9beb4bcf786a6b3478d549e15b442cebee4bfe25848f8414371672819fd2",
+  "session.json": "bf2a4de44ff004313adbf577eee82b07a52701dea755b7fa55d5b9593c381cf9"
 }

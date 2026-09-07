@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "initialCase": "missing-cosmetic",
+  "controlCase": "complete-photograph",
+  "scope": "Native R4 applyR5 full Q/QR request-only loop; no renderer, persisted-answer deletion, or HTTP transport claim.",
+  "steps": [
+    {
+      "name": "initial-pause",
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "cosmetic"
+        ]
+      },
+      "questions": [
+        "B",
+        "P",
+        "cosmetic",
+        "photoConform",
+        "vfConform",
+        "indication",
+        "complaint",
+        "photo",
+        "vf"
+      ]
+    },
+    {
+      "name": "answer-met",
+      "key": "cosmetic",
+      "value": false,
+      "authored": "2026-09-09T12:00:00Z",
+      "expected": {
+        "kind": "activity",
+        "nodeId": "when[0]/when[1]/when[0]/action[0]",
+        "activity": "certify.Met"
+      },
+      "questions": [
+        "B",
+        "P",
+        "cosmetic",
+        "photoConform",
+        "vfConform",
+        "indication",
+        "complaint",
+        "photo",
+        "vf",
+        "bdoc",
+        "pdoc"
+      ]
+    },
+    {
+      "name": "change-unmet",
+      "key": "complaint",
+      "value": "none-of-the-listed-complaints",
+      "authored": "2026-09-10T12:00:00Z",
+      "expected": {
+        "kind": "activity",
+        "activity": "not-certify.Unmet",
+        "nodeId": "when[0]/when[1]/otherwise/action[0]"
+      },
+      "questions": [
+        "B",
+        "P",
+        "cosmetic",
+        "photoConform",
+        "vfConform",
+        "indication",
+        "complaint",
+        "photo",
+        "vf",
+        "bdoc",
+        "pdoc"
+      ]
+    },
+    {
+      "name": "clear-pause",
+      "key": "cosmetic",
+      "value": null,
+      "authored": "2026-09-11T12:00:00Z",
+      "expected": {
+        "kind": "pause",
+        "nodeId": "when[0]/when[0]",
+        "activity": null,
+        "pauseInputs": [
+          "cosmetic"
+        ]
+      },
+      "questions": [
+        "B",
+        "P",
+        "cosmetic",
+        "photoConform",
+        "vfConform",
+        "indication",
+        "complaint",
+        "photo",
+        "vf",
+        "bdoc",
+        "pdoc"
+      ]
+    }
+  ]
+}
