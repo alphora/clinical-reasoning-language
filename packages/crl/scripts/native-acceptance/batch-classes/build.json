@@ -1,0 +1,9 @@
+{
+  "sourceSha256": "5d389e1cba59325fc7a62ed9404971046d2cbaaad61dd4ae0677b4fb9eb38987",
+  "classFileMajor": 61,
+  "classes": {
+    "BatchApplyDriver$1.class": "8bdaa62c61a3d2b222e94c6ec1884da8bb7719bab4402217b7fbb4a37f8973be",
+    "BatchApplyDriver$RoutedOutput.class": "d8614c5b6b5db3da51d8bd959d4b44f8d856a21a8d882b8209474aadf58415b2",
+    "BatchApplyDriver.class": "313efc8b64fda626dfe28b5bd4bc9bc7ae6f9521317438a52a7bf37a133b0c6b"
+  }
+}

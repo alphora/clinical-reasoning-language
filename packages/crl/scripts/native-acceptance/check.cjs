@@ -229,4 +229,4 @@ function summarize(entries, rows, sourceDirty = null) {
     // A disagreeing CRE fails the paired suite, but never rewrites the native verdict.
     accepted: nativeAccepted && creAccepted };
 }
-module.exports = { hash, loadFixture, caseKey, exactCases, objects, pauseInputs, checkNative, checkCre, nativeVerdict, summarize };
+module.exports = { hash, hasEngineError, loadFixture, caseKey, exactCases, objects, pauseInputs, checkNative, checkCre, nativeVerdict, summarize };

@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const { hash, loadFixture, exactCases, caseKey, checkCre, nativeVerdict, summarize } = require('./check.cjs');
 const { childEnvironment, runBounded } = require('./process.cjs');
+const { batchReady, classDir, runBatch } = require('./batch.cjs');
 const packageRoot = path.resolve(__dirname, '../..');
 const workspace = fs.realpathSync(path.resolve(packageRoot, '../..'));
 const fixture = path.join(packageRoot, 'test/acceptance/bleph');
@@ -19,16 +20,17 @@ const jvmSettings = Object.freeze({ 'user.timezone': 'UTC', 'user.language': 'en
 const settingsArgs = Object.entries(jvmSettings).map(([key, value]) => `-D${key}=${value}`);
 
 function options(args) {
-  const result = { workers: 2 };
+  const result = { workers: 2, batchSize: 8, order: 'forward' }, seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
-    const key = { '--engine-jar': 'jar', '--out': 'out', '--workers': 'workers', '--java': 'java' }[args[i]];
-    assert.ok(key && args[i + 1] && !args[i + 1].startsWith('--'), 'Usage: --engine-jar PATH --out NEW_DIRECTORY [--workers 1..4] [--java PATH]');
-    assert.ok(key === 'workers' ? !result.workersSpecified : result[key] === undefined, `Duplicate option ${args[i]}`);
-    if (key === 'workers') result.workersSpecified = true;
-    result[key] = key === 'workers' ? Number(args[i + 1]) : args[i + 1];
+    const key = { '--engine-jar': 'jar', '--out': 'out', '--workers': 'workers', '--java': 'java', '--batch-size': 'batchSize', '--order': 'order' }[args[i]];
+    assert.ok(key && args[i + 1] && !args[i + 1].startsWith('--'), 'Usage: --engine-jar PATH --out NEW_DIRECTORY [--workers 1..4] [--batch-size 1..32] [--order forward|reverse] [--java PATH]');
+    assert.ok(!seen.has(key), `Duplicate option ${args[i]}`); seen.add(key);
+    result[key] = ['workers', 'batchSize'].includes(key) ? Number(args[i + 1]) : args[i + 1];
   }
   assert.ok(result.jar && result.out, 'Explicit --engine-jar and --out are required');
   assert.ok(Number.isInteger(result.workers) && result.workers >= 1 && result.workers <= 4, 'workers must be 1..4');
+  assert.ok(Number.isInteger(result.batchSize) && result.batchSize >= 1 && result.batchSize <= 32, 'batch-size must be 1..32');
+  assert.ok(['forward', 'reverse'].includes(result.order), 'order must be forward or reverse');
   result.jar = fs.realpathSync(result.jar);
   // Resolve the existing parent to stop symlink/junction aliases from bypassing source protection.
   const target = path.resolve(result.out);
@@ -37,17 +39,18 @@ function options(args) {
   const relative = path.relative(workspace, result.out).replaceAll('\\', '/');
   assert.ok(path.isAbsolute(relative) || relative.startsWith('../') || /^tmp\//i.test(relative), 'Output must be outside source/fixture directories: outside the workspace or under tmp/');
   assert.ok(!fs.existsSync(result.out), 'Output directory must be new');
-  delete result.workersSpecified;
   return result;
 }
 
 async function main(args) {
+  const runStart = Date.now();
   const opts = options(args), { contract, entries, hashes, inputs } = loadFixture(fixture);
   const { ENGINE_JAR_SOURCE, verifyJar, parseJavaMajor, MIN_JAVA_MAJOR } = require('../../dist/results/spawn');
   const { driverReady, driverClassPath, driverArgs } = require('../../dist/results/driver');
   const { buildEngineRepoBundle, parseDriverStdout } = require('../../dist/results/repoBundle');
   assert.equal(verifyJar(opts.jar, ENGINE_JAR_SOURCE.sha256).ok, true, 'Requires the original pinned engine jar');
   const ready = driverReady(); assert.equal(ready.ok, true, JSON.stringify(ready));
+  const batchBuild = opts.batchSize > 1 ? batchReady() : null;
   fs.mkdirSync(opts.out); // Exclusive creation; never overwrite or remove another run.
   const controller = new AbortController();
   const interrupt = () => controller.abort();
@@ -67,7 +70,8 @@ async function main(args) {
       sourceHead: git('rev-parse', 'HEAD'), sourceStatus, sourceDirty, node: process.version, java: version.stderr + version.stdout,
       platform: process.platform, arch: process.arch, nodeTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone, nodeLocale: Intl.DateTimeFormat().resolvedOptions().locale, jvmSettings,
       engine: ENGINE_JAR_SOURCE, driverSha256: hash(fs.readFileSync(driverClassPath())), distHashes, fixtureHashes: hashes, harnessHashes,
-      workers: opts.workers, invocation: 'shipped ApplyDriver; useServerData=true; no request bundle', bounds });
+      workers: opts.workers, batchSize: opts.batchSize, order: opts.order, batchBuild,
+      invocation: 'shipped ApplyDriver; fresh repository/processor per call; useServerData=true; no request bundle', bounds });
     const { resolveCelImports } = require('../../dist/cel/imports');
     const { validateCEL } = require('../../dist/cel/validator');
     const { emitCelToFhir } = require('../../dist/cel/emitter/emitFhir');
@@ -106,24 +110,44 @@ async function main(args) {
       }
     }
     assert.ok(exactCases(entries, jobs), 'Incomplete/duplicate scheduling');
-    let next = 0;
+    if (opts.order === 'reverse') jobs.reverse();
+    for (const job of jobs) {
+      job.dir = path.join(opts.out, job.name); fs.mkdirSync(job.dir);
+      job.repoPath = path.join(job.dir, 'repo.json'); job.planId = contract.planId; write(job.repoPath, job.repo);
+    }
+    let next = 0, batchNumber = 0;
+    const nativeStart = Date.now();
+    const flags = dir => [`-Xmx${bounds.heapMiB}m`, '-XX:+ExitOnOutOfMemoryError', `-XX:ActiveProcessorCount=${bounds.activeProcessors}`, '-Djava.awt.headless=true', `-Djava.io.tmpdir=${dir}`, ...settingsArgs];
+    function record(job, processResult, command, batchEvidenceDirectory) {
+      const dir = job.dir;
+      write(path.join(dir, 'command.json'), { ...command, ...(batchEvidenceDirectory ? { batchEvidenceDirectory, driverArguments: [job.repoPath, job.planId, job.subject] } : {}) });
+      if (!batchEvidenceDirectory) {
+        write(path.join(dir, 'stdout.log'), processResult.stdout); write(path.join(dir, 'stderr.log'), processResult.stderr);
+      }
+      write(path.join(dir, 'process.json'), { ...processResult, stdout: undefined, stderr: undefined, ...(batchEvidenceDirectory ? { batchEvidenceDirectory } : {}) });
+      const result = parseDriverStdout(processResult.stdout);
+      if (result) write(path.join(dir, 'result.json'), result);
+      const native = nativeVerdict(result, job.entry, contract, job.subject, processResult);
+      const row = { suite: job.suite, case: job.case, expected: job.entry.expected, cre: job.cre, native, evidenceDirectory: job.name };
+      rows.push(row); write(path.join(dir, 'comparison.json'), row); write(path.join(opts.out, 'comparison.json'), rows);
+      console.log(JSON.stringify({ completed: rows.length, case: job.name, native: native.passed, cre: job.cre.passed, errors: native.errors }));
+    }
     async function worker() {
       while (next < jobs.length && !controller.signal.aborted) {
-        const job = jobs[next++], dir = path.join(opts.out, job.name); fs.mkdirSync(dir);
-        const repoPath = path.join(dir, 'repo.json'); write(repoPath, job.repo);
-        const args = driverArgs({ jvmFlags: [`-Xmx${bounds.heapMiB}m`, '-XX:+ExitOnOutOfMemoryError', `-XX:ActiveProcessorCount=${bounds.activeProcessors}`, '-Djava.awt.headless=true', `-Djava.io.tmpdir=${dir}`, ...settingsArgs], engineJarPath: opts.jar, loaderPath: ready.loaderPath, repoPath, planDefinitionId: contract.planId, subjectReference: job.subject });
-        write(path.join(dir, 'command.json'), { executable: java, args });
-        const start = Date.now();
-        const processResult = await runBounded(java, args, { cwd: dir, env: childEnvironment(dir), signal: controller.signal, timeoutMs: bounds.timeoutMs, maxBytes: bounds.maxBytes });
-        processResult.durationMs = Date.now() - start;
-        write(path.join(dir, 'stdout.log'), processResult.stdout); write(path.join(dir, 'stderr.log'), processResult.stderr);
-        write(path.join(dir, 'process.json'), { ...processResult, stdout: undefined, stderr: undefined });
-        const result = parseDriverStdout(processResult.stdout);
-        if (result) write(path.join(dir, 'result.json'), result);
-        const native = nativeVerdict(result, job.entry, contract, job.subject, processResult);
-        const row = { suite: job.suite, case: job.case, expected: job.entry.expected, cre: job.cre, native, evidenceDirectory: job.name };
-        rows.push(row); write(path.join(dir, 'comparison.json'), row); write(path.join(opts.out, 'comparison.json'), rows);
-        console.log(JSON.stringify({ completed: rows.length, case: job.name, native: native.passed, cre: job.cre.passed, errors: native.errors }));
+        const assigned = jobs.slice(next, next + opts.batchSize); next += assigned.length;
+        if (opts.batchSize === 1) {
+          const job = assigned[0], dir = job.dir;
+          const args = driverArgs({ jvmFlags: flags(dir), engineJarPath: opts.jar, loaderPath: ready.loaderPath, repoPath: job.repoPath, planDefinitionId: contract.planId, subjectReference: job.subject });
+          const command = { executable: java, args }; write(path.join(dir, 'command.json'), command);
+          const start = Date.now();
+          const result = await runBounded(java, args, { cwd: dir, env: childEnvironment(dir), signal: controller.signal, timeoutMs: bounds.timeoutMs, maxBytes: bounds.maxBytes });
+          result.durationMs = Date.now() - start; record(job, result, command);
+        } else {
+          const name = `batch-${String(++batchNumber).padStart(3, '0')}`, dir = path.join(opts.out, name); fs.mkdirSync(dir);
+          const prefix = [...flags(dir), '-Dloader.main=BatchApplyDriver', `-Dloader.path=${classDir},${ready.loaderPath}`, '-cp', opts.jar, 'org.springframework.boot.loader.launch.PropertiesLauncher'];
+          const batch = await runBatch({ java, argsPrefix: prefix, jobs: assigned, dir, bounds, signal: controller.signal });
+          for (const [i, job] of assigned.entries()) record(job, batch.results[i], batch.command, name);
+        }
       }
     }
     const workers = Array.from({ length: opts.workers }, (_, workerId) => worker().catch(e => { workerFailures.push({ workerId, error: String(e), occurredAt: new Date().toISOString() }); controller.abort(); throw e; }));
@@ -131,7 +155,8 @@ async function main(args) {
     if (workerFailures.length) throw new Error(workerFailures[0].error);
     rows.sort((a, b) => caseKey(a) < caseKey(b) ? -1 : caseKey(a) > caseKey(b) ? 1 : 0);
     write(path.join(opts.out, 'comparison.json'), rows);
-    const summary = summarize(entries, rows, sourceDirty); write(path.join(opts.out, 'summary.json'), summary);
+    const summary = { ...summarize(entries, rows, sourceDirty), nativeWallMs: Date.now() - nativeStart, totalWallMs: Date.now() - runStart };
+    write(path.join(opts.out, 'summary.json'), summary);
     console.log(JSON.stringify(summary)); if (!summary.accepted) process.exitCode = 1;
   } catch (e) {
     controller.abort();

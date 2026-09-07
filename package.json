@@ -16,7 +16,7 @@
     "pretest:native:bleph": "npm run build",
     "test:native:bleph": "node packages/crl/scripts/native-acceptance/run.cjs",
     "pretest:native:checks": "npm run build",
-    "test:native:checks": "node --test packages/crl/scripts/native-acceptance/check.test.cjs",
+    "test:native:checks": "node --test packages/crl/scripts/native-acceptance/check.test.cjs packages/crl/scripts/native-acceptance/batch.test.cjs",
     "test:vitest": "vitest run --no-file-parallelism",
     "package:extension": "npm run package -w crl-language-support",
     "seed:questionnaire": "node packages/crl-vscode/scripts/seed-questionnaire-fixture.mjs"
