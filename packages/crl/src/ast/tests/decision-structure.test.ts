@@ -29,7 +29,7 @@ decision "IMMZ.D2.D5.Measles":
                 - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
             end.
             - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-        end`;
+        end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -93,7 +93,7 @@ decision "Test Decision":
         any:
             - when "Greater Than 18" then recommend activity "Adult Protocol".
             - when "Less Than 65" then recommend activity "Standard Care".
-        end`;
+        end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -112,7 +112,7 @@ decision "Test Decision":
         all:
             - when "Greater Than 18" then recommend activity "Adult Protocol".
             - when "Less Than 65" then recommend activity "Standard Care".
-        end`;
+        end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -168,7 +168,7 @@ decision "IMMZ.D2.D5.Measles":
             - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
         end.
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-    end`;
+    end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -193,7 +193,7 @@ decision "Elderly Based":
         - recommend activity "Vaccinate".
         - recommend activity "another thing".
         - recommend activity "something else".
-    end`;
+    end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -212,7 +212,7 @@ decision "Elderly Based":
             - use decision "Some Other Decision".
             - use decision "Some Other Other Decision".
         end.
-    end`;
+    end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -289,7 +289,7 @@ decision "Test Decision":
     - when "Age" then:
         - use decision "Protocol1".
         - use decision "Protocol2".
-    end`;
+    end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -317,7 +317,7 @@ decision "Test Decision":
     - when "Age" then:
         - recommend activity "Action1".
         - recommend activity "Action2".
-    end`;
+    end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -347,7 +347,7 @@ decision "Test Decision":
         - use decision "Protocol1".
         - recommend activity "Action2".
         - use decision "Protocol2".
-    end`;
+    end.`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;

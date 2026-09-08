@@ -228,7 +228,8 @@ describe("canonicalizeDocx — text walk determinism", () => {
 });
 
 describe("canonicalizeDocx — warnings + fail-closed errors", () => {
-  it("WARNS (does not drop) when an excluded part carries text", () => {
+  // @kit provenance-source:excluded-text
+  it("warns and excludes text carried by an unsupported document part", () => {
     const r = expectOk(
       docx(para(t("body")), {
         "word/footnotes.xml": `<w:footnotes ${NS}>${para(t("a footnote criterion"))}</w:footnotes>`,

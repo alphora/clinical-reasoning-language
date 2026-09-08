@@ -3,11 +3,11 @@
  * this repo). It exercises the four moving parts together:
  *   1. generate  → a Model-A scaffold (provisional refs, no items).
  *   2. validate  → the documented baseline { over-reach × K, uncovered-span × 1 } (the KE worklist).
- *   3. attribute → simulate the KE's hand-work: add a SOURCE item with a real sourceRef byte-range into the anchor +
- *                  link it into the cluster + flip the relevant CRL refs to status:"linked" + add ignoredRanges over
- *                  the rest of the anchor. Re-validate → the over-reach + uncovered findings SHRINK (the loop closes).
+ *   3. suppress coverage incorrectly → deliberately truncate a criterion and ignore meaningful denial text.
+ *                  Coverage counts shrink, but item-text drift and waiver review remain. This is a counterexample,
+ *                  not a recipe for faithful attribution.
  *   4. merge     → re-generate a FRESH scaffold over the same graph, mergeScaffold(attributed, fresh). The attribution
- *                  (the source item + the linked refs) SURVIVES the merge; re-validating the merged artifact stays reduced.
+ *                  (including incorrect source attribution) SURVIVES the merge; integrity still requires repair.
  *
  * The fixture mirrors generate.test.ts (a covered "Policy" with a `defined as` composite criterion, a when-gated +
  * an otherwise recommend; a companion .cel with frozen cases) so the K=8 baseline is the same shape T1's tests pin.
@@ -160,12 +160,12 @@ describe("provenance feedback loop — worklist mode softens a FRESH scaffold (n
 });
 
 /**
- * Simulate the KE's source-attribution on a generated scaffold (the human/agent step the scaffold deliberately leaves
- * empty). Returns a NEW artifact (the input is treated as immutable):
+ * Deliberately incorrect attribution to demonstrate that coverage alone cannot certify fidelity.
+ * Returns a NEW artifact (the input is treated as immutable):
  *  - adds a SOURCE item with a sourceRef covering the LEADING half of the anchor + links it into the Dec cluster;
  *  - flips EVERY policy-owned leaf/decision-node ref in that cluster to status:"linked" (the attribution edge that
  *    escapes over-reach per §4);
- *  - adds an ignoredRange covering the REMAINDER of the anchor (page-chrome acknowledgement) so Missed₂ → 0.
+ *  - wrongly labels the remaining meaningful denial text as page chrome, suppressing uncovered-span findings.
  */
 function attribute(scaffold: ProvenanceArtifact): ProvenanceArtifact {
   const splitAt = 20; // a UTF-8 boundary in the ASCII anchor (covers "Approve when criteri")
@@ -196,8 +196,9 @@ function attribute(scaffold: ProvenanceArtifact): ProvenanceArtifact {
   };
 }
 
-describe("provenance feedback loop — attribution reduces the smell", () => {
-  it("after attribution the over-reach + uncovered findings SHRINK to zero", () => {
+describe("provenance feedback loop — zero coverage findings do not prove faithful attribution", () => {
+  // @kit provenance-source:coverage-is-not-fidelity
+  it("incorrect attribution clears coverage while retaining drift and waiver-review findings", () => {
     const { artifact } = gen();
     const before = validate(artifact);
     expect(countKind(before, "over-reach")).toBe(K);
@@ -205,10 +206,14 @@ describe("provenance feedback loop — attribution reduces the smell", () => {
 
     const attributed = attribute(artifact);
     const after = validate(attributed);
-    // the loop closes: linked policy-owned leaves/decision-nodes are no longer over-reach; the anchor is fully covered.
+    // Coverage accounting closes even though the source attribution is wrong.
     expect(countKind(after, "over-reach")).toBeLessThan(K);
     expect(countKind(after, "over-reach")).toBe(0);
     expect(countKind(after, "uncovered-span")).toBe(0);
+    expect(after).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "item-text-drift", severity: "error" }),
+      expect.objectContaining({ kind: "waiver-ignored-span", severity: "manual-review" }),
+    ]));
 
     // coverage agrees: no over-reach, no uncovered spans.
     const coverage = deriveCoverage(attributed, idx, ANCHOR);
@@ -239,10 +244,12 @@ describe("provenance feedback loop — merge preserves attribution", () => {
     );
     expect(linkedSurvived).toBe(true);
 
-    // re-validating the MERGED artifact is still reduced (the loop's gains are durable across a re-generation).
+    // Merge preserves the incorrect attribution too; reduced coverage counts are not repair.
     const after = validate(merged);
     expect(countKind(after, "over-reach")).toBe(0);
     expect(countKind(after, "uncovered-span")).toBe(0);
+    expect(countKind(after, "item-text-drift")).toBe(1);
+    expect(countKind(after, "waiver-ignored-span")).toBe(1);
   });
 
   it("every linked-CRL nodeKey the KE created is still present + linked after the merge (no silent drop)", () => {

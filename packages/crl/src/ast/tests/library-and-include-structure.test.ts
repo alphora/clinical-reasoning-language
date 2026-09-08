@@ -28,6 +28,7 @@ concept "X":
       expect(ast.library?.location.start.line).toBe(2);
     });
 
+    // @kit library-scoping:declaration-syntax
     it("rejects a library statement carrying a version clause", () => {
       // version was dropped in the npm-resolution redesign; the parser must reject
       // any leftover `version '...'` syntax so old files fail loudly.
@@ -80,8 +81,10 @@ concept "X":
       expect(ast.includes[0].location.start.line).toBe(3);
     });
 
+    // @kit library-scoping:declaration-syntax
     it("rejects an include statement carrying a version clause", () => {
       const input = `# H
+library "Root".
 include "Bar" version '1.0.0'.
 `;
       const result = buildCRL(input);
@@ -108,6 +111,7 @@ include "CMS22 Interface".
     // The anonymous-file mode that existed in v2.0.0 is gone in v2.1.0.
     // Files without a `library "Foo".` declaration fail to parse.
 
+    // @kit library-scoping:declaration-syntax
     it("rejects a file with no library declaration", () => {
       const input = `# H
 concept "X":

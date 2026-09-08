@@ -14,7 +14,7 @@ import { createParser } from "../../parser/createParser";
  * Decision-shape structural rules (first/any/all/otherwise legality).
  * See src/validator/decisionShapeValidator.ts and docs/decision-shapes.md.
  *
- * These cases are all grammatically VALID — homogeneity and the `end` closer
+ * These cases are all grammatically VALID — homogeneity and the `end.` closer
  * are grammar-enforced — so they parse cleanly and exercise only the semantic
  * rules. Unresolved-reference errors (the snippets reference undeclared
  * concepts/activities) are filtered out; we assert only on `decision-shape`.
@@ -112,7 +112,7 @@ any:
   first:
   - recommend activity "X".
   - recommend activity "Y".
-  end`),
+  end.`),
       ).toContain("first-over-actions");
     });
 

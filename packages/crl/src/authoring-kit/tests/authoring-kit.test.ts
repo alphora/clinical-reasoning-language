@@ -873,7 +873,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "330bee8bec5acc81df1084e83756cacefeff6178804830c61abd7bd23cb022bf",
+      "ccd59432c0a0e5036fd1f51d1d66973e79f823e3edb15a25c9b7636efe557d40",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -886,7 +886,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "87f58e6ba88224f86b69aa086f40aed3503fe9aeb37604005b68b0a0d5ced4d3",
+      "dafcc2d04b41b59b56a7ba058f73f47259080218972dae38ac8ffe2162858d6f",
     );
   });
 
@@ -907,7 +907,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
-    "1.38": { cpg: "330bee8bec5acc81df1084e83756cacefeff6178804830c61abd7bd23cb022bf", priorAuth: "87f58e6ba88224f86b69aa086f40aed3503fe9aeb37604005b68b0a0d5ced4d3" },
+    "1.38": { cpg: "ccd59432c0a0e5036fd1f51d1d66973e79f823e3edb15a25c9b7636efe557d40", priorAuth: "dafcc2d04b41b59b56a7ba058f73f47259080218972dae38ac8ffe2162858d6f" },
     "1.37": { cpg: "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b", priorAuth: "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3" },
     "1.36": { cpg: "417b27c9557431cde15b1cf2c7f45f646a3598bb02bfdf559ffd7b260becdcfc", priorAuth: "183f26f2a9ff6f2b82087505f3a63e91e6a034ba3013b003bb71aa2a8a6882e9" },
     "1.35": { cpg: "72cdbf0d7f8db6fa7b3f843d3e82a76f6ca12558c7c560bff2dd3d913fff6c3a", priorAuth: "4d5004b9ff65d7370b83f3b352c7cf5d7662158c0f83cca4a1bb3c460f271423" },

@@ -17,7 +17,8 @@ import {
 import { parseInput } from "./parseInput";
 
 // #189 grammar+validation slice — IMPL 1 (grammar + AST foundation):
-//   - `shape is <Scalar|Record|RecordSet>.` concept-level line (Scalar default, builder-normalized)
+//   - explicit shape token preservation; omission remains undefined (no Scalar default).
+//     Legacy Scalar/RecordSet parsing below does not establish publication admission.
 //   - the dedicated `count <target> at least N` reduction production
 //   - the structural `Reduction` discriminated union (exists / mostRecent / count) over a
 //     `ThisRecords | ReductionConceptRef` target, replacing the recognized `definition is`

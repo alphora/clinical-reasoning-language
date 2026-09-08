@@ -20,7 +20,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and terminology", () => {
-    const input = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis\n- with "Colonoscopy".';
+    const input = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis.\n- with "Colonoscopy".';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
@@ -34,7 +34,7 @@ describe("Activity Structure", () => {
 
   it("should correctly structure activity with type and free text", () => {
     const input =
-      '# Test\nlibrary "Test".\nactivity "another thing":\n- request CPGCommunicationRequest\n- with `The message`.';
+      '# Test\nlibrary "Test".\nactivity "another thing":\n- request CPGCommunicationRequest.\n- with `The message`.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
@@ -47,9 +47,9 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and terminology or free text", () => {
-    const input1 = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis\n- with "Colonoscopy".';
+    const input1 = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis.\n- with "Colonoscopy".';
     const input2 =
-      '# Test\nlibrary "Test".\nactivity "Notify":\n- request CPGCommunicationRequest\n- with `A notification message`.';
+      '# Test\nlibrary "Test".\nactivity "Notify":\n- request CPGCommunicationRequest.\n- with `A notification message`.';
 
     const result1 = parseInput(input1);
     const result2 = parseInput(input2);
@@ -65,7 +65,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with empty free text", () => {
-    const input = '# Test\nlibrary "Test".\nactivity "Empty Free Text":\n- request CPGCommunicationRequest\n- with ``.';
+    const input = '# Test\nlibrary "Test".\nactivity "Empty Free Text":\n- request CPGCommunicationRequest.\n- with ``.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;

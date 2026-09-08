@@ -21,6 +21,16 @@ import { parseInput } from "./parseInput";
 import { soleRef, branchConditionRefs } from "../branchCondition";
 import type { BranchConditionAnd, BranchConditionOr } from "../types";
 
+describe("positive AST fixture parsing", () => {
+  it("rejects parser recovery instead of certifying the recovered AST", () => {
+    expect(() => parseInput('library "T".\nactivity "A":\n- request CPGCommunicationRequest'))
+      .toThrow("CRL syntax errors");
+  });
+  it("rejects lexical diagnostics instead of certifying the remaining AST", () => {
+    expect(() => parseInput('library "T".\n@invalid')).toThrow("CRL syntax errors");
+  });
+});
+
 describe("CRLAstBuilder", () => {
   describe("Decision Statements", () => {
     it("should parse a simple decision with when block", () => {
@@ -362,7 +372,7 @@ library "Test".
       const input = `# Test
 library "Test".
         terminology "BMI Valueset":
-        - valueset is "bmi valueset".`;
+        - valueset is \`http://example.org/ValueSet/bmi\`.`;
 
       const result = parseInput(input);
       const ast = result.statements[0] as Terminology;
@@ -372,7 +382,7 @@ library "Test".
       expect(valuesetLine).toBeDefined();
       if (valuesetLine) {
         expect((valuesetLine as import("../types").TerminologyValueset).valuesetName).toBe(
-          "bmi valueset",
+          "http://example.org/ValueSet/bmi",
         );
       }
     });
@@ -433,7 +443,7 @@ library "Test".
     it("should parse an activity with of clause", () => {
       const input = `# Test
 library "Test".
-      activity "Indicate":\n- request CPGProposeDiagnosis\n- with "Colonoscopy".`;
+      activity "Indicate":\n- request CPGProposeDiagnosis.\n- with "Colonoscopy".`;
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
@@ -646,7 +656,7 @@ library "Test".
       const input = `# Test
 library "Test".
         terminology "BMI Valueset":
-        - valueset is "bmi valueset".
+        - valueset is \`http://example.org/ValueSet/bmi\`.
         activity "Vaccinate":
           - request CPGImmunizationRequest.
         concept "BMI":

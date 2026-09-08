@@ -4,6 +4,8 @@ import { emitCQL } from "../../cql-emitter/emitCQL";
 import { buildCRL, validateCRL } from "../../index";
 import type { CRLError } from "../../types/errors";
 import { Concept } from "../types";
+import { SOURCE_ORDER_EXAMPLE } from "../../authoring-kit/sourceOrderExample";
+import { prepareSingleLibraryPublication } from "../../emit/publicationProgram";
 
 // disc 402 (T4 STEP 1) — the concept body is now ORDER-INDEPENDENT. The fixed line sequence that
 // used to be grammar-enforced was pure convention (KEs faceplanted on `- meta is @tag` placement
@@ -41,13 +43,14 @@ const ruleOf = (e: CRLError): string | undefined =>
 const rulesIn = (errors: CRLError[] | undefined): string[] =>
   (errors ?? []).map(ruleOf).filter((r): r is string => r !== undefined);
 
-describe("concept body is order-independent (disc 402)", () => {
+describe("concept fields before source representations are order-independent", () => {
   // Same concept, three line orders. The canonical order is a strict SUBSET of the language, so all
   // three must build the SAME concept (location-stripped).
   const canonical = `library "T".
 concept "C":
 - type is Observation.
-- value element is Observation.value.
+- shape is Record.
+- shape reduction is most recent.
 - value type is Quantity.
 - meta is \`@severity high\`.
 - evidence is \`per policy\`.
@@ -57,7 +60,8 @@ concept "C":
 concept "C":
 - value type is Quantity.
 - type is Observation.
-- value element is Observation.value.
+- shape is Record.
+- shape reduction is most recent.
 - meta is \`@severity high\`.
 - evidence is \`per policy\`.
 - code is \`c\`.`;
@@ -69,7 +73,8 @@ concept "C":
 - value type is Quantity.
 - evidence is \`per policy\`.
 - type is Observation.
-- value element is Observation.value.`;
+- shape is Record.
+- shape reduction is most recent.`;
 
   it("value-type-before-type builds the same concept as canonical", () => {
     expect(stripLocations(conceptOf(valueTypeFirst, "C"))).toEqual(
@@ -100,29 +105,22 @@ concept "C":
     expect(c.meta?.map((m) => m.text)).toEqual(["@severity high", "@audience clinician"]);
   });
 
-  it("a source-representation body is itself order-independent", () => {
-    const canonicalRep = `library "T".
-concept "C":
-- value type is dateTime.
-- code is \`c\`.
-- source representation:
-  - type is Patient.
-  - value element is Patient.birthDate.
-  - value type is dateTime.
-  - value projection is age today at least 18 years.`;
-    const reorderedRep = `library "T".
-concept "C":
-- value type is dateTime.
-- code is \`c\`.
-- source representation:
-  - value projection is age today at least 18 years.
-  - value type is dateTime.
-  - value element is Patient.birthDate.
-  - type is Patient.`;
-    expect(stripLocations(conceptOf(reorderedRep, "C").representations)).toEqual(
-      stripLocations(conceptOf(canonicalRep, "C").representations),
+  // @kit source-representation:field-order
+  it("places current concept fields before the trailing source block and admits the publication", () => {
+    const source = 'library "T".\n' + SOURCE_ORDER_EXAMPLE;
+    const built = buildCRL(source);
+    expect(built.success, JSON.stringify(built.errors)).toBe(true);
+    const prepared = prepareSingleLibraryPublication(built.result!, {
+      canonicalBase: "http://example.org", policyId: "source-order",
+    });
+    expect(prepared.diagnostics).toEqual([]);
+    const reordered = source.replace(
+      '  - type is Patient.\n  - value projection is age today at least 18 years.',
+      '  - value projection is age today at least 18 years.\n  - type is Patient.',
     );
+    expect(stripLocations(conceptOf(reordered, "Adult"))).toEqual(stripLocations(conceptOf(source, "Adult")));
   });
+
 });
 
 describe("concept-body cardinality is builder-enforced and fail-closed (disc 402)", () => {
@@ -265,48 +263,42 @@ concept "C":`, { soft: true }) as unknown as {
     expect((v.errors ?? []).map((e) => e.kind)).toContain("concept-no-substance");
   });
 
-  // The NON-shared line kinds have no `representationBody` slot, so writing one after a posrep is a
-  // LOUD parse error (the boundary "holds" for these). Pinned so a future grammar edit that adds one
-  // of these to `representationBody` flips loud→silent visibly (disc 402 impl-review Fable#2).
+  // @kit source-representation:field-order
   it.each([
-    ["definition is", `- definition is "X" performed.`],
-    ["defined as", `- defined as ("A" sem-or "B").`],
-    ["code is", "- code is `late`."],
-    ["evidence is", "- evidence is `late`."],
-    ["meta is", "- meta is `@severity high`."],
-  ])("a `%s` line written AFTER a posrep is a parse error (no slot)", (_kind, line) => {
-    const built = buildCRL(
-      `library "T".\nconcept "C":\n- value type is dateTime.\n- code is \`c\`.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is dateTime.\n${line}`,
-    );
-    expect(built.success).toBe(false);
+    ['definition is', '- definition is "X" performed.'],
+    ['defined as', '- defined as ("A" sem-or "B").'],
+    ['code is', '- code is `late`.'],
+    ['evidence is', '- evidence is `late`.'],
+    ['meta is', '- meta is `@severity high`.'],
+  ])("rejects concept-only %s after a source block", (_kind, line) => {
+    expect(buildCRL('library "T".\n' + SOURCE_ORDER_EXAMPLE + '\n' + line).success).toBe(false);
   });
 
-  it("a SHARED-kind `coded from` written after a coded-from-less posrep is SILENTLY absorbed by it (design-inherent; the language cannot catch this — teaching does)", () => {
-    // Fable#1: the one trap order-independence cannot flag. The trailing `coded from` joins the
-    // posrep (which had none), the concept's definition slot stays null, and nothing fires. Pinned
-    // so the behavior is known and the migration/teaching layer accounts for it.
-    const built = buildCRL(
-      `library "T".\nconcept "C":\n- code is \`c\`.\n- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n- coded from "VS".`,
-    );
-    expect(built.success).toBe(true);
-    const c = built.result!.statements.find((s) => s.type === "Concept") as Concept;
-    expect(c.definition).toBeUndefined();
-    expect(c.representations[0].terminologyName).toBe("VS");
+  // @kit source-representation:field-order
+  it("dedenting a projection still attaches it to the last source representation", () => {
+    const source = 'library "T".\n' + SOURCE_ORDER_EXAMPLE;
+    const dedented = source.replace('  - value projection', '- value projection');
+    expect(stripLocations(conceptOf(dedented, "Adult"))).toEqual(stripLocations(conceptOf(source, "Adult")));
+    expect(conceptOf(dedented, "Adult").definition).toBeUndefined();
   });
 
-  it("a concept-level singleton line written AFTER a posrep is captured by that posrep (not the concept) — so STEP-2 inserts value-type in the PREFIX", () => {
-    // Posreps are trailing and `representationBody` shares line kinds with the concept body, so a
-    // `- value type is …` appended after a posrep joins the posrep. Here it becomes the posrep's
-    // SECOND value type → A.9 (validator), NOT a concept-level value type. Pinned so the migration
-    // never blindly appends.
-    const built = buildCRL(
-      `library "T".\nconcept "C":\n- code is \`c\`.\n- source representation:\n  - type is Patient.\n  - value element is Patient.birthDate.\n  - value type is dateTime.\n- value type is boolean.`,
-    );
-    expect(built.success).toBe(true);
-    const c = built.result!.statements.find((s) => s.type === "Concept") as Concept;
-    // The trailing `value type is boolean` attached to the posrep (now 2 value types there), and did
-    // NOT become the concept's value type.
-    expect(c.valueTypes).toEqual([]);
-    expect(c.representations[0].valueTypes).toEqual(["dateTime", "boolean"]);
+  // These deliberately ambiguous parser inputs are not positive publication examples.
+  // @kit source-representation:field-order
+  it("a dedented shared coded-from line belongs to the source, not the concept", () => {
+    const source = 'library "T".\n' + SOURCE_ORDER_EXAMPLE
+      .replace('type is Patient.', 'type is ServiceRequest.')
+      .replace('value projection is age today at least 18 years.', 'value projection is exists this.')
+      + '\n- coded from "Procedures".';
+    const concept = conceptOf(source, "Adult");
+    expect(concept.definition).toBeUndefined();
+    expect(concept.representations[0].terminologyName).toBe("Procedures");
+  });
+
+  // @kit source-representation:field-order
+  it("a dedented shared value-type line belongs to the source, not the concept", () => {
+    const concept = conceptOf('library "T".\n' + SOURCE_ORDER_EXAMPLE
+      + '\n- value type is Quantity.', "Adult");
+    expect(concept.valueTypes).toEqual(["boolean"]);
+    expect(concept.representations[0].valueTypes).toEqual(["Quantity"]);
   });
 });

@@ -1,6 +1,7 @@
 import { ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_TERMS, ANSWER_EXAMPLE_CEL, answerExampleSource } from "./answerExample";
 import { SELECTION_REFERENCE_CRL, SELECTION_REFERENCE_CEL } from "./selectionExample";
 import { QUANTITY_EXAMPLE_DECLARATION, QUANTITY_EXAMPLE_FACT } from "./quantityExample";
+import { SOURCE_ORDER_EXAMPLE } from "./sourceOrderExample";
 /**
  * `authoring_kit` — the self-contained authoring knowledge a fresh-context KE
  * agent needs to encode one Stage-1 (local-decision-support) artifact, served
@@ -439,7 +440,7 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
     form: '- source representation: - type is <Resource>. - [ coded from "Value Set" ] - [ value projection is <phrase> ].',
     meaning:
-      "A source representation declares its resource type, optional coded from membership and value projection. Model information supplies the datum carrier; do not author value element is or value type is on the representation. coded from retrieves matching source records; value from is binds offered answers. Supported publication forms include Patient age projection, matching ServiceRequest with value projection is exists this, and finite-code Observation Quantity sources. Source and local contributions join before the final authored selector. Patient age has its own daily recalculation/same-day assertion policy; no universal local-wins rule follows. Opaque ValueSet retrieval and arbitrary projection/producer combinations remain unsupported in this publication path; parsing a phrase is not proof of emission.",
+      "Write every concept-level field before the first source representation; source representations come last, and indentation does not close them. A source representation declares its resource type, optional coded from membership and value projection. Model information supplies the datum carrier; do not author value element is or value type is on the representation. coded from retrieves matching source records; value from is binds offered answers. Supported publication forms include Patient age projection, matching ServiceRequest with value projection is exists this, and finite-code Observation Quantity sources. Source and local contributions join before the final authored selector. Patient age has its own daily recalculation/same-day assertion policy; no universal local-wins rule follows. Opaque ValueSet retrieval and arbitrary projection/producer combinations remain unsupported in this publication path; parsing a phrase is not proof of emission.",
     scope: "in",
   },
   {
@@ -828,7 +829,7 @@ const RULES: KitRule[] = [
     id: "library-scoping",
     edge: "cpg",
     category: "process",
-    rule: 'Use logical CRL library and declaration names, not generated CQL filenames. Validate multifile content with validate_crl(path); inline code has no sibling context. The nearest package.json defines the project, and nested packages are separate projects. A qualified local sibling reference such as "Shared"."Choices" resolves without include, as in named-answer-reference.crl and named-answer-terms.crl. Installed packages must expose CRL files through package.json crl.libraries and be discoverable under the project\'s top-level node_modules (including scoped packages); nested dependency installations are not scanned. Each referencing CRL library must explicitly include a package library by its declared CRL name. Being installed, discovered or transitively included by another library does not grant reference visibility.',
+    rule: 'A document may start with one # header, followed by its required library "Name". declaration and optional library metadata, then includes before statements. Library and include declarations do not accept version clauses. Use logical CRL library and declaration names, not generated CQL filenames. Validate multifile content with validate_crl(path); inline code has no sibling context. The nearest package.json defines the project, and nested packages are separate projects. A qualified local sibling reference such as "Shared"."Choices" resolves without include, as in named-answer-reference.crl and named-answer-terms.crl. Installed packages must expose CRL files through package.json crl.libraries and be discoverable under the project\'s top-level node_modules (including scoped packages); nested dependency installations are not scanned. Each referencing CRL library must explicitly include a package library by its declared CRL name. Being installed, discovered or transitively included by another library does not grant reference visibility.',
     why: 'Discovery, reference visibility and physical CQL routing are distinct. Explicit include resolves an installed package before a same-named local library; without that include, a local qualified reference resolves locally. Avoid ambiguous ownership names. Packages cannot fall back to consumer-local libraries. Include aliases are unsupported: use declared names. Fix missing imports, cycles and emitted-name collision diagnostics in the source/package configuration, not generated CQL. Criteria are library-local; a concept and criterion cannot share a name within one library, and including another library does not make its criteria exportable.',
     ref: "imports/tests/preparePublicationContext.test.ts; imports/tests/registry.test.ts; imports/tests/criterionMultifile.test.ts; docs/decision-shapes.md",
   },
@@ -1031,6 +1032,7 @@ const TYPE_ALLOWLIST: TypeAllowlist = {
 };
 
 const EXAMPLES: KitExample[] = [
+  { title: "source-field-order", language: "crl", valid: true, snippet: SOURCE_ORDER_EXAMPLE, note: "Exact declaration shared with concept-body-order-independence.test.ts: all concept fields precede the trailing source block. The owning test checks AST ownership and publication preparation, not native execution." },
   { title: "quantity-declaration", language: "crl", valid: true, snippet: QUANTITY_EXAMPLE_DECLARATION, note: "Exact current Quantity declaration from the owning CEL numeric-literal test. Supply package.json crl.canonicalBase for emission. This example defines a measurement, not a Boolean decision guard." },
   { title: "quantity-answer", language: "cel", valid: true, snippet: QUANTITY_EXAMPLE_FACT, note: "Fact excerpt shared verbatim with numericValueRules.test.ts. Use within a CEL library covering L with a Patient subject and case referencing F. The owning test checks numeric-literal diagnostics; this excerpt does not establish BMI, unit conversion or native execution." },
 
@@ -1144,10 +1146,9 @@ const VERIFY_LOOP_NOTE_BASE =
   "DELETES any Q/QR under `tests/results/fhir/` that the run did not write — do not hand-author artifacts there. " +
   "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths. " +
   "PROJECT CONFIG — the project's `package.json` MUST declare `crl.canonicalBase` (e.g. `\"crl\": { \"canonicalBase\": \"http://example.org/crl/<project>\" }`): the analytical local CodeSystem url is `<canonicalBase>/CodeSystem/<domain>-local`; owned answer vocabularies have separate logical-owner CodeSystem identities, so emit fails with `missing-canonical-url-base` without it (no urn fallback). Projects that emit FHIR already require it; `emit_cql` for local-`code is` content likewise needs a `path` (not inline `code`) so it can read the base from the nearest package.json. " +
-  "PROVENANCE / PROMOTION (beyond the run_decision proof): generate the scaffold with `generate_provenance` " +
-  'clusterBy:"disposition-path" — it clusters per RUN PATH (decision-node refs only) so it is correspondence-correct ' +
-  "BY CONSTRUCTION, clearing the FINAL `validate_provenance` cockpit-correspondence gate AS GENERATED (before any " +
-  'source attribution). The default clusterBy:"decision" is the per-decision concept-attribution VIEW (it cites ' +
+  "PROVENANCE / PROMOTION (beyond the run_decision proof): canonicalize the source, inspect excluded/dropped-text warnings against the original, and resolve meaningful omissions before attributing its anchor. Successful canonicalization and matching hashes do not prove the anchor includes every source criterion. Generate the scaffold with `generate_provenance` " +
+  'clusterBy:"disposition-path" — it clusters per grounded RUN PATH (decision-node refs only). Correspondence requires frozen, uniquely identified cases, successful rendering and resolvable produced paths. Check generation diagnostics and FINAL validate_provenance results; generation success alone is insufficient. Cases with no produced activity, including pauses, currently remain unchecked by this correspondence gate. Keep useful pause tests and record that provenance limitation; never invent a disposition to clear it. ' +
+  'The default clusterBy:"decision" is the per-decision concept-attribution VIEW (it cites ' +
   "concept refs that fan out / over-light the gate) — inspect with it, do NOT promote with it. " +
   "DERIVEDFROM PORTABILITY (#250): the anchorSource.derivedFrom back-pointer must be CARRIER-RELATIVE + POSIX — " +
   "relative to the directory of the file that carries it, `/` only, a leading `../` is legal. canonicalize_source and the " +
@@ -1155,7 +1156,7 @@ const VERIFY_LOOP_NOTE_BASE =
   "path that returns the artifact inline, its derivedFrom relative to the producer-assumed carrier dir) must be NORMALIZED " +
   "if you save it to a different " +
   "directory. The gate otherwise bites LEGACY + hand-edited records. validate_provenance emits `derived-from-*` findings " +
-  "(graded warning during the #250 transition window, error from the bundled delivery onward); when one fires, do NOT " +
+  "as errors under the enforced contract; when one fires, do NOT " +
   "hand-edit the path — run normalize_provenance (CLI crl-normalize-provenance) to rewrite it carrier-relative + stamp " +
   "the 1.1 marker, oracle-verified. It writes each VERIFIED record and leaves each WORKLISTED record byte-untouched " +
   "(per-record — a run can rewrite the artifact yet worklist its sidecar). Exit 0 = every record normalized; exit 2 = " +
@@ -1308,7 +1309,7 @@ const JUDGE_LENS: JudgeLens = {
       kind: "waiver-authored",
       weightedBy:
         "authoredKind — clinical-assumption / derived-glue (clinical logic with NO source span) = highest scrutiny; " +
-        "implementation-artifact / modeling-rationale = routine (rubber-stamp).",
+        "implementation-artifact / modeling-rationale = routine priority. These labels are prioritization hints, not earned acceptance; every waiver still needs its source-fidelity checks.",
       guidance:
         "An authored item with `supports` suppresses the over-reach of every candidate CRL node in its cluster (the " +
         "BLAST RADIUS named in the message). Earned when the suppressed logic is genuine glue/implementation the source " +

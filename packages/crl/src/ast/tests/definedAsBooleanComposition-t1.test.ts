@@ -31,13 +31,10 @@ import { parseInput } from "./parseInput";
 // Concept boolean composition, Todo 1 (design of record `tmp/_old/DESIGN-concept-boolean-composition.md`).
 // The NEW `defined as ( <boolean> )` family — plain `and`/`or`/`not` over SEPARATE boolean facts
 // (QM population logic etc.), a THIRD composition family distinct from subsumption `sem-or` and
-// refinement `sem-and`/`sem-not`. T1 is grammar + AST + consumer-safety ONLY: emit stays inert
-// behind a sentinel until T3, so these tests exercise PARSING, the parenthesized-only / no-mixing
-// boundary, the degenerate-alias invariant, and that NO consumer silently drops an operand.
-//
-// ⚠ These tests parse against the WORKING-TREE parser (`buildCRL` / `parseInput`), NOT the CRL MCP
-// tool — the MCP server runs a provisioned globalStorage COPY that lags an un-released grammar
-// change, so it reports the new syntax as a parse error. The working tree is the authority here.
+// refinement `sem-and`/`sem-not`. This suite covers parsing, validation, dependency
+// preservation, and legacy CQL/CRE behavior. These regression fixtures are not
+// current selected-publication authoring examples or native execution evidence.
+// Tests use working-tree APIs; they make no assertion about an installed MCP build.
 
 const conceptNamed = (src: string, name: string): Concept => {
   const ast = parseInput(src);

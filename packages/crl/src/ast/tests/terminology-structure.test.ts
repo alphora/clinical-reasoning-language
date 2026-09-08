@@ -7,7 +7,7 @@ describe("Terminology Structure", () => {
     const input = `# Test
 library "Test".
 terminology "MeaslesVaccineCodes":
-- valueset is "bmi valueset".
+- valueset is \`http://example.org/ValueSet/bmi\`.
 `;
 
     const result = parseInput(input);
@@ -20,7 +20,7 @@ terminology "MeaslesVaccineCodes":
       (l) => l.type === "TerminologyValueset",
     ) as TerminologyValueset;
     expect(valuesetLine).toBeDefined();
-    expect(valuesetLine.valuesetName).toBe("bmi valueset");
+    expect(valuesetLine.valuesetName).toBe("http://example.org/ValueSet/bmi");
   });
 
   it("should correctly structure terminology with system and code", () => {

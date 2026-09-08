@@ -153,9 +153,9 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "C1":
-- when "C2".
+- when ("C2").
 criterion "C2":
-- when "C1".
+- when ("C1").
 decision "D":
 first:
 - when ( "A" and "C1" ) then recommend activity "X".
@@ -184,9 +184,9 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "C1":
-- when "C2".
+- when ("C2").
 criterion "C2":
-- when "C1".
+- when ("C1").
 decision "D":
 first:
 - when "C1" then recommend activity "X".
@@ -214,7 +214,7 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "CritC":
-- when "Cc".
+- when ("Cc").
 decision "D":
 first:
 - when ( "A" and "CritC" ) then recommend activity "X".
@@ -243,9 +243,9 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "Inner":
-- when "Leaf1".
+- when ("Leaf1").
 criterion "Outer":
-- when "Inner".
+- when ("Inner").
 decision "D":
 first:
 - when "Outer" then recommend activity "X".
@@ -274,9 +274,9 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "Shared":
-- when "L".
+- when ("L").
 criterion "Wrapper":
-- when "Shared".
+- when ("Shared").
 decision "D":
 first:
 - when "Shared" then recommend activity "X".
@@ -342,15 +342,15 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "C1":
-- when "C2".
+- when ("C2").
 criterion "C2":
-- when "C3".
+- when ("C3").
 criterion "C3":
-- when "C4".
+- when ("C4").
 criterion "C4":
-- when "C5".
+- when ("C5").
 criterion "C5":
-- when "L".
+- when ("L").
 decision "D":
 first:
 - when "C1" then recommend activity "X".
@@ -374,9 +374,9 @@ first:
     // (the blank-nested-token rule blanks Inner's hash TOKEN but keeps its expanded CONTENT), so the change is detected.
     const mk = (innerRef: string, unrelatedRef: string, order: "inner-first" | "outer-first"): string => {
       const decls = `concept "L1":\n- type is Observation.\n- code is \`l1\`.\nconcept "L2":\n- type is Observation.\n- code is \`l2\`.\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\n`;
-      const inner = `criterion "Inner":\n- when "${innerRef}".\n`;
-      const outer = `criterion "Outer":\n- when "Inner".\n`;
-      const unrelated = `criterion "Unrelated":\n- when "${unrelatedRef}".\n`;
+      const inner = `criterion "Inner":\n- when ("${innerRef}").\n`;
+      const outer = `criterion "Outer":\n- when ("Inner").\n`;
+      const unrelated = `criterion "Unrelated":\n- when ("${unrelatedRef}").\n`;
       const crits = order === "inner-first" ? inner + outer + unrelated : outer + unrelated + inner;
       return `library "T".\n${decls}${crits}decision "D":\nfirst:\n- when "Outer" then recommend activity "X".\n- otherwise then recommend activity "X".`;
     };
@@ -430,9 +430,9 @@ criterion "K":
   it("#233: wraps a nested criterion in a `criterion` node; a criterion CYCLE terminates at a NAMED elided node (visiting guard)", () => {
     const src = `library "T".
 criterion "C1":
-- when "C2".
+- when ("C2").
 criterion "C2":
-- when "C1".`;
+- when ("C1").`;
     const table = buildCriterionTable(classifyCriterionRefs(parseInput(src)).statements);
     // C1 → C2 → C1 → (C2 already visiting) → a NAMED elided criterion node (not an `external` stub). Terminates.
     const out = branchConditionToDefStruct(table.get("C1")!.condition, table, stubResolve, "T", new Map());
@@ -483,9 +483,9 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "Used":
-- when "A".
+- when ("A").
 criterion "Orphan":
-- when "B".
+- when ("B").
 decision "D":
 first:
 - when "Used" then recommend activity "X".
@@ -511,9 +511,9 @@ activity "X":
 - request CPGCommunicationRequest.
 - with \`x\`.
 criterion "Inner":
-- when "A".
+- when ("A").
 criterion "Outer":
-- when "Inner".
+- when ("Inner").
 decision "D":
 first:
 - when ( "Outer" and "Inner" ) then recommend activity "X".
@@ -616,7 +616,7 @@ ${whens}
   });
 
   it("a `not Crit` guard → not(criterion node) — the criterion stays a first-class boundary AND is reached by the verdict gate", () => {
-    const concepts = `${CONCEPTS}\ncriterion "Crit":\n- when "A".`;
+    const concepts = `${CONCEPTS}\ncriterion "Crit":\n- when ("A").`;
     const graph = graphFrom(POL(`- when not "Crit" then recommend activity "X".`, concepts), CEL);
     const defIndex = defIndexOf(graph);
     const identities = buildCriterionIdentities(graph, defIndex);

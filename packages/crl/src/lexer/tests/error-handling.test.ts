@@ -4,7 +4,7 @@ import { CRLError } from "../../types/errors";
 import { getTokensFromString } from "./helpers";
 
 describe("Lexer Error Handling", () => {
-  it("should handle invalid characters", () => {
+  it("recovers without throwing from miscellaneous token fragments", () => {
     const inputs = ["@invalid", "$tokens", "#notallowed", "~invalid", "`backtick"];
 
     inputs.forEach((input) => {
@@ -13,7 +13,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should handle unterminated identifiers and strings", () => {
+  it("recovers without throwing from unterminated string fragments", () => {
     const inputs = [
       '"unterminated identifier',
       '"identifier with\nnewline',
@@ -28,7 +28,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should handle invalid characters with line and character position", () => {
+  it("retains preceding tokens while recovering from malformed suffixes", () => {
     const testCases = [
       {
         input: "@invalid",
@@ -50,7 +50,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid tokens", () => {
+  it("collects diagnostics for invalid tokens", () => {
     const testCases = [
       {
         input: "@invalid",
@@ -87,7 +87,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid activity types", () => {
+  it("collects diagnostics for invalid activity types", () => {
     const testCases = [
       {
         input: 'activity "blah" request invalidActivity',
@@ -113,7 +113,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid concept types", () => {
+  it("collects diagnostics for invalid concept types", () => {
     const testCases = [
       {
         input: 'concept "blah": - type is InvalidConcept.',
@@ -135,7 +135,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid concept value types", () => {
+  it("collects diagnostics for invalid concept value types", () => {
     const testCases = [
       {
         input: 'concept "blah": - value type is InvalidValueType.',
@@ -157,7 +157,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid characters in concept mode", () => {
+  it("collects diagnostics for invalid characters in concept mode", () => {
     const testCases = [
       {
         input: 'concept "blah": - type is @invalid.',
@@ -179,7 +179,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid characters in value type mode", () => {
+  it("collects diagnostics for invalid characters in value type mode", () => {
     const testCases = [
       {
         input: 'concept "blah": - value type is @invalid.',
@@ -201,7 +201,7 @@ describe("Lexer Error Handling", () => {
     });
   });
 
-  it("should throw an exception for invalid characters in activity mode", () => {
+  it("collects diagnostics for invalid characters in activity mode", () => {
     const testCases = [
       {
         input: "request @invalid",

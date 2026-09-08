@@ -410,7 +410,7 @@ export function createServer(): McpServer {
         "Parse CRL source and build its Abstract Syntax Tree. Pass exactly one of `code` (inline) or `path` (file). " +
         "Returns a ParseResult JSON envelope: { success: boolean; result?: <AST>; errors?: CRLError[] }. " +
         "success:true means lexing/parsing/AST construction succeeded — it does NOT perform semantic validation. " +
-        "The AST root is { type: 'CRL', header?, library?, includes[], statements[], location }. header is present only when the document opens with a '#' line; library is present only when the file declares `library \"Name\" version '<v>'?.`; includes is always an array (may be empty) of `include` declarations.",
+        "The successful AST root is { type: 'CRL', header?, library, includes[], statements[], location }. An optional leading '#' header precedes the required `library \"Name\".` declaration. Version clauses are not supported. Includes follow the library declaration and any library metadata, before statements; includes is always an array (may be empty).",
       inputSchema,
     },
     (args) => runTool(buildCRL, args),
@@ -950,7 +950,7 @@ export function createServer(): McpServer {
         "diagnostics[], findings:[{kind, severity (error|manual-review|warning), class (attribution|integrity), message, itemId?, " +
         "cluster?, ref?, range?, scrutiny? (routine|scrutinize, on waiver-* only)}], errorCount, manualReviewCount, warningCount, worklistCount, " +
         "waiverCount, waiverScrutinizeCount, pass }. pass=true ⇔ zero error-severity findings (waivers are manual-review — they do NOT fail the " +
-        "gate, but waiverScrutinizeCount>0 means the Judge has real adjudication to do; the routine remainder is a rubber-stamp).",
+        "gate). Scrutiny labels prioritize review; every waiver still needs source-fidelity adjudication. A zero scrutinize-count does not certify that routine waivers are earned.",
       inputSchema: {
         artifact: z.string().min(1).describe("Absolute path to the provenance artifact JSON."),
         cel: z
@@ -972,7 +972,7 @@ export function createServer(): McpServer {
         "mode: attribution-class findings (the COVERAGE backlog — over-reach, uncovered-span, missed-decision) are " +
         're-graded from error to "warning" and reported as REMAINING WORK, not failures — so a fresh, half-attributed ' +
         "scaffold does not read as a wall of red. Integrity issues (drift, mistag, mn-keyword, malformed, referential, " +
-        "etc.) are STILL surfaced at their native severity and STILL fail. Use this WHILE authoring; use " +
+        "etc.) retain their native severity: errors fail; manual-review and warning findings remain visible review obligations. Use this WHILE authoring; use " +
         "validate_provenance for the final/strict gate on a completed artifact. Pass three ABSOLUTE paths. Returns the " +
         "same envelope as validate_provenance plus `worklistCount` (the attribution-backlog tally) and a `remaining` " +
         "note. pass=true ⇔ zero error-severity findings (so a fresh scaffold's attribution backlog passes).",
@@ -1025,10 +1025,9 @@ export function createServer(): McpServer {
         "(X fired in ≥2 distinct subs), or `cel-result-run-mismatch` (the run produced no X, or the chained case's run " +
         'path is unavailable/ungroundable), or `unfrozen-case`. "disposition-path" instead renders the CEL and ' +
         "emits one cluster per distinct RUN PATH (decision-node refs ONLY) + one policy-owned-leaf coverage cluster — a " +
-        "scaffold that is correspondence-correct BY CONSTRUCTION (it passes validate_provenance's FINAL cockpit gate with " +
-        "zero mismatch before any items are attached). A same-lib inlined `use decision` chain RESOLVES (the run path is " +
+        "scaffold whose grounded, frozen, uniquely identified and successfully rendered cases can satisfy the correspondence check before source attribution. Check generation diagnostics and FINAL validation; success alone does not clear the gate. Pauses and other cases with no produced action currently remain unchecked by correspondence. Preserve those tests and record the limitation. A same-lib inlined `use decision` chain RESOLVES (the run path is " +
         "decomposed into each sub's standalone rows — #175); a case that can't be path-clustered (unfrozen, name-collision, " +
-        "no/unresolved decision, no produced action, a run error, or a cross-lib / genuinely-ungroundable run) is surfaced " +
+        "no/unresolved decision, no produced action, a run error, or an unresolved/ungroundable path, including across libraries) is surfaced " +
         "as a deferred-disposition-path diagnostic, never silently dropped. Changing clusterBy is a STRUCTURAL mode switch, " +
         "not a safe `existingArtifact` regen (a cross-mode merge orphans the prior mode's clusters).",
       inputSchema: {

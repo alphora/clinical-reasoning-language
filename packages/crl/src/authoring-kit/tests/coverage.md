@@ -1,13 +1,37 @@
 # Kit evidence ledger
 
-## Broad audit in progress — 624–628
+## Broad audit in progress — 624–633
 
-First batch committed as dcf63244. Second batch is review628. The discovery remains
-300 files; **93 have full source reads** (71 lead,22 native reviewer). This does not
-mean93 complete claim mappings. [survey-dispositions.md](survey-dispositions.md)
+First batches committed as dcf63244 and2e645034. Review632 corrects grammar and
+provenance teaching. The discovery remains300 files; **169 have recorded full
+source reads** (98 lead,71 native reviewer). This does not mean169 complete claim
+mappings. CQL631 and FHIR633 reviews are being integrated separately. [survey-dispositions.md](survey-dispositions.md)
 records mixed applicable/internal/legacy cases; no entire mixed file is excluded.
 Historical execution rows retain the hash tested at that time, separately from
 the current source hash. Reading, passing tests and verified teaching are distinct.
+
+### Grammar and provenance corrections — 632
+
+Current intent: teach admitted syntax and preserve faithful narrative attribution.
+Parser recovery and zero coverage/error counts cannot supply that evidence alone.
+
+| Tag / consumer | Owning evidence | Observation and limit |
+|---|---|---|
+| `source-representation:field-order` | `ast/tests/concept-body-order-independence.test.ts`; shared `sourceOrderExample.ts` | Complete selected Patient-age declaration prepares without diagnostics; reordered source fields preserve the AST; dedented projection remains in the source; concept-only trailing lines fail. Kit embeds the exact declaration. No native execution claim |
+| `library-scoping:declaration-syntax` | `ast/tests/library-and-include-structure.test.ts` | Required library, rejected library/include version clauses; include negative has a valid required library so the rejection is specific. Existing ordering cases own header/include structure |
+| Positive syntax evidence | `ast/tests/parseInput.ts` and builder positive-fixture tests | Rejects lexer/parser diagnostics before building. Two malformed inputs prove the helper catches recovery.27 previously recovered fixtures repaired; this does not validate their legacy semantics |
+| `provenance-source:excluded-text` | `provenance/tests/canonicalize.test.ts`, footnote criterion input | Successful canonicalization excludes footnote text and reports excluded-part-text. Source completeness requires reviewing that warning; source-fidelity adjudication remains manual |
+| `provenance-source:coverage-is-not-fidelity` | `provenance/tests/generate-loop.test.ts`, intentionally incorrect20-byte source span plus ignored denial | Coverage clears but item-text-drift error and waiver-ignored-span review remain, including after merge. This is an explicit counterexample, not a positive attribution recipe |
+| Correspondence eligibility / verification note and MCP | `provenance/tests/correspondenceCheck.test.ts`, `generate-disposition-path.test.ts`; reviewed production branches | Frozen identity and grounded produced paths required. Pauses/no-produced-action and unfrozen cases remain unchecked; full gate can fail. Existing legacy fixtures establish provenance mechanics, not clinical or native correctness |
+| Waiver priority / worklist severity / judge and MCP | `provenance/tests/validators.test.ts`; reviewed authoredKind classifier and MN-keyword severity branches | Routine labels are hints; manual-review/warning do not fail the error count but retain review obligations. Truth of the waiver label is manual evidence |
+| Derived-from enforcement / verification note | `provenance/tests/derivedFromResolution.test.ts`, `derivedFromPolicy.ts` | Enforced state is true; transition-window teaching removed. Source integrity is distinct from source fidelity |
+
+Read-only reviews629/630 accepted all12 findings. Corrected44-distinct-file run had
+916pass/3fail/9skip; stale ValueSet expectation and two payload-pin failures were
+fixed, then112pass/0fail/5skip in affected builder/library/kit follow-up. TypeScript
+build and complete MCP smoke passed. Final latest-per-file results: 44 files, 921 passed, 0 failed, 9 skipped;
+source hashes and individual reports are recorded in632-execution.json; no installed or native-engine result is claimed. Broader
+mapping and remaining test survey are still prerequisites to release.
 
 ### CEL and library scope corrections — 628
 
