@@ -252,24 +252,22 @@ try {
     // The un-fused cpg base carries only the PA-FREE artifacts (pure-CDS decision + patient-age).
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.deepEqual(refNames, [
-      "decision-reference.cel",
-      "decision-reference.crl",
       "named-answer-reference.cel",
       "named-answer-reference.crl",
       "named-answer-terms.crl",
       "patient-age-both-rep-reference.crl",
-      "representation-reference.crl",
+      "publication-reference.crl",
     ]);
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
     assert.equal(kit.schemaVersion, "1.38"); // named answer ValueSets and presentations
-    assert.equal(kit.contentHash, "87bd21be696388ada111a3eb1668ecf46a020f5831a5d6a564e40d84c06175e8");
+    assert.equal(kit.contentHash, "fb24c8b3a91d896a41e031595d720300e7a3abc41a8e20e3828fb9404a9432d9");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // Supported source/producer publications and legacy inference are distinct in-scope forms.
     const scopeOf = (frag) => kit.conceptLayerModel.find((e) => e.form.includes(frag))?.scope;
-    assert.equal(scopeOf("defined as"), "in");
+    assert.equal(scopeOf("defined as"), undefined);
     assert.equal(scopeOf("definition is"), "in");
   });
 
@@ -281,25 +279,25 @@ try {
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
     assert.equal(kit.schemaVersion, "1.38");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "0773104991c59bce3f59660a8aa429b16ef01c4235808753264ac99f53af43ca");
+    assert.equal(kit.contentHash, "7a66c3286dcdbf6c6566bab00f11879d8ec3029ce3d8f03f25af456a4fb7d6d8");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.equal(refNames.length, 15); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
+    assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities); publication-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));
     assert.ok(!kit.facets, "advisory facets are retired");
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
   });
 
-  await check("authoring_kit embedded decision-reference.crl validates clean via validate_crl", async () => {
+  await check("authoring_kit embedded patient-age-both-rep-reference.crl validates clean via validate_crl", async () => {
     const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
-    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const crl = kit.referenceArtifacts.find((a) => a.name === "patient-age-both-rep-reference.crl").source;
     const r = await client.callTool({ name: "validate_crl", arguments: { code: crl } });
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true, `embedded reference CRL must validate clean; errors: ${JSON.stringify(out.errors ?? []).slice(0, 200)}`);
   });
 
-  await check("emit_cql via inline code → runs without a tool error (the kit's decision-reference.crl)", async () => {
+  await check("emit_cql via inline code → runs without a tool error (the kit's patient-age-both-rep-reference.crl)", async () => {
     const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
-    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const crl = kit.referenceArtifacts.find((a) => a.name === "patient-age-both-rep-reference.crl").source;
     const r = await client.callTool({ name: "emit_cql", arguments: { code: crl } });
     assert.ok(!r.isError, `emit_cql should not be a tool error; got ${r.content?.[0]?.text?.slice(0, 200)}`);
     assert.ok((r.content?.[0]?.text?.length ?? 0) > 0, "emit_cql should return content");

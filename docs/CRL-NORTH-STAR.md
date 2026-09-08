@@ -136,7 +136,7 @@ representation; an uncoded calculation publishes its result without inventing a 
 Implicit/Scalar age-today and `definition is age today` are retired. KEs migrate existing content when
 touching it; new authoring uses the replacement. A criterion may negate the selected Boolean value;
 publication aliases and concept-space composition remain unsupported and are diagnosed explicitly.
-This is an age-specific retirement, not removal of all Scalar declarations or generic recency patterns.
+New authoring and kit examples use explicit selected Record publications. General Scalar and implicit-default compiler paths still exist; that implementation debt does not authorize teaching them as the current contract. Full compiler retirement remains #320 work.
 
 Quantity measurements can use explicit Record/Observation publication with `shape reduction is most recent`.
 An Observation source preserves its Quantity and effectiveDateTime while projecting the analytical identity.
@@ -327,9 +327,10 @@ does not prescribe a particular composition operator or implicit conversion.
 
 ### Decisions still to resolve
 
-- Candidate/value model: the operator proposes replacing Scalars with Observations carrying value and
-  metadata; evaluate this with tuples/relations and the current Scalar/Record/RecordSet distinction;
-  declared versus derived shape; distinguish absent candidates from candidates with unknown values.
+- Candidate/value model: the replacement target uses Observations carrying value and metadata instead
+  of Scalar publications. Supported selected publications implement part of this target; general
+  composition and collection replacements remain unfinished. Distinguish absent candidates from
+  candidates with unknown values without treating legacy compiler acceptance as authority.
 - Named-set scope: the current `this` plus named-set reduction rule (historically attributed to the
   operator, 2026-08-29) is reopened. Specify whether each operation reads its operand alone or also
   the enclosing concept collection; test whether local assertions participate. No silent implicit union.

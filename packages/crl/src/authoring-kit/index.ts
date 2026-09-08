@@ -19,16 +19,12 @@ import { conceptValueTypes } from "../grammar/conceptValueTypes";
 import { ENGINE_JAR_SOURCE } from "../results/spawn";
 
 import {
-  CRITERIA_DECISION_REFERENCE_CEL,
-  CRITERIA_DECISION_REFERENCE_CRL,
-  DECISION_REFERENCE_CEL,
-  DECISION_REFERENCE_CRL,
   DISPOSITION_ARBITRATION_REFERENCE_CEL,
   DISPOSITION_ARBITRATION_REFERENCE_CRL,
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
   PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
-  REPRESENTATION_REFERENCE_CRL,
+  PUBLICATION_REFERENCE_CRL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "./reference";
@@ -338,6 +334,8 @@ export type {
 // schemaVersion → "1.37": named answer ValueSets, explicit question presentation, and migrated worked references.
 // "1.37" → "1.38": correct removed inline-answer teaching shipped in the prior-auth 1.37 kit,
 // reconcile selected-publication scope, guards, CRE limits and shared-determination judging across channels.
+// 1.38 (unreleased): retire Scalar teaching and legacy templates; selected answers
+// gain pause cases; the supported BMI subset becomes an emitting reference.
 const SCHEMA_VERSION = "1.38";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
@@ -419,19 +417,19 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
     form: "- value type is <shape>.",
     meaning:
-      "value type describes the datum/value, while shape is distinguishes Scalar, Record and RecordSet cardinality and type is names the resource. Scalar requires value type (missing-value-type). The supported selected Observation publication also declares its value type explicitly. A value type alone supplies no data: author a local code, source representation or supported producer. Boolean guards read the selected Boolean value, not the mere presence of a record; derive a separate Boolean qualification/threshold when the selected datum is coded or numeric.",
+      "Declare value type explicitly on selected Observation publications: boolean for a finding used as a guard, Quantity for a measurement, CodeableConcept for a coded answer. The Case Feature expression returns the selected record; supported guards read its Boolean value. Do not relabel coded or numeric data as boolean to satisfy a guard: derive a separate qualification or threshold publication. Missing answers remain unknown; record presence does not establish a true answer. Selected publications are rejected in legacy aliases, sem composition, collection-existence reductions and per-action menu guards (publication-unsupported-context). Use supported publication producers and branch/criterion guards. Validation checks do not replace emitted CQL and native execution.",
     scope: "in",
   },
   {
-    form: "- shape is Scalar | Record | RecordSet.",
+    form: "- shape is Record.",
     meaning:
-      "Scalar publishes a value, Record one selected record, and RecordSet a collection. Scalar remains a language default, not the recommended replacement for age/BMI or the new coded-answer publication contract. For supported selected publications author shape is Record, type is Observation, value type is, and shape reduction is most recent. The final selector combines eligible local, sourced and inferred candidates independently of producer operations. RecordSet history assembly and arbitrary reductions are not covered by this contract. Legacy shape markers without an active reduction can still warn shape-marker-not-emit-active; do not interpret that legacy warning as rejection of supported shape reduction is publications.",
+      "A selected publication returns one Observation record. Declare its value type and shape reduction is most recent explicitly. Eligible local, sourced and inferred candidates enter the final selection after each producer's own operations. RecordSet history and arbitrary reductions are outside this supported contract.",
     scope: "in",
   },
   {
     form: "- code is `local-code`.",
     meaning:
-      "The local code identifies the analytical Case Feature and its answer representation; it is not a chart diagnosis. New selected answers use Record / Observation / an explicit value type / shape reduction is most recent. A code requires type is (local-code-missing-type). Missing answers stay unknown; explicit false remains false. Bare Scalar Observation Boolean questions still have a supported legacy path, but adding definition is exists this changes value-reading to record presence and cannot repair a missing answer. Non-Observation records have their own meaning and are not automatically Boolean answer slots. code is also makes the concept eligible for a presentation; omission of presentation warns and falls back to the concept name with no description.",
+      "The local code identifies the analytical Case Feature and its answer representation, not a chart diagnosis. Use the explicit selected Observation publication contract. A missing answer is unknown; false is an answer value. A presentation is optional: absence warns and uses the concept name as question text with no description.",
     scope: "in",
   },
   {
@@ -441,20 +439,14 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
     scope: "in",
   },
   {
-    form: "- defined as ( ... sem-and / sem-or / sem-not ... ).",
-    meaning:
-      "INFERENCE / semantic normalization: combines the sub-representations or data-components of ONE concept into ONE clinical fact (a separate construct from the selected-publication producers). It is NOT decision composition and NEVER combines distinct decision criteria — that is the decision tree's job (#168). THE TELL (anchor the unit OUTSIDE the label): name the ONE clinical reality the operands each RECORD without using the concept's own name — alternative records of a SINGLE underlying occurrence (a viral-load lab result and/or a chart note attesting the SAME suppression — the records may themselves coexist, that is fine) are one fact. Operands that are SEPARATE underlying events, each independently occurring (a patient can fail drug therapy AND, separately, physical therapy), are DISTINCT criteria → decision layer, NOT `defined as`. The tell is SAME occurrence vs DIFFERENT occurrences, not whether the records coexist. run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not. The MODEL requires unknown-preserving boolean composition. CRE preserves unknown through supported Boolean/sem composition: true OR unknown is true, false AND unknown is false, and a decisive unknown remains unknown. An explicit closed-world record-existence operation is total over its specified collection; CRE legacy value-reading existence can conflate unanswered values with absent records and is not certified for that case (#320). This prediction still requires independent native verification. Branch and criterion guards preserve unknown. Report lane disagreements and verify the engine result; do not encode around them. Bare operands resolve within the defining library; cross-library operands must be qualified. VALUE-PRESERVING: `sem-or`/`sem-and` and a bare-ref alias PRESERVE the concept's declared value type (the author declares it, the composition reconciles operands) — only a TOP-LEVEL `sem-not` and the `defined as exists (…)` sub-form are inherently boolean (see rule value-type). `defined as exists ( \"Concept\" )` tests record existence (present → true, absent → false). Legacy record-existence capability: standard CQL and the CRE support record-existence reach-through (#270); this does not prove arbitrary scalar reductions, recency arbitration, or questionnaire answerability. Use an instance-bearing operand: exists over a scalar boolean can become silently always true through CQL list promotion. Emit rejects recognized scalar-boolean operands (#269); validate and execute the actual project, including cross-library forms. #317/#318 remain unresolved for computed boolean questionnaire items; a green CRE run does not establish a working question. Selected publications cannot currently be operands of legacy sem composition, bare aliases or collection-existence reductions; use supported publication producers or decision/criterion Boolean composition. Absence of evidence does not establish a broader negative determination without an explicit completeness assumption.",
-    scope: "in",
-  },
-  {
     form: "- definition is <predicate>.",
     meaning:
-      "definition is contributes inferred candidates using a supported producer; it does not select the final combined collection. This kit teaches selected-answer in qualifying, a separate named-set membership predicate over a declared value domain, Quantity at least thresholds, and body mass index with an explicit validity operand. Each pattern owns its input, missing-value and validity behavior. shape reduction is most recent selects the final Record. Legacy count/temporal/collection forms and the validate-only representation preview do not establish support for arbitrary combinations. Patient age today is a source value projection; anchored age at start of is a separate measure-context form outside these worked examples.",
+      "definition is contributes inferred candidates using a supported producer; it does not select the final combined collection. This kit teaches selected-answer in qualifying, a separate named-set membership predicate over a declared value domain, Quantity at least thresholds, and body mass index with an explicit validity operand. Each pattern owns its input, missing-value and validity behavior. shape reduction is most recent selects the final Record. General count/temporal/collection refinements do not have a complete publication replacement. Patient age today is a source value projection; anchored age at start of is a separate measure-context form outside these worked examples.",
     scope: "in",
   },
   {
     form: "- shape is Record. - type is Observation. - value type is boolean. - code is `age-code`. - shape reduction is most recent. - source representation: - type is Patient. - value projection is age today <at least | at most | under | younger than> <N> years|months.",
-    meaning: "Patient age calculation with local answer publication. The age pattern recalculates for today; same-day assertions take precedence. Missing input stays unknown. See patient-age-projection for temporal, method and migration rules. Other patterns own their own behavior.",
+    meaning: "The age pattern recalculates from Patient birthDate each day. A same-day assertion can override; a determinate fresh calculation supersedes older assertions. Missing birthDate remains unknown.",
     scope: "in",
   },
 ];
@@ -464,62 +456,38 @@ const RULES: KitRule[] = [
     id: "concept-form",
     edge: "cpg",
     category: "concept-model",
-    rule: "A concept declares its shape-appropriate type and at least one source of data. For new selected Case Features use shape is Record, type is Observation, value type is, code is, and shape reduction is most recent. Coded choices also use value domain is answer options and value from is \"Named Terminology\". Presentations separate question wording from clinical concept names. Sources and supported definition is producers are in scope: Patient age, ServiceRequest existence projections, finite-code Quantity sources, answer qualification, numeric thresholds and BMI with explicit validity. These are bounded supported forms, not a promise of arbitrary pipelines. Scalar remains supported in legacy examples; age/BMI retirement diagnostics require the explicit publication replacement. Distinct policy criteria belong in decision/criterion structure; defined as semantic composition may normalize ONE clinical fact in the legacy path, not fuse separate events or consume selected publications. See named-answer-options, bmi-publication, patient-age-projection and branch-guards for the precise contracts.",
+    rule: "For selected concepts declare shape is Record, type is Observation, value type is and shape reduction is most recent. Supply data with code is, a supported source representation or a supported definition is producer. code is provides the local answer representation; an uncoded calculation has no local answer slot. Coded answers use value domain is answer options and value from is \"Named Terminology\". Presentations separate questions from concept names. Supported patterns include Patient age, ServiceRequest existence, finite-code Quantity sources, answer qualification, thresholds and BMI with explicit validity. These are bounded contracts; unsupported composition is a capability gap, not a reason to copy legacy Scalar content.",
     why: "Separate what supplies data, what computes a candidate, what selects the published record and what expresses the decision. A kit scope label must not forbid forms that the same kit teaches. Preserve distinct source criteria as auditable decision operands; do not infer one fact merely from a shared label.",
-    ref: "concept-layer-model; the `representation-reference.crl` artifact (the reachable worked v3 exemplar)",
+    ref: "concept-layer-model; publication-reference.crl; named-answer-options",
     clauses: [
-      {
-        text: "The supported selected-publication form explicitly declares shape is Record, type is Observation, value type is and shape reduction is most recent. code is supplies the local answer representation when needed. Supported source representation and definition is forms are in scope with their pattern-specific limits. Remaining legacy Scalar examples declare value type; RecordSet history and arbitrary pipelines require separate implementation evidence.",
-        force: "default",
-      },
-      {
-        text: "`defined as` at the CONCEPT level (this stage) is INFERENCE over the sub-representations/components of ONE concept (the §1 rung-1 unit). Joining a policy's DISTINCT criteria is a DECISION-level construct, not a concept-model one (see decision-composition): author it as decision STRUCTURE — a compound branch guard `when ( A and B )` (or a `criterion`) when the criteria share one consequence, sibling `when` branches when they route to different consequences — NEVER a `defined as`/`sem-*` composite, which ships ONE opaque `condition[]` (the distinct criteria vanish from the emitted artifact) and asserts a sameness distinct criteria do not have. Likewise the disposition-arbitration model carries precedence in the DECISION layer (`first:` branch ORDER over full-conjunction guards), not in the inference layer via `sem-not` FINAL-* concepts (see disposition-arbitration-reference). The violation is distinct criteria fused by opaque inference; the faithful form keeps each criterion a visible structural operand (an inline atom in the applicability expression and dependency `input[]`, or a named criterion as one identifier `condition[]` whose transparent define + use-site `input[]` expose its atoms).",
-        force: "invariant",
-        test: "judgeLens.composition:hollowed-criteria",
-      },
-    ],
+  {
+    "text": "For selected concepts declare shape is Record, type is Observation, value type is and shape reduction is most recent. Supply data with code is, a supported source representation or a supported definition is producer. code is provides the local answer representation; an uncoded calculation has no local answer slot. Coded answers use value domain is answer options and value from is \"Named Terminology\". Presentations separate questions from concept names. Supported patterns include Patient age, ServiceRequest existence, finite-code Quantity sources, answer qualification, thresholds and BMI with explicit validity. These are bounded contracts; unsupported composition is a capability gap, not a reason to copy legacy Scalar content.",
+    "force": "default"
+  },
+  {
+    "text": "Keep distinct criteria in decision STRUCTURE, with their source meaning visible in the applicability expression and dependency input[] or in a named criterion's transparent define. A shared label does not turn separate events into one fact. Do not fuse distinct criteria into a defined as composite.",
+    "force": "invariant",
+    "test": "judgeLens.composition:hollowed-criteria"
+  }
+],
   },
   {
     id: "value-type",
     edge: "cpg",
     category: "concept-model",
-    rule: "`value type` names the datum/value type; shape is separately declares Scalar, Record or RecordSet. A selected Observation Record exposes its typed value to supported Boolean guards while its Case Feature expression returns the record. REQUIRED on every SCALAR concept — the remaining legacy default shape — where A.10 `missing-value-type` is a validator ERROR; the requirement is SHAPE-CONDITIONAL (a `shape is Record | RecordSet` concept may omit it, taking its result type from `type is`). The selected-publication contract explicitly requires a value type. A value type with NO producer is invalid (`x + n ≥ 1`, #202). CHOOSE BY ROLE — what the concept RESULTS IN, not its FHIR resource type: `boolean` = a determination/finding (present-or-not, met-or-not) — INCLUDING any concept a decision `when`, a `criterion` body, or an action guard (`unless`/`only when`) consumes (a guard REQUIRES boolean; rule-B `decision-guard-nonboolean`); `Quantity` = a measurement/value (a BMI, a BP, a lab value — most-recent-able); `CodeableConcept` = a coded refinement/classification; `dateTime`/`integer`/`string` = a scalar datum. THE A.10b LESSON: a determination whose UNDERLYING resource is coded is STILL `boolean` when it is consumed as a guard — the guard CONSUMPTION governs the value type, NOT the resource's codedness. And do NOT relabel a genuinely resource/value-shaped concept `boolean` merely to feed a guard: keep that concept at its real shape (it may also be needed as an instance stream, e.g. `most recent`) and DERIVE a SEPARATE boolean guard concept from it. LEGACY VALUE-PRESERVING INFERENCE (not selected-publication composition): `sem-or`/`sem-and` composition and a bare-ref alias PRESERVE the declared value type (the author declares the concept's value type, the composition reconciles operands — the validator makes a NON-boolean composition with a BOOLEAN leaf a hard ERROR, and WARNS on any other result-type disagreement it currently bridges — `composition-result-type-mismatch`, which becomes an ERROR at the #189 flip — though it does not check full datum-type equality among matching-shape non-boolean leaves); only a TOP-LEVEL `sem-not` and `defined as exists (…)` are inherently boolean — so a `defined as` concept is NOT boolean-by-default. NORMATIVE vs SHIPPED: the MODEL requires the value type checked at EVERY use site, but the validator ENFORCES a subset (the operand-constraint registry is seeded, not exhaustive — #266; the nested-call blind spot is the OUTER constrained position; and package-library resolution is a blind spot across ALL rule-B checks), so author to use-site typing as doctrine, not as a guarantee the tool catches every violation. Among the rule-B checks shipped THIS STAGE (NOT an exhaustive list): a guard operand must be boolean; a bare-ref alias must EQUAL its target's value type (FULL equality, not just boolean-ness); a NON-boolean composition requires every LEAF non-boolean (a boolean leaf under a non-boolean VALUE-TYPE parent is a hard ERROR `boolean-in-refinement-composition`; a boolean PARENT over a resource/record leaf is bridged today but WARNS `composition-result-type-mismatch` → ERROR at the flip, fixed with an explicit `defined as exists ( … )`; two differing non-booleans likewise warn); a RecordSet-shaped guard concept warns `decision-guard-record-shaped`; a no-projector posrep must EQUAL the concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean. `defined as exists ( \"Concept\" )` tests record existence (present → true, absent → false). Legacy record-existence capability: standard CQL and the CRE support record-existence reach-through (#270); this is not proof of arbitrary scalar reductions or questionnaire answerability. Use an instance-bearing operand: exists over a scalar boolean can become silently always true through CQL list promotion. Emit rejects recognized scalar-boolean operands (#269); validate and execute the actual project, including cross-library forms. #317/#318 remain unresolved for computed boolean questionnaire items. Selected publications are rejected in legacy aliases, sem composition, collection-existence reductions and per-action menu guards (publication-unsupported-context); branch/criterion guards read their Boolean values without an exists wrapper. For a selected-publication action guard, validation/CRE report publication-unsupported-context and FHIR emit reports publication-action-guard-unsupported.",
+    rule: "Declare value type explicitly on selected Observation publications: boolean for a finding used as a guard, Quantity for a measurement, CodeableConcept for a coded answer. The Case Feature expression returns the selected record; supported guards read its Boolean value. Do not relabel coded or numeric data as boolean to satisfy a guard: derive a separate qualification or threshold publication. Missing answers remain unknown; record presence does not establish a true answer. Selected publications are rejected in legacy aliases, sem composition, collection-existence reductions and per-action menu guards (publication-unsupported-context). Use supported publication producers and branch/criterion guards. Validation checks do not replace emitted CQL and native execution.",
     why: "The published value type is what makes a concept's result legible AND checkable at every use site; DECLARING it (rather than inferring a return type — patterns have none) is what lets the producers disagree LOUDLY at validate time instead of silently at apply time (the #231 lane bug the redesign closes). The guard⇒boolean check is the specific rule that catches the A.10b masking — a coded-resource determination mis-typed `CodeableConcept` but consumed as a guard. Separating normative doctrine from shipped enforcement keeps the kit honest: it teaches the model to author to without claiming coverage the validator does not yet have.",
-    ref: "the `representation-reference.crl` artifact (worked v3 exemplar); src/validator/useSiteTypeValidator.ts (rule-B); concept-layer-model; #202; #231; #265; #266; #269; #270; A.10 missing-value-type",
+    ref: "src/emit/publicationProgram.ts; src/validator/useSiteTypeValidator.ts; named-answer-options",
     clauses: [
-      {
-        text: "`value type` is REQUIRED on every SCALAR concept (the legacy default shape; A.10 `missing-value-type` ERROR for Scalar — SHAPE-CONDITIONAL, a `shape is Record | RecordSet` concept may omit it and takes its result type from `type is`) and needs at least one producer (`x + n ≥ 1`, #202). Selected-publication admission also requires an explicit value type.",
-        force: "validator-enforced",
-      },
-      {
-        text: "Choose the value type by ROLE — what the concept RESULTS IN, not its FHIR resource type: boolean = determination (incl. any guard-consumed concept); Quantity = measurement; CodeableConcept = coded refinement; dateTime/integer/string = scalar.",
-        force: "default",
-      },
-      {
-        text: "GUARD ⇒ BOOLEAN: any concept a decision `when`, a `criterion` body, or an action guard (`unless`/`only when`) consumes must be `value type is boolean` (rule-B `decision-guard-nonboolean`).",
-        force: "validator-enforced",
-      },
-      {
-        text: "A coded-resource determination consumed as a guard is boolean — the guard consumption governs, NOT the resource's codedness (the A.10b masking lesson). Do NOT relabel a genuinely resource/value-shaped concept boolean merely to feed a guard (the validator cannot SEE a relabel — the guard check then passes on the wrong shape); keep it at its real shape and DERIVE a separate boolean guard concept.",
-        force: "default",
-      },
-      {
-        text: "Legacy composition only; selected publications are not admitted to these aliases/sem operators. VALUE-PRESERVING inference (DOCTRINE, partially tool-checked): `sem-or`/`sem-and` and a bare-ref alias preserve the declared value type (author declares; composition reconciles). The validator hard-errors the boolean-leaf/non-boolean-value-type-parent cell and WARNS on other determinable RESULT-type disagreements (`composition-result-type-mismatch` → error at the #189 flip); it does NOT check full DATUM/element-level equality among matching-shape non-boolean leaves, and has documented resolution blind spots (unknown-resource, cross-library), so that finer drift is on the author. Only a TOP-LEVEL `sem-not` and `defined as exists (…)` are inherently boolean.",
-        force: "default",
-      },
-      {
-        text: "SHIPPED rule-B checks (NOT exhaustive): a bare-ref alias = FULL equality with its target; a non-boolean composition rejects any boolean LEAF (`boolean-in-refinement-composition`, value-type-keyed hard ERROR — fix by giving the leaf its resource value type or declaring the parent boolean, NOT an `exists` lift); any OTHER composition result-type disagreement the implicit-existence bridge permits (a boolean parent over a resource/record leaf; two differing non-booleans, incl. two Scalar leaves like Quantity-under-CodeableConcept; a differing record resource) is a `composition-result-type-mismatch` WARNING today that becomes an ERROR at the #189 flip (fix the boolean-parent+record-leaf cell with an explicit `defined as exists ( \"X\" )`); a TYPED RecordSet concept (a collection with a declared boolean datum value type) in a decision guard warns (`decision-guard-record-shaped`) — but a value-type-LESS RecordSet guard operand resolves untyped and is SILENT in N (a residual flip hole, not caught until the flip); a no-projector posrep = concept value type; a TOP-LEVEL `sem-not` / `defined as exists` result must be boolean; a guard operand must be boolean. A selected Boolean Record is a supported branch/criterion operand and does not receive decision-guard-record-shaped. Publication aliases and concept-space composition are refused separately.",
-        force: "validator-enforced",
-      },
-      {
-        text: "NORMATIVE vs SHIPPED: the model requires use-site type-checking EVERYWHERE, but the enforced set is a SUBSET (operand-constraint registry seeded not exhaustive, #266; nested-call / package-library blind spots) — author to the doctrine; do not assume the tool catches every use-site mismatch.",
-        force: "default",
-      },
-      {
-        text: "`defined as exists ( \"Concept\" )` tests record existence (present → true, absent → false). Legacy record-existence capability: standard CQL and the CRE support record-existence reach-through (#270); this does not prove arbitrary scalar reductions, recency arbitration, or questionnaire answerability. Use an instance-bearing operand: exists over a scalar boolean can become silently always true through CQL list promotion. Emit rejects recognized scalar-boolean operands (#269); validate and execute the actual project, including cross-library forms. #317/#318 remain unresolved for computed boolean questionnaire items; a green CRE run does not establish a working question. This is not the selected-publication path; presence is not an answer value, and an open-world nonmatch cannot establish a clinical negative.",
-        force: "default",
-      },
-    ],
+  {
+    "text": "Selected-publication admission requires an explicit value type, Record shape, Observation type and supported shape reduction.",
+    "force": "validator-enforced"
+  },
+  {
+    "text": "Guard operands must expose Boolean values. Preserve the real type of coded/numeric data and derive a separate guard.",
+    "force": "default"
+  }
+],
   },
   {
     "id": "named-answer-options",
@@ -637,41 +605,29 @@ const RULES: KitRule[] = [
     id: "decision-composition",
     edge: "cpg",
     category: "decision-shape",
-    rule: "The COMPOSITION LADDER (§1) — the primitive is decided by the UNIT you are combining: (rung 1) sub-representations of ONE criterion → `defined as` INFERENCE (sem-and/or/not; the model requires unknown propagation, supported Boolean composition preserves unknown; publication composition limits are in concept-form); (rung 2) DISTINCT criteria of ONE determination → decision STRUCTURE in all cases: a COMPOUND BRANCH GUARD `when ( A and B and C )` (or a named `criterion`, see branch-guards / criterion) when the criteria share ONE consequence and you want a single gate node; sibling `when` branches under `first:` when they route to DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree). Distinct criteria are NEVER fused by `defined as`/`sem-*` — that inference collapses them to ONE opaque CQL boolean (the criteria vanish from the emitted PlanDefinition) and asserts a sameness that does not exist; `defined as` is rung-1 only. (rung 3) SEPARATE determinations the SOURCE delegates, OR a GENUINELY-SHARED determination reused across policies/pathways → chained `use decision` (see chaining-necessity — source-delegation OR genuine reuse, NOT fabricated coupling). The tree already expresses AND/OR/NOT, so \"I have boolean logic\" is NOT a chaining signal — almost all of it stays in ONE tree. (`any:` is over ACTIONS only — alternatives WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` now takes an `and`/`or`/`not` boolean over concept/criterion refs (see branch-guards / criterion), not a single concept. A `defined as` composite over distinct criteria gated as a `when` is a VIOLATION regardless of consequence: the emitted PlanDefinition ships ONE opaque `condition[]` (the distinct criteria are invisible), and `sem-*` over distinct criteria asserts a sameness that does not exist. Each distinct criterion is a visible structural operand — an inline concept atom in the condition expression and dependency `input[]`, or its own `when` node, or a named `criterion` (itself one identifier `condition[]` whose transparent define + use-site `input[]` expose its atoms, post-#236) — NEVER fused into one opaque inference boolean (see criteria-decision-reference / criterion). Exposing ONE criterion's sub-representations AS `when` nodes (§3) is presumed-faithful: do NOT revert it. AT SCALE, when one determination has many OVERLAPPING pathways with outcome precedence + fall-through, gate each pathway on its FULL conjunction as a compound branch guard and let `first:` branch ORDER carry the precedence (see disposition-arbitration-reference) — every criterion stays a visible guard atom, a partial match falls through (no trap), and NO `sem-not` inference-layer arbitration is needed (that was the retired pre-#224 workaround for single-concept `when`).",
-    why: "The test is SAME-FACT vs DISTINCT-CRITERIA (\"one fact\" is ANCHORED OUTSIDE the author's naming — it must be nameable without the composite's own label; see the UNIT ANCHORING clause. Without that anchor this test is unfalsifiable, because the author names the composite and thereby names the fact.) — are the `defined as`/`sem-*` operands alternative representations of ONE clinical fact, or a policy's distinct criteria? Two reasons a composite over DISTINCT criteria is unfaithful. (1) EMIT OPACITY: it lowers to ONE opaque CQL boolean, so the emitted PlanDefinition ships a SINGLE `condition[]` — the distinct criteria are INVISIBLE in the shipped artifact (a downstream reader, and any engine but the CRE, sees one true/false, not which criterion failed). A decision-layer branch guard keeps each criterion VISIBLE instead — an inline atom in the applicability expression and dependency `input[]`, a named criterion as one identifier `condition[]` resolving to a transparent define with its atoms in the use-site `input[]` (post-#236) — never fused into one opaque boolean. (2) SEMANTIC SAMENESS: `sem-*` asserts its operands are alternative REPRESENTATIONS of ONE fact; distinct criteria are not one fact, so the assertion is false — and now that the decision layer expresses conjunction (`and` guards) and precedence (`first:`) directly, there is a faithful STRUCTURAL home with no reason to reach for inference. So `defined as`/`sem-*` is rung-1 ONLY (one criterion's representations); distinct-criteria composition AND precedence live in the decision layer. (This retires the earlier 'a single-consequence composite is faithful' rule, which rested on the CRE's render-time operand truth-table — an affordance the SHIPPED artifact does not carry — and it lands the whole kit on one rule with no carve-out.)",
-    ref: "docs/decision-shapes.md; criteria-decision-reference; disposition-arbitration-reference; chaining-necessity; #168",
+    rule: "Choose structure from the source meaning. Alternative records of ONE clinical fact belong to that concept's supported source representations or producers; separate independently occurring facts used as policy criteria belong to decision logic. Do not invent a composition syntax when the required producer is unsupported: report the gap. DISTINCT criteria sharing a consequence can use a compound branch guard or a named criterion. Criteria routing to different consequences use separate when branches. Under first:, a false guard skips its branch, a true guard selects it, and a decisive unknown pauses; ordered siblings are not interchangeable with Boolean OR when an earlier operand is unknown. Full-conjunction guards permit later qualifying pathways when the earlier conjunction is false. A matched branch's descendants remain within that branch. Separate source-delegated or genuinely shared determinations may use use decision. Do not manufacture inference concepts merely to hide a policy's Boolean logic.",
+    why: "Source fidelity depends on the meaning and dependencies of each criterion, not the number of emitted condition entries.",
+    ref: "branch-guards; criterion; chaining-necessity; disposition-arbitration-reference",
     clauses: [
-      {
-        text: "Combine by the UNIT (§1 ladder): one criterion's representations → `defined as`; distinct criteria of one determination → decision STRUCTURE (a compound branch guard / `criterion` when they share one consequence; sibling `when` branches when they route to different consequences); separate source-delegated OR genuinely-shared/reused determinations → `use decision`. Distinct criteria are NEVER fused by `defined as`/`sem-*`. Boolean complexity alone is NOT a chaining signal.",
-        force: "default",
-      },
-      {
-        text: "A `defined as`/`sem-*` composite over a policy's DISTINCT criteria, gated as a `when`, is a VIOLATION regardless of shared consequence. Two reasons: the emitted PlanDefinition ships ONE opaque `condition[]` (the distinct criteria are INVISIBLE in the shipped artifact — the CRE's operand truth-table is a render-time affordance the artifact does not carry), and `sem-*` asserts a SAMENESS (alternative representations of ONE fact) that distinct criteria do not have. The faithful home is decision STRUCTURE: a COMPOUND BRANCH GUARD `when ( A and B and C )` (or a named `criterion`) when the criteria share one consequence — each criterion a distinct VISIBLE structural operand (an inline concept atom in the condition expression and dependency `input[]`; a named criterion as one identifier `condition[]` whose transparent decomposable define + use-site `input[]` expose its atoms — post-#236, NOT collapsed into the parent), never FUSED into one opaque inference boolean; sibling `when` branches when they route to DIFFERENT consequences (divergent dispositions / precedence / exclusion-first / per-criterion sub-tree). Flag and revert (even against a human) a distinct-criteria `defined as`/`sem-*` composite. (The REVERSE — exposing ONE criterion's sub-representations as `when` nodes — is faithful; do NOT revert it. `defined as`/`sem-*` over ONE criterion's representations is rung-1 and stands.)",
-        force: "invariant",
-        test: "judgeLens.composition:hollowed-criteria",
-      },
-      {
-        text: "UNIT ANCHORING — the ONE fact must be identifiable WITHOUT the composite's own label. `sem-` is SEMANTIC: the operator ASSERTS its operands are the same underlying clinical reality RECORDED DIFFERENTLY (a lab value OR a chart note attesting one viral suppression; the local age Observation OR the computed `Patient.birthDate`). A composite's NAME must NEVER be accepted as the fact its operands represent: name seven distinct diseases `Substantial Co Morbidity` and they become 'representations' of it — at which point EVERY disjunction is rung-1 and the distinct-criteria invariant CANNOT BE VIOLATED. A test whose subject the author names is a test the author always passes. Adjudicate by asking: is this ONE clinical event/state that could be RECORDED in more than one place, or are these DIFFERENT states, any of which independently satisfies the rule? Different diseases, expense categories, programmes, diagnoses, clinician types, required plan components are DIFFERENT -> decision STRUCTURE. Source wording offering alternatives ('one or both of the following', 'either of the following', 'such as', 'including') marks ALTERNATIVES the policy presents; it is NOT a licence for `defined as`. Rung-1 inference is NARROW: on a real policy most candidate composites FAIL this test, and a review clearing most of them is itself evidence the label was allowed to stand in for the fact. MECHANICAL COROLLARY, decisive alone and needing no source read: if an operand ALSO appears as a guard atom anywhere in the decision, it is a distinct criterion — the author already had to name it as its own condition.",
-        force: "invariant",
-        test: "judgeLens.composition:hollowed-criteria",
-      },
-      {
-        text: "OR-of-PATHWAYS: when a policy offers criteria as ALTERNATIVE multi-criterion pathways ('medically necessary for ANY ONE of the following indications'), give each pathway its OWN sibling `when` branch gated on its FULL conjunction as a COMPOUND BRANCH GUARD (`when ( c1 and c2 and c3 ) then …`), or name that conjunction a `criterion` and gate on the name. This is required for ACCURACY: under `first:` a matched branch COMMITS and `otherwise` is TERMINAL, so gating a pathway on a PARTIAL condition strands a patient who fails it but qualifies under the next pathway — the full-conjunction guard is what makes a partial match FALL THROUGH. Both keep every criterion visible — the inline compound guard as an auditable expression with dependency `input[]`, the named criterion as one identifier `condition[]` resolving to a transparent define with its atoms in the use-site `input[]` (post-#236) — so do NOT additionally re-expose them as nested `when` nodes (behaviour-neutral duplication). Do NOT gate the pathway on a `defined as` entry-gate composite — that hides the criteria in one opaque `condition[]` and asserts false sameness (per the invariant above).",
-        force: "default",
-      },
-      {
-        text: "Legacy DNF materialization only. SIZE / #236 (emit mechanics of the recommended shape — load-bearing): an INLINE compound `or`-guard (`when ( A or B )`, or a mixed `and`-of-`or`) lowers to the FHIR PlanDefinition in DISJUNCTIVE NORMAL FORM — the guard expands into K arms (K = the number of DNF terms, NOT necessarily the count of source disjuncts: a mixed `and`-of-`or` guard multiplies the arm count CARTESIANLY, ~2^N in the worst case), and each arm gets its own per-atom `condition[]` AND a DEEP-CLONED copy of the ENTIRE downstream subtree beneath the guard. So K arms over an S-action descendant subtree emit ~K×(S+1) actions. Placement: the arms splice as ordered SIBLINGS under `first:`; under other qualifiers they are wrapped in ONE synthesized `cqf-applicabilityBehavior \"any\"` grouping action. That duplication is the transparency win for an inline guard (every atom is a visible `condition[]`, no hidden disjunction), but it is MULTIPLICATIVE — an inline `or` high in the tree clones everything below it. A named `criterion` is the FACTORING remedy (post-#236): a criterion ref is ONE DNF leaf — its `or` lives inside the criterion's named define, emitted ONCE and referenced by identity, so it does NOT expand at the parent and does NOT clone the subtree (multiplication → addition; its atoms stay visible in the define body + use-site `input[]`). Contrast a rung-1 `defined as`, which lowers to ONE opaque `condition[]` — bounded but HIDING the disjunction (right for one-fact-attested-two-ways, wrong for distinct criteria). So for distinct criteria: an inline compound guard is transparent-but-multiplicative; a named criterion is transparent-AND-linear; a `defined as` is bounded-but-opaque and reserved for rung-1. #236 was MOTIVATED by a measurement on a real prior-auth policy — PRE-#236, inline-expanding a reused criterion grew one emitted PlanDefinition ~51× (130 KB → 6.7 MB, 2.5k → 122k lines) with no logic change; the named-define lowering (#236, resolved) retired that expansion. Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in one text/cql-expression applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test.",
-        force: "default",
-      },
-      {
-        text: "Exposing ONE criterion's sub-representations as `when` nodes (§3, inference→decision) remains presumed-faithful — do NOT revert it (caveat: flag only if it mis-casts what the source states as ONE criterion into several independent presented criteria).",
-        force: "default",
-      },
-      {
-        text: "The disposition-arbitration model (many OVERLAPPING pathways with outcome PRECEDENCE + fall-through) is expressed in the DECISION LAYER: each pathway a sibling `when` on its full-conjunction compound guard, the precedence carried by `first:` branch ORDER (highest-precedence outcome first), the residual by `otherwise` (see disposition-arbitration-reference). Every criterion stays a visible guard atom and a partial pathway match falls through (no overlap-pop). Do NOT compute the precedence in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts — that was the pre-#224 workaround for single-concept `when`; it reduces to the structural form with an IDENTICAL truth function and now reads as inference doing decision work.",
-        force: "default",
-      },
-    ],
+  {
+    "text": "Keep distinct criteria in decision STRUCTURE, with their source meaning visible in the applicability expression and dependency input[] or in a named criterion's transparent define. A shared label does not turn separate events into one fact. Do not fuse distinct criteria into a defined as composite.",
+    "force": "invariant",
+    "test": "judgeLens.composition:hollowed-criteria"
+  },
+  {
+    "text": "UNIT ANCHORING — identify ONE underlying event/state without using the composite's label. A lab result and a clinician note may record the same suppression; drug-therapy failure and physical-therapy failure are separate events. Different diseases do not become representations of one event merely by naming their collection \"Substantial Co Morbidity\". This distinction remains essential even where the replacement producer is not implemented.",
+    "force": "invariant",
+    "test": "judgeLens.composition:hollowed-criteria"
+  },
+  {
+    "text": "OR-of-PATHWAYS: put each alternative pathway's FULL conjunction in its branch guard, or reference a named criterion for that conjunction. A false earlier conjunction can fall through; an unknown one cannot be treated as false to reach an activity.",
+    "force": "default"
+  },
+  {
+    "text": "Publication-reachable branch guards preserve the whole Boolean expression in one text/cql-expression applicability condition, including references through criteria, with dependency input[]. Naming a criterion supports reuse and readability; the number of condition entries is not a source-fidelity test.",
+    "force": "default"
+  }
+],
   },
   {
     id: "chaining-necessity",
@@ -701,7 +657,7 @@ const RULES: KitRule[] = [
     id: "guards",
     edge: "cpg",
     category: "guards",
-    rule: "Per-action guards (only when / unless) are available only on multi-action menu members and take a concept, not a criterion. Keep an unguarded option. This is a legacy capability: selected publications in action-guard positions are rejected by validation with publication-unsupported-context; FHIR emit reports publication-action-guard-unsupported. In CRE, an unanswered action guard in a closure with any prepared publication is an error, even when that publication is unused. Without publications the legacy path can discard unknown as false and cannot certify a pause assertion. Use supported ordered branch conditions for question-driven decisions requiring pause; do not teach legacy coercion as the intended missing-answer semantics. See branch-guards.",
+    rule: "Per-action only when / unless guards are unsupported for selected publications: validation reports publication-unsupported-context and FHIR emit reports publication-action-guard-unsupported. Use branch conditions when that expresses the source intent. If the source requires a guarded action menu, report the missing publication capability; do not fall back to legacy Scalar answers. CRE legacy unknown coercion is not an intended pause contract.",
     ref: "docs/decision-shapes.md; validator rule guard-on-single-action",
   },
   {
@@ -730,23 +686,19 @@ const RULES: KitRule[] = [
     id: "criterion",
     edge: "cpg",
     category: "decision-shape",
-    rule: "A criterion names decision logic and retains its own CQL define and dependency inputs. A `criterion` is a NAMED, reusable branch-guard sub-expression: `criterion \"Name\": - when ( <and/or/not condition> ).` (outer parens REQUIRED on the declaration; a criterion body may use `not`/`and`/`or`, #224 iii.3 — emitted STRUCTURALLY into its define, with bare operands that preserve unknown, with NO De Morgan / DNF flattening of the body; only a LEGACY parent guard's own leaves lower to DNF, and a criterion ref is one such leaf). Reference it UNQUALIFIED in any `when` branch (bare or inside a compound). It LOWERS ONCE to a NAMED boolean CQL define and is referenced BY IDENTITY — a criterion ref is a single guard LITERAL (one positive `text/cql-identifier` `condition[]`, or `not \"Lib\".\"Name\"` when negated, #224 iii.3), NOT its inline-expanded body (this is the decision-layer twin of naming a `concept … defined as` — a named reference, not a materialized macro; #236). N references → the body is emitted ONCE (a DAG of named defines, linear in distinct criteria); criterion→criterion refs are define→define refs. BRANCH-CONDITION position ONLY; UN-ASSERTABLE (a CEL case cannot assert a criterion — it is not a first-class value; the named define is emitted LOGIC identity, NOT a concept identity or an assertable value); illegal inside `defined as`/`sem-*`, a narrative, or an action guard (`criterion-misuse`). LIBRARY-LOCAL: an unqualified or SELF-qualified (`\"ThisLib\".\"X\"`) ref resolves; a FOREIGN-qualified ref is rejected (`criterion-misuse: cannot be library-qualified` once the sibling lib is included; `external-library-not-included` before). A criterion is not cross-library exportable — to REUSE guard logic across libraries, share a CONCEPT only when it is ONE genuine clinical fact and its representations (NEVER as a container for distinct-criteria guard logic — that is the retired composite the invariant forbids), or a `use decision` for a genuinely-shared determination; otherwise duplicate inline, or report the missing cross-library structural capability. In the legacy DNF path it IS an emit-arm reducer: a criterion ref is ALWAYS one parent DNF leaf (positive → one `text/cql-identifier` `condition[]`; negated → one `not <ref>` `text/cql-expression` `condition[]`), so it never itself multiplies the parent arm count. Whether NAMING reduces the count vs inlining is a property of the BODY: naming reduces exactly when the inlined-then-NNF equivalent would have >1 DNF arm — the common cases are a positive ref to an effective-disjunction body (an `or` not under a `not`) and a negated ref to an effective-conjunction body (`not ( A and B )`). Any body whose inlined NNF is a pure conjunction is arm-neutral (a positive pure-`and`/single-ref body — and equally e.g. a negated `or`, `not ( X or Y )`). The criterion's atoms stay VISIBLE — in its own decomposable define body, in the use-site `input[]` (its recursive atom closure), and as an expandable named node in the cockpit view-model (`op:\"criterion\"`; the MV cockpit rendering of it trails, #274) — so naming does not hide them; it RELOCATES where they surface (§decision-composition). Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in one text/cql-expression applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test.",
-    why: "A `criterion` is authoring DRY for a distinct-criteria guard sub-expression reused across branches/decisions — a readability aid AND (post-#236) an emit-tractability one: it lowers to a named define emitted once and referenced by identity, so a reused or large-`or` sub-expression collapses to a single guard leaf instead of cloning its body across DNF arms. Keeping it un-assertable + branch-only + library-local keeps it a pure guard name (emitted LOGIC identity, not a concept/value kind or a cross-library coupling). Its define is a TRANSPARENT decomposable boolean over named leaves (with the atom closure carried in the use-site `input[]`), which is exactly what distinguishes it from a `defined as`/`sem-*` inference composite (one opaque boolean asserting a sameness) — so naming a criterion is a faithful STRUCTURAL factoring, not a hiding of distinct criteria.",
+    rule: "A criterion names a reusable and/or/not branch condition: criterion \"Name\": - when ( <condition> ). Parenthesize its declaration body. It lowers once to a named Boolean CQL define, preserving its expression and unknown values. Reference it unqualified or self-qualified in branch conditions; publication-reachable guards preserve the whole applicability expression with dependency input[]. A criterion is library-local, unassertable and not a concept: CEL cannot define a fact by it. Foreign criterion references, cycles and concept-only uses are errors. Cross-library reuse must reflect a genuine shared determination via use decision, or a genuine shared concept; otherwise report the missing structural capability.",
+    why: "A named criterion preserves source criteria and their dependencies while providing readable reuse. It does not invent an assertable clinical fact or a determination boundary.",
     ref: "docs/decision-shapes.md; validator rules criterion-cycle / criterion-misuse; #224",
     clauses: [
-      {
-        text: "VALIDATOR-ENFORCED: a criterion in a concept-only slot (`defined as`/`sem-*`/narrative/action-guard) or a FOREIGN library-qualified ref is `criterion-misuse`; a cycle/self-reference is `criterion-cycle`; a CEL `defined by` a criterion is `criterion-not-a-defined-by-target`; a name is EITHER a concept or a criterion (`duplicate-name`). The tool rejects these — the agent need not police them.",
-        force: "validator-enforced",
-      },
-      {
-        text: "A `criterion` names a reusable `and`/`or`/`not` branch guard, referenced UNQUALIFIED (or self-qualified) in a branch condition; it lowers ONCE to a named boolean CQL define referenced BY IDENTITY (body emitted once) — a readability/DRY + emit-tractability aid: the criterion ref stays ONE parent leaf, and in the legacy DNF path naming reduces the arm count exactly when the inlined-then-NNF body would have >1 DNF arm (a positive effective disjunction, or a negated effective conjunction); a body whose inlined NNF is a pure conjunction is arm-neutral. Still NOT a cross-library export. Its atoms stay visible in the define body + use-site `input[]` + an expandable named cockpit view-model node. Publication-reachable guards preserve the full expression instead.",
-        force: "default",
-      },
-      {
-        text: "The named define is emitted LOGIC identity referenced by the FHIR applicability condition — NOT a concept identity, NOT a first-class assertable value, NOT a separate FHIR resource (it lives in the existing library). So a criterion stays UN-ASSERTABLE and branch-only even though it now has a name in the emitted CQL.",
-        force: "default",
-      },
-    ],
+  {
+    "text": "Criterion cycles, concept-only uses and foreign references are rejected; CEL cannot define a fact by a criterion.",
+    "force": "validator-enforced"
+  },
+  {
+    "text": "Keep distinct criteria in the named Boolean expression and its dependency input[]. Naming does not justify hiding, dropping or inventing a criterion.",
+    "force": "default"
+  }
+],
   },
   {
     id: "guard-or-vs-sibling-or",
@@ -759,7 +711,7 @@ const RULES: KitRule[] = [
     id: "dispositions",
     edge: "cpg",
     category: "dispositions",
-    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference); a disposition that is COMMUNICATED rather than ordered uses `request CPGCommunicationRequest`. The emitter derives the request type from the act — do not over-specify it.",
+    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (service-order activity); a disposition that is COMMUNICATED rather than ordered uses `request CPGCommunicationRequest`. The emitter derives the request type from the act — do not over-specify it.",
     why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not tied to any one disposition vocabulary; keep the core minimal. The disposition's request type follows what the ACT is — an ORDER vs a COMMUNICATION — which the emitter derives; inventing approve/deny/pend verbs bakes one domain's taxonomy into the language.",
     ref: "crl-not-a-pa-language",
     clauses: [
@@ -862,7 +814,7 @@ const RULES: KitRule[] = [
     edge: "cpg",
     category: "cel",
     rule: "Author a companion `.cel`: `covers \"<CRL library>\"`; a Patient subject `fact` (`- defined by \"Patient\".`); one clinical `fact` per case-feature linked to its concept via `- defined by \"<library>\".\"<concept>\".`; and one `case` per path with `- subject is …`, the relevant `- fact is …`, and a `- result is \"<decision>\" is \"<branch>\".` oracle. For expected missing evidence before any activity, use `- result is \"<decision>\" is pause.` instead; a pause case must have exactly one result assertion. Quoted \"pause\" is an activity name. A passing pause assertion checks CRE's prediction only: native $apply is the source of truth, and each case requires independent error/activity/Questionnaire/QuestionnaireResponse answer-state checks. All-false empty results and partial `all:` activity production are not whole-decision pauses. CRE attribution currently identifies the decision condition, not an unknown compound operand. The CRE resolves concept-linked facts and checks code membership for supported representations; an explicit code must match the resolved representation set. CURRENT LIMIT: a local concept without a derivable local code set fails loudly. Some non-local forms still use name-based presence; this is not evidence of code membership. A bare concept-linked fact uses its declared local code. For a value-reading boolean question, write `value is true` or `value is false`; omission is UNKNOWN and pauses, not an implicit no. There is no absence code. Existence over records is different: no matching record gives false, and a value on a presence-only fact does not change its existence. A bare-type CEL fact without a code cannot match a coded retrieve; CEL validation emits warning `bare-type-fact-uncoded` for those resource types (#312). Patient is exempt because its retrieve is not code-scoped.",
-    ref: "decision-reference.cel; src/cre/run.ts",
+    ref: "pa-determination-reference.cel; src/cre/run.ts",
     clauses: [
       {
         text: "COMPOUND-GUARD operand LOAD-BEARING: every source-required conjunct of an `and` branch guard (or a `criterion` body) must be demonstrably load-bearing — a dropped conjunct is a DROPPED CRITERION (source infidelity), not a testing nicety. A compound-guard branch whose operands are not each shown load-bearing is flagged.",
@@ -1057,7 +1009,7 @@ const EXAMPLES: KitExample[] = [
     title: "Local case-feature concept (asserted, in scope)",
     language: "crl",
     snippet:
-      'concept "Documented Nonunion":\n- type is Observation.\n- value type is boolean.\n- code is `documented-nonunion`.',
+      "concept \"Documented Nonunion\":\n- shape is Record.\n- shape reduction is most recent.\n- type is Observation.\n- value type is boolean.\n- code is `documented-nonunion`.",
     valid: true,
     note: "A locally attested question: the boolean answer lives in Observation.value; omission is unknown, and an explicit false answer is not absence.",
   },
@@ -1065,17 +1017,9 @@ const EXAMPLES: KitExample[] = [
     title: "A policy's ALTERNATIVES are joined in the DECISION layer, not by `defined as`",
     language: "crl",
     snippet:
-      'concept "Failed Drug Therapy":\n- type is Observation.\n- value type is boolean.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- value type is boolean.\n- code is `failed-pt`.\ncriterion "Failed Conservative Therapy":\n- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).',
+      "concept \"Failed Drug Therapy\":\n- shape is Record.\n- shape reduction is most recent.\n- type is Observation.\n- value type is boolean.\n- code is `failed-drug`.\nconcept \"Failed Physical Therapy\":\n- shape is Record.\n- shape reduction is most recent.\n- type is Observation.\n- value type is boolean.\n- code is `failed-pt`.\ncriterion \"Failed Conservative Therapy\":\n- when ( \"Failed Drug Therapy\" or \"Failed Physical Therapy\" ).",
     valid: true,
-    note: 'TWO DISTINCT criteria the policy offers as ALTERNATIVES, joined in the DECISION layer by naming them a `criterion`. Post-#236 the criterion lowers to ONE named boolean CQL define referenced by identity — so a `when` on it emits ONE identifier `condition[]` naming the criterion, and the two modality atoms stay visible in the criterion\'s TRANSPARENT define body (`"Failed Drug Therapy" or "Failed Physical Therapy"`) + the use-site `input[]` (the recursive atom closure) + an expandable named node in the cockpit view-model (post-#236) — a downstream reader recovers WHICH modality failed from those, and the modalities do NOT clone the downstream subtree. This is faithful STRUCTURE, categorically distinct from a `defined as` sem-or composite (which fuses them into ONE opaque inference boolean asserting a false sameness). REPLACES the former `defined as` sem-or composite over these same two failures: pre-#224 a `when` took a SINGLE concept reference, so `defined as` was the ONLY way to get a disjunction into a guard — that constraint is gone. The old note (\'ONE criterion satisfiable by either representation\') was weaker than the rule and was read as licensing any disjunction sitting under a criterion label. #168.',
-  },
-  {
-    title: "GENUINE rung-1 — ONE fact RECORDED two ways",
-    language: "crl",
-    snippet:
-      'concept "Viral Load Below Threshold Lab Result":\n- type is Observation.\n- value type is boolean.\n- code is `viral-load-lab`.\nconcept "Viral Suppression Charted By Clinician":\n- type is Observation.\n- value type is boolean.\n- code is `viral-suppression-charted`.\nconcept "Viral Suppression Documented":\n- value type is boolean.\n- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).',
-    valid: true,
-    note: "ONE clinical reality — this patient's viral suppression — RECORDED in two places: a lab result or a clinician's chart note (the two records may themselves coexist; it is still ONE occurrence). The fact is nameable WITHOUT the concept's label, which IS the test. Contrast the criterion example above: failed drug therapy and failed physical therapy are two DIFFERENT events, not one occurrence recorded twice. This is rung-1 INFERENCE over ONE concept's representations. #168.",
+    note: "Drug-therapy failure and physical-therapy failure are DISTINCT events. The named criterion combines their selected Boolean values in decision logic. Publication guards preserve the expression and expose its dependency inputs; no inference concept is invented to name these alternatives.",
   },
   {
     title: 'THE VACUITY TRAP — the label supplying "the one fact"',
@@ -1083,15 +1027,7 @@ const EXAMPLES: KitExample[] = [
     snippet:
       'concept "Life Threatening Cardiovascular Disease":\n- type is Condition.\n- value type is boolean.\n- code is `cv-disease`.\nconcept "Sleep Apnea":\n- type is Condition.\n- value type is boolean.\n- code is `sleep-apnea`.\nconcept "Uncontrolled Diabetes Mellitus":\n- type is Condition.\n- value type is boolean.\n- code is `uncontrolled-dm`.\nconcept "Severe Musculoskeletal Problem":\n- type is Condition.\n- value type is boolean.\n- code is `msk-problem`.\nconcept "Substantial Co Morbidity":\n- value type is boolean.\n- defined as ( "Life Threatening Cardiovascular Disease" sem-or "Sleep Apnea" sem-or "Uncontrolled Diabetes Mellitus" sem-or "Severe Musculoskeletal Problem" ).',
     valid: false,
-    note: "Defended as rung-1 because the operands are 'representations of substantial co-morbidity' — but that fact is supplied by the concept's own NAME. Strip the label and there is no single clinical event: cardiovascular disease, sleep apnea, diabetes and a musculoskeletal problem are four DIFFERENT states, any of which independently satisfies the rule (they co-occur). The source's 'such as' marks alternatives, not representations. Faithful form: `criterion \"Substantial Co Morbidity\": - when ( A or B or C or D ).` The four operands are DECLARED, so the snippet is self-contained: pasting it produces ZERO validator output — no unresolved-reference noise to distract from the point. VALIDATOR-CLEAN — this is a JUDGE-lens (`hollowed-criteria`) violation, not a grammar/shape one (hence no `expectRule`); the grammar sees NOTHING wrong, which is exactly why UNIT ANCHORING exists.",
-  },
-  {
-    title: "Matched branch with a guarded `any:` menu",
-    language: "crl",
-    snippet:
-      'decision "Coverage":\nfirst:\n- when "Indication" then:\n  any:\n  - recommend activity "Order MRI".\n  - recommend activity "Order CT" unless "Contrast Allergy".\n  end.\n- otherwise then recommend activity "Deny".',
-    valid: true,
-    note: "Order MRI is always offered; CT is dropped when contraindicated.",
+    note: "Legacy counterexample, not current authoring: naming cardiovascular disease, sleep apnea, diabetes and a musculoskeletal problem as one co-morbidity does not make them one event. They are independently occurring criteria. Repair both the operands and the composition according to the narrative. For submitter/reviewer-attested Boolean answers, use shape is Record, type is Observation, value type is boolean, code is and shape reduction is most recent. Condition has no Boolean answer value slot. For chart-derived Condition evidence, report the outstanding Condition source projection/merge capability gap; do not substitute local attestation. Combine selected Boolean answers in a library-local criterion, as in policy-alternatives. That repair does not provide an imported or CEL-assertable composite concept; report the outstanding concept-composition capability if either is needed. Parser or validator acceptance of old syntax does not establish correct source modeling or current authoring.",
   },
   {
     title: "DON'T: a guard on a single menu-less action",
@@ -1099,7 +1035,7 @@ const EXAMPLES: KitExample[] = [
     snippet: 'decision "D":\n- when "A" then:\n  - recommend activity "X" unless "C".\n  end.',
     valid: false,
     expectRule: "guard-on-single-action",
-    note: "Guards are only meaningful inside a multi-action menu. Put X in an `any:`/`all:` block, or gate the whole branch with a `when`.",
+    note: "Gate the whole branch with when. Per-action guards over selected publications are unsupported; do not repair this by switching to a legacy Scalar concept.",
   },
   {
     title: "DON'T: `any:` over when-branches",
@@ -1108,7 +1044,7 @@ const EXAMPLES: KitExample[] = [
       'decision "D":\nany:\n- when "A" then recommend activity "X".\n- when "B" then recommend activity "Y".',
     valid: false,
     expectRule: "any-over-branches",
-    note: 'Nondeterministic over branches. Give each condition its OWN sibling `when` under `first:` (each → the same disposition), or pack them into one branch guard `when ( "A" or "B" )`, or use `all:` if every match should fire. Do NOT fuse the distinct conditions into one `defined as`/`sem-or` concept (that hides which matched — #168).',
+    note: "any: selects among actions, not when branches. Use ordered first: branches for precedence, or a Boolean OR guard when the source means disjunction. They differ on unknown input: an earlier unknown ordered guard pauses even if a later branch could qualify.",
   },
   {
     title: "Compound branch guard — distinct criteria as `when ( A and B )` (#224)",
@@ -1116,7 +1052,7 @@ const EXAMPLES: KitExample[] = [
     snippet:
       'decision "Coverage":\nfirst:\n- when ( "Has Qualifying Diagnosis" and "Failed Conservative Therapy" ) then recommend activity "certify.Approve".\n- otherwise then recommend activity "not-certify.Deny".',
     valid: true,
-    note: 'Distinct criteria conjoined in the DECISION layer — each conjunct is its OWN visible `condition[]` in the emitted PlanDefinition, NOT fused into a `defined as` composite. (A conjunct that is itself a named `criterion` — here `"Failed Conservative Therapy"` — resolves to ONE identifier `condition[]` naming that criterion, its own sub-atoms in its transparent define + use-site `input[]`, post-#236; it is not re-expanded.) A single ref needs no parens; a homogeneous chain may be bare; MIXED `and`/`or` must be parenthesized.',
+    note: "Distinct criteria conjoined in decision logic. For selected publications, the emitter keeps the whole applicability expression and its dependency input[]. This is an excerpt: supply the referenced concepts/criteria and activity in the containing library. Mixed and/or must be parenthesized.",
   },
   {
     title: "`criterion` — a named, reusable branch guard (#224)",
@@ -1124,7 +1060,7 @@ const EXAMPLES: KitExample[] = [
     snippet:
       'criterion "Meets Coverage Preconditions":\n- when ( "Has Qualifying Diagnosis" and "Failed Conservative Therapy" ).\ndecision "Coverage":\nfirst:\n- when ( "Meets Coverage Preconditions" and "Imaging Not Recent" ) then recommend activity "certify.Approve".\n- otherwise then recommend activity "not-certify.Deny".',
     valid: true,
-    note: "Names a reusable distinct-criteria guard; referenced unqualified in a `when` and lowered ONCE to a named boolean define referenced BY IDENTITY (a readability/DRY + emit-tractability aid: the ref is ONE parent leaf; naming reduces the arm count exactly when the inlined-then-NNF body would have >1 DNF arm — a positive effective disjunction, or a negated effective conjunction — and is arm-neutral when that NNF is a pure conjunction; atoms visible in the define + use-site `input[]`). Un-assertable, branch-only, library-local.",
+    note: "A reusable library-local Boolean guard over distinct criteria. Its dependency inputs remain visible when used in a publication-reachable branch. This excerpt requires the referenced concepts and activity in the containing library.",
   },
   {
     title:
@@ -1148,7 +1084,7 @@ const EXAMPLES: KitExample[] = [
       "@gap-filed is NOT a flag — it stays a `.crl` meta tag (required `; ref`), ships fine, does not gate",
     language: "crl",
     snippet:
-      'concept "Renal Function":\n- type is Observation.\n- value type is boolean.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.',
+      "concept \"Renal Function\":\n- shape is Record.\n- shape reduction is most recent.\n- type is Observation.\n- value type is boolean.\n- meta is `@gap-filed: eGFR unit normalization not yet expressible; ref #180`.\n- code is `renal-function`.",
     valid: true,
     note: "A durable pointer to already-tracked work — a REAL `.crl` meta tag (unlike flags, which left `.crl`), REQUIRED `; ref`, does not block mvComplete. Contrast with a review flag (a `medical-validation/flags/` store record authored via create_flag, blocks while open).",
   },
@@ -1310,15 +1246,15 @@ const JUDGE_LENS: JudgeLens = {
     {
       check: "hollowed-criteria",
       weightedBy:
-        "whether the `defined as`/`sem-*` operands are alternative REPRESENTATIONS of ONE clinical fact (faithful inference) or DISTINCT criteria (a decision-composition violation), and whether each distinct criterion surfaces as a distinct STRUCTURAL operand (an inline atom's own `condition[]`, a `when` node, or a named criterion's transparent define + use-site `input[]`) rather than being FUSED into ONE opaque inference `condition[]`.",
+        "Whether separate source criteria remain visible as decision operands with traceable dependencies, rather than being renamed as one clinical fact.",
       guidance:
-        "FAITHFUL: `defined as`/`sem-*` used ONLY over the alternative representations of ONE criterion (one clinical fact — the rung-1 unit). VIOLATION: distinct criteria fused by `defined as`/`sem-*`, REGARDLESS of shared consequence. The semantic distinction is that `sem-*` asserts its operands are one fact's representations, which distinct criteria are not. The faithful home is decision STRUCTURE: a compound branch guard (each source criterion retained in the authored expression and dependency `input[]`) or a named `criterion` (one identifier `condition[]` resolving to a TRANSPARENT decomposable define with its atoms in the use-site `input[]`, post-#236) when they share one consequence, sibling `when` branches when they route differently. Flag a distinct-criteria composite even if deliberate; a one-fact `defined as` STANDS even if deliberate. (The REVERSE — exposing one criterion's sub-representations as `when` nodes — is faithful; do NOT revert it.) NOT behaviour-based: re-grounding a composite to a guard is a zero-behaviour diff — 'it changed nothing' is expected (the truth function is preserved), not a defence. APPLY UNIT ANCHORING FIRST, OR THIS CHECKPOINT CANNOT FAIL: name the single clinical reality the operands each RECORD, WITHOUT using the composite's own label. If you cannot, they are distinct criteria and the faithful home is decision structure. 'The policy groups them under one heading' is evidence of nothing — a heading is a label, not a fact. MECHANICAL COROLLARY (no source read needed): an operand that ALSO appears as a guard atom anywhere in the decision is a distinct criterion; a floor, not a substitute — it catches only the subset the author re-used. EXPECT most composites in a real policy to FAIL; a pass clearing the majority must be re-run against UNIT ANCHORING before it is reported. Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in one text/cql-expression applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test.",
+        "APPLY UNIT ANCHORING FIRST: identify the underlying event or state without using the composite's label. Alternative records of one fact differ from independently occurring criteria. Put distinct criteria in decision expressions or named criteria and preserve their dependencies. Do not use legacy sem composition to evade an unsupported publication producer. A green legacy test is not evidence that the construct belongs in new teaching. Compare source meaning and missing-data behavior, not the number of emitted condition entries; moving logic can change unknown propagation.",
       checkpoints: [
-        "Are the `defined as`/`sem-*` operands alternative REPRESENTATIONS of ONE clinical fact, or DISTINCT criteria of the policy? Operational test (from decision-shapes.md): would a policy reviewer expect to see this operand as its OWN criterion line (→ distinct criterion; use structure) or as one of several data forms of a single fact (→ representation; inference is faithful)?",
-        "Are the distinct criteria carried by decision STRUCTURE — each an inline atom in the applicability expression and dependency `input[]`, a `when` node, or a named `criterion` (one identifier `condition[]` resolving to a TRANSPARENT decomposable define with its atoms in the use-site `input[]`, post-#236) — or are they FUSED inside ONE opaque `defined as`/`sem-*` inference `condition[]` (the violation)? The test is OPACITY-OF-INFERENCE, not action-level condition count: a named criterion is faithful even though its sub-atoms live in its define + `input[]` rather than as separate action conditions.",
-        "Is precedence among outcomes computed by `first:` branch ORDER (faithful), or by `sem-not` FINAL-* concepts in the inference layer (the retired pre-#224 workaround)?",
-        "Name the ONE clinical reality the operands each RECORD, without using the composite's label. Cannot? -> distinct criteria -> decision structure.",
-      ],
+  "Can you identify one underlying event without using the composite's label, or are these distinct independently occurring events?",
+  "Are the distinct criteria retained in the applicability expression or a named criterion's transparent define + use-site input[]?",
+  "Does first: precedence belong to the source, including behavior when an earlier criterion is unknown?",
+  "Does a proposed normalization require a publication capability that has not been implemented?"
+],
     },
     {
       check: "dropped-or-added-criterion",
@@ -1395,11 +1331,11 @@ const JUDGE_LENS: JudgeLens = {
 
 const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
   {
-    text: "Supported definition is producers include selected-answer qualification, named-set membership over a declared domain, Quantity at least thresholds and BMI with explicit validity. These are in scope. General count/temporal/collection refinements, anchored age at start of and arbitrary pipelines are outside these worked examples; consult the current catalog and establish validation, emit and native evidence before relying on them. The representation-reference artifact remains a validate-only preview of its particular unimplemented combinations. This kit does not yet serve a complete executable BMI/threshold/ServiceRequest example: BMI and thresholds occur in a broader validate-only preview. These supported forms still require project-specific validation, emission and native execution; that example-coverage gap is not a language prohibition.",
+    text: "New kit authoring uses explicit selected publications. Scalar remains compiler-legal in general legacy paths and is the implicit result of omitting shape; full compiler retirement is unfinished under #320. It is not a recommended kit form. Legacy sem composition, aliases, action guards and general source-collection operations lack complete publication replacements. Report a required missing capability rather than copying old syntax.",
     edge: "cpg",
   },
   {
-    text: "External `source representation` + `coded from` forms are legal and have implemented paths, including request records and rep-local `exists this` projections. They extend beyond the introductory local-question examples. This kit's representation-reference artifact remains validate-only because its particular local-code + top-level definition forms are not lowered; that stamp is not a ban on external representations or a claim that #257/#270 are wholly unbuilt. Preserve a faithful model and establish its actual emit/engine proof.",
+    text: "publication-reference.crl demonstrates finite-code Quantity sources, BMI with explicit validity, a numeric threshold and an uncoded Patient-age projection. It is validated and FHIR-emitted, not a whole-artifact native $apply proof. ServiceRequest projections remain supported but lack a complete served worked example. General count/temporal/collection refinements and arbitrary pipelines require separate implementation evidence.",
     edge: "cpg",
   },
   {
@@ -1416,24 +1352,7 @@ const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
   },
 ];
 
-/**
- * The reference artifacts, edge-tagged (#191): the PA determination exemplars (criteria / pa-determination /
- * source-delegated / disposition-arbitration) ride the `prior-auth` edge because they ARE PA coverage-determination
- * content — they recommend configured `<category>.<key>` determinations (certify/not-certify/pended) and carry their
- * own local determination `activity` blocks (validated against `crl.dispositions`; the shared vendored library was
- * retired in the configurable-PA-leaves work). The `cpg` base keeps the pure-CDS `decision-reference` (service
- * ORDERS), the `patient-age` projection exemplar, and the `representation-reference` capability preview (validate-only — the
- * v3 multi-representation concept model). (A cpg-general criteria/delegation exemplar is deferred to the CPG-edge
- * build; the `cpg` decision RULES still teach the composition surface.)
- *
- * KNOWN GAP (deferred to the CPG-edge build): a few `cpg` RULES point by name at exemplars that ride the
- * `prior-auth` edge — `decision-composition`/`concept-form` → `criteria-decision-reference` +
- * `disposition-arbitration-reference`, `chaining-necessity` → `source-delegated-decision-reference`. For a
- * `prior-auth` author these resolve (the artifacts are in their chain); for a PURE-`cpg` author they are dead
- * prose pointers (soft doc-refs only — NOT resolvable activity refs, so closure + the hash are unaffected). The
- * fix is to author cpg-general (plain-activity) versions of those exemplars when the CPG seat is built; until
- * then the sole real consumer is the PA seat (`prior-auth`), for whom the refs resolve.
- */
+/** Worked sources are edge-tagged; common selected publications are inherited by PA. */
 /**
  * The in-payload legend for `ReferenceArtifact.verification` (a TS docstring never reaches the remote-MCP
  * consumer). The independent tiers are different KINDS of proof, NOT an ordered rank. It states the PROOF axis
@@ -1455,20 +1374,6 @@ const VERIFICATION_LEGEND: VerificationLegendEntry[] = [
     doesNotProve:
       "Activity assertions prove membership, not exact output, absence of other guarded items, or path identity. Pause assertions prove the CRE prediction, not native `$apply` pausing. Neither proves clinical `code is` correctness, engine retrieval, FHIR emit, or `$apply`. CRE code-membership execution is not a clinical terminology review.",
   },
-  {
-    tier: "engine-run",
-    means:
-      "Validated by the kit suite, AND the artifact's CONSTRUCT was verified at `PlanDefinition/<id>/$r5.apply` POINT-IN-TIME by a separate engine harness (used for the patient-age recency merge, which this kit's CRE cases cannot prove).",
-    doesNotProve:
-      "That THIS exact artifact is re-run by the kit suite — the `$r5.apply` verification is a historical, point-in-time claim over the construct, not a per-build regression. There is no CEL companion.",
-  },
-  {
-    tier: "validate-only",
-    means:
-      "Validated by the kit suite (build + validator-clean) only. A capability PREVIEW of the concept model — reachable so the worked form (e.g. the value-preserving `sem-or` union) can be learned.",
-    doesNotProve:
-      "Any runtime behavior OF THIS ARTIFACT: the suite does not execute its constructs. Individual constructs have shipped since this exemplar was written; its verification stamp makes no claim about those other fixtures. An artifact MAY embed a construct that IS runtime-shipped in production (e.g. the patient-age `value projection`) — `validate-only` only says THIS artifact was not runtime-proven here (not re-verified at `$r5.apply`), never that every construct in it is deferred. It is NOT a runtime-proven template, and NOT a Stage-1 authoring license (see `boundary`).",
-  },
 ];
 
 const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
@@ -1476,47 +1381,11 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
   { name: "named-answer-terms.crl", language: "crl", edge: "cpg", verification: ["fhir-emit"], purpose: "Imported answer vocabulary for named-answer-reference.crl. Validated and emitted as a terminology module (ValueSet, no Case Feature profile), and used by the tested CRL/CEL closure. Use the same canonicalBase as the named-answer reference; this module defines no standalone decision.", source: `library "Shared".\n${ANSWER_EXAMPLE_TERMS}` },
   { name: "named-answer-reference.cel", language: "cel", edge: "cpg", verification: ["cre-run"], purpose: "Actual positive and explicit-negative CEL cases consumed by the named-answer closure test; bare answer codes resolve to their unique offered systems.", source: ANSWER_EXAMPLE_CEL },
   {
-    name: "decision-reference.crl",
-    language: "crl",
-    edge: "cpg",
-    purpose:
-      "Legacy menu example with explicitly answered action guards and no selected publications in its original case context. It is not a missing-answer pause template; mixing unanswered action guards with publications is unsupported (see guards). Canonical Stage-1 decision: first:/otherwise ordered precedence + a matched branch opening an `any:` menu with `unless`/`only when` guards and an always-offered item; local `code is` concepts; plain activity dispositions.",
-    verification: ["cre-run", "fhir-emit"],
-    source: DECISION_REFERENCE_CRL,
-  },
-  {
-    name: "decision-reference.cel",
-    language: "cel",
-    edge: "cpg",
-    purpose:
-      "Companion cases for decision-reference.crl: Patient subject, concept-linked facts, and one `result is` oracle per path (the unless drop, the only-when enable, ordered exclusion, a plain offer).",
-    verification: ["cre-run"],
-    source: DECISION_REFERENCE_CEL,
-  },
-  {
-    name: "criteria-decision-reference.crl",
-    language: "crl",
-    edge: "prior-auth",
-    purpose:
-      "The model for #168: a policy's DISTINCT criteria as decision STRUCTURE (each criterion visible/auditable) — nested `when` nodes or a COMPOUND BRANCH GUARD `when ( A and B )` (nesting/`and` = AND): a legacy inline atom is its own action `condition[]`; a publication guard preserves the whole expression with dependency `input[]`; a named `criterion` is one identifier `condition[]` whose TRANSPARENT decomposable define + use-site `input[]` expose its atoms (post-#236, NOT collapsed into the parent). \"Failed Conservative Therapy\" (failed drug therapy OR failed physical therapy) is a named `criterion` — lowered ONCE to a boolean define referenced by identity, NOT a `defined as`: failed drug therapy and failed physical therapy are two SEPARATE events joined in the DECISION layer. Its CONTRAST — \"Viral Suppression Documented\" (ONE clinical state attested two ways: a lab result OR a chart note) — IS a `defined as ( ... sem-or ... )`, riding the tree as a single-concept `when` node: the artifact's end-to-end proof that the sanctioned rung-1 construct emits + runs. THE TELL — alternative records of a SINGLE underlying occurrence (their records may coexist) are one fact → `defined as`; SEPARATE independently-occurring events are distinct criteria → decision structure. Criteria that route to DIFFERENT consequences MUST be separate `when` nodes; a conjunction sharing ONE consequence is a compound branch guard (or a `criterion`). Distinct criteria are NEVER fused into a `defined as`/`sem-*` composite (see decision-composition). `defined as` at the concept level normalizes ONE concept's representations.",
-    verification: ["cre-run", "fhir-emit"],
-    source: CRITERIA_DECISION_REFERENCE_CRL,
-  },
-  {
-    name: "criteria-decision-reference.cel",
-    language: "cel",
-    edge: "prior-auth",
-    purpose:
-      "Companion cases exercising each decision NODE: criterion-1 node (Has Qualifying Diagnosis), the nested criterion-2 node (the failed-conservative-therapy guard-`or`, resolving on EITHER distinct criterion — drug OR physical therapy), the criterion-3 node (the viral-suppression `defined as`, resolving on EITHER record — lab OR chart note — of the one occurrence, and denying at its `otherwise` when both evidence predicates are explicitly false), and the top-level otherwise.",
-    verification: ["cre-run"],
-    source: CRITERIA_DECISION_REFERENCE_CEL,
-  },
-  {
     name: "pa-determination-reference.crl",
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via configured `<category>.<key>` local activities (certify.Approve / not-certify.Deny), validated against crl.dispositions; Pended (A4) is a non-final leaf, legitimate only in embedded mode.",
+      "Coverage communication using configured certify.Approve and not-certify.Deny activities. A local selected Boolean answer supplies the criterion; unanswered input pauses before a disposition.",
     verification: ["cre-run", "fhir-emit"],
     source: PA_DETERMINATION_REFERENCE_CRL,
   },
@@ -1525,7 +1394,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "cel",
     edge: "prior-auth",
     purpose:
-      "Companion cases for the PA exemplar: qualifying diagnosis → certify.Approve; otherwise → not-certify.Deny. The determination activities are local (config-driven, no shared library).",
+      "Explicit true approves, explicit false denies and missing input predicts pause in the CRE.",
     verification: ["cre-run"],
     source: PA_DETERMINATION_REFERENCE_CEL,
   },
@@ -1543,7 +1412,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "cel",
     edge: "prior-auth",
     purpose:
-      "Companion cases for exemplar B: the two delegated-path cases (continuation → the sub's Approve/Deny bubbles up) + the two parent-resolved cases. The kit's unit test asserts the continuation→Deny case's PATH goes through the delegated sub (not the parent `otherwise`) — §4-req1.",
+      "Two delegated and two parent outcome cases plus missing delegated input. Path assertions distinguish the delegated Deny from the parent Deny; unknown delegated input predicts pause.",
     verification: ["cre-run"],
     source: SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   },
@@ -1552,7 +1421,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "Exemplar C — DISPOSITION-ARBITRATION (§5-C / §6). The TEMPTING-but-DON'T-chain case: ONE determination with MANY OVERLAPPING pathways + outcome PRECEDENCE + fall-through, which a KE is tempted to factor into chained sub-decisions — but the source draws no boundary, so it is ONE determination. Faithful form (CRL #224): each pathway a sibling `when` gated on its FULL conjunction as a COMPOUND BRANCH GUARD, the precedence carried by `first:` branch ORDER, the residual by `otherwise` — every criterion a visible guard atom, partial matches fall through (no trap), NO `use decision` and NO `sem-not` inference-layer arbitration. Two denies use DISTINCT activities (Deny vs Deny EIU) so `result is` distinguishes them.",
+      "One determination with overlapping full-conjunction pathways and first: outcome precedence. Selected Boolean publications preserve whole applicability expressions and dependency inputs. Explicit false permits fall-through; decisive unknown pauses. Distinct Deny and EIU activities make the outcome observable.",
     verification: ["cre-run", "fhir-emit"],
     source: DISPOSITION_ARBITRATION_REFERENCE_CRL,
   },
@@ -1561,7 +1430,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "cel",
     edge: "prior-auth",
     purpose:
-      "Companion cases for exemplar C (verified 6/6): each pathway alone (approve), BOTH load-bearing overlap cases (a both-indication patient who fails one pathway still approves via the other — no overlap-pop), within-indication failure (Deny), off-indication (Deny EIU).",
+      "Cases for both qualifying pathways, explicit-negative overlap cases, within-indication Deny, off-indication EIU and missing-answer pause.",
     verification: ["cre-run"],
     source: DISPOSITION_ARBITRATION_REFERENCE_CEL,
   },
@@ -1571,17 +1440,19 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     edge: "cpg",
     purpose:
       "Synthetic age Record publication with Patient calculation and local answers. The age pattern recalculates daily and admits same-day asserted overrides; missing input remains unknown. Execute the emitted artifact and its full Q/QR interaction. See patient-age-projection for method metadata and temporal rules.",
-    verification: ["engine-run", "fhir-emit"],
+    verification: ["fhir-emit"],
     source: PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
   },
   {
-    name: "representation-reference.crl",
+    name: "publication-reference.crl",
     language: "crl",
     edge: "cpg",
     purpose:
-      "The v3 concept-model multi-representation exemplar (Mammogram multi-source + BMI cascade + a standalone patient-age projection) — reachable in the payload so a remote-MCP consumer can READ the worked form (a `ref:` path string can't be followed; disc 398 measured a MISSING worked `sem-or` REGENERATING the 'defined-as is boolean' misconception). Teaches: the value-preserving `sem-or` union of two dateTime concepts into a dateTime `Mammogram` (NOT boolean — only `defined as exists` / a top-level `sem-not` are boolean); addressability-split discipline (split a concept into named sub-concepts only when a downstream query must NAME the subset — NOT by provenance alone; contrast `Height`, one posrep, no split); source representations with model-provided datum carriers; the STANDALONE patient-age `value projection` (`age today under 6 months` over `Patient.birthDate` — the worked Patient projection, `months` unit #257 T2, no local `code is` so no answer arm; explicit Record publication with shape reduction; see rule patient-age-projection); and `defined as exists` / `definition is` selection/count/within forms. CAPABILITY PREVIEW, `verification: validate-only` (the ARTIFACT tier — the suite builds + validates it, but does NOT execute it). It PARSES + VALIDATES clean; This exact artifact has no runtime proof. External representation (#257) and record-existence (#270) support elsewhere does not make this exemplar executable. ONE construct — the patient-age `value projection` — is by contrast runtime-SHIPPED in production (the #257 age slice; construct- + executed-CQL-verified) and IS in-stage authorable; but THIS artifact stays `validate-only` (that projection is not re-verified at `$r5.apply` here). This is a PROOF-axis status: do NOT copy it as a run_decision-complete Stage-1 artifact. Its forms must be checked individually; the stamp is not a language legality ban.",
-    verification: ["validate-only"],
-    source: REPRESENTATION_REFERENCE_CRL,
+      "Selected Quantity publications for Height, Weight and BMI, a Boolean threshold, and uncoded Patient age. Synthetic finite source codes; explicit BMI validity. This exact source validates and emits; no CEL companion or whole-artifact native execution is claimed.",
+    verification: [
+  "fhir-emit"
+],
+    source: PUBLICATION_REFERENCE_CRL,
   },
 ];
 

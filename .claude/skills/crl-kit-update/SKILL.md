@@ -97,7 +97,7 @@ put customer-specific requirements into the universal payload.
 Compare the complete assembled payloads, not just edited rule strings. A rule,
 example, summary, boundary, judge instruction or MCP description that contradicts
 another is a defect. Correct every active copy, including tests pinning obsolete
-teaching. A retired positive example is not preserved for compatibility.
+teaching. A retired positive example is not preserved for compatibility. Check implicit defaults as well as explicit syntax: an omitted shape can keep a retired representation alive. For current selected-publication examples, require the full declaration admission contract, including its reduction; a Record marker alone is insufficient. Keep compiler regression inputs separate from recommended kit teaching.
 
 Cover invalid forms and meaningful boundaries alongside successful examples.
 Keep the delivered kit readable: one concise claim can summarize many tests;

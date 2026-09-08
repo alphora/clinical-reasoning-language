@@ -1,5 +1,5 @@
 import { isFhirDefError } from "../../fhir-emitter/types";
-// REFACTOR:grounded (#320, plan595): BMI subsection emits; mammography exemption remains explicit.
+// REFACTOR:grounded (#320, review622): all positive reference concepts are selected publications.
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,6 +9,7 @@ import { getAuthoringKit } from "../index";
 import { ANSWER_EXAMPLE_BASE } from "../answerExample";
 import { emitFhirDefFromPath, validateCRL } from "../../index";
 import { validateCRLImports } from "../../imports/validate";
+import { publicationAdmissionReason } from "../../emit/publicationProgram";
 import { parseInput } from "../../ast/tests/parseInput";
 
 /**
@@ -33,25 +34,6 @@ import { parseInput } from "../../ast/tests/parseInput";
 
 const kit = getAuthoringKit("local-decision-support", "prior-auth");
 const crlArtifacts = kit.referenceArtifacts.filter((a) => a.language === "crl");
-
-const bareNonObservationAnswers = (source: string) => parseInput(source).statements
-  .filter(c => c.type === "Concept" && c.code && c.valueTypes.includes("boolean") &&
-    (!c.shape || c.shape === "Scalar") && !c.definition && c.representations.length === 0 &&
-    c.conceptType !== "Observation")
-  .map(c => c.type === "Concept" ? c.name : "");
-
-/**
- * The ONE artifact that legitimately does not emit, with the reason stated.
- *
- * ⚠ AN EXEMPTION MUST NAME ITS ARTIFACT AND ITS REASON. A predicate ("skip anything stamped
- * validate-only") would let the next non-emitting artifact join silently by carrying the same stamp.
- */
-const NON_EMITTING: Readonly<Record<string, string>> = {
-  "representation-reference.crl":
-    "teaches the representation MODEL at the grammar/validator surface; its `code is` concepts " +
-    "pair a local code with a top-level DefinitionIsDefinition (Up To Date On Mammography) " +
-    "that still produces emit-mixed-code-and-definition. BMI and High BMI now emit independently. Stamped validate-only.",
-};
 
 const PROJECT = {
   "package.json": JSON.stringify({
@@ -103,10 +85,10 @@ describe("every kit reference artifact does what its stamp claims", () => {
   });
 
   for (const a of crlArtifacts) {
-    const exemptReason = NON_EMITTING[a.name];
+
 
     it(`${a.name} carries exactly the emit claim its executed gate supports`, () => {
-      expect(a.verification.includes("fhir-emit")).toBe(!exemptReason);
+      expect(a.verification.includes("fhir-emit")).toBe(true);
     });
 
     it(`⭐ ${a.name} VALIDATES clean`, () => {
@@ -123,21 +105,6 @@ describe("every kit reference artifact does what its stamp claims", () => {
         expect(v.errors ?? []).toEqual([]);
       }
     });
-
-    if (exemptReason) {
-      it(`⚠ ${a.name} is a NAMED exemption from emit — ${exemptReason.slice(0, 60)}…`, () => {
-        // Pinned so the exemption is a decision, not a silence. If this artifact starts emitting, this
-        // test fails and the exemption gets removed deliberately.
-        const r = emitArtifact(a.name, a.source);
-        expect(r.hardErrors).toHaveLength(1);
-        for (const name of ["Up To Date On Mammography"]) {
-          expect(r.hardErrors).toEqual(expect.arrayContaining([
-            expect.objectContaining({ kind: "emit-mixed-code-and-definition", message: expect.stringContaining(`"${name}"`) }),
-          ]));
-        }
-      });
-      continue;
-    }
 
     it(`⭐ ${a.name} EMITS its expected definition resources`, () => {
       const r = emitArtifact(a.name, a.source);
@@ -162,13 +129,13 @@ describe("every kit reference artifact does what its stamp claims", () => {
   }
 
   it("a broken reference cannot retain an apparently successful FHIR emission", () => {
-    const a = crlArtifacts.find((a) => a.name === "decision-reference.crl")!;
+    const a = crlArtifacts.find((a) => a.name === "pa-determination-reference.crl")!;
     const broken = a.source.replace("- type is Observation.", "");
     expect(broken).not.toBe(a.source);
     const r = emitArtifact(a.name, broken);
     expect(r.success).toBe(false);
     expect(r.hardErrors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: "emit-local-code-missing-type", message: expect.stringContaining('"Hard Exclusion"') }),
+      expect.objectContaining({ kind: "publication-unsupported-form", message: expect.stringContaining('"Has Qualifying Diagnosis"') }),
     ]));
   });
 
@@ -178,20 +145,27 @@ describe("every kit reference artifact does what its stamp claims", () => {
     }
   });
 
-  it("bare local boolean answers use Observation; record derivations retain their resource type", () => {
-    // The exact defect, pinned at the source rather than only via its emit consequence: a local `code is`
-    // boolean with no source representation is an ANSWER and must be an Observation. A non-Observation
-    // type is emittable only as an INFERENCE (`definition is exists this`), and bare `code is` on one is
-    // neither — which is why it emitted nothing.
-    for (const a of crlArtifacts) {
-      if (NON_EMITTING[a.name]) continue;
-      expect(bareNonObservationAnswers(a.source), a.name).toEqual([]);
+  const unsupportedConcepts = (source: string) => parseInput(/^library\s/m.test(source) ? source : 'library "Snippet".\n' + source).statements
+    .filter(c => c.type === "Concept")
+    .flatMap(c => { const reason = publicationAdmissionReason(c); return reason ? [c.name + ": " + reason] : []; });
+
+  it("every positive delivered concept uses the admitted publication contract", () => {
+    for (const useCase of ["cpg", "prior-auth"] as const) {
+      const payload = getAuthoringKit(undefined, useCase);
+      const sources = [
+        ...payload.referenceArtifacts.filter(a => a.language === "crl").map(a => ({ name: a.name, source: a.source })),
+        ...payload.examples.filter(e => e.language === "crl" && e.valid).map(e => ({ name: e.title, source: e.snippet })),
+      ];
+      expect(sources.length).toBeGreaterThan(5);
+      for (const example of sources) expect(unsupportedConcepts(example.source), example.name).toEqual([]);
     }
   });
 
-  it("the answer check admits Condition existence and catches a bare answer regardless of line order", () => {
-    const source = 'library "T".\nconcept "Prior Surgery":\n- type is Condition.\n- code is `prior-surgery`.\n- value type is boolean.\n- definition is exists this.';
-    expect(bareNonObservationAnswers(source)).toEqual([]);
-    expect(bareNonObservationAnswers(source.replace('- definition is exists this.', ''))).toEqual(["Prior Surgery"]);
+  it("the admission gate catches implicit Scalar, explicit Scalar and inactive Record markers", () => {
+    const source = 'concept "Answer":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `answer`.\n- shape reduction is most recent.';
+    expect(unsupportedConcepts(source)).toEqual([]);
+    for (const broken of [source.replace('- shape is Record.', ''), source.replace('shape is Record', 'shape is Scalar'), source.replace('- shape reduction is most recent.', '')]) {
+      expect(unsupportedConcepts(broken)).toHaveLength(1);
+    }
   });
 });

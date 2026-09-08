@@ -12,7 +12,7 @@ import { resolveCelImports } from "../../cel/imports";
 import { runCel } from "../../cre/run";
 import { prepareSingleLibraryPublication } from "../../emit/publicationProgram";
 import { bmiRetirementReason } from "../../template-match/bmiPublication";
-import { REPRESENTATION_REFERENCE_CRL } from "../../authoring-kit/reference";
+import { PUBLICATION_REFERENCE_CRL } from "../../authoring-kit/reference";
 
 const fixture = path.resolve(__dirname, "../../emit/tests/fixtures/publication-imports");
 const artifact = {
@@ -280,7 +280,7 @@ concept "Old BMI":
     expect(validateCRL(source).errors?.length ?? 0, to).toBeGreaterThan(0);
   });
   it("the actual kit BMI subsection prepares and emits with synthetic finite sources", () => {
-    const ast = buildCRL(REPRESENTATION_REFERENCE_CRL).result!;
+    const ast = buildCRL(PUBLICATION_REFERENCE_CRL).result!;
     const names = new Set([
       "Height VS",
       "Weight VS",
@@ -303,15 +303,16 @@ concept "Old BMI":
       "Weight",
     ]);
     expect(emitCQLFromAST(section, artifact).success).toBe(true);
-    // The remainder is still a validate-only mixed-model illustration, not an executable policy claim.
+    // The complete selected-publication example also prepares without diagnostics.
     expect(prepareSingleLibraryPublication(ast, artifact).diagnostics).toEqual([]);
   });
+  // @kit bmi-publication:kit-finite-source-and-missing
   it("runs the unchanged kit BMI subsection against finite source data and missing data", () =>
     project((dir) => {
-      const source = REPRESENTATION_REFERENCE_CRL;
+      const source = PUBLICATION_REFERENCE_CRL;
       const terms = source.slice(
         source.indexOf('terminology "Height VS":'),
-        source.indexOf("// ============ Mammogram"),
+        source.indexOf('concept "Height":'),
       );
       const concepts = source.slice(
         source.indexOf('concept "Height":'),

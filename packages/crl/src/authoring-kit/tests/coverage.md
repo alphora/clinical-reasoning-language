@@ -41,11 +41,36 @@ its CEL including a missing-answer pause. `ANSWER_EXAMPLE_BASE` is required proj
 input changes what the behavior test executes; no second copy is maintained.
 The kit/reference packaging suite separately verifies the delivered closure.
 
-The older representation preview uses an existing normalized byte-equality check
-against `tests/fixtures/representation/mammogram-and-bmi.crl`. Its complete artifact
-is validate-only and warns about unsupported combinations; individual runtime
-successes do not upgrade its whole-artifact evidence. Missing presentations are
-legal warning/fallback examples, not proof of authored question wording.
+The mixed mammography/representation preview is withdrawn from the kit. Its old
+fixture remains a legacy validator regression, not a recommended example. The
+supported BMI/threshold and uncoded-age declarations now live in the shared
+`PUBLICATION_REFERENCE_CRL` constant, with synthetic decisions keeping those
+dependencies in the emitted closure. The kit's emission gate executes that exact
+source; it does not claim whole-artifact native execution. Missing presentations
+remain legal warning/fallback examples, not proof of authored question wording.
+
+## Scalar teaching correction (review 622)
+
+Scope: both payloads, all positive CRL examples/reference artifacts, affected
+normative/judge text, and active charter wording. Compiler Scalar/default paths
+remain #320 retirement debt. RecordSet history, arbitrary composition/collection
+operations and publication action-menu guards are not replaced by this kit edit.
+
+| Tag | Shared input / owning assertion | Bounded claim |
+| --- | --- | --- |
+| `concept-form:local-answer-pause` | `PA_DETERMINATION_REFERENCE_CRL/CEL`; kit CRE test asserts all three cases pass | Explicit true approves, false denies, missing predicts pause |
+| `chaining-necessity:local-delegation-pause` | `SOURCE_DELEGATED_DECISION_REFERENCE_CRL/CEL`; five CRE cases plus delegated-Deny trace assertions | Bare same-library delegation preserves its path and unknown-input pause prediction; no foreign-delegation claim |
+| `decision-composition:arbitration` | `DISPOSITION_ARBITRATION_REFERENCE_CRL/CEL`; seven cases with exact outputs for every case | Explicit negatives in both overlap cases, false-dominant conjunction with other inputs absent, and wholly missing input; CRE only |
+| `bmi-publication:kit-finite-source-and-missing` | `cql-emitter/tests/bmiRetirement.test.ts`; extracts actual terms/BMI concepts from `PUBLICATION_REFERENCE_CRL` | CQL/FHIR emission and three CRE outcomes: high BMI approves, a newer lower weight denies, missing height pauses. Existing subsection hash is unchanged; historical native evidence is not a fresh run. |
+
+All source constants are consumed directly by the delivered kit and the owning
+tests. The admission gate is a packaging check using `publicationAdmissionReason`;
+it rejects omitted shape, explicit Scalar and a Record marker without reduction.
+It does not substitute for running the examples. Every remaining CRL reference
+must validate and emit without an exemption. Withdrawn delivery tests and reasons
+are recorded in discussion 622; compiler regression tests were not deleted.
+
+The revised inputs pass all 81 kit checks and the complete MCP smoke in the isolated checkout. The three migrated companions pass 15 cases, and every remaining CRL artifact emits. After the exact-output assertion fix, all 55 checks in the affected kit suite pass; the 22 BMI retirement checks also pass with the renamed shared reference and unchanged native-evidence hash. Discussion 623 records commands and source hashes. Prior 621 counts below describe the earlier revision only.
 
 ## Manual evidence and remaining work
 

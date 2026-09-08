@@ -1,31 +1,7 @@
 /**
- * Canonical Stage-1 reference artifacts for the authoring kit.
- *
- * With ONE exception (below), these constants are the SINGLE SOURCE OF TRUTH for the
- * kit's worked examples. They are embedded as TS string constants (NOT `.crl`/`.cel`
- * files) because the npm package and the VSIX ship `dist/**` only — a source-tree
- * `.crl` would not be present at runtime for the MCP consumers. Each artifact carries a
- * `verification` set, and the kit's unit test enforces each tier's in-repository FLOOR
- * (see the payload `verificationLegend`): EVERY artifact is built + validator-clean;
- * a `cre-run` `.crl`+`.cel` pair is ADDITIONALLY executed through the CRE (the engine
- * behind `run_decision`) every build. An `engine-run` artifact only RECORDS a
- * point-in-time external-harness `$r5.apply` claim over its construct — the kit suite
- * does NOT re-run that, so `engine-run` is not proven here, only the validate floor is.
- * So the embedded text is proven to (or, for engine-run, recorded at) its declared proof methods,
- * never over-claimed past them. `fhir-emit` additionally executes CRL emission in referenceArtifactsEmit.test.ts.
- * (THE EXCEPTION — `REPRESENTATION_REFERENCE_CRL`: the CANONICAL source is the
- * `tests/fixtures/representation/mammogram-and-bmi.crl` FILE — which is ALSO the rule-B
- * positive exemplar, so it must stay a file — and this const is its SHIPPED MIRROR, kept
- * identical by a CRLF-normalized text-equality test. Edit the fixture; the const follows.)
- *
- * `decision-reference.crl` exercises the full Stage-1 decision surface:
- *  - `first:` ordered precedence with a required `otherwise`,
- *  - a matched branch opening an `any:` menu of alternatives,
- *  - per-action guards `unless` / `only when`,
- *  - at least one ALWAYS-offered menu item (so a matched branch can never
- *    produce nothing — see docs/decision-shapes.md),
- *  - local case-feature concepts (`type is` + `code is` only),
- *  - plain `activity` dispositions (CRL has no approve/deny verbs).
+ * Current worked publication examples. Each source is consumed by the kit and
+ * its validation/emission/CRE tests. Verification stamps name independent evidence;
+ * CRE predictions and construct-level engine history are not whole-artifact $apply proof.
  */
 
 /**
@@ -58,441 +34,32 @@ activity "not-certify.EIU":
 - with \`Not certified — experimental/investigational/unproven (X12 278 HCR01 A3); a denial reason distinct from a medical-necessity not-certify (both are X12 A3), not a service order.\`.
 `;
 
-export const DECISION_REFERENCE_CRL = `// Legacy action-menu example: its cases explicitly answer the guards.
-// Use the selected-publication examples for question-driven pause; an unanswered
-// action guard in a closure with a publication is currently unsupported.
-# Decision Reference — Imaging Coverage (Stage 1 authoring exemplar)
-library "Imaging Coverage Reference".
-
-/*
-Canonical Stage-1 (local-decision-support) exemplar. Every concept is a LOCAL
-case-feature: \`type is\` + \`code is\` only — no \`source representation\` and no
-\`definition is\` / \`defined as\` (shown in separate examples). Dispositions are plain
-\`activity\` declarations; CRL has no approve/deny/pend verbs. The decision shows
-the full shape: \`first:\` ordered precedence with a required \`otherwise\`, and a
-matched branch opening an \`any:\` menu with per-action guards. "Order MRI" is
-always offered, so a matched branch can never produce nothing.
-
-SIGNPOST — this is a CDS exemplar: "Order MRI"/"Order CT" are CPGServiceRequest
-service ORDERS, correct here because CDS recommends the clinician ORDER a service.
-DISPOSITION TYPE follows the ACT: an act that is COMMUNICATED rather than ordered
-uses CPGCommunicationRequest instead — do NOT copy this order pattern where the act
-is a communicated decision (see the dispositions rule).
-*/
-
-// ============ Concepts (local case-features: type is + code is only) ============
-
-concept "Hard Exclusion":
-- value type is boolean.
-- type is Observation.
-- code is \`hard-exclusion\`.
-
-concept "Qualifying Indication":
-- value type is boolean.
-- type is Observation.
-- code is \`qualifying-indication\`.
-
-concept "Contrast Allergy":
-- value type is boolean.
-- type is Observation.
-- code is \`contrast-allergy\`.
-
-concept "Complex Case":
-- value type is boolean.
-- type is Observation.
-- code is \`complex-case\`.
-
-// ============ Decision ============
-
-decision "Imaging Coverage":
-first:
-- when "Hard Exclusion" then recommend activity "Deny".
-- when "Qualifying Indication" then:
-  any:
-  - recommend activity "Order MRI".
-  - recommend activity "Order CT" unless "Contrast Allergy".
-  - recommend activity "Refer To Specialist" only when "Complex Case".
-  end.
-- otherwise then recommend activity "Deny".
-
-// ============ Activities (plain dispositions; shareable) ============
-
-activity "Order MRI":
-- request CPGServiceRequest.
-- with \`Order MRI of the affected region.\`.
-
-activity "Order CT":
-- request CPGServiceRequest.
-- with \`Order CT of the affected region.\`.
-
-activity "Refer To Specialist":
-- request CPGCommunicationRequest.
-- with \`Refer to the appropriate specialist.\`.
-
-activity "Deny":
-- request CPGCommunicationRequest.
-- with \`Imaging is not covered for this presentation.\`.
-
-presentation for "Hard Exclusion":
-- question text is "Does a hard exclusion apply?".
-
-presentation for "Qualifying Indication":
-- question text is "Is a qualifying indication documented?".
-
-presentation for "Contrast Allergy":
-- question text is "Does the patient have a contrast allergy?".
-
-presentation for "Complex Case":
-- question text is "Is this a complex case?".
-`;
-
 /**
- * Companion CEL for `decision-reference.crl`. Shows the CEL shapes a Stage-1
- * author needs for `run_decision`: a Patient subject fact, clinical facts linked
- * to concepts via `defined by` (qualified by the covered library name), and one
- * `result is "<decision>" is "<branch>"` oracle per case. Each case exercises a
- * distinct path: the `unless` drop, the `only when` enable, ordered exclusion,
- * and a plain menu offer.
- */
-export const DECISION_REFERENCE_CEL = `# Decision Reference — Imaging Coverage — cases (Stage 1 CEL exemplar)
-library "Imaging Coverage Reference Cases".
-covers "Imaging Coverage Reference".
-
-/*
-Companion CEL for decision-reference.crl. \`covers\` names the CRL LIBRARY; the
-\`result is\` oracle names the DECISION. Each clinical fact is linked to a concept
-via \`defined by "<library>"."<concept>"\`. The CRE checks each case's produced
-recommendations against its \`result is\` (membership: the asserted branch must be
-among the produced recommendations).
-*/
-
-// ============ Patient ============
-
-fact "Sample Patient":
-- name is "Sample Patient".
-- birth date is "1970-01-01".
-- defined by "Patient".
-
-// ============ Clinical facts (each linked to a concept) ============
-
-fact "Indication Finding":
-- date is "2026-01-01".
-- value is true.
-- defined by "Imaging Coverage Reference"."Qualifying Indication".
-
-fact "Exclusion Finding":
-- date is "2026-01-01".
-- value is true.
-- defined by "Imaging Coverage Reference"."Hard Exclusion".
-
-fact "Contrast Allergy Finding":
-- date is "2026-01-01".
-- value is true.
-- defined by "Imaging Coverage Reference"."Contrast Allergy".
-
-fact "Complex Case Finding":
-- date is "2026-01-01".
-- value is true.
-- defined by "Imaging Coverage Reference"."Complex Case".
-
-// ⚠ NEGATIVE ANSWERS ARE NOT OPTIONAL under value-read semantics. A locally-coded boolean with a
-// bare \`code is\` is a QUESTION: unanswered it is UNKNOWN, so the branch guarding on it can neither
-// fire nor fall through and the decision PAUSES. Omitting "no hard exclusion" does not mean false; it
-// means nobody has been asked. Every case below therefore answers each criterion on its path.
-
-fact "No Hard Exclusion":
-- date is "2026-01-01".
-- value is false.
-- defined by "Imaging Coverage Reference"."Hard Exclusion".
-
-fact "No Contrast Allergy":
-- date is "2026-01-01".
-- value is false.
-- defined by "Imaging Coverage Reference"."Contrast Allergy".
-
-fact "Not A Complex Case":
-- date is "2026-01-01".
-- value is false.
-- defined by "Imaging Coverage Reference"."Complex Case".
-
-// ============ Cases ============
-
-case "indication, no contraindication -> CT offered":
-- description is \`Qualifying indication present, no contrast allergy and not a
-  complex case: the menu offers MRI and CT; Refer To Specialist is guarded out.\`.
-- subject is "Sample Patient".
-- fact is "No Hard Exclusion".
-- fact is "Indication Finding".
-- fact is "No Contrast Allergy".
-- fact is "Not A Complex Case".
-- result is "Imaging Coverage" is "Order CT".
-
-case "contrast allergy -> CT dropped, MRI still offered":
-- description is \`Contrast allergy contraindicates CT (unless drops it); MRI is
-  always offered, so the menu still produces MRI.\`.
-- subject is "Sample Patient".
-- fact is "No Hard Exclusion".
-- fact is "Indication Finding".
-- fact is "Contrast Allergy Finding".
-- fact is "Not A Complex Case".
-- result is "Imaging Coverage" is "Order MRI".
-
-case "complex case -> specialist referral offered":
-- description is \`A complex case enables the only-when-guarded specialist
-  referral option.\`.
-- subject is "Sample Patient".
-- fact is "No Hard Exclusion".
-- fact is "Indication Finding".
-- fact is "No Contrast Allergy".
-- fact is "Complex Case Finding".
-- result is "Imaging Coverage" is "Refer To Specialist".
-
-case "hard exclusion -> denied":
-- description is \`A hard exclusion matches the first branch; by ordered
-  precedence the decision denies regardless of indication.\`.
-- subject is "Sample Patient".
-- fact is "Indication Finding".
-- fact is "Exclusion Finding".
-- result is "Imaging Coverage" is "Deny".
-`;
-
-/**
- * Tools-authored criteria-decision reference (Stage 1). The CENTERPIECE for #168:
- * decision composition (combining the policy's DISTINCT criteria) lives in the
- * DECISION TREE — each criterion is its own `when` node (nesting = AND), and
- * criteria offered as ALTERNATIVES ("Failed Conservative Therapy" = failed drug OR
- * failed physical therapy — two SEPARATE events, so DISTINCT criteria) are a named
- * `criterion` gated by an `or`-guard, NOT a `defined as` composite (they are not one
- * fact recorded twice). Its CONTRAST — "Viral Suppression Documented" (ONE clinical
- * state attested two ways: a lab result OR a chart note) — is GENUINE rung-1 `defined as`
- * inference, riding the tree as a single-concept `when` node; it is the kit's ONE
- * end-to-end `defined as` exemplar, proving the sanctioned rung-1 construct emits and
- * runs in artifact context (#234 follow-up). The kit's unit test materializes this and
- * drives the real CRE over it (criterion-1 node, the criterion `or`-guard resolving on
- * either distinct criterion, and the `defined as` node resolving on either record). #234.
- */
-export const CRITERIA_DECISION_REFERENCE_CRL =
-  `# Criteria Decision Reference — coverage criteria as DECISION NODES (Stage 1)
-library "Coverage Criteria Reference".
-
-/*
-Decision composition (combining the policy's DISTINCT criteria -> a determination)
-lives in the DECISION TREE: each criterion is its own \`when\` node (nesting = AND).
-"Failed Conservative Therapy" (failed drug therapy OR failed physical therapy) is a
-named \`criterion\` gated by an \`or\`-guard: failed drug therapy and failed physical
-therapy are two SEPARATE events (each can occur independently, so both may be present
-at once) — DISTINCT criteria the policy offers as alternatives, NOT one fact recorded
-two ways, so they are joined structurally, never fused with \`defined as\`/\`sem-or\`.
-
-"Viral Suppression Documented" is the CONTRAST: ONE clinical STATE — this member's
-viral suppression at the determination point — attested two ways (a lab result OR a
-clinician's chart note; the two records may coexist, they still attest the ONE state).
-THAT is rung-1 inference, so it is a \`defined as ( ... sem-or ... )\` over the two
-records and rides the tree as a single-concept \`when\` node. The tell: one-state-attested
--two-ways -> \`defined as\`; separate independently-occurring events -> distinct criteria
-(#234). NOTE: the three criteria here (qualifying diagnosis, failed conservative therapy,
-documented viral suppression) are combined for PEDAGOGICAL CONTRAST — a distinct-criteria
-or-guard beside a genuine rung-1 \`defined as\` — NOT as a clinically coherent policy. The
-determination is a configured category.key local activity (certify.Approve /
-not-certify.Deny), validated against crl.dispositions.
-*/
-
-concept "Has Qualifying Diagnosis":
-- value type is boolean.
-- type is Observation.
-- code is \`qualifying-diagnosis\`.
-
-concept "Failed Drug Therapy":
-- value type is boolean.
-- type is Observation.
-- code is \`failed-drug-therapy\`.
-concept "Failed Physical Therapy":
-- value type is boolean.
-- type is Observation.
-- code is \`failed-physical-therapy\`.
-criterion "Failed Conservative Therapy":          // two DISTINCT criteria (SEPARATE events) -> decision-layer or-guard,
-- when ( "Failed Drug Therapy" or "Failed Physical Therapy" ).  // NOT a \`defined as\` composite (not one fact recorded twice)
-
-concept "Viral Load Below Threshold Lab Result":
-- value type is boolean.
-- type is Observation.
-- code is \`viral-load-lab\`.
-concept "Viral Suppression Charted By Clinician":
-- value type is boolean.
-- type is Observation.
-- code is \`viral-suppression-charted\`.
-concept "Viral Suppression Documented":           // ONE clinical state attested two ways (lab OR chart note) -> GENUINE
-- value type is boolean.
-- defined as ( "Viral Load Below Threshold Lab Result" sem-or "Viral Suppression Charted By Clinician" ).  // rung-1 \`defined as\`, NOT distinct criteria
-
-decision "Coverage Determination":                 // criteria are nested \`when\` NODES (nesting = AND)
-first:
-- when "Has Qualifying Diagnosis" then:
-    first:
-    - when ( "Failed Conservative Therapy" ) then:
-        first:
-        - when "Viral Suppression Documented" then recommend activity "certify.Approve".
-        - otherwise then recommend activity "not-certify.Deny".
-        end.
-    - otherwise then recommend activity "not-certify.Deny".
-    end.
-- otherwise then recommend activity "not-certify.Deny".
-
-presentation for "Has Qualifying Diagnosis":
-- question text is "Is a qualifying diagnosis documented?".
-
-presentation for "Failed Drug Therapy":
-- question text is "Has drug therapy failed?".
-
-presentation for "Failed Physical Therapy":
-- question text is "Has physical therapy failed?".
-
-presentation for "Viral Load Below Threshold Lab Result":
-- question text is "Is the documented viral load below the required threshold?".
-
-presentation for "Viral Suppression Charted By Clinician":
-- question text is "Has the clinician documented viral suppression?".
-` + DETERMINATION_ACTIVITIES;
-
-export const CRITERIA_DECISION_REFERENCE_CEL = `# Criteria Decision Reference — cases (Stage 1)
-library "Coverage Criteria Reference Cases".
-covers "Coverage Criteria Reference".
-
-/*
-Each case exercises a decision NODE: criterion-1 (\`when[0]\`), criterion-2
-(\`when[0]/when[0]\` — the failed-conservative-therapy or-guard, a nested NODE, not a
-composite), and criterion-3 (\`when[0]/when[0]/when[0]\` — the viral-suppression
-\`defined as\` node). The two approve cases prove the criterion-2 guard resolves on
-EITHER distinct criterion (failed drug OR failed physical therapy independently) AND
-that the criterion-3 \`defined as\` resolves on EITHER record (lab OR chart note) of the
-one occurrence. One positive record is sufficient for either approval case; the other record remains
-unanswered. The denial case explicitly answers both evidence predicates false. Missing
-answers are unknown and do not become false through composition.
-*/
-
-fact "Sample Patient":
-- name is "Sample Patient".
-- birth date is "1970-01-01".
-- defined by "Patient".
-
-fact "Diagnosis Finding":
-- date is "2026-01-01".
-- value is true.
-- defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
-
-fact "No Qualifying Diagnosis":
-- date is "2026-01-01".
-- value is false.
-- defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
-
-fact "Drug Therapy Failure":
-- date is "2026-01-01".
-- value is true.
-- defined by "Coverage Criteria Reference"."Failed Drug Therapy".
-
-fact "Physical Therapy Failure":
-- date is "2026-01-01".
-- value is true.
-- defined by "Coverage Criteria Reference"."Failed Physical Therapy".
-
-// #189 null/pause — "the patient did NOT fail therapy" is now something you STATE, not something you get by
-// omitting the fact. Omission means UNKNOWN (nothing established it and nothing can compute it), which makes
-// the gate pause and ask. An explicit \`value is false\` is the answer "no".
-fact "No Drug Therapy Failure":
-- date is "2026-01-01".
-- value is false.
-- defined by "Coverage Criteria Reference"."Failed Drug Therapy".
-
-fact "No Physical Therapy Failure":
-- date is "2026-01-01".
-- value is false.
-- defined by "Coverage Criteria Reference"."Failed Physical Therapy".
-
-fact "Viral Load Lab Result":
-- date is "2026-01-01".
-- value is true.
-- defined by "Coverage Criteria Reference"."Viral Load Below Threshold Lab Result".
-
-fact "Viral Suppression Chart Note":
-- date is "2026-01-01".
-- value is true.
-- defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
-
-// Explicit negative answers, not an inference from absent source records.
-fact "No Viral Suppression Lab Evidence":
-- date is "2026-01-01".
-- value is false.
-- defined by "Coverage Criteria Reference"."Viral Load Below Threshold Lab Result".
-
-fact "No Viral Suppression Chart Evidence":
-- date is "2026-01-01".
-- value is false.
-- defined by "Coverage Criteria Reference"."Viral Suppression Charted By Clinician".
-
-case "diagnosis + failed drug therapy + viral suppression (lab record) -> approve":
-- subject is "Sample Patient".
-- fact is "Diagnosis Finding".
-- fact is "Drug Therapy Failure".
-- fact is "Viral Load Lab Result".
-- result is "Coverage Determination" is "certify.Approve".
-
-case "diagnosis + failed physical therapy + viral suppression (chart record) -> approve (guard-or + defined-as either record)":
-- subject is "Sample Patient".
-- fact is "Diagnosis Finding".
-- fact is "Physical Therapy Failure".
-- fact is "Viral Suppression Chart Note".
-- result is "Coverage Determination" is "certify.Approve".
-
-case "diagnosis + failed conservative therapy but no documented viral suppression -> deny (defined-as node otherwise)":
-- subject is "Sample Patient".
-- fact is "Diagnosis Finding".
-- fact is "Drug Therapy Failure".
-- fact is "No Viral Suppression Lab Evidence".
-- fact is "No Viral Suppression Chart Evidence".
-- result is "Coverage Determination" is "not-certify.Deny".
-
-case "diagnosis + viral suppression but no conservative-therapy failure -> deny (criterion-2 node otherwise)":
-- subject is "Sample Patient".
-- fact is "Diagnosis Finding".
-- fact is "Viral Load Lab Result".
-- fact is "No Drug Therapy Failure".
-- fact is "No Physical Therapy Failure".
-- result is "Coverage Determination" is "not-certify.Deny".
-
-case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
-- subject is "Sample Patient".
-- fact is "No Qualifying Diagnosis".
-- fact is "Drug Therapy Failure".
-- fact is "Viral Load Lab Result".
-- result is "Coverage Determination" is "not-certify.Deny".
-`;
-
-/**
- * Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS
- * `decision-reference` (which ORDERs a service via `CPGServiceRequest`). Here the
+ * Canonical PRIOR-AUTHORIZATION exemplar (#134) — a coverage communication rather than a service order. Here the
  * payer COMMUNICATES a coverage determination via configured `<category>.<key>` local
  * activities (validated against `crl.dispositions`). This exemplar shows the
  * certify/not-certify baseline; a non-final `pended` leaf is legitimate only in embedded
  * mode. A single local criterion keeps the focus on the determination pattern; a real
- * policy authors its DISTINCT criteria as decision-tree nodes (see criteria-decision-reference).
+ * policy authors its DISTINCT criteria as decision-tree nodes (see the decision-composition rule).
  */
 export const PA_DETERMINATION_REFERENCE_CRL =
   `# PA Determination Reference — Coverage Determination (Stage 1 PA exemplar)
 library "PA Determination Reference".
 
 /*
-The canonical PRIOR-AUTHORIZATION exemplar — distinct from the CDS decision-reference (which
-ORDERs a service via CPGServiceRequest). Here the payer COMMUNICATES a coverage determination:
+The canonical PRIOR-AUTHORIZATION exemplar — a coverage communication rather than a service order. Here the payer COMMUNICATES a coverage determination:
 certify (X12 HCR01 A1) / not-certify (A3), via configured \`<category>.<key>\` local activities
 (validated against crl.dispositions — no shared library). This exemplar uses the certify/not-certify
 baseline; a deployment configures further keyed flavors. A non-final pended (A4) leaf is legitimate
 only in embedded mode. A single local criterion is shown; a real policy authors its DISTINCT
-criteria as decision-tree nodes (see criteria-decision-reference).
+criteria as decision-tree nodes (see the decision-composition rule).
 */
 
 // (illustrative placeholder criterion — a real policy decomposes its stated criteria;
 // here a single local leaf keeps the focus on the determination pattern)
 concept "Has Qualifying Diagnosis":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`qualifying-diagnosis\`.
@@ -536,6 +103,10 @@ case "no qualifying diagnosis -> deny (otherwise)":
 - subject is "Sample Patient".
 - fact is "No Qualifying Diagnosis".
 - result is "Coverage Determination" is "not-certify.Deny".
+
+case "missing required answer -> pause":
+- subject is "Sample Patient".
+- result is "Coverage Determination" is pause.
 `;
 
 /**
@@ -570,14 +141,20 @@ determination + one delegated sub.
 */
 
 concept "Continuation Request":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`continuation-request\`.
 concept "Demonstrated Response":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`demonstrated-response\`.
 concept "Clinically Indicated":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`clinically-indicated\`.
@@ -674,21 +251,14 @@ case "neither -> deny in parent otherwise":
 - fact is "No Continuation Request".
 - fact is "Not Clinically Indicated".
 - result is "Coverage Determination" is "not-certify.Deny".
+
+case "missing required answer -> pause":
+- subject is "Sample Patient".
+- fact is "Continuation Request Finding".
+- result is "Coverage Determination" is pause.
 `;
 
-/**
- * Worked exemplar C — DISPOSITION-ARBITRATION (kit teaching §5-C / §6). VERIFIED GREEN 6/6 including the two
- * load-bearing overlap cases. The TEMPTING-but-DON'T-chain case: ONE determination with MULTIPLE OVERLAPPING
- * qualifying pathways + a PRECEDENCE among outcome categories + fall-through. A KE is tempted to factor it into
- * chained sub-decisions, but the source draws NO determination boundary → it is ONE determination. Faithful form
- * (CRL #224 — structure, not inference): each pathway a sibling \`when\` gated on its FULL conjunction as a
- * COMPOUND BRANCH GUARD, the Approve > Deny > EIU precedence carried by \`first:\` branch ORDER, the residual by
- * \`otherwise\` — every criterion a visible guard atom, partial matches fall through (no trap), NO \`use decision\`
- * and NO \`sem-not\` inference-layer arbitration. The two denies use DISTINCT activities (not-certify.Deny vs
- * not-certify.EIU) so \`result is\` can distinguish them (§4-req1). The frozen \`.cel\` truth function is UNCHANGED
- * from the pre-#224 \`sem-not\` form (run_decision 6/6); this artifact RE-GROUNDS that form to the decision layer —
- * the \`sem-not\` FINAL-* arbitration was the single-concept-\`when\`-era workaround the decision layer now subsumes.
- */
+/** One determination, overlapping pathways, explicit outcome precedence. */
 export const DISPOSITION_ARBITRATION_REFERENCE_CRL =
   `# Disposition-Arbitration Reference — overlapping qualifying pathways with outcome precedence (Stage 1)
 library "Disposition Arbitration Reference".
@@ -707,16 +277,9 @@ gated on its FULL conjunction as a COMPOUND BRANCH GUARD (\`when ( c1 and c2 )\`
 \`first:\` BRANCH ORDER — Approve pathways first, then the covered-but-unqualified Deny, then the residual
 off-indication EIU (\`otherwise\`). The full-conjunction guard is what makes a PARTIAL pathway match fall
 THROUGH to the next branch rather than being trapped, so a patient who satisfies BOTH indications but
-fails one pathway still approves via the other — no "overlap pop". Every clinical criterion stays a
-VISIBLE guard atom in the emitted PlanDefinition (each pathway's \`condition[]\` shows which criteria
-drove it) — #168-clean by construction.
-
-This REPLACES the pre-#224 form, which computed the precedence in the INFERENCE layer via
-pairwise-disjoint \`sem-not\` FINAL-* concepts (Deny = ¬Approve, EIU = the complement) — an inference
-workaround for the era when a \`when\` could take only a SINGLE concept, so a conjunction had to live in
-\`defined as\` and disjointness had to be manufactured to keep flat siblings safe. The decision layer now
-subsumes it: \`first:\` gives precedence, the compound guard gives the conjunction. The truth function is
-UNCHANGED — the frozen cases below pass identically.
+fails one pathway still approves via the other — no "overlap pop". Publication guards emit a whole Boolean applicability expression and dependency input metadata.
+The authored criteria remain operands of that expression; they are not separate condition entries.
+False guards fall through; decisive unknown guards pause before a leaf.
 
 OVERLAP ORACLE (load-bearing): a patient who satisfies BOTH indications but fails ONE pathway's
 criteria still APPROVES via the OTHER pathway — the failure does not pop to a deny. The oracle asserts
@@ -726,28 +289,33 @@ WHICH outcome wins (the EXACT disposition under \`first:\`), so a precedence inv
 
 // ===== Clinical criteria (local case-features; visible decision nodes) =====
 concept "Has Indication X":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`indication-x\`.
 concept "Failed Standard Therapy":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`failed-standard-therapy\`.
 concept "Has Indication Y":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`indication-y\`.
 concept "Has Severe Markers":
+- shape is Record.
+- shape reduction is most recent.
 - value type is boolean.
 - type is Observation.
 - code is \`severe-markers\`.
 
 // ===== Decision: sibling compound-guard pathways; precedence = first: branch ORDER (CRL #224) =====
-// Each pathway is gated on its FULL conjunction as a compound branch guard, so a PARTIAL match falls
-// THROUGH to the next branch (no trap); the Approve > Deny > EIU precedence is the branch ORDER; every
-// clinical criterion stays a VISIBLE guard atom in the emitted PlanDefinition (#168-clean by
-// construction). No \`defined as\` composite and no \`sem-not\` arbitration — decision precedence lives
-// in the decision layer.
+// Each full conjunction determines whether its pathway applies.
+// first: gives precedence; unknown does not become false.
 decision "Coverage Determination":
 first:
 - when ( "Has Indication X" and "Failed Standard Therapy" ) then recommend activity "certify.Approve".
@@ -823,6 +391,11 @@ fact "Severe Markers Finding":
 - value is true.
 - defined by "Disposition Arbitration Reference"."Has Severe Markers".
 
+fact "No Severe Markers":
+- date is "2026-01-01".
+- value is false.
+- defined by "Disposition Arbitration Reference"."Has Severe Markers".
+
 case "X pathway qualifies -> approve":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
@@ -849,6 +422,7 @@ case "OVERLAP: both indications, Y-pathway fails (no severe markers) -> approve 
 - fact is "Indication X Finding".
 - fact is "Failed Standard Therapy Finding".
 - fact is "Indication Y Finding".
+- fact is "No Severe Markers".
 - result is "Coverage Determination" is "certify.Approve".
 
 case "within-indication: X present but pathway fails, no Y -> Deny":
@@ -863,6 +437,10 @@ case "off-indication: neither indication -> Deny EIU":
 - fact is "No Indication X".
 - fact is "No Indication Y".
 - result is "Coverage Determination" is "not-certify.EIU".
+
+case "missing required answer -> pause":
+- subject is "Sample Patient".
+- result is "Coverage Determination" is pause.
 `;
 
 export const PATIENT_AGE_BOTH_REP_REFERENCE_CRL = `# Patient-Age Both-Representation Reference — the local override + Patient age \`source representation\`
@@ -870,6 +448,9 @@ library "Patient Age Reference".
 
 /*
 REFACTOR:grounded (#320, plan583): synthetic age eligibility with explicit Record publication.
+The following behavior describes the age pattern's contract. Separate native probes cover
+the redesigned publication (review584); they do not certify this exact artifact.
+This exact example is validated and emitted here; its full Q/QR session is not executed by the kit suite.
 The age pattern recalculates each day; same-day assertions can override. Missing age remains
 unknown until a calculation or answer determines it. Persisted calculations retain their method,
 and cannot suppress a fresh calculation. CEL and extracted answers carry asserted method.
@@ -922,53 +503,16 @@ presentation for "Patient Under Twenty One Years":
 - question text is "Is the patient younger than 21 years?".
 `;
 
-/**
- * The multi-representation exemplar (Mammogram multi-source + BMI cascade), shipped as the
- * `representation-reference.crl` artifact (`verification: "validate-only"`). Its CANONICAL source is the
- * `tests/fixtures/representation/mammogram-and-bmi.crl` FILE (ALSO the rule-B positive exemplar); this const is
- * the SHIPPED MIRROR, kept identical by a CRLF-normalized text-equality test (edit the fixture; the const follows). FORWARD-LOOKING capability preview: it exercises constructs that PARSE + VALIDATE but are MOSTLY
- * runtime-deferred (the general external posrep #257; `defined as exists` #270; `definition is`
- * selection/count/within) — EXCEPT the standalone patient-age `value projection` (the #257 age slice: T1
- * recency + T2 months), which is runtime-SHIPPED in production. NOT a Stage-1 authoring license (see the kit
- * `boundary`); the value-preserving `sem-or` union + the standalone age `value projection` are the pieces it
- * teaches (a MISSING worked `sem-or` regenerated the "defined-as is boolean" misconception).
- */
-export const REPRESENTATION_REFERENCE_CRL = `# Representation-model reference — Mammogram (multi-source) + BMI (cascade)
-// Whole-artifact verification is validate-only: the mammography section illustrates grammar
-// and addressability, but uses unsupported opaque-ValueSet sourcing. It is not an executable
-// policy template; do not copy it as emit-ready CRL.
-// The Height/Weight/BMI/High BMI subsection uses the current explicit publication contract.
-// That isolated subsection validates, emits and has separate direct-data native controls;
-// its success does not establish the mammography section or full QR resubmission behavior.
-//
-// ── Addressability discipline (split on ADDRESSABILITY, not provenance alone) ──────────────
-// A \`source representation\` is an alternative SHAPE of ONE datum — not independently nameable.
-// A \`sem-or\` operand is a CONCEPT — independently assertable and referenceable. So you SPLIT a
-// concept into named sub-concepts only when a downstream query needs to NAME a subset; you do
-// NOT split merely because the data came from different systems.
-//   • "Height" — ONE source rep, NO split. Nobody needs "height via value set X" as a separate
-//     fact, so there is nothing to name; a lone posrep suffices.
-//   • "Mammogram" — SPLIT into "Clinical Mammogram" (performed: ImagingStudy/DiagnosticReport)
-//     and "Administrative Mammogram" (billed: Claim/EoB). "Most recent CLINICAL mammogram" is a
-//     real query, so the clinical subset must be nameable — hence two assertable concepts,
-//     value-preservingly unioned by \`sem-or\` into a dateTime "Mammogram".
-// Author self-check (DELETE TEST): delete a split; if nothing downstream loses the ability to
-// NAME something, it should not have been split. This keeps (C) from becoming a cargo-cult
-// "always split by provenance".
-//
-// The union is a WORKED \`sem-or\` over two dateTime concepts — value-preserving, NOT boolean.
-// (\`sem-or\`/\`sem-and\`/bare \`defined as\` preserve the operands' value type; only \`defined as
-// exists\` / a top-level \`sem-not\` are boolean.) Time-selection (\`most recent "Mammogram"\`) is
-// valid because "Mammogram" is an instance-bearing dateTime, not a derived boolean.
-library "Representation Examples".
+export const PUBLICATION_REFERENCE_CRL = `# Selected publication reference — BMI cascade and uncoded age
+library "Publication Examples".
 
-// ============ Terminologies (external systems / value sets) ============
-terminology "Mammogram VS":
-- valueset is \`http://example.org/screening/ValueSet/mammogram\`.
-terminology "Mammogram DiagnosticReport VS":
-- valueset is \`http://example.org/screening/ValueSet/mammogram-dr\`.
-terminology "Mammogram Billing VS":
-- valueset is \`http://example.org/screening/ValueSet/mammogram-billing\`.
+// Synthetic finite codes. Validate and emit this exact example; native execution
+// of related producer fixtures does not establish this entire artifact or a Q/QR session.
+// Codes intentionally keep local answers available, including for computed BMI and High BMI.
+// Presentations are omitted: emission warns and adds no authored question-text or description extension.
+// See concept-presentation for the tested engine's concept-name fallback.
+// See bmi-publication: full Q/QR resubmission for coded BMI remains open because untouched defaults
+// can become new assertions. This example does not certify that session behavior.
 terminology "Height VS":
 - system is \`http://example.org/synthetic-measurements\`.
 - code is \`height\`.
@@ -979,61 +523,6 @@ terminology "Clinical BMI":
 - system is \`http://example.org/synthetic-measurements\`.
 - code is \`bmi\`.
 
-// ============ Mammogram — split by ADDRESSABILITY (clinical vs administrative), source-rep-only ============
-// The performed study: ImagingStudy/DiagnosticReport prove the study HAPPENED. Serviced-not-created,
-// effective-not-issued (\`.issued\` lags the study and would corrupt a recency window).
-concept "Clinical Mammogram":
-- value type is dateTime.
-- source representation:
-  - type is ImagingStudy.
-  - coded from "Mammogram VS".
-- source representation:
-  - type is DiagnosticReport.
-  - coded from "Mammogram DiagnosticReport VS".
-
-// The billed study: Claim/EoB prove it was BILLED (deniable/reversible; no findings). A distinct
-// grade of evidence — payers distinguish them. Its own billing VS (CPT/HCPCS, not clinical codes).
-concept "Administrative Mammogram":
-- value type is dateTime.
-- source representation:
-  - type is Claim.
-  - coded from "Mammogram Billing VS".
-- source representation:
-  - type is ExplanationOfBenefit.
-  - coded from "Mammogram Billing VS".
-
-// ============ Mammogram — locally coded (\`code is\`) + value-preserving \`sem-or\` union ============
-concept "Mammogram":
-- value type is dateTime.
-- type is Observation.
-- code is \`mammogram\`.
-- defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
-
-// Two natural user-assertion points (assert at any level, ADR 0001 §8):
-//   - assert the EVENT ("Mammogram") → flows to most-recent, count, up-to-date;
-//   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
-concept "Had Mammogram":
-- value type is boolean.
-- type is Observation.
-- code is \`had-mammogram\`.
-- defined as exists ("Mammogram").
-
-concept "Most Recent Mammogram":
-- value type is dateTime.
-- definition is most recent "Mammogram".
-
-concept "Mammograms In Last Six Months":
-- value type is integer.
-- definition is count of "Mammogram" within last 6 months.
-
-concept "Up To Date On Mammography":
-- value type is boolean.
-- type is Observation.
-- code is \`up-to-date-on-mammography\`.
-- definition is "Most Recent Mammogram" within last 27 months.
-
-// REFACTOR:grounded (#320, plan595): synthetic finite source codes demonstrate explicit BMI publication.
-// ============ BMI cascade — Height (no split) contrasts with Mammogram (split) ============
 concept "Height":
 - shape is Record.
 - shape reduction is most recent.
@@ -1086,4 +575,24 @@ concept "Patient Under Six Months":
 - source representation:
   - type is Patient.
   - value projection is age today under 6 months.
+
+// Synthetic consumers keep the publication dependencies in the emitted closure.
+// These illustrate threshold evaluation, not clinical recommendations.
+decision "BMI Threshold Demonstration":
+first:
+- when "High BMI" then recommend activity "Threshold Met".
+- otherwise then recommend activity "Threshold Not Met".
+
+decision "Infant Age Demonstration":
+first:
+- when "Patient Under Six Months" then recommend activity "Threshold Met".
+- otherwise then recommend activity "Threshold Not Met".
+
+activity "Threshold Met":
+- request CPGCommunicationRequest.
+- with \`Synthetic demonstration: threshold met.\`.
+
+activity "Threshold Not Met":
+- request CPGCommunicationRequest.
+- with \`Synthetic demonstration: threshold not met.\`.
 `;
