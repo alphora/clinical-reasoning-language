@@ -28,8 +28,7 @@ import {
 } from "../reference";
 import { getAuthoringKit, STAGES, USE_CASE_NAMES } from "../index";
 import { answerExampleSource, ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_CEL, ANSWER_EXAMPLE_TERMS } from "../answerExample";
-import { fieldRulesOf } from "../../meta/registry";
-import { flagFieldRulesOf, validateFlagFields } from "../../flags/flagVocab"; // #212 step 4b: flag field rules live in the vocab now
+import { flagFieldRulesOf } from "../../flags/flagVocab"; // #212 step 4b: flag field rules live in the vocab now
 
 function crlErrors(src: string) {
   // Validate through the REAL single-file gate — `buildCRL` runs `classifyCriterionRefs`, so a `when`
@@ -331,6 +330,9 @@ describe("authoring-kit — getAuthoringKit", () => {
 
   it("stageRecommended types are all members of the full grammar lists", () => {
     const kit = getAuthoringKit();
+    // The grammar also contains legacy and source-only resource types. They must
+    // not be promoted into current selected-concept teaching by this field.
+    expect(kit.typeAllowlist.stageRecommended.conceptTypes).toEqual(["Observation"]);
     for (const t of kit.typeAllowlist.stageRecommended.conceptTypes) {
       expect(conceptTypes).toContain(t);
     }
@@ -348,6 +350,8 @@ describe("authoring-kit — getAuthoringKit", () => {
       "named-answer-terms.crl",
       "patient-age-both-rep-reference.crl",
       "publication-reference.crl",
+      "selection-reference.cel",
+      "selection-reference.crl",
     ]);
     // Every cpg artifact is edge-tagged cpg, and (closure) references no PA determination lib.
     for (const a of kit.referenceArtifacts) {
@@ -356,7 +360,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("the prior-auth chain embeds the full 11-artifact set (cpg base + the PA edge, inheritance; shared lib removed)", () => {
+  it("the prior-auth chain embeds the full artifact set (cpg base + the PA edge)", () => {
     const kit = getAuthoringKit(undefined, "prior-auth");
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
@@ -369,6 +373,8 @@ describe("authoring-kit — getAuthoringKit", () => {
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
       "publication-reference.crl",
+      "selection-reference.cel",
+      "selection-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
@@ -459,7 +465,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
-    expect(crePairs.length).toBe(4); // four decision exemplars; prevents a vacuous loop
+    expect(crePairs.length).toBe(5); // includes the shared selection test input
     for (const crl of crePairs) {
       const base = crl.name.replace(/\.crl$/, "");
       const cel = byName.get(`${base}.cel`);
@@ -867,7 +873,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "fb24c8b3a91d896a41e031595d720300e7a3abc41a8e20e3828fb9404a9432d9",
+      "d5640ae00853ae013d6a101bac3181156548dffd446c3604ac87629f94653f6c",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -880,7 +886,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "7a66c3286dcdbf6c6566bab00f11879d8ec3029ce3d8f03f25af456a4fb7d6d8",
+      "7e4ca21f79260a282970a64e3bcb40cb35dcb6f4f02934832af2cb12c903675f",
     );
   });
 
@@ -901,7 +907,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
-    "1.38": { cpg: "fb24c8b3a91d896a41e031595d720300e7a3abc41a8e20e3828fb9404a9432d9", priorAuth: "7a66c3286dcdbf6c6566bab00f11879d8ec3029ce3d8f03f25af456a4fb7d6d8" },
+    "1.38": { cpg: "d5640ae00853ae013d6a101bac3181156548dffd446c3604ac87629f94653f6c", priorAuth: "7e4ca21f79260a282970a64e3bcb40cb35dcb6f4f02934832af2cb12c903675f" },
     "1.37": { cpg: "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b", priorAuth: "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3" },
     "1.36": { cpg: "417b27c9557431cde15b1cf2c7f45f646a3598bb02bfdf559ffd7b260becdcfc", priorAuth: "183f26f2a9ff6f2b82087505f3a63e91e6a034ba3013b003bb71aa2a8a6882e9" },
     "1.35": { cpg: "72cdbf0d7f8db6fa7b3f843d3e82a76f6ca12558c7c560bff2dd3d913fff6c3a", priorAuth: "4d5004b9ff65d7370b83f3b352c7cf5d7662158c0f83cca4a1bb3c460f271423" },
@@ -1172,53 +1178,9 @@ describe("authoring-kit — examples are validated (no unverified CRL ships)", (
   });
 });
 
-describe("authoring-kit — review-flag + @gap-filed required fields are enforced (backs the review-flags rule)", () => {
-  // #212 step 4b: review FLAGS left the `.crl` registry — their field enforcement moved to the flag vocab
-  // (`validateFlagFields`), while `@gap-filed` (a NON-flag `.crl` meta tag) stays validator-enforced. The kit's
-  // "`@fidelity-defect` needs `; direction`, `@gap-filed` needs `; ref`" claim is backed HERE.
-  const conceptWith = (metaLine: string): string =>
-    `# T\nlibrary "T".\nconcept "C":\n- type is Observation.\n- meta is \`${metaLine}\`.\n- code is \`c\`.`;
-
-  it("@fidelity-defect WITHOUT `; direction` → validateFlagFields missing-field", () => {
-    const r = validateFlagFields({ tag: "fidelity-defect", gist: "over-reached somewhere" });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.reason).toBe("missing-field");
-  });
-  it("@gap-filed WITHOUT `; ref` → meta-missing-field (a NON-flag `.crl` tag, still validator-enforced)", () => {
-    expect(
-      crlErrors(conceptWith("@gap-filed: eGFR normalization not expressible")).map((e) => e.kind),
-    ).toContain("meta-missing-field");
-  });
-  it("well-formed @fidelity-defect (+ `; direction`) validates; @gap-filed (+ `; ref`) raises NO missing-field error", () => {
-    expect(
-      validateFlagFields({
-        tag: "fidelity-defect",
-        gist: "x",
-        fields: { direction: "over-reach", ref: "#207" },
-      }).ok,
-    ).toBe(true);
-    expect(crlErrors(conceptWith("@gap-filed: x; ref #180")).map((e) => e.kind)).not.toContain(
-      "meta-missing-field",
-    );
-  });
-  it("the taught optional `; ref` is VOCAB-MODELED on ALL FIVE flag tags — proven via the accessor", () => {
-    for (const tag of [
-      "customer-confirmable",
-      "internal-inconsistency",
-      "open-fork",
-      "fidelity-defect",
-      "validation-concern",
-    ]) {
-      const ref = flagFieldRulesOf(tag).find((r) => r.key === "ref");
-      expect(ref).toBeDefined();
-      expect(ref?.required).toBe(false);
-    }
-    // @gap-filed's ref stays REQUIRED in the `.crl` registry (the not-a-flag pointer).
-    expect(fieldRulesOf("gap-filed").find((r) => r.key === "ref")?.required).toBe(true);
-  });
-});
-
+// Flag field behavior is owned by flags/tests/flagVocab.test.ts; @gap-filed
+// field validation is owned by validator/tests/metaTag.test.ts. The checks below
+// verify delivered teaching, rather than repeating those implementations.
 describe("authoring-kit — the review-flags rule teaches the `medical-validation/flags/` STORE model, not `.crl`-meta flags (#212 step 4c, #230 relocation)", () => {
   // Guards the kit PAYLOAD (what a KE agent receives) against re-teaching the deleted `.crl`-meta flag path (gpt55 impl
   // review, disc 253). The strip tests prove the tags left the registry; this proves the kit no longer instructs authoring

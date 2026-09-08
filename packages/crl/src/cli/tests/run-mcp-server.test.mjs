@@ -257,12 +257,14 @@ try {
       "named-answer-terms.crl",
       "patient-age-both-rep-reference.crl",
       "publication-reference.crl",
+      "selection-reference.cel",
+      "selection-reference.crl",
     ]);
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
     assert.equal(kit.schemaVersion, "1.38"); // named answer ValueSets and presentations
-    assert.equal(kit.contentHash, "fb24c8b3a91d896a41e031595d720300e7a3abc41a8e20e3828fb9404a9432d9");
+    assert.equal(kit.contentHash, "d5640ae00853ae013d6a101bac3181156548dffd446c3604ac87629f94653f6c");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // Supported source/producer publications and legacy inference are distinct in-scope forms.
@@ -279,9 +281,9 @@ try {
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
     assert.equal(kit.schemaVersion, "1.38");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "7a66c3286dcdbf6c6566bab00f11879d8ec3029ce3d8f03f25af456a4fb7d6d8");
+    assert.equal(kit.contentHash, "7e4ca21f79260a282970a64e3bcb40cb35dcb6f4f02934832af2cb12c903675f");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities); publication-reference.crl added
+    assert.equal(refNames.length, 13); // inherited references, including the shared selection CRL/CEL pair
     assert.ok(!refNames.includes("medical-policy-determination.crl"));
     assert.ok(!kit.facets, "advisory facets are retired");
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");

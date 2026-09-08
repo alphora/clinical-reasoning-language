@@ -54,6 +54,7 @@ describe("extracting results from the engine envelope", () => {
 describe("every case gets exactly one terminal state", () => {
   const q = { questionnaire: { resourceType: "Questionnaire", id: "q" } };
 
+  // @kit produce-results:generated-is-not-an-outcome-oracle
   it("⭐ a clean run with a questionnaire is `generated`", () => {
     expect(classify(q, "", false, 0).state).toBe("generated");
   });
@@ -77,6 +78,7 @@ describe("every case gets exactly one terminal state", () => {
     expect(classify({}, "", false, 1).state).toBe("failed");
   });
 
+  // @kit produce-results:case-states
   it("⚠ every non-generated state carries a reason", () => {
     for (const c of [
       classify({}, "", true, null),

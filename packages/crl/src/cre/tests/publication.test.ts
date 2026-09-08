@@ -10,30 +10,9 @@ import { runCel } from "../run";
 import { renderScenario } from "../viewModel";
 import * as publicationProgramModule from "../../emit/publicationProgram";
 import { produceMembershipCandidate } from "../../emit/publicationProducer";
+import { SELECTION_POLICY as POLICY, SELECTION_DECISION as DECISION, SELECTION_NEWER_FALSE, selectionFact as fact, selectionCases } from "../../authoring-kit/selectionExample";
 
 // REFACTOR:grounded (#320, review 560): the selected Record's value decides; unknown pauses.
-const POLICY = `library "Publication".
-concept "Answer":
-- shape is Record.
-- type is Observation.
-- value type is boolean.
-- code is \`answer\`.
-- shape reduction is most recent.
-activity "Approve":
-- request CPGCommunicationRequest.
-- with \`APPROVED\`.
-activity "Deny":
-- request CPGCommunicationRequest.
-- with \`DENIED\`.
-`;
-const DECISION = `decision "D":
-first:
-- when "Answer" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".`;
-const fact = (name: string, value?: string, date?: string) => `fact "${name}":
-${value === undefined ? "" : `- value is ${value}.`}
-${date === undefined ? "" : `- date is "${date}".`}
-- defined by "Publication"."Answer".`;
 
 function evaluate(facts: string, references: string[], decision = DECISION, addition = "", expected = "Deny", extraCases = "", project: { policy?: string; coveredLibrary?: string; siblings?: string[]; installed?: string[]; packageName?: string; capturePublication?: boolean; captureView?: boolean } = {}) {
   const parent = path.resolve(os.tmpdir());
@@ -50,18 +29,7 @@ function evaluate(facts: string, references: string[], decision = DECISION, addi
       writeFileSync(path.join(packageDirectory, "policy.crl"), source);
     }
     const celPath = path.join(directory, "cases.cel");
-    writeFileSync(celPath, `library "Cases".
-covers "${project.coveredLibrary ?? "Publication"}".
-fact "Subject":
-- name is "Synthetic subject".
-- birth date is "1970-01-01".
-- defined by "Patient".
-${facts}
-case "Case":
-- subject is "Subject".
-${references.map((r) => `- fact is "${r}".`).join("\n")}
-- result is "D" is "${expected}".
-${extraCases}`);
+    writeFileSync(celPath, selectionCases(facts, references, expected, extraCases, project.coveredLibrary));
     const graph = resolveCelImports(celPath);
     expect(graph.celParseErrors).toEqual([]);
     expect(graph.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
@@ -110,14 +78,16 @@ describe("CRE selected Boolean publication", () => {
     expect(run.conceptTruth).toEqual([]);
   });
 
+  // @kit publication-selection:newest-value
   it.each([false, true])("newer false wins independent of order (reverse=%s)", (reverse) => {
-    const refs = ["Old", "New"];
-    const { run } = evaluate(fact("Old", "true", "2026-01-01") + fact("New", "false", "2026-02-01"), reverse ? refs.reverse() : refs);
+    const refs = [...SELECTION_NEWER_FALSE.references];
+    const { run } = evaluate(SELECTION_NEWER_FALSE.facts, reverse ? refs.reverse() : refs);
     expect(run.status).toBe("pass");
     expect(run.trace[0].facts).toEqual(["New"]);
     expect(run.produced[0].recommendation).toBe("Deny");
   });
 
+  // @kit publication-selection:newest-unknown
   it("newer unknown displaces old true", () => {
     const { run, emission, validation } = evaluate(fact("Old", "true", "2026-01-01") + fact("New", undefined, "2026-02-01"), ["Old", "New"]);
     expect(run.produced).toEqual([]);

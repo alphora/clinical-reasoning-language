@@ -287,6 +287,7 @@ describe("selected coded value classification and inferred candidate", () => {
     expect(produced.candidate.validity).toBeUndefined();
     expect(produced.computationalLineage.operandKey).toBe("idless");
   });
+  // @kit named-answer-options:domain-coding
   it("ignores foreign/display/version codings but rejects conflict or no domain coding", () => {
     const { operand, output } = descriptors();
     const system = operand.valueDomain![0].system;
@@ -315,6 +316,7 @@ describe("selected coded value classification and inferred candidate", () => {
       interpretPublicationCodeableValue(operand.valueDomain!, resource("unrecognized")),
     ).toMatchObject({ kind: "error", code: "publication-uninterpretable-value" });
   });
+  // @kit named-answer-options:selected-record-only
   it("does not interpret an older losing value", () => {
     const { operand, output } = descriptors();
     const rows = [

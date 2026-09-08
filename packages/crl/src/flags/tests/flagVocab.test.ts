@@ -14,6 +14,7 @@ import {
 } from "../flagVocab";
 
 describe("flagVocab accessors", () => {
+  // @kit review-flags:phase-vocabulary
   test("flagTags() returns the eight flag tags with their categories", () => {
     const byId = new Map(flagTags().map((t) => [t.id, t]));
     expect([...byId.keys()].sort()).toEqual([
@@ -96,6 +97,21 @@ describe("flagVocab accessors", () => {
 });
 
 describe("validateFlagFields", () => {
+  // @kit review-flags:optional-issue-reference
+  test.each(flagTags().map(t => t.id))("%s accepts an optional issue reference", tag => {
+    const fields: Record<string, string> = { ref: "#207" };
+    if (tag === "fidelity-defect") fields.direction = "over-reach";
+    const result = validateFlagFields({ tag, gist: "Review finding", fields });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.fields.ref).toBe("#207");
+    delete fields.ref;
+    const withoutRef = validateFlagFields({ tag, gist: "Review finding", fields });
+    expect(withoutRef.ok).toBe(true);
+    if (!withoutRef.ok) throw new Error(withoutRef.reason);
+    expect(withoutRef.fields).not.toHaveProperty("ref");
+  });
+
   test("a valid validation-concern → ok (canonical tag, its category, open status, empty fields)", () => {
     const r = validateFlagFields({ tag: "validation-concern", gist: "looks off" });
     expect(r.ok).toBe(true);
@@ -132,6 +148,7 @@ describe("validateFlagFields", () => {
     expect(r.reason).toBe("invalid-value");
   });
 
+  // @kit review-flags:required-direction
   test("a missing registry-required field → missing-field (@fidelity-defect needs direction)", () => {
     const r = validateFlagFields({ tag: "fidelity-defect", gist: "x" });
     expect(r.ok).toBe(false);

@@ -1,0 +1,320 @@
+# CRL test survey
+
+Baseline 60e0cd0c, 2026-09-08. **In progress, not comprehensive certification.**
+
+300 tracked test files. 36 read in full in this round; reading is not completion of claim mapping. Literal declaration inventory and source hashes: [test-inventory.json](test-inventory.json). Named declarations do not count all parameterized/dynamic cases; inspect their tables/helpers too. Earlier mappings remain in [coverage.md](coverage.md), with their own evidence revision.
+
+Normal runner discovery was reconciled with tracked files: batch-java.test.cjs requires an explicit JDK run and is absent from test:native:checks. Conditional native tests and early-return OS cases need per-case execution evidence. A green file or a matching hash does not establish that an assertion ran. No file below is excluded merely because it is unreviewed.
+
+| File (workspace-relative) | Literal declarations | Source loops | Inspection | Runner |
+|---|---:|---:|---|---|
+| packages/crl/scripts/native-acceptance/batch-java.test.cjs | 4 | 0 | read; claim disposition in progress | explicit JDK maintainer check |
+| packages/crl/scripts/native-acceptance/batch.test.cjs | 5 | 5 | read; claim disposition in progress | test:native:checks |
+| packages/crl/scripts/native-acceptance/bmi-session.test.cjs | 12 | 5 | read; claim disposition in progress | test:native:checks |
+| packages/crl/scripts/native-acceptance/check.test.cjs | 18 | 13 | read; claim disposition in progress | test:native:checks |
+| packages/crl/scripts/native-acceptance/session.test.cjs | 13 | 4 | read; claim disposition in progress | test:native:checks |
+| packages/crl/src/ast/tests/activity-structure.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/branchCondition.test.ts | 50 | 3 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/builder.test.ts | 39 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/concept-body-order-independence.test.ts | 20 | 1 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/concept-model-t1.test.ts | 23 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/concept-structure.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/conceptDependencies.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/criterionClassify.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/criterionExpansion.test.ts | 11 | 2 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/criterionIndex.test.ts | 13 | 3 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/decision-structure.test.ts | 14 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/decisionSpine.test.ts | 14 | 7 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/definedAsBooleanComposition-t1.test.ts | 35 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/guardDefines.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/inferenceWalk.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/library-and-include-structure.test.ts | 25 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/meta-carrier.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/reductions-shape.test.ts | 36 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/representation-structure.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/ast/tests/shape-reduction.test.ts | 11 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/ast/tests/terminology-structure.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/authoring-kit/tests/authoring-kit.test.ts | 51 | 32 | unreviewed | vitest crl |
+| packages/crl/src/authoring-kit/tests/referenceArtifactsEmit.test.ts | 5 | 8 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/b4-coded-value.test.ts | 6 | 4 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/bareTypeUncoded.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/classifyConceptRole.test.ts | 7 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/compartmentPathAuthority.test.ts | 5 | 4 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/derive-local.test.ts | 5 | 2 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/derivedRejectEmit.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/emit-fhir-golden.test.ts | 2 | 7 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/emitter.test.ts | 13 | 8 | unreviewed | vitest crl |
+| packages/crl/src/cel/emitter/tests/resource-coverage.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/imports/tests/resolver.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/tests/caseId.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/tests/definedByResolve.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/tests/factDate.test.ts | 30 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cel/tests/index.test.ts | 27 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/tests/temporal.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/bareFactWrongSystem.test.ts | 4 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/booleanValueRules.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/factDate.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/identityDiagnostics.test.ts | 11 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/localMembershipWarning.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/numericValueRules.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cel/validator/tests/validator.test.ts | 49 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cli/tests/run-emitter.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cli/tests/run-mcp-server.test.mjs | 0 | 0 | unreviewed | test:mcp |
+| packages/crl/src/cql-emitter/tests/ageChainAssertionPoints.test.ts | 3 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/ageProjectionRetirement.test.ts | 9 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/bmiRetirement.test.ts | 14 | 7 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/caseFeatureGuards.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/compositionErrorKinds.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/constructorCelParity.test.ts | 4 | 4 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/criterionCollision.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/criterionLoweringPin.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/definedAsExistsLowering.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/dme101-030-emit.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/emit-golden.test.ts | 2 | 2 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitCQL-meta.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitCQL-parameters.test.ts | 15 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitCriterionDefine.test.ts | 11 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitsScalarValue.test.ts | 8 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/foreignCriterionScope.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/functionalVsBinding.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/guardDefineBothLanes.test.ts | 4 | 4 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/heterogeneousSourceEmit.test.ts | 8 | 2 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/layeredEmit.test.ts | 39 | 3 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/leafEligibleConcepts.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/ledgerEnrollment2a.test.ts | 16 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/lowerLocalCodes.test.ts | 44 | 4 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/meta-emit-registry.test.ts | 15 | 6 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/namedAnswerOptionsEmit.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/publicationRecord.test.ts | 18 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/pureQuestionEmit.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/recencyRecordMerge.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/recencyTieBreak.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/recordUnionTerms.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/reductionExistsEmit.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/renderConstructorCall.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/renderPublicationSelection.test.ts | 2 | 5 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/renderRecordConstructor.test.ts | 9 | 5 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/semnotLowering.test.ts | 13 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/terminologyIdentifierCollision.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/totalScalarBoolean.test.ts | 22 | 2 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/truthsetProbe.test.ts | 1 | 8 | unreviewed | vitest crl |
+| packages/crl/src/cql-emitter/tests/unmatched-narrative.test.ts | 23 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/branchConditionEval.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/caseFactDates.test.ts | 25 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/composition.test.ts | 15 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/conceptTruth.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/criterionEval.test.ts | 32 | 7 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/decisionResolver.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/inlineAnswerBareCode.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/interfaceOwnValue.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/localMembership.test.ts | 14 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/membershipRefusal.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/pauseResult.test.ts | 20 | 5 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/pipelineFamily.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/publication.test.ts | 62 | 8 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/publicationAge.test.ts | 2 | 2 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/publicationBMI.test.ts | 1 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/publicationImports.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/publicationQuantity.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/publicationSource.test.ts | 8 | 2 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/run.test.ts | 22 | 3 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/unsatisfiedFrontier.test.ts | 34 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/viewModel.test.ts | 15 | 1 | unreviewed | vitest crl |
+| packages/crl/src/dispositions/tests/config.test.ts | 27 | 1 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/dispositions/tests/displayName.test.ts | 7 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/booleanTotality.test.ts | 50 | 0 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/boundaryTransform.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/closeIndex.test.ts | 14 | 2 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/declaredResultIndex.test.ts | 28 | 0 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/effectiveRepresentation.test.ts | 33 | 1 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/presentation.test.ts | 13 | 1 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/producerCandidate.test.ts | 10 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationAge.test.ts | 16 | 3 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationBMI.test.ts | 5 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationContext.test.ts | 16 | 4 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/publicationMembership.test.ts | 20 | 2 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationProgram.test.ts | 9 | 1 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationQuantity.test.ts | 8 | 1 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationSelection.test.ts | 29 | 2 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/emit/tests/publicationSource.test.ts | 19 | 1 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/publicationTemporal.test.ts | 3 | 1 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/recordConstructor.test.ts | 22 | 7 | unreviewed | vitest crl |
+| packages/crl/src/emit/tests/resourceEmitRegistry.test.ts | 45 | 12 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/activity.test.ts | 29 | 1 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/answerOptionsBinding.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/blephPresentation.test.ts | 1 | 2 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/caseFeatureCollection.test.ts | 11 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/caseFeatureRecord.test.ts | 11 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/ccScreeningRoundTrip.test.ts | 5 | 5 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/checkIds.test.ts | 15 | 2 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts | 56 | 18 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/codeSystem.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/collectCaseFeatures.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/corpusProbe.test.ts | 4 | 5 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/cpgActivityProfiles.test.ts | 10 | 4 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/criterionEmit.test.ts | 22 | 7 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/decision.test.ts | 75 | 3 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/emit-fhir-golden.test.ts | 2 | 5 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/example-fhir-golden.test.ts | 3 | 4 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/idFormatter.test.ts | 5 | 1 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/library.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/membershipPublication.test.ts | 14 | 3 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/metadata.test.ts | 25 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/namedAnswerClosure.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/partial-split-author-vs-golden.test.ts | 5 | 5 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/partial-split-fhir-golden.test.ts | 18 | 6 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/patient-age.test.ts | 3 | 1 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/presentationEmit.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/presentationReachability.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/recommendation.test.ts | 14 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/referenceStub.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/reproDate.test.ts | 20 | 2 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/selectedPublication.test.ts | 5 | 1 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/slug.test.ts | 33 | 1 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/structureDefinition.test.ts | 20 | 4 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/terminologyCodeDisplay.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/valueSet.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/writer.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-model/tests/elementPath.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-model/tests/fhirValueModel.test.ts | 20 | 9 | unreviewed | vitest crl |
+| packages/crl/src/flags/tests/buildFlagDraft.test.ts | 13 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/flags/tests/flagVocab.test.ts | 21 | 3 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/flags/tests/mvFlag.test.ts | 11 | 3 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/flags/tests/mvFlagAnchor.test.ts | 13 | 1 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/flags/tests/mvFlagStore.test.ts | 14 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/flags/tests/occurrenceKey.test.ts | 10 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/flags/tests/occurrenceSig.test.ts | 3 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/imports/tests/booleanCompositionCrossLib.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/booleanCompositionInferred.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/criterionAcceptance.test.ts | 3 | 4 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/criterionEmitEndToEnd.test.ts | 7 | 1 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/criterionMultifile.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/criterionTripwire.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/definedAsExistsInferred.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/dispositionValidate.integration.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/emit.test.ts | 35 | 2 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/foreignPublicationInterface.test.ts | 3 | 2 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/imports/tests/index.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/namespace.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/overlay.test.ts | 3 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/preparePublicationContext.test.ts | 17 | 3 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/imports/tests/publicationEmit.test.ts | 11 | 5 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/imports/tests/registry-and-resolver-v21.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/registry.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/resolver.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/scoping-v21.test.ts | 16 | 0 | unreviewed | vitest crl |
+| packages/crl/src/imports/tests/validate.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/celCompletion.integration.test.ts | 7 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/celCompletion.test.ts | 25 | 1 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/celDiagnostics.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/celHover.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/celNavigation.test.ts | 16 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/celSymbols.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/completion.test.ts | 18 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/contracts.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/criterionRename.test.ts | 2 | 2 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/diagnostics.test.ts | 15 | 2 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/host.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/hover.test.ts | 16 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/navigation.test.ts | 17 | 0 | unreviewed | vitest crl |
+| packages/crl/src/language-services/tests/refRanges.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/basic-tokens.test.ts | 42 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/comments.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/error-handling.test.ts | 11 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/error-listener.test.ts | 14 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/fhir-types.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/integration.test.ts | 16 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/parameter.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/structures.test.ts | 11 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/value-element.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/lexer/tests/whitespace.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/migration/tests/migrationInventory.test.ts | 25 | 0 | unreviewed | vitest crl |
+| packages/crl/src/migration/tests/retiredFormCorpus.test.ts | 3 | 4 | unreviewed | vitest crl |
+| packages/crl/src/parser/tests/createParser.test.ts | 2 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/canonicalize.test.ts | 57 | 4 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/chainBaseline.test.ts | 6 | 1 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/conceptContainment.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/conceptShape.test.ts | 13 | 3 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/correspondence.test.ts | 24 | 1 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/correspondenceCheck.test.ts | 26 | 8 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/coverage.test.ts | 11 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/criterionReachability.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/crlConceptLayer.test.ts | 24 | 1 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/crlStructure.test.ts | 20 | 8 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/cross-lib-boundary.test.ts | 15 | 6 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/cross-lib-chain.test.ts | 12 | 2 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/definedAsExpr.test.ts | 13 | 3 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/delegated-reachability.test.ts | 13 | 3 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/derivedFromContract.test.ts | 29 | 1 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/derivedFromPolicy.test.ts | 11 | 3 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/derivedFromResolution.test.ts | 13 | 2 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/discoverSource.test.ts | 18 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/failedCriteria.test.ts | 23 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/generate-default-chain.test.ts | 13 | 3 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/generate-disposition-path.test.ts | 16 | 14 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/generate-loop.test.ts | 18 | 7 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/generate.test.ts | 12 | 12 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/guardOutline.test.ts | 31 | 5 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/indexer.test.ts | 17 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/loadArtifact.test.ts | 17 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/merge.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/normalizeFiles.test.ts | 32 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/repoEscape.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/revealMaps.test.ts | 39 | 2 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/runPath.test.ts | 18 | 1 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/validators.test.ts | 52 | 12 | unreviewed | vitest crl |
+| packages/crl/src/provenance/tests/writeFileAtomic.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/results/tests/caseInput.test.ts | 5 | 5 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/driver.test.ts | 11 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/manifest.test.ts | 6 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/orphans.test.ts | 10 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/persistedPair.test.ts | 10 | 1 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/repoBundle.test.ts | 7 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/runProducer.test.ts | 11 | 1 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/spawn.test.ts | 15 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/results/tests/useCases.test.ts | 8 | 2 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/template-match/agePredicate.test.ts | 4 | 0 | unreviewed | vitest crl |
+| packages/crl/src/template-match/tests/membershipPattern.test.ts | 17 | 1 | unreviewed | vitest crl |
+| packages/crl/src/template-match/tests/patternCatalog.test.ts | 11 | 2 | unreviewed | vitest crl |
+| packages/crl/src/template-match/tests/pipeline.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/template-match/tests/recencyValueConcept.test.ts | 16 | 0 | unreviewed | vitest crl |
+| packages/crl/src/template-match/tests/resolvePipeline.test.ts | 21 | 0 | unreviewed | vitest crl |
+| packages/crl/src/tests/emit-layout.test.ts | 7 | 3 | unreviewed | vitest crl |
+| packages/crl/src/tests/emit-writers.test.ts | 17 | 2 | unreviewed | vitest crl |
+| packages/crl/src/tests/obesityTarget.test.ts | 3 | 5 | unreviewed | vitest crl |
+| packages/crl/src/tests/regression/regression-ast.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/tests/regression/regression-lexer.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/tests/regression/regression-parser.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/tests/regression/regression-transformer.test.ts | 0 | 0 | unreviewed | vitest crl |
+| packages/crl/src/tests/serviceRequestTarget.test.ts | 9 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/agePredicate.test.ts | 14 | 5 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/answerOptions.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/conceptSubstance.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/criterionSemantics.test.ts | 25 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/cycleDetector.test.ts | 18 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/decisionShape.test.ts | 27 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/definedAsBooleanComposition-t2.test.ts | 13 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/dispositionValidation.test.ts | 12 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/emitCapability.test.ts | 6 | 1 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/metaTag.test.ts | 11 | 0 | read; claim disposition in progress | vitest crl |
+| packages/crl/src/validator/tests/nameUniqueness.test.ts | 6 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/namedAnswerOptions.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/parameter.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/pipelineStage.test.ts | 10 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/publication.test.ts | 8 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/publicationMarkers.test.ts | 12 | 1 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/recordSetBound.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/reductionShape.test.ts | 47 | 1 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/representationShape.test.ts | 30 | 0 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/reservedLibraryName.test.ts | 3 | 1 | unreviewed | vitest crl |
+| packages/crl/src/validator/tests/useSiteType.test.ts | 77 | 11 | unreviewed | vitest crl |
+
+## Additional native entry points
+
+| File | Invocation | Inspection | Inputs / limits |
+|---|---|---|---|
+| packages/crl/scripts/native-acceptance/run.cjs | test:native:bleph | unreviewed | Requires explicit engine jar/output; source/CEL/FHIR and native/CRE case oracles |
+| packages/crl/scripts/native-acceptance/session.cjs | test:native:bleph-session | read; mapping in progress | Explicit engine jar/output; 4 steps in test/acceptance/bleph/session.json; fresh repository, returned QR + copied bindings; no Q sent |
+| packages/crl/scripts/native-acceptance/bmi-session.cjs | explicit node command | unreviewed | Separate BMI session; not the same transport contract as Bleph |
+
+The CLI MCP smoke uses assertions outside named test declarations; a zero declaration count does not exclude it. Extension tests that implement advertised tool availability/settings also require linked evidence, even though this discovery is scoped to packages/crl. Remaining discovery: reconcile all documented maintainer commands and fixture-only harnesses.

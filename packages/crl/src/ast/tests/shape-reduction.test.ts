@@ -31,6 +31,7 @@ const conceptFrom = (body: string): Concept => {
 };
 
 describe("first-class concept shape reduction", () => {
+  // @kit publication-selection:syntax
   it("captures a plain final selector with its source location and no implicit tie preference", () => {
     const line = "- shape reduction is most recent.";
     const concept = conceptFrom(`- shape is Record.\n${line}`);
@@ -44,6 +45,7 @@ describe("first-class concept shape reduction", () => {
     expect(concept.definition).toBeUndefined();
   });
 
+  // @kit publication-selection:syntax
   it("captures only an authored prefer-local equal-time policy", () => {
     const concept = conceptFrom(
       "- shape reduction is most recent, on equal time prefer local.\n- shape is Record.",

@@ -81,12 +81,12 @@ Replace-eligible tags (family-C + candidate external refs) **require** a `run` s
 
 Review flags were once carried here as `.crl` meta tags with `flag: true`. As of **#212 they left the `.crl` model entirely** and live as first-class **store records**; **#230 relocated the store** from the untracked artifact root (`<artifactRoot>/.crl/flags/`, outside every KELP entity → never captured by `kelp save`, left the worktree dirty) into the tracked `medical-validation` entity, at `<policySrc>/medical-validation/flags/<id>.json` — beside the MV sidecar, so `kelp save medical-validation` captures the records on the artifact branch:
 
-- **Vocabulary + validation:** [`flags/flagVocab.ts`](../src/flags/flagVocab.ts) (the five concern types + their field rules/aliases/enums/categories + the pure draft validator) — moved OUT of this registry.
+- **Vocabulary + validation:** [`flags/flagVocab.ts`](../src/flags/flagVocab.ts) (the four extraction tags and four MV validation types, with their field rules/aliases/enums/categories and the pure draft validator) — moved OUT of this registry.
 - **Record model + store:** [`flags/mvFlag.ts`](../src/flags/mvFlag.ts) + [`flags/mvFlagStore.ts`](../src/flags/mvFlagStore.ts) (a self-describing `MvFlag` record with an anchor; per-flag JSON under `medical-validation/flags/`).
 - **Authoring:** the `create_flag` / `set_flag_status` MCP tools WRITE the store (they require a `path` and do NOT rewrite `.crl` source). The MV cockpit's Add-flag drawer routes through the same seam (`validateAndBuildMvFlagDraft`).
 - **The `mvComplete` gate** reads the flag store (open flags block), not `.crl` meta. Writing a former flag tag as a `.crl` meta line now yields a `meta-unknown-tag` warning and does NOT gate.
 
-The concern taxonomy (extraction vs validation reference point; the four extraction types + `@validation-concern`) is unchanged in meaning — it just lives in `flagVocab`, not here. `@gap-filed` (a non-flag pointer, required `; ref`, no gate) remains a `.crl` meta tag in this model.
+The extraction tags are `customer-confirmable`, `internal-inconsistency`, `open-fork`, and `fidelity-defect`. The MV validation types are `validation-concern`, `narrative-defect`, `tooling-bug`, and `other`. Category identifies workflow phase, not the identity of the person or agent filing the flag; it grants no authorization to judge customer intent. Their field rules live in `flagVocab`, not the meta registry. Preserve existing MV review records when re-extracting CRL. `@gap-filed` (a non-flag pointer, required `; ref`, no gate) remains a `.crl` meta tag in this model.
 
 ## Stable identity (recommended)
 

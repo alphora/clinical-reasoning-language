@@ -1,5 +1,68 @@
 # Kit evidence ledger
 
+## Broad audit in progress — 624
+
+Baseline 60e0cd0c; source kit 1.38 remains unreleased. The initial discovery now
+includes **300 tracked test files**, including CLI and native checker tests.
+[test-survey.md](test-survey.md) and [test-inventory.json](test-inventory.json)
+record discovered declarations, source hashes, runner membership and unreviewed
+areas. This is discovery, not a completed semantic census. Parameter tables,
+helper assertions and documented native entry points still need explicit review.
+Inspection and execution are separate: a native test skipped for a missing jar
+does not gain runtime evidence from its passing registration sibling.
+
+### First corrected claims
+
+Current intent: independent final selection after producer-owned operations,
+preserve selected false/unknown, explicit equal-time policy, and classify a
+selected coded answer. Basis: north star assembly model, operator's pattern-owned
+behavior clarification, and the #320 selection/membership contracts tested below.
+
+| Tag / kit consumer | Actual input and owning assertion | Evidence and limits |
+|---|---|---|
+| `concept-form:publication-admission` / typeAllowlist | `emit/tests/publicationProgram.test.ts`: “refuses unsupported %s”; Scalar, Condition, string, empty producer and legacy selector mutations of explicit Answer | No descriptor, one error, lookup fails. Grammar vocabulary is not an execution allowlist. This kit's selected concepts recommend Observation; Patient/ServiceRequest are source types. Other supported Quantity/coded/age forms retain their separate evidence |
+| `publication-selection:syntax` | `ast/tests/shape-reduction.test.ts`: plain selector and authored prefer-local tests; exact `line`/body strings | AST has equalTime `error` or authored `preferLocal`; syntax only |
+| `publication-selection:newest-value` | `cre/tests/publication.test.ts`: “newer false wins independent of order”; both reference orders | Selects New and produces Deny. `selectionExample.ts` holds the actual policy, decision, fact and CEL builders. The delivered CRL/CEL pair is exactly the non-reversed test input; the generic kit gate also executes it. CRE, not native `$apply` |
+| `publication-selection:newest-unknown` | Same file: “newer unknown displaces old true”; dated Old/New facts | No activity, blockedUnknown true, selected fact New, emitted newer Observation lacks valueBoolean. The test deliberately supplies Deny as an unmet oracle; that oracle is not taught as the expected outcome |
+| `publication-selection:single-undated` | `emit/tests/publicationSelection.test.ts`: “selects one undated %s record”; false and unknown resources | Exact resource retained for both rows; pure selector evidence |
+| `publication-selection:equal-time-error` | Same file: “does not merge equal-time records…”; agreeing/disagreeing values and every order | `publication-ambiguous-selection`, not a value merge |
+| `publication-selection:local-tie-only` | Same file: authored local preference, older-local/newer-source, and multiple maximal locals tests | Unique local wins at equal latest time; newer source wins over older local; two latest locals still fail. Each helper checks permutations |
+| `publication-selection:incomparable-validity` | Same file: “does not treat %s versus %s as an equal-time tie”; calendar overlap plus unsupported comparison rows | Fails as incomparable, not a tie. These unit rows do not establish arbitrary precision support |
+| `publication-selection:undated-competition` | Same file: three undated competition/repair tests | Additional dated answer cannot repair undated competition; correcting actual validity can |
+| `publication-selection:invalid-input` | Same file: malformed validity table and repeated contributor/input identity table | Invalid input fails even when another row is newer; duplicate identity is scoped to a contributor. Same input in different contributors remains distinct (separate existing tests), not blanket deduplication |
+| `named-answer-options:domain-coding` | `emit/tests/publicationMembership.test.ts`: “ignores foreign/display/version codings…”; both coding orders | Recognized yes plus foreign no remains true; adding recognized no errors; no domain coding errors. Display/version do not decide membership |
+| `named-answer-options:selected-record-only` | Same file: “does not interpret an older losing value”; older unrecognized and newer yes | Selects newer yes, then produces true. Does not excuse malformed carrier/identity/validity |
+| `produce-results:generated-is-not-an-outcome-oracle`, `:case-states` | `results/tests/runProducer.test.ts`: synthetic clean Questionnaire and each non-generated state | `generated` classifies returned form presence; no activity assertion. Non-generated cases carry reasons. Synthetic classification does not prove native behavior |
+| `produce-results:mv-pair-normalization` | `results/tests/persistedPair.test.ts`: “drops QuestionnaireResponse.authored…” | Written MV pair lacks run-authored time; do not treat it as a complete interactive request. No client interaction is executed by this unit test |
+| `review-flags:phase-vocabulary`, `:required-direction`, `:optional-issue-reference` | `flags/tests/flagVocab.test.ts`: complete tag/category table, missing direction failure, all eight optional-ref rows | Four extraction tags and four validation types; fidelity-defect requires direction, issue ref is optional. Phase is distinct from actor identity per flagVocab's workflow contract. Preservation and authority to judge customer intent are manual workflow requirements, not conclusions from these tests |
+| `review-flags:gap-pointer-required-reference` | `validator/tests/metaTag.test.ts`: missing `@gap-filed` ref errors | Filtered metadata diagnostic only; legacy fixture is not a positive selected-concept example. The delivered Renal Function gap-pointer snippet is validated by the existing kit example gate |
+
+Removed four duplicated flag/metadata behavior checks from the kit suite. Negative
+direction and gap-reference assertions already belong to the flag and metadata
+validator suites. The optional-ref check moved to the flag suite and now validates
+all eight types both with and without ref rather than merely inspecting five registry entries. Positive
+gap-pointer authoring remains covered by the delivered-example validation gate.
+
+Validation of this slice: isolated released emitter plus audit changes; TypeScript
+build and 495 tests across 24 files passed, plus the complete MCP smoke. Review625
+found and closed two gaps: share the concrete selection case as well as its builders,
+and test optional references both present and absent. The affected209 tests across4
+files passed afterward; delivered kit hashes were unchanged by those fixes. Exact
+per-case outputs: tmp/625-vitest.json and tmp/625-followup-vitest.json; MCP log:
+tmp/625-mcp.log. Native review converged; external review was unavailable after
+two internal errors. No fresh native execution is claimed. The
+optional native selector test requires CRL_PUBLICATION_CQL_ENGINE_JAR and its
+matching driver configuration; it was not included in this command. The results
+orphan symlink test can return early when the OS refuses symlink creation, so its
+passing status alone is not proof that symlink rejection executed.
+
+Further inspected areas have candidate mappings, not completed coverage:
+ServiceRequest and Quantity source bounds; import visibility; all results tests;
+flag workflow vocabulary; native checker false-positive defenses. The remaining
+survey must cover both complete payloads and all applicable tests before release.
+
+## Earlier correction evidence
+
 Initial adoption of `crl-kit-update`, 2026-09-08. Diff baseline: CRL v4.123.0,
 `8f62a14a99aa3823fc3c54fb47a2d5fa4009604c`. Current audit covers the kit correction
 and shared answer example in this change. **The complete CRL test census is not

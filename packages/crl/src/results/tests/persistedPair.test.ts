@@ -73,6 +73,7 @@ describe("idempotence — no run clock in a committed artifact", () => {
     expect(stripRunTimestamp(42)).toBeUndefined();
   });
 
+  // @kit produce-results:mv-pair-normalization
   it("drops QuestionnaireResponse.authored — the run time belongs in the manifest, once", () => {
     const qr = { resourceType: "QuestionnaireResponse", authored: "2026-09-04T00:08:35-04:00" };
     const out = normalizePersistedPair(q(), qr, COMPARTMENT_A).questionnaireResponse!;

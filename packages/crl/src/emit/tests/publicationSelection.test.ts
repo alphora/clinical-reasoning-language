@@ -73,6 +73,7 @@ describe("selectPublicationCandidate: candidate/value preservation", () => {
     expect(selectPublicationCandidate([], options)).toEqual({ state: "missing" });
   });
 
+  // @kit publication-selection:single-undated
   it.each([
     ["known false", Object.freeze({ resourceType: "Observation", valueBoolean: false })],
     [
@@ -148,6 +149,7 @@ describe("selectPublicationCandidate: demonstrable recency", () => {
     selectsInEveryOrder([candidate("year", "2026"), candidate("month", "2026-09"), newest], newest);
   });
 
+  // @kit publication-selection:local-tie-only
   it("does not let an older local answer override a strictly newer source", () => {
     const newerSource = candidate("source", newTime, "source", { valueBoolean: true });
     selectsInEveryOrder(
@@ -159,6 +161,7 @@ describe("selectPublicationCandidate: demonstrable recency", () => {
 });
 
 describe("selectPublicationCandidate: authored equal-time selection", () => {
+  // @kit publication-selection:equal-time-error
   it.each([true, false])(
     "does not merge equal-time records merely because values agree/disagree (%s)",
     (otherValue) => {
@@ -172,6 +175,7 @@ describe("selectPublicationCandidate: authored equal-time selection", () => {
     },
   );
 
+  // @kit publication-selection:local-tie-only
   it.each([true, false])(
     "honors authored local preference for matching or conflicting same-QR values (%s)",
     (computedValue) => {
@@ -190,6 +194,7 @@ describe("selectPublicationCandidate: authored equal-time selection", () => {
     selectsInEveryOrder([local, source], local, preferLocal);
   });
 
+  // @kit publication-selection:local-tie-only
   it("fails when multiple local candidates share the maximal time", () => {
     failsInEveryOrder(
       [
@@ -243,6 +248,7 @@ describe("selectPublicationCandidate: authored equal-time selection", () => {
 });
 
 describe("selectPublicationCandidate: unavailable order and malformed data", () => {
+  // @kit publication-selection:incomparable-validity
   it.each([
     ["2026", "2026-09", "indeterminate"],
     ["2026-09-06", newTime, "indeterminate"],
@@ -257,6 +263,7 @@ describe("selectPublicationCandidate: unavailable order and malformed data", () 
     expect(result.diagnostic.message).toContain(comparison === "unsupported" ? "unsupported comparison" : "overlapping precision");
   });
 
+  // @kit publication-selection:invalid-input
   it.each(["2026-02-30", "2026-13", "2026-09-06T10:00:00", "", "2026\n"])(
     "rejects malformed supplied validity %j even alongside an otherwise newest row",
     (invalid) => {
@@ -268,6 +275,7 @@ describe("selectPublicationCandidate: unavailable order and malformed data", () 
 });
 
 describe("selectPublicationCandidate: undated multi-candidate input", () => {
+  // @kit publication-selection:undated-competition
   it("names the undated identity when a dated and undated candidate compete", () => {
     const undated = candidate("undated", undefined, "local");
     const dated = candidate("dated", newTime);
@@ -280,6 +288,7 @@ describe("selectPublicationCandidate: undated multi-candidate input", () => {
     expect(result.diagnostic.candidates).toHaveLength(1);
   });
 
+  // @kit publication-selection:undated-competition
   it("rejects two undated candidates and selects after their validity is corrected", () => {
     const first = candidate("first", undefined, "local");
     const second = candidate("second", undefined, "inferred");
@@ -289,6 +298,7 @@ describe("selectPublicationCandidate: undated multi-candidate input", () => {
     selectsInEveryOrder([correctedFirst, correctedSecond], correctedSecond, preferLocal);
   });
 
+  // @kit publication-selection:undated-competition
   it("a new dated answer cannot repair an undated input, but correcting that validity can", () => {
     const undated = candidate("undated", undefined);
     const existing = candidate("existing", oldTime, "local");
@@ -322,6 +332,7 @@ describe("selectPublicationCandidate: explicit identity boundary", () => {
     failsInEveryOrder([unidentified], "publication-missing-input-identity");
   });
 
+  // @kit publication-selection:invalid-input
   it.each([true, false])(
     "rejects repeated contributor/input identity including identical payload copies (%s)",
     (otherValue) => {

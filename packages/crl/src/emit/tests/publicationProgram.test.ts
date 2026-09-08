@@ -36,6 +36,7 @@ describe("admitted local Boolean publication", () => {
     expect(Object.isFrozen(descriptor)).toBe(true);
   });
 
+  // @kit concept-form:publication-admission
   it.each([
     ["shape", source.replace("shape is Record", "shape is Scalar")],
     ["resource", source.replace("type is Observation", "type is Condition")],

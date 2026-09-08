@@ -47,6 +47,7 @@ concept "C":
     expect(kinds(r.warnings ?? [])).toContain("meta-unknown-tag");
   });
 
+  // @kit review-flags:gap-pointer-required-reference
   it("@gap-filed without a `ref` → meta-missing-field error", () => {
     const r = validate(`library "L".
 concept "C":
