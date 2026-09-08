@@ -187,21 +187,22 @@ describe("the JVM spawn contract is bounded by construction", () => {
 // gate is not the failure path — it is the signature." They recovered the URL by reading back an
 // agent-to-agent message thread, because it existed nowhere in the shipped tool.
 describe("obtaining the engine jar", () => {
-  it("defaults to the local Maven repository copy when it is there", () => {
-    const home = mkdtempSync(path.join(tmpdir(), "crl-m2-"));
-    const dir = path.join(home, ".m2", "repository", "org", "opencds", "cqf", "fhir", "cqf-fhir-cr-cli", "4.7.0");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(path.join(dir, "cqf-fhir-cr-cli-4.7.0.jar"), "not-really-a-jar", "utf8");
-    expect(defaultEngineJarPath({ HOME: home } as NodeJS.ProcessEnv)).toBe(
-      path.join(dir, "cqf-fhir-cr-cli-4.7.0.jar"),
-    );
+  it("uses a distinct corrected-engine cache while preserving the original Maven jar", () => {
+    const home = mkdtempSync(path.join(tmpdir(), "crl-engine-"));
+    const old = path.join(home, ".m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar");
+    mkdirSync(path.dirname(old), { recursive: true });
+    writeFileSync(old, "original-engine");
+    expect(defaultEngineJarPath({ HOME: home } as NodeJS.ProcessEnv)).toBeUndefined();
+    const corrected = path.join(home, ENGINE_JAR_SOURCE.cacheRelativePath);
+    mkdirSync(path.dirname(corrected), { recursive: true });
+    writeFileSync(corrected, "corrected-engine");
+    expect(defaultEngineJarPath({ HOME: home } as NodeJS.ProcessEnv)).toBe(corrected);
+    expect(readFileSync(old, "utf8")).toBe("original-engine");
   });
 
-  // ⚠ A DEFAULT, NOT A SEARCH. Absence must be undefined so the caller refuses with the URL rather than
-  // crawling the filesystem looking for a file it cannot identify.
-  it("is undefined when the jar is not in the Maven repository", () => {
-    const home = mkdtempSync(path.join(tmpdir(), "crl-m2-empty-"));
-    expect(defaultEngineJarPath({ HOME: home } as NodeJS.ProcessEnv)).toBeUndefined();
+  it("is undefined in a fresh cache and without a home", () => {
+    const home = mkdtempSync(path.join(tmpdir(), "crl-engine-empty-"));
+    expect(defaultEngineJarPath({ USERPROFILE: home } as NodeJS.ProcessEnv)).toBeUndefined();
     expect(defaultEngineJarPath({} as NodeJS.ProcessEnv)).toBeUndefined();
   });
 
@@ -217,7 +218,7 @@ describe("obtaining the engine jar", () => {
   it("the fetch command is copy-pasteable and lands where the default looks", () => {
     const cmd = engineJarFetchCommand();
     expect(cmd).toContain(ENGINE_JAR_SOURCE.url);
-    expect(cmd).toContain(".m2/repository/" + ENGINE_JAR_SOURCE.mavenLocalPath);
+    expect(cmd).toContain(ENGINE_JAR_SOURCE.cacheRelativePath);
     expect(cmd).toContain("--create-dirs"); // the directory will not exist on a first fetch
   });
 });

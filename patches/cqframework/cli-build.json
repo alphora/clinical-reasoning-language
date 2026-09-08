@@ -1,0 +1,20 @@
+{
+  "buildId": "cqf-4.7-crl-bd2b1c19",
+  "upstreamBase": "4.7.0",
+  "upstreamBaseCommit": "1335b9443777725220c3520342e1664dda409584",
+  "sourceCommit": "bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73",
+  "sourceTree": "3749585e5f9d8a46de713ad58b953a78dd65e993",
+  "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73",
+  "upstreamRelease": false,
+  "embeddedBuildVersion": "4.8.0-codex-qr-extraction-backport-bd2b1c1-SNAPSHOT",
+  "embeddedVersionExplanation": "Upstream Gradle derives the next-version branch snapshot; source is the pinned 4.7.0 base plus the two reviewed patches, not an upstream4.8 release.",
+  "asset": "cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar",
+  "sha256": "5eb708ece6ecbf307825e9dc25510b52c4e8c3b832a487bf546802443440dc4c",
+  "bytes": 215813768,
+  "unchangedThirdPartyJars": 129,
+  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=2",
+  "jdkMajor": 17,
+  "patchManifest": "patches/cqframework/manifest.json",
+  "license": "Apache-2.0",
+  "scope": "Complete maintainer-built CLI jar; no runtime overlay or upstream publication claim."
+}

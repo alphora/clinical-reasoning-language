@@ -5,7 +5,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {execFileSync}=require('node:child_process');
 const {loadFixture,hash}=require('./check.cjs');
 const {runBounded,childEnvironment}=require('./process.cjs');
-const {classDir,overlaySha256,helperReady,checkOrigins,single,editResponse,checkExtraction,sessionVerdict}=require('./session-check.cjs');
+const {classDir,overlaySha256,helperReady,checkOrigins,sessionEngine,originalEngineSha256,single,editResponse,checkExtraction,sessionVerdict}=require('./session-check.cjs');
 const pkg=path.resolve(__dirname,'../..'),workspace=fs.realpathSync(path.resolve(pkg,'../..')),fixture=path.join(pkg,'test/acceptance/bleph');
 const write=(p,v)=>fs.writeFileSync(p,typeof v==='string'?v:JSON.stringify(v,null,2)+'\n');
 const maxBytes=32*1024*1024;
@@ -33,9 +33,9 @@ function options(args) {
 async function main(args) {
   const startTime=Date.now(),o=options(args),f=loadFixture(fixture),session=read(path.join(fixture,'session.json'));
   const {ENGINE_JAR_SOURCE,parseJavaMajor,MIN_JAVA_MAJOR}=require('../../dist/results/spawn');
-  const engineHash=hash(fs.readFileSync(o.jar));assert.equal(engineHash,ENGINE_JAR_SOURCE.sha256,'Requires original pinned engine jar');
+  const engineHash=hash(fs.readFileSync(o.jar)),engine=sessionEngine(engineHash,o.overlay,ENGINE_JAR_SOURCE);
   if(o.overlay)assert.equal(hash(fs.readFileSync(o.overlay)),overlaySha256,'Only reviewed combined4.7 overlay admitted');
-  const helper=helperReady();assert.equal(helper.engineSha256,engineHash);
+  const helper=helperReady();assert.ok([originalEngineSha256,ENGINE_JAR_SOURCE.sha256].includes(helper.engineSha256),'Unrecognized helper compilation engine');
   assert.equal(session.schemaVersion,1);assert.equal(session.steps.length,4);
   fs.mkdirSync(o.out);const controller=new AbortController(),interrupt=()=>controller.abort();
   process.on('SIGINT',interrupt);process.on('SIGTERM',interrupt);
@@ -46,7 +46,7 @@ async function main(args) {
   try {
     const java=o.java||'java',version=await runBounded(java,['-version'],{cwd:o.out,env:childEnvironment(o.out),signal:controller.signal,timeoutMs:15000});
     assert.ok(!version.failure&&version.exitCode===0&&parseJavaMajor(version.stderr+version.stdout)>=MIN_JAVA_MAJOR,'Java unavailable/too old');
-    write(path.join(o.out,'manifest.json'),{schemaVersion:1,sourceHead:git('rev-parse','HEAD'),sourceStatus:git('status','--porcelain'),engine:ENGINE_JAR_SOURCE,
+    write(path.join(o.out,'manifest.json'),{schemaVersion:1,sourceHead:git('rev-parse','HEAD'),sourceStatus:git('status','--porcelain'),engine,
       overlay:o.overlay?{sha256:overlaySha256,label:'Reviewed local test instrument; not installed/shipped engine'}:null,
       helper,distHashes,harnessHashes,fixtureHashes:f.hashes,node:process.version,java:version.stderr+version.stdout,
       invocation:'Native R4 applyR5, useServerData=true, complete Q+QR in dataBundle; fresh repository per call; fixed initial clinical data',
@@ -84,7 +84,7 @@ async function main(args) {
       const began=Date.now(),p=await runBounded(java,javaArgs,{cwd:dir,env:childEnvironment(dir),signal:controller.signal,timeoutMs:120000,maxBytes});
       p.durationMs=Date.now()-began;write(path.join(dir,'stdout.log'),p.stdout);write(path.join(dir,'stderr.log'),p.stderr);write(path.join(dir,'process.json'),{...p,stdout:undefined,stderr:undefined});
       assert.ok(!p.failure&&p.exitCode===0,'Native process failed at '+step.name);
-      checkOrigins(fs.readFileSync(prefix+'-origins.txt','utf8'),o.jar,o.overlay);
+      checkOrigins(fs.readFileSync(prefix+'-origins.txt','utf8'),o.jar,o.overlay,!engine.original||Boolean(o.overlay));
       const result=read(prefix+'-result.json'),native=sessionVerdict(result,oracle,f.contract,step,subject,p);
       const extraction=checkExtraction({before:read(prefix+'-request-before.json'),after:read(prefix+'-request-after.json'),
         storedBefore:read(prefix+'-stored-observations-before.json'),storedAfter:read(prefix+'-stored-observations-after.json'),
@@ -106,7 +106,7 @@ async function main(args) {
       if(o.overlay)assert.equal(hash(fs.readFileSync(o.overlay)),overlaySha256,'Overlay changed during run');
     }catch(e){failures.push(e.message);}
     const passed=rows.length===4&&rows.every(r=>r.passed)&&!failures.length;
-    write(path.join(o.out,'summary.json'),{passed,scope:session.scope,engine:o.overlay?'explicit-reviewed-overlay':'original-pinned-engine',durationMs:Date.now()-startTime,rows,failures});
+    write(path.join(o.out,'summary.json'),{passed,scope:session.scope,engine:engine.mode,engineSha256:engine.sha256,durationMs:Date.now()-startTime,rows,failures});
     console.log(`Session acceptance: ${passed?'PASS':'FAIL'}; ${rows.filter(r=>r.passed).length}/4 stages`);
     if(!passed)process.exitCode=1;
   }

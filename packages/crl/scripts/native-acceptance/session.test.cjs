@@ -51,3 +51,16 @@ test('questionnaire expansion does not imply response or data mutation',()=>{
 });
 test('runtime helper matches source and Java17 floor',()=>assert.equal(helperReady().classFileMajor,61));
 test('missing class-origin evidence cannot pass',()=>assert.throws(()=>checkOrigins('',path.resolve('engine.jar'))));
+
+const {sessionEngine,originalEngineSha256}=require('./session-check.cjs');
+test('session admits corrected jar and explicit original control, rejects unknown and mixed overlay',()=>{
+  const current={buildId:'corrected',sha256:'corrected-hash'};
+  assert.equal(sessionEngine('corrected-hash',undefined,current).original,false);
+  assert.equal(sessionEngine('corrected-hash',undefined,current).mode,'corrected');
+  assert.equal(sessionEngine(originalEngineSha256,undefined,current).original,true);
+  assert.equal(sessionEngine(originalEngineSha256,undefined,current).mode,'original-pinned-engine');
+  assert.equal(sessionEngine(originalEngineSha256,'reviewed-overlay',current).original,true);
+  assert.equal(sessionEngine(originalEngineSha256,'reviewed-overlay',current).mode,'explicit-reviewed-overlay');
+  assert.throws(()=>sessionEngine('corrected-hash','reviewed-overlay',current),/only compatible/);
+  assert.throws(()=>sessionEngine('unknown',undefined,current),/Unrecognized/);
+});

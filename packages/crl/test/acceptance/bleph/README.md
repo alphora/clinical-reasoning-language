@@ -8,10 +8,10 @@ From the repository root, with dependencies installed and Java 17 or newer:
 
 ```sh
 npm run test:native:checks
-npm run test:native:bleph -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7.0.jar --out /existing/parent/new-run
+npm run test:native:bleph -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar --out /existing/parent/new-run
 ```
 
-In PowerShell use `npm.cmd` for argument forwarding. The acceptance command's `pretest:native:bleph` hook builds the core before execution; do not invoke `run.cjs` directly as a source acceptance gate. Checker tests require built core driver helpers. Java or jar absence is an error, never a skipped pass. No download or installation occurs. The jar must match `ENGINE_JAR_SOURCE` in `src/results/spawn.ts`: CQFramework4.7.0, SHA256 `10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0`.
+In PowerShell use `npm.cmd` for argument forwarding. The acceptance command's `pretest:native:bleph` hook builds the core before execution; do not invoke `run.cjs` directly as a source acceptance gate. Checker tests require built core driver helpers. Java or jar absence is an error, never a skipped pass. No download or installation occurs. The jar must match `ENGINE_JAR_SOURCE` in `src/results/spawn.ts`: CRL-maintained build `cqf-4.7-crl-bd2b1c19`, SHA256 `5eb708ece6ecbf307825e9dc25510b52c4e8c3b832a487bf546802443440dc4c`. Source/build provenance is in [cli-build.json](../../../../../patches/cqframework/cli-build.json). Historical original-engine measurements below identify what ran at that time, not the current engine selection.
 
 The output parent must exist and the final directory must be new and outside source/fixture directories. Outputs include exact inputs, emitted definitions/CQL, process logs, Parameters, per-case checks, toolchain/fixture/dist/harness hashes, and a completeness summary. Choose a drive with adequate space. `--java PATH` selects a runtime; `--workers 1..4` defaults to2. `--batch-size 1..32` defaults to8 cases per JVM; `--batch-size 1` starts a separate JVM for each case. `--order reverse` reverses the full case order for isolation checks; default is `forward`. Every mode runs all116 cases.
 
@@ -67,7 +67,7 @@ The final summary separately reports `nativeAccepted`, `creAccepted`, their pass
 Run the separate four-step native operation gate with:
 
 ```sh
-npm run test:native:bleph-session -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7.0.jar --out /existing/parent/new-session
+npm run test:native:bleph-session -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar --out /existing/parent/new-session
 ```
 
 This command builds the core and uses the same pinned jar. It starts with `missing-cosmetic`, submits
@@ -85,11 +85,15 @@ fixed; stored Observation queries and repository-input snapshots must remain unc
 Questionnaires can expand/reversion during apply; submitted responses must remain intact. Returned
 activities, routes, null witnesses, questions and typed answers receive the existing native checks.
 
-The original4.7 engine loses Coding answers in this path; that is a failed acceptance result, never an
-expected-failure pass. To measure the already reviewed CQFramework patches, explicitly pass
+The complete corrected engine runs without an overlay. The session runner also admits the original
+4.7 jar (SHA256 `10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0`)
+as an explicit failure control; it loses Coding answers in this path. That is a failed acceptance
+result, never an expected-failure pass. To reproduce the earlier patch-overlay measurement with
+that original jar, explicitly pass
 `--engine-overlay /path/to/combined-4.7.0-overlay.jar`. Only SHA256
 `3d7c2ff9492006ad06e8d61e7e5f5aff9a2c3c062b9579611f1361c05a98c6f8` is admitted. This is a local test
-instrument, not a released or installed engine. Both configurations have identical clinical targets;
+instrument, not a released or installed engine, and cannot be stacked on the corrected complete jar.
+All configurations have identical clinical targets;
 the summary returns failure if any stage or extraction check fails. Actual class origins distinguish
 the pinned nested engine dependencies from the selected overlay. See [patch provenance](../../../../../patches/cqframework/README.md).
 

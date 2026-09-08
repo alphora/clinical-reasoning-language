@@ -20,6 +20,7 @@ import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { produceResults } from "../results/produce";
+import { ENGINE_JAR_SOURCE, engineJarHelp } from "../results/spawn";
 import { RESULT_USE_CASES, isResultUseCase } from "../results/useCases";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
 import { resolveEmitOutput, LANE_PRODUCES, type EmitLane } from "../emit-layout";
@@ -797,12 +798,7 @@ export function createServer(): McpServer {
           .min(1)
           .optional()
           .describe(
-            "OPTIONAL absolute path to the engine jar. Omit it and the local Maven repository copy is " +
-              "used: <home>/.m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/" +
-              "cqf-fhir-cr-cli-4.7.0.jar. Do not have it? It is ~215 MB from " +
-              "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/" +
-              "cqf-fhir-cr-cli-4.7.0.jar (maven org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0). ⚠ It must be " +
-              "the -cli artifact — the plain cqf-fhir-cr jar is not a Spring Boot fat jar and will not launch.",
+            "OPTIONAL absolute path to the engine jar. " + engineJarHelp().join(" "),
           ),
         jarSha256: z
           .string()
@@ -810,8 +806,7 @@ export function createServer(): McpServer {
           .optional()
           .describe(
             "OPTIONAL expected sha256, verified before every launch. Omit it and this build’s pinned " +
-              "value is used: 10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0. Pass one " +
-              "only to pin a different engine build.",
+              `value is used: ${ENGINE_JAR_SOURCE.sha256}. Pass one only to pin a different engine build.`,
           ),
         outRoot: z
           .string()

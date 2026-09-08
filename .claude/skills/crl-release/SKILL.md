@@ -149,6 +149,25 @@ Not the working tree. The thing a user installs.
 - [ ] Anything with a viewer (pane, cockpit): **open it and confirm it matches.** A pane that renders
       empty is indistinguishable from a pane with nothing to show. That shipped for months.
 
+### `emit_results`: verify the engine and the results
+
+The compiled ApplyDriver ships with CRL; the CQFramework CLI engine JAR is a separate
+runtime dependency. Rebuilding CRL does not update that JAR. For an `emit_results` release:
+
+- Record the engine actually selected by the installed tool (version/build, source of fixes,
+  and SHA-256), including any configuration override. A merged PR, a rebuilt driver, or a
+  passing test overlay does not establish which engine the KE will run. If the release needs
+  engine fixes, verify the delivered engine contains them and the KE setup selects it.
+- Invoke installed `emit_results` over MCP on the in-scope CEL cases. Inspect its result
+  manifest, engine errors, expected activities/null conditions, and actual Questionnaire and
+  QuestionnaireResponse files. File existence and exit zero alone are insufficient.
+- Open those generated outputs in the project's result viewer (the CRL Medical Validation
+  pane for PA). This full-path review display is not the customer's interactive client.
+  Verify Q/QR structure and $apply outcomes directly; a separate client is not required.
+  When the release claims interactive
+  answer/change/clear behavior, also run the corresponding full-response native session check;
+  initial `emit_results` population alone does not establish that behavior.
+
 ## 5. Gate D — setup cost is part of the product
 
 Write out, literally, every step a KE performs from zero. If that list contains hashing a jar,

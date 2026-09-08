@@ -21,13 +21,20 @@ function helperReady() {
   assert.equal(m.classFileMajor,61);assert.equal(bytes.readUInt32BE(0),0xcafebabe);assert.equal(bytes.readUInt16BE(6),61);
   assert.deepEqual(m.classes,{'ApplySessionDriver.class':hash(bytes)});return m;
 }
-function checkOrigins(text,jar,overlay) {
+const originalEngineSha256='10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0';
+function sessionEngine(engineHash,overlay,current) {
+  const original=engineHash===originalEngineSha256;
+  assert.ok(original||engineHash===current.sha256,'Unrecognized session engine build');
+  assert.ok(!overlay||original,'Test overlay is only compatible with the original4.7 engine');
+  return original?{buildId:'upstream-4.7.0',sha256:originalEngineSha256,original:true,mode:overlay?'explicit-reviewed-overlay':'original-pinned-engine'}:{...current,original:false,mode:current.buildId};
+}
+function checkOrigins(text,jar,overlay,hasGeneratedIds=Boolean(overlay)) {
   const entries=text.trim().split(/\r?\n/).map(l=>l.split('\t'));
   assert.deepEqual(entries.map(e=>e[0]),classNames,'Missing/duplicate engine class origins');
   const jarPart=pathToFileURL(jar).href.slice('file:'.length).replace(/^\/\//,'');
   for(const [i,[name,origin]] of entries.entries()) {
     if(overlay&&i>0) assert.equal(origin,pathToFileURL(overlay).href.replace('file:///','file:/'),name+' overlay not loaded');
-    else if(!overlay&&i===7) assert.equal(origin,'ABSENT',name);
+    else if(!hasGeneratedIds&&i===7) assert.equal(origin,'ABSENT',name);
     else assert.ok(decodeURI(origin).includes(decodeURI(jarPart))&&origin.includes('/!BOOT-INF/lib/'),name+' did not load from pinned nested jar: '+origin);
   }
 }
@@ -92,4 +99,4 @@ function sessionVerdict(result,entry,contract,step,subject,processResult) {
   // stdout-JSON driver's prefix parser must not hide errors or null witnesses here.
   return nativeVerdict(result,e,c,subject,{...processResult,stdout:'',stderr:(processResult.stderr||'')+'\n'+(processResult.stdout||'')});
 }
-module.exports={classDir,overlaySha256,helperReady,checkOrigins,single,leaf,editResponse,checkEdit,checkExtraction,sessionVerdict};
+module.exports={sessionEngine,originalEngineSha256,classDir,overlaySha256,helperReady,checkOrigins,single,leaf,editResponse,checkEdit,checkExtraction,sessionVerdict};

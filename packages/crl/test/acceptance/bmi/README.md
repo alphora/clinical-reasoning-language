@@ -4,7 +4,7 @@ This explicitly invoked probe tests one client-owned submission strategy on orig
 CQFramework4.7.0. It is not the full-QuestionnaireResponse acceptance gate, a rendered
 client, persistence reconciliation, or a replacement for Bleph acceptance.
 
-From the repository root, with the pinned engine downloaded and Java17+ available:
+From the repository root, with the original 4.7.0 control engine downloaded and Java17+ available:
 
 ```sh
 node packages/crl/scripts/native-acceptance/bmi-session.cjs --engine-jar /path/to/cqf-fhir-cr-cli-4.7.0.jar --out /path/to/new-output --java /path/to/java
@@ -16,6 +16,9 @@ Its parent must exist. The probe builds the core before loading emitters and emi
 `src/emit/tests/fixtures/publication-bmi.crl` into a fresh output project. It checks
 the pinned engine hash, session helper bytes, actual class origins, and unchanged
 compiler/harness/fixture/engine hashes over execution. No overlay is admitted.
+This probe explicitly retains original4.7 (`10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0`)
+independently of the corrected engine selected by the shipped `emit_results` default.
+It is a historical BMI control, not a certification of BMI on that corrected engine.
 Requests, results, extraction, state before/after, build log, source identity and
 verdicts are retained under the output directory. Failure returns a nonzero exit.
 

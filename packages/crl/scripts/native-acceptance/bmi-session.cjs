@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {execFileSync}=require('node:child_process');
 const pkg=path.resolve(__dirname,'../..'),workspace=path.resolve(pkg,'../..');
 const {hasEngineError,objects,hash}=require('./check.cjs');
-const {classDir,helperReady,checkOrigins,single}=require('./session-check.cjs');
+const {classDir,helperReady,checkOrigins,single,originalEngineSha256}=require('./session-check.cjs');
 const read=p=>{assert.ok(fs.statSync(p).size<=32*1024*1024,'Oversized evidence');return JSON.parse(fs.readFileSync(p));};
 const write=(p,v)=>fs.writeFileSync(p,JSON.stringify(v,null,2)+'\n');
 const profile=k=>'http://example.org/bmi/StructureDefinition/bmi-publication-'+k;
@@ -98,7 +98,8 @@ async function main(args){
  fs.writeFileSync(path.join(root,'build.log'),buildLog);
  const {runBounded,childEnvironment}=require('./process.cjs');
  const {ENGINE_JAR_SOURCE}=require('../../dist/results/spawn');
- const jar=o.jar,helper=helperReady();assert.equal(hash(fs.readFileSync(jar)),ENGINE_JAR_SOURCE.sha256);assert.equal(helper.engineSha256,ENGINE_JAR_SOURCE.sha256);
+ // This historical control deliberately stays on original4.7 when the delivered default changes.
+ const jar=o.jar,helper=helperReady();assert.equal(hash(fs.readFileSync(jar)),originalEngineSha256);assert.ok([originalEngineSha256,ENGINE_JAR_SOURCE.sha256].includes(helper.engineSha256));
  const fixture=path.join(pkg,'src/emit/tests/fixtures/publication-bmi.crl');
  const snapshot=()=>({dist:treeHashes(path.join(pkg,'dist')),harness:treeHashes(__dirname),fixture:hash(fs.readFileSync(fixture)),engine:hash(fs.readFileSync(jar))});
  initialHashes=snapshot();

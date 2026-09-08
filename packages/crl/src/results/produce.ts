@@ -55,7 +55,7 @@ export interface ProduceRequest {
    * caller hash jar A, execute jar B, and record A's sha in the manifest as provenance for B.
    */
   /**
-   * ⚠ OPTIONAL. Omitted → the local Maven repository copy, if it is there. The consumer should not
+   * ⚠ OPTIONAL. Omitted → the CRL engine cache copy, if it is there. The consumer should not
    * have to restate a constant we own; requiring it is what made this tool unreachable in the field.
    */
   jarPath?: string;
@@ -112,7 +112,7 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
   if (!jarPath) {
     return {
       ok: false,
-      reason: "no engine jar: none was given and none is in the local Maven repository",
+      reason: "no engine jar: none was given and none is in the CRL engine cache",
       detail: [...engineJarHelp(), "", "fetch it with:", `  ${engineJarFetchCommand()}`],
     };
   }

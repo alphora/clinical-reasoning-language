@@ -22,6 +22,7 @@ import {
 } from "../index";
 import { resolveEmitOutput } from "../emit-layout";
 import { produceResults } from "../results/produce";
+import { engineJarHelp, engineJarFetchCommand } from "../results/spawn";
 
 // Provenance must name the version that actually ran, not a placeholder.
 const CRL_VERSION: string = (require("../../package.json") as { version: string }).version;
@@ -51,11 +52,9 @@ FLAGS:
   --cel <file>         The CEL suite. Required.
   --crl <file>         The CRL library the suite covers. Required.
   --use-case <name>    ${RESULT_USE_CASES.join(" | ")}. Required.
-  --jar <path>         Engine jar. OPTIONAL — defaults to the local Maven repository copy at
-                       ~/.m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar
-                       Do not have it? ~215 MB:
-                         curl -fL --create-dirs -o "$HOME/.m2/repository/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar"                               "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar"
-                       ⚠ the -cli artifact; the plain cqf-fhir-cr jar will not launch.
+  --jar <path>         Engine jar. OPTIONAL — uses this build's identified cache.
+                       ${engineJarHelp().join("\n                       ")}
+                       Fetch: ${engineJarFetchCommand()}
   --jar-sha256 <hex>   Expected sha256, verified BEFORE EVERY LAUNCH. OPTIONAL — defaults to this
                        build's pinned value. Pass one only to pin a different engine build.
   --out <root>         Root the results tree hangs off. Default: the .cel file's PROJECT ROOT

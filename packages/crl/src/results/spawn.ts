@@ -142,66 +142,39 @@ export function resolveJava(
  * such class — and the JVM reports that as `Could not find or load main class …`, exit 1, which
  * `classify` would otherwise render as a bare "driver exited 1" for every case with no cause named.
  */
-/**
- * ⭐ WHERE THE ENGINE JAR COMES FROM — CARRIED IN THE REFUSAL, NOT LEFT TO THE READER.
- *
- * `emit_results` verifies a jar it never told anyone how to obtain. The IEHP KE hit the
- * launcher refusal, had no fat jar, and found exactly ONE copy on their machine: OUR repository’s
- * `tmp/`. Their working configuration was reaching across the filesystem into another team’s checkout,
- * which is a coincidence of that workstation, not a dependency — on any machine that does not also
- * host this repo the tool could not run at all.
- *
- * A gate that knows the input is wrong and cannot say what right looks like is half a feature.
- *
- * ⚠ `cqf-fhir-cr` AND `cqf-fhir-cr-cli` ARE DIFFERENT ARTIFACTS. Only the `-cli` one is the Spring
- * Boot fat jar carrying PropertiesLauncher; the plain library jar fails the launcher check. That is the
- * exact wrong turn taken in the field, so the coordinates below are spelled out rather than described.
- *
- * VERIFIED 2026-09-04: fetched Maven Central’s published `.sha1` and compared it against the local copy
- * that produced a 44-case run — identical, with Content-Length matching to the byte.
- */
+// REFACTOR:grounded (#320, plan597): the delivered engine has a distinct identity and cache.
+/** CRL-maintained build of the reviewed 4.7 source plus Coding/extraction-ID fixes. */
 export const ENGINE_JAR_SOURCE = {
-  coordinates: "org.opencds.cqf.fhir:cqf-fhir-cr-cli:4.7.0",
-  url: "https://repo1.maven.org/maven2/org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar",
-  sha256: "10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0",
-  /** Where Maven would put it if anything on this machine has ever resolved the coordinates. */
-  mavenLocalPath: "org/opencds/cqf/fhir/cqf-fhir-cr-cli/4.7.0/cqf-fhir-cr-cli-4.7.0.jar",
+  buildId: "cqf-4.7-crl-bd2b1c19",
+  upstreamBase: "4.7.0",
+  sourceCommit: "bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73",
+  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/v4.122.0/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar",
+  sha256: "5eb708ece6ecbf307825e9dc25510b52c4e8c3b832a487bf546802443440dc4c",
+  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar",
 } as const;
 
-/**
- * The jar this build expects, if it is already in the local Maven repository.
- *
- * ⚠ A DEFAULT, NOT A SEARCH. One deterministic location that Maven itself defines — no filesystem
- * crawl, no guessing. It is `undefined` when the file is not there, and the caller then refuses with
- * the URL rather than hunting.
- */
+/** One identified cache location; never replace or discover an upstream Maven artifact. */
 export function defaultEngineJarPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const home = env.HOME ?? env.USERPROFILE;
   if (!home) return undefined;
-  const candidate = path.join(home, ".m2", "repository", ...ENGINE_JAR_SOURCE.mavenLocalPath.split("/"));
+  const candidate = path.join(home, ...ENGINE_JAR_SOURCE.cacheRelativePath.split("/"));
   return existsSync(candidate) ? candidate : undefined;
 }
 
-/** The jar source, formatted for an error message a human has to act on. */
+/** Shared acquisition guidance for CLI, MCP schema and runtime refusals. */
 export function engineJarHelp(): string[] {
   return [
+    `build: ${ENGINE_JAR_SOURCE.buildId} (CRL-maintained; upstream base ${ENGINE_JAR_SOURCE.upstreamBase})`,
     `download: ${ENGINE_JAR_SOURCE.url}`,
-    `sha256:   ${ENGINE_JAR_SOURCE.sha256}  (the default — you only pass it to pin something else)`,
-    `maven:    ${ENGINE_JAR_SOURCE.coordinates}`,
-    `or drop it at: <home>/.m2/repository/${ENGINE_JAR_SOURCE.mavenLocalPath} and omit jarPath entirely`,
-    "⚠ it must be the -cli artifact: the plain cqf-fhir-cr jar is not a Spring Boot fat jar and will not launch",
+    `sha256: ${ENGINE_JAR_SOURCE.sha256} (default; supply a hash only for a different engine build)`,
+    `cache: <home>/${ENGINE_JAR_SOURCE.cacheRelativePath}; omit jarPath after placing it here`,
+    "Use the -cli artifact; a plain cqf-fhir-cr library jar will not launch.",
   ];
 }
 
-/**
- * ⭐ THE ONE-LINE FETCH. Printed when the jar cannot be found, because "here is a URL" still leaves a
- * person composing a command, and the whole finding was that we made them compose too much.
- */
+/** Fetch to the distinct cache; the producer verifies the pinned hash before every launch. */
 export function engineJarFetchCommand(): string {
-  return (
-    `curl -fL --create-dirs -o "$HOME/.m2/repository/${ENGINE_JAR_SOURCE.mavenLocalPath}" ` +
-    `"${ENGINE_JAR_SOURCE.url}"`
-  );
+  return `curl -fL --create-dirs -o "$HOME/${ENGINE_JAR_SOURCE.cacheRelativePath}" "${ENGINE_JAR_SOURCE.url}"`;
 }
 
 export const LAUNCHER_ENTRY = "org/springframework/boot/loader/launch/PropertiesLauncher.class";

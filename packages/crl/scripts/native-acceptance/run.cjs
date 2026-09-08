@@ -48,7 +48,7 @@ async function main(args) {
   const { ENGINE_JAR_SOURCE, verifyJar, parseJavaMajor, MIN_JAVA_MAJOR } = require('../../dist/results/spawn');
   const { driverReady, driverClassPath, driverArgs } = require('../../dist/results/driver');
   const { buildEngineRepoBundle, parseDriverStdout } = require('../../dist/results/repoBundle');
-  assert.equal(verifyJar(opts.jar, ENGINE_JAR_SOURCE.sha256).ok, true, 'Requires the original pinned engine jar');
+  assert.equal(verifyJar(opts.jar, ENGINE_JAR_SOURCE.sha256).ok, true, 'Requires the current CRL pinned engine jar');
   const ready = driverReady(); assert.equal(ready.ok, true, JSON.stringify(ready));
   const batchBuild = opts.batchSize > 1 ? batchReady() : null;
   fs.mkdirSync(opts.out); // Exclusive creation; never overwrite or remove another run.
