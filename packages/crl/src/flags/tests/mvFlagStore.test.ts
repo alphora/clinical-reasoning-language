@@ -98,6 +98,7 @@ test("flagStoreDir: a path not inside a policy src/ → undefined (mirrors medic
   expect(flagStoreDir(join(tmpdir(), "nowhere", "x.cel"))).toBeUndefined();
 });
 
+// @kit review-flags:tracked-store-location
 test("flagStoreDir: #230 — resolves to `<policySrc>/medical-validation/flags` (INSIDE the tracked entity, not `.crl/flags`)", () => {
   const root = tmp();
   const src = join(root, "src");

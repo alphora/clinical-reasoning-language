@@ -35,6 +35,7 @@ function project(): { root: string; celPath: string; crlPath: string } {
 const rel = (root: string, dir: string) => dir.slice(root.length).split(sep).filter(Boolean).join("/");
 
 describe("resolveEmitOutput — the produces table", () => {
+  // @kit emit-output-root:project-root-layout
   it("defaults every lane to the PROJECT ROOT, not the source file's directory", () => {
     const { root, celPath, crlPath } = project();
     try {
@@ -80,6 +81,7 @@ describe("resolveEmitOutput — the produces table", () => {
     }
   });
 
+  // @kit emit-output-root:alternate-root-layout
   it("gives an arbitrary path the SAME table — a mirror, so copy-back is a copy", () => {
     // ⭐ This is what makes emit-to-scratch safe. The failure being prevented, in the operator's words:
     // "AI emit to some temp place, test everything, and then forget to … copy over to the real repo at

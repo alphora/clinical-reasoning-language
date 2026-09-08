@@ -238,6 +238,7 @@ describe("activity — emitActivityDefinition", () => {
     ]);
   });
 
+  // @kit dispositions:label-narrative-reason-code
   it("a determination with a `with` narrative emits payload(label) + note(with) + reasonCode; no option code → just the review-action Coding", () => {
     const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType, {
       withText: "Prior authorization request denied.",

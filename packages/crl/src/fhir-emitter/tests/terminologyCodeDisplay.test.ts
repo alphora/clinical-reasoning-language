@@ -70,6 +70,7 @@ describe("#313 — an authored display reaches BOTH compose and expansion", () =
 
   // Mixed authoring is legal — a display on the code the reviewer will see, none on the one taken verbatim
   // from the code system. The key is that the undisplayed code gains no invented text.
+  // @kit terminology-forms:authored-display-presence
   it("keeps displayed and undisplayed codes independent", () => {
     const r = emit([{ code: "15822", display: "Upper eyelid" }, { code: "15823" }]);
     expect(concepts(r)).toEqual([{ code: "15822", display: "Upper eyelid" }, { code: "15823" }]);

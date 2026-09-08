@@ -392,6 +392,7 @@ describe("checkCockpitCorrespondence — unchecked reasons (a green gate must me
     }
   });
 
+  // @kit provenance-source:correspondence-unfrozen
   it("unfrozen-case: a case with NO `- id is` is reported unchecked (unfrozen-case), never silently skipped", () => {
     // Author a CEL whose case lacks `- id is` → not in caseIdByName → unchecked unfrozen-case.
     const celNoId = CEL.replace('- id is "case-outer".\n', "");
@@ -514,6 +515,7 @@ describe("checkCockpitCorrespondence — unchecked reasons (a green gate must me
     ]);
   });
 
+  // @kit provenance-source:failed-render-not-pass
   it("never green-passes a failed render envelope whose retained cases happen to compare cleanly", () => {
     const model = buildCockpitModel(
       writeArtifact([approveOk, innerDenyOk, outerDenyOk]), celPath, anchorPath, "final",

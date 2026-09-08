@@ -44,6 +44,7 @@ function candidate(
   };
 }
 describe("BMI publication", () => {
+  // @kit bmi-publication:bounded-decimal
   it.each([
     [q(36.3), q(1.1, "m"), 30],
     [q(36300, "g"), q(110, "cm"), 30],
@@ -60,6 +61,7 @@ describe("BMI publication", () => {
       value: expected >= 30,
     });
   });
+  // @kit bmi-publication:invalid-input
   it.each([
     [q(0), q(1, "m"), "nonpositive"],
     [q(-1), q(1, "m"), "nonpositive"],
@@ -109,6 +111,7 @@ describe("BMI publication", () => {
       true,
     ),
   );
+  // @kit bmi-publication:candidate-states-and-selection
   it("distinguishes absent, valueless, competing and undated inputs", () => {
     const { d } = prepare(),
       w = candidate("w", q(36.3)),

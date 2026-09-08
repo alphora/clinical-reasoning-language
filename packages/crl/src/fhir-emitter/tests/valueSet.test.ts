@@ -27,6 +27,7 @@ function term(name: string, body: TerminologyBodyLine[]): Terminology {
 }
 
 describe("fhir-emitter valueSet.emitValueSet", () => {
+  // @kit terminology-forms:reference-fhir
   it("emits a cpg-shareableValueSet for a valueset-URL terminology", () => {
     const t = term("BP Screening Encounter Codes", [
       {
@@ -82,6 +83,7 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
     expect(resource!.relativePath).toBe("ValueSet/bp-screening-encounter.json");
   });
 
+  // @kit terminology-forms:instantiated-fhir
   it("emits inline system+code body", () => {
     const t = term("Inline Codes", [
       { type: "TerminologySystem", system: "http://loinc.org", location: LOC },
@@ -95,6 +97,7 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
     });
   });
 
+  // @kit terminology-forms:mixed-fhir
   it("Δ-G2 — mixed body (multiple valueset is + multiple system+code) preserves ordering", () => {
     const t = term("Mixed", [
       {

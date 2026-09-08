@@ -1,14 +1,28 @@
 # Kit evidence ledger
 
-## Broad audit in progress — 624–638
+## Initial broader audit — 624–639
 
-Grammar/provenance corrections are committed in1da9f59c, following dcf63244 and
-2e645034. All **300 discovered test files have recorded full source reads**, with
-mixed per-file dispositions in [survey-dispositions.md](survey-dispositions.md).
-This completes the discovered-file census, not every claim mapping. Reverse audit638
-is consolidating payload claims, linked active documentation, additional harnesses
-and extension-owned evidence. Reading, passing tests and verified teaching remain
-distinct; installed/native/clinical evidence is not renewed by this source audit.
+Source review and the grouped reverse mapping are complete, with explicit evidence limits. All300 originally discovered test files were read, including parameterized rows/helpers;639 adds a producer cleanup suite (301 total). See [reverse-claim-map.md](reverse-claim-map.md) for every substantive payload claim group and [survey-dispositions.md](survey-dispositions.md) for applicable, internal and legacy cases. The machine inventory records source hashes and execution separately.
+
+Source kit1.38 remains unreleased; installed4.123.0/kit1.37 is unchanged. This audit does not recertify native engines, installed clients, rendered questionnaires or clinical fidelity. Those limits are mapped explicitly rather than counted as passing source tests.
+
+The inventory links118 primary test declarations to stable `@kit` claims, plus
+four extension-owned assertions. Final639 added40 reviewed declaration tags
+across21 files; a byte comparison verified those edits only insert comments.
+Parameterized declarations retain their existing rows and evidence limits.
+Examples reuse the owning inputs described below; tags do not create a second
+behavior suite or turn internal/legacy cases into recommended authoring.
+
+### Final corrections — 639
+
+- Empty disposition options produce a warning and disable disposition checks; corrected rule, all invariant clauses, methodology and model. Owning config/validator tests retain actual input `{ options: {} }` and are tagged.
+- Producer cleanup has three new owning filesystem tests: default removal, prune:false retention and failed-removal reporting, preserving unowned types. No production behavior changed.
+- Linked TOOLING/USER_GUIDE now describe reproducible dates, shared catalog versions and supported prepared imports accurately. MCP date/capability inputs remain supported; explicit date has precedence.
+- Extension-owned opt-in and MV flag gate assertions are linked/tagged separately from the CRL census; source assertion inspection does not claim an installed-client run.
+
+Review638:0 critical,1 important,0 nit; accepted. Review639 first round:0 critical,2 important,0 nit; both accepted and corrected. Final verification and follow-up review recorded below. Native GPT-6 Astra/high, crl-emit-v0.1.0; external unavailable after two624 failures.
+
+Final639 verification: **244 passed,0 failed,0 skipped across10 files**; TypeScript and complete MCP smoke passed in isolation. Native follow-up review found0 critical/important/nit and closed both findings. CPG contentHash remains `ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9`; PA contentHash is `cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d`. These are payload content hashes, not serialized-file SHA256.
 
 ### CQL, FHIR, CRE and reference corrections — 637
 
@@ -33,8 +47,7 @@ were applied. Native GPT-6 Astra/high used crl-emit-v0.1.0; external arm unavail
 Final latest-per-file validation: **603 passed,0 failed,0 skipped in31 files**.
 TypeScript and complete MCP smoke passed. Per-file reports/tested-source hashes
 are preserved in637-execution.json and the inventory. Source kit1.38 is unreleased.
-Both assembled payloads were reviewed; reverse mapping and explicit remaining gaps
-are prerequisites to comprehensive status and release.
+Both assembled payloads were reviewed. The subsequent638 reverse map and639 corrections complete the initial grouped survey; release/native gates remain separate.
 
 ### Grammar and provenance corrections — 632
 
@@ -231,10 +244,7 @@ The revised inputs pass all 81 kit checks and the complete MCP smoke in the isol
   PA inline answers, action-guard assumptions, compound-emission generalizations,
   CRE fallback wording and completion-versus-pause language. Both assembled use
   cases and the MCP description copies are in scope.
-- Remaining census: classify all 294 files, their parameterized cases, applicable
-  claims and exclusions; map other kit process rules, type/catalog guidance,
-  source-fidelity instructions and examples. No blanket file exclusion has been
-  made. The current ledger is not comprehensive certification.
+- Historical621 census work is completed by the301-file inventory and reverse map above. Manual clinical/source fidelity and explicitly listed native/installed gaps remain obligations; this is not comprehensive runtime certification.
 - A wording/hash/synchronization test is packaging evidence, not behavioral
   evidence. Historical engine stamps are not fresh native execution.
 

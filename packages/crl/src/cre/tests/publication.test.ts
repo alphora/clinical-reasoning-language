@@ -161,6 +161,7 @@ describe("CRE selected Boolean publication", () => {
     expect(run.diagnostics.join("\n")).toContain("id-collision");
   });
 
+  // @kit branch-guards:nullable-negation
   it("preserves nullable criterion and compound branch negation", () => {
     const decision = `criterion "Eligible":
 - when ("Answer" or not "Publication"."Answer").
@@ -337,6 +338,7 @@ first:
     expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
   });
 
+  // @kit chaining-necessity:foreign-scope-refusal
   it.each(["guard", "delegation"])("does not exempt a foreign %s alongside a valid sibling leaf", (site) => {
     const shared = sharedActivities + '\nconcept "Foreign":\n- type is Observation.\ndecision "Sub":\nfirst:\n- when "Foreign" then recommend activity "Approve".';
     const decision = site === "guard" ? sharedDecision.replace('when "Answer"', 'when "Shared"."Foreign"')

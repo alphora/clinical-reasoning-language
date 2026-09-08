@@ -792,9 +792,11 @@ check("mvCasesClean: a pending/failed/stale/unreviewable case → false", () => 
 check("mvComplete: cases clean AND no open flags AND no load error → true", () => {
   assert.equal(mvComplete(P({ total: 1, reviewed: 1, passed: 1 }), { open: 0, resolved: 2, error: false }), true);
 });
+// @kit review-flags:open-blocks-mv
 check("mvComplete: an open flag blocks even when cases are clean", () => {
   assert.equal(mvComplete(P({ total: 1, reviewed: 1, passed: 1 }), { open: 1, resolved: 0, error: false }), false);
 });
+// @kit review-flags:load-error-blocks-mv
 check("mvComplete: a flag LOAD ERROR blocks (unknown state must never silently pass)", () => {
   assert.equal(mvComplete(P({ total: 1, reviewed: 1, passed: 1 }), { open: 0, resolved: 0, error: true }), false);
 });

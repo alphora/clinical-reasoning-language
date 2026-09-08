@@ -1,6 +1,6 @@
 # Broader survey dispositions
 
-In progress. Sources inspected on60e0cd0c/dcf63244, 2026-09-08. These are source-review
+Initial source survey completed through639, 2026-09-08. Earlier sections retain their inspected baselines (starting60e0cd0c/dcf63244). These are source-review
 dispositions, not new execution claims. Paths below are relative to `packages/crl/src`.
 The full discovery set and execution reports remain in test-inventory.json.
 Every mixed file retains its applicable cases for mapping; a legacy fixture is
@@ -410,3 +410,12 @@ Before-state dispositions at1da9f59c. Review637 corrects accepted findings. Full
 - template-match/tests/recencyValueConcept.test.ts: Legacy recency/member-existence classifier. No installed-MCP or current publication capability claim.
 - template-match/tests/resolvePipeline.test.ts: Internal legacy effect/shape/identity matrix and typed refusals. Old generic pipelines are not current authored producers.
 - template-match/tests/membershipPattern.test.ts: Mixed matcher qualification/scope diagnostics and CQL guards; legacy Scalar predicate acceptance not current admission. No native execution.
+
+## Final reverse mapping and new coverage — 638/639
+
+Every substantive assembled kit claim group has a disposition in reverse-claim-map.md; equivalent assertions share one claim. Full source reading does not renew execution or clinical evidence.
+
+- results/tests/produceCleanup.test.ts: all three tests are applicable filesystem teaching, tagged individually; real producer manifest/scan/delete with stubbed compilation/runtime, empty emitted case set.
+- dispositions/config and validator/dispositionValidation empty-vocabulary controls: warning plus inactive enforcement; preserve behavior and correct teaching.
+- Linked extension provision opt-in and medicalValidationStore open/error controls: applicable operational claims, tagged; reviewed source assertions only, no installed-client claim.
+- Native run/session/BMI entry points: current Bleph session and historical cumulative BMI transport remain distinct; no fresh native run in this audit.

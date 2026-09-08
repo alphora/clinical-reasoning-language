@@ -33,6 +33,7 @@ describe("DispositionValidator — closed-set (config-gated)", () => {
     expect(dispErrors(src)).toEqual([]);
   });
 
+  // @kit configure-dispositions:membership-diagnostic
   it("a recommended activity NOT in the configured set → disposition-not-configured", () => {
     const src =
       HEADER +
@@ -89,6 +90,7 @@ describe("DispositionValidator — closed-set (config-gated)", () => {
     expect(dispErrors(src).some((e) => e.kind === "disposition-not-configured" && (e as any).activityName === "Bogus")).toBe(true);
   });
 
+  // @kit configure-dispositions:empty-vocabulary
   it("a configured-but-EMPTY vocabulary does not flood every recommend (empty-set guard)", () => {
     const empty = normalizeDispositionConfig({ options: {} }).config; // configured=true, zero leaves
     expect(empty.configured).toBe(true);
@@ -97,6 +99,7 @@ describe("DispositionValidator — closed-set (config-gated)", () => {
     expect(dispErrors(src, empty)).toEqual([]); // the empty-vocabulary warning is the signal, not a flood here
   });
 
+  // @kit disposition-mode:standalone-pended-diagnostic
   it("standalone mode: a non-final (pended) recommend → disposition-non-final-leaf", () => {
     const standalonePend = normalizeDispositionConfig({
       mode: "standalone",

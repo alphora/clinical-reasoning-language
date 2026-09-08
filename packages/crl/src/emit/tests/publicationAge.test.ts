@@ -63,12 +63,15 @@ describe("pattern-owned age publication", () => {
   it.each(["age today less than 18 years", "age today at least 18 days", "exists this"])("does not admit unsupported Patient %s", projection => {
     expect(prepared(text.replace("age today at least 18 years", projection)).program.diagnostics.length).toBeGreaterThan(0);
   });
+  // @kit patient-age-projection:daily-calculation
   it("crosses the birthday without a Patient update and dates the calculation today", () => {
     expect(calculate("2008-09-07", "2026-09-06")).toMatchObject({ kind: "candidate", candidate: { resource: { valueBoolean: false } } });
     expect(calculate("2008-09-07")).toMatchObject({ kind: "candidate", candidate: { validity: clock.day, resource: { valueBoolean: true, effectiveDateTime: clock.day, method: ageMethod("calculated") } } });
   });
+  // @kit patient-age-projection:missing-partial-dob
   it.each([undefined, "2008", "2008-09"])("missing/partial DOB %s does not manufacture a negative", birth => expect(calculate(birth)).toEqual({ kind: "missing" }));
   it.each(["2026-13-01", "2026-02-30", "2027-01-01", "2027"])("invalid/future DOB %s fails", birth => expect(calculate(birth).kind).toBe("error"));
+  // @kit patient-age-projection:assertion-calculation-selection
   it.each([
     ["2008-09-07", [local(false, "2026-09-06")], true],
     ["2008-09-07", [local(false)], false],
@@ -81,6 +84,7 @@ describe("pattern-owned age publication", () => {
     const result = resolve(birth, [...inputs]);expect(result).toMatchObject({ state: "selected", candidate: { resource: {} } });
     if ("state" in result && result.state === "selected") expect(result.candidate.resource.valueBoolean).toBe(want);
   });
+  // @kit patient-age-projection:cached-calculation-expiry
   it("expires yesterday's cached calculation", () => expect(resolve(undefined, [local(true, "2026-09-06", "calculated")])).toEqual({ state: "missing" }));
   it.each(["2020", "2026-08"])("classifies definitely past partial validity %s", validity => {
     expect(resolve("2008-09-07", [local(false, validity)])).toMatchObject({ state: "selected", candidate: { resource: { valueBoolean: true } } });
@@ -101,6 +105,7 @@ describe("pattern-owned age publication", () => {
   it("validates identity before discarding stale inputs", () => {
     const old = local(false, "2026-09-06");expect(resolve("2008-09-07", [old, old])).toMatchObject({ kind: "error", code: "publication-duplicate-input" });
   });
+  // @kit patient-age-projection:observable-method
   it("requires observable method rather than guessing from the local arm", () => {
     const answer = local(false);delete answer.resource.method;
     expect(resolve("2008-09-07", [answer])).toMatchObject({ kind: "error", code: "publication-age-method-required" });

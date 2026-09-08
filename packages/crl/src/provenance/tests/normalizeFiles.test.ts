@@ -316,6 +316,7 @@ describe("normalizeProvenanceFiles — sidecar (upstream-source)", () => {
     expect(readFileSync(p, "utf8")).toBe(before);
   });
 
+  // @kit provenance-source:hash-mismatch-preservation
   it("worklists hash-mismatch when the path resolves but the bytes differ (never re-points)", () => {
     const p = writeSidecar({
       derivedFrom: resolve(dir, "source.docx"),
@@ -363,6 +364,7 @@ describe("normalizeProvenanceFiles — sidecar (upstream-source)", () => {
 });
 
 describe("normalizeProvenanceFiles — artifact + discovered sidecar together", () => {
+  // @kit provenance-source:artifact-sidecar-normalization
   it("normalizes both the artifact (anchor-self) and its sidecar (upstream-source) beside the anchor", () => {
     const dir = mkdtempSync(join(tmpdir(), "crl-norm-"));
     try {

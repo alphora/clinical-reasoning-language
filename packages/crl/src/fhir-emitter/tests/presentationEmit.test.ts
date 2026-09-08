@@ -71,6 +71,7 @@ decision "D": - when "Answer" then recommend activity "Met".`);
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
     expect(inputText(inputs(result.resources)[0])).toBe('Was "chronic" recorded?');
   });
+  // @kit concept-presentation:text-description-identity
   it("keeps text, description, and identity distinct", () => {
     const result = emit(`library "P".\n${answer}${activity}${wording}decision "D": - when "Answer" then recommend activity "Met".`);
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
@@ -84,6 +85,7 @@ decision "D": - when "Answer" then recommend activity "Met".`);
     expect(profile.differential.element.find((e: any) => e.path === "Observation.value[x]").short).toBe("Answer");
     expect(profile.differential.element.find((e: any) => e.path === "Observation.code").patternCodeableConcept.coding[0].code).toBe("answer");
   });
+  // @kit concept-presentation:imported-owner
   it("inherits imported input wording from its owner without accepting local overrides", () => {
     const result = emit(`library "P".\n${activity}decision "D": - when "Shared"."Answer" then recommend activity "Met".`, `library "Shared".\n${answer}${wording}`);
     expect(result.success, JSON.stringify(result.errors)).toBe(true);

@@ -42,12 +42,14 @@ describe("ServiceRequest publication", () => {
     expect(result.resource.derivedFrom).toBeUndefined();
     expect(result.resource.meta).toBeDefined();
   });
+  // @kit source-representation:finite-code-match
   it("matches either finite code by exact system/code, not display or resource presence", () => {
     const s = prepare().program.descriptors[0].sources![0];
     expect(matchesPublicationSource(s, request({ code: { coding: [{ system: "http://example.org/procedures", code: "second-code" }] } }))).toBe(true);
     expect(matchesPublicationSource(s, request({ code: { text: "repair" } }))).toBe(false);
     expect(matchesPublicationSource(s, request({ code: { coding: [{ system: "http://other", code: "repair" }] } }))).toBe(false);
   });
+  // @kit source-representation:local-source-selection
   it.each([false, undefined])("newer local %s displaces the positive source without OR", (value) => {
     const d = prepare().program.descriptors[0];
     const local = adaptBooleanPublicationCandidate(d, { resourceType: "Observation", id: "a", status: "final", effectiveDateTime: "2026-02-01", ...(value === undefined ? {} : { valueBoolean: value }) });

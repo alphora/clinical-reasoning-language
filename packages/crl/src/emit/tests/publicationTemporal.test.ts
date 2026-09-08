@@ -7,6 +7,7 @@ import { comparePublicationValidity } from "../publicationTemporal";
 import { publicationTemporalVectors } from "./publicationTemporalVectors";
 
 describe("publication-only temporal bounds", () => {
+  // @kit publication-selection:temporal-bounds
   it.each(publicationTemporalVectors)("%s", (_name, calendar, instant, expected) => {
     expect(comparePublicationValidity(calendar, instant)).toBe(expected);
     expect(comparePublicationValidity(instant, calendar)).toBe(

@@ -25,6 +25,7 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(config.byLeaf["not-certify/Deny"].finality).toBe("final");
   });
 
+  // @kit configure-dispositions:replacement-vocabulary
   it("declared options FULLY define the vocabulary (no merge with defaults) + carry a PAS reason code", () => {
     const { config, errors } = normalizeDispositionConfig({
       mode: "embedded",
@@ -128,6 +129,7 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(normalizeDispositionConfig({ version: "1" }).errors.some((e) => e.kind === "malformed-version")).toBe(true);
   });
 
+  // @kit configure-dispositions:empty-vocabulary
   it("declared-but-empty options → empty-vocabulary WARNING + zero leaves (NOT silently defaulted)", () => {
     const { config, errors } = normalizeDispositionConfig({ options: {} });
     expect(config.options).toEqual([]);

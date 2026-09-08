@@ -55,12 +55,14 @@ ${references.map((ref) => `- fact is "${ref}"${ref === "Request" && modifiers.in
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 describe("CRE ServiceRequest publication", () => {
+  // @kit source-representation:request-witness-cre
   it.each(["repair", "second-code"])("a matching %s request supplies true", (code) => {
     const { run, emission } = execute(["Request"], undefined, code);
     expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
     expect(run.status).toBe("pass");
     expect(emission.emittedCases[0].resources.find((r) => r.resourceType === "ServiceRequest")?.body.authoredOn).toBe("2026-01-01");
   });
+  // @kit source-representation:request-absence-cre
   it.each([{ refs: [] }, { refs: ["Request"] }])("absence/nonmatch pauses %j", ({ refs }) => {
     const { run } = execute(refs, undefined, "unrelated");
     expect(run.produced).toEqual([]);

@@ -102,6 +102,7 @@ describe("authored CEL fact date resolution", () => {
       }),
     ]);
   });
+  // @kit cel-cases:fact-date-override
   it("gives the reference's absolute date precedence over reusable body data", () => {
     expect(resolved('- fact is "F" on 2026-02-05.', "2026-01-01")).toEqual(["2026-02-05"]);
   });
@@ -142,6 +143,7 @@ describe("authored CEL fact date resolution", () => {
     expect(resolveCaseFactDates(c, facts, now).diagnostics[0].kind).toBe("invalid-date");
   });
 
+  // @kit cel-cases:undated-not-now
   it("leaves an undated fact missing even with a now anchor and an injected clock", () => {
     const { c, facts, refs } = fixture('- anchor is now.\n- fact is "F".');
     const anchors = buildCaseAnchors(c, now);

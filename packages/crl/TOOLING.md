@@ -129,7 +129,7 @@ crl-emit --help
 | `--out-dir` | no | root to write under | the **project root** (nearest `package.json`) | Created if missing. See "the ROOT" below |
 | `--target` | for `.crl` | `cql` \| `fhir-def` | `cql` for `.crl`; rejected for `.cel` | See dispatch table below |
 | `--quiet` | no | (flag) | off | Suppress per-file `wrote …` lines (`--target fhir-def` only) |
-| `--date` | no | ISO date | `SOURCE_DATE_EPOCH` → `crl.date` → wall clock | Reproducible publication date (`--target fhir-def`); only stamped at publishable+ |
+| `--date` | no | ISO date | `SOURCE_DATE_EPOCH` → `crl.date`; missing at publishable is an error | Reproducible publication date (`--target fhir-def`); only stamped at publishable+ |
 | `--capability` | no | `shareable` \| `computable` \| `publishable` | `publishable` | CRMI capability level (`--target fhir-def`); gates `date` + `meta.profile` + `knowledgeCapability`. `executable` is not yet supported (needs ELM/expansion — [#113](https://github.com/alphora/clinical-reasoning-language/issues/113)) |
 | `--help` / `-h` | no | (flag) | — | Print usage + exit 0 |
 
@@ -256,12 +256,12 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
 <a id="emit_cql"></a>**`emit_cql`** — CRL → CQL.
 - Input: `{ code?: string, path?: string, libraryName?: string }`
 - Returns: `{ success, result?, errors?, unmatched?, futureExpressions? }`
-- On full success, `result` is the generated CQL targeting the bundled `CRLCommon` library (unversioned `include`).
+- Require `success: true`; an empty `unmatched` list alone does not establish success. On full success, `result` is the generated CQL targeting the bundled `CRLCommon` library (unversioned `include`).
 - When at least one `- definition is …` body fails to match a catalog pattern, `success: false` and `unmatched[]` lists each failing narrative. The emitted CQL still populates `result` with compile-failing `CRLCommon.UnmatchedNarrative(…)` sentinels so downstream CQL translation fails loudly.
 - `meta is` annotations on concepts emit as a leading block comment on each `define`. `@crl-future-expression: <body>` annotations also surface as structured `futureExpressions[]` records `{conceptName, expression, line, column}` — informational, does NOT force `success: false`.
 
 <a id="emit_crl_fhir"></a>**`emit_crl_fhir`** — CRL → FHIR Definition resources.
-- Input: `{ path: string, includeResources?: boolean }` (path required + absolute)
+- Input: `{ path: string, includeResources?: boolean, date?: string, capability?: "shareable" | "computable" | "publishable" }` (path required + absolute)
 - Returns a summary envelope by default:
   ```
   { success, resourceCount, resourceManifest: [{resourceType, id, relativePath, sourceKind, sourceName}],
@@ -269,9 +269,9 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
   ```
 - `includeResources: true` adds `resources[]` with the full FHIR JSON.
 - The closure walks from the file's nearest `package.json`.
-- Emitted FHIR definitional resources carry `version` (from `package.json`; CRMI Shareable requires it 1..1) and, at publishable+ capability, a reproducible `date` (resolved from `--date`/`date` → `SOURCE_DATE_EPOCH` env → `crl.date` → wall clock). Emitted CQL stays version-less. Optional inputs: `date` (ISO) and `capability` (`shareable|computable|publishable`, default `publishable`; `executable` is rejected — needs ELM/expansion, #113).
+- Policy resource versions come from `package.json`; shared catalog Libraries retain their own versions. Optional MCP inputs are `date` (ISO) and `capability` (`shareable|computable|publishable`, default `publishable`; `executable` is rejected as unsupported). Publishable+ requires a reproducible date: explicit `date` → `SOURCE_DATE_EPOCH` → package.json `crl.date`. Missing date produces `missing-publishable-date`; any wall-clock partial resources are for inspection, not successful publication. Emitted CQL stays version-less.
 - `meta.profile` canonicals: `cpg-strategydefinition`, `cpg-recommendationdefinition` (CPG IG); at publishable+ `crmi-publishableplandefinition`/`crmi-publishablevalueset`, at shareable `crmi-shareableplandefinition`/`crmi-shareablevalueset` (CRMI IG); `cqf-knowledgeCapability`, `cqf-knowledgeRepresentationLevel` (FHIR-core).
-- Cross-library concept/terminology refs are unsupported in v0; same-library qualified refs `"CurrentLib"."X"` resolve as bare locals.
+- Prepared closure emission supports qualified selected-publication references and imported answer terminology. Unsupported or unresolved contexts produce diagnostics; require a successful emission envelope rather than assuming arbitrary cross-library expressions are supported.
 - `first:` decision (ordered/first-match) emits the standard `cqf-applicabilityBehavior` "any" extension on a grouping action (apply the first applicable branch). Menu `any:` still emits a `crl-logical-switch` extension URL (StructureDefinition not yet shipped; its FHIR selection semantics are pending — GitHub #184).
 
 <a id="emit_cel"></a>**`emit_cel`** — CEL → FHIR instance resources.

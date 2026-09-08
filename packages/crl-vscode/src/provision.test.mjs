@@ -265,6 +265,7 @@ test("mergeEnableResultsEnv: sets the flag when enabled, and drops the whole blo
 // had already done.
 //
 // `undefined` means NOBODY HAS EXPRESSED AN OPINION. Removing a capability requires someone to ask for it.
+// @kit produce-results:opt-in-preserved
 test("mergeEnableResultsEnv: `undefined` (unset) leaves an existing opt-in ALONE — only explicit false deletes", () => {
   // The regression this pins: unset must NOT behave like false.
   assert.deepEqual(mergeEnableResultsEnv({ [ENABLE_RESULTS_ENV]: "1" }, undefined), {
@@ -295,6 +296,7 @@ test("mergeEnableResultsEnv: a non-object env REFUSES loudly instead of doing no
   assert.throws(() => mergeEnableResultsEnv(["a"], false), /not an object/);
 });
 
+// @kit produce-results:opt-in-written
 check("apply writes CRL_ENABLE_RESULTS=1 into the crl server env when enabled", (ws) => {
   const ctx = { ...ctxFor(ws), enableResults: true };
   target.apply(ctx);

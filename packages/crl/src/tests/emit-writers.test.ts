@@ -198,6 +198,7 @@ describe("writeEmitResult (CEL) — absolute manifest + containment", () => {
 
   // ⚠ A stale manifest beside a wiped tree would certify files that no longer exist — the same
   // "manufactured confidence" failure this whole change exists to remove, one level in.
+  // @kit emitted-trees-are-ours:cel-preflight-preservation
   it("a preflight-rejected write preserves the previous valid manifest and data", () => {
     writeEmitResult(makeResult("patient/c1/observation", "obs-1"), dir);
     expect(existsSync(join(dir, CEL_DATA_MANIFEST))).toBe(true);
@@ -220,6 +221,7 @@ describe("writeEmitResult (CEL) — absolute manifest + containment", () => {
     expect(readFileSync(join(dir, CEL_DATA_MANIFEST), "utf8")).toBe(first);
   });
 
+  // @kit emitted-trees-are-ours:cel-stale-compartment-removal
   it("WIPES a stale compartment left by a renamed case, rather than leaving it beside the new one", () => {
     writeEmitResult(makeResult("patient/OLD-NAME/observation", "obs-1"), dir);
     const ghost = join(dir, "patient", "OLD-NAME", "observation", "obs-1.json");
@@ -234,6 +236,7 @@ describe("writeEmitResult (CEL) — absolute manifest + containment", () => {
   // A manifest is a fact a consumer can check; a prune is an action they have to trust. `emit_cel`
   // previously returned its resource list in the RESPONSE only, so the tree could be verified solely by
   // whoever still held that response.
+  // @kit emitted-trees-are-ours:cel-manifest-disk-hash
   it("writes a manifest whose sha256 matches the bytes actually on disk", () => {
     writeEmitResult(makeResult("patient/c1/observation", "obs-1"), dir);
     const manifest = JSON.parse(readFileSync(join(dir, CEL_DATA_MANIFEST), "utf8")) as {

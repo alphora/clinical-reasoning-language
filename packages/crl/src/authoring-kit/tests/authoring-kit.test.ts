@@ -887,7 +887,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "00151b2005cf86fcbe6c7a49280f22fb2c5f30964e37cccef2fc3769cc52ab78",
+      "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d",
     );
   });
 
@@ -908,7 +908,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
-    "1.38": { cpg: "ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9", priorAuth: "00151b2005cf86fcbe6c7a49280f22fb2c5f30964e37cccef2fc3769cc52ab78" },
+    "1.38": { cpg: "ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9", priorAuth: "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d" },
     "1.37": { cpg: "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b", priorAuth: "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3" },
     "1.36": { cpg: "417b27c9557431cde15b1cf2c7f45f646a3598bb02bfdf559ffd7b260becdcfc", priorAuth: "183f26f2a9ff6f2b82087505f3a63e91e6a034ba3013b003bb71aa2a8a6882e9" },
     "1.35": { cpg: "72cdbf0d7f8db6fa7b3f843d3e82a76f6ca12558c7c560bff2dd3d913fff6c3a", priorAuth: "4d5004b9ff65d7370b83f3b352c7cf5d7662158c0f83cca4a1bb3c460f271423" },

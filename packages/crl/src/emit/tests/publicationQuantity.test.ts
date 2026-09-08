@@ -55,6 +55,7 @@ describe("Quantity publication", () => {
     { value: 2, system: "http://unitsofmeasure.org", unit: "m" },
     { value: 2, unit: "m", comparator: ">" }, { value: Infinity, unit: "m" },
   ])("refuses invalid exact measurement %j", q => expect(readPublicationQuantity(q).kind).toBe("error"));
+  // @kit source-representation:quantity-value-validity
   it("projects source analytical identity while retaining quantity and validity", () => {
     const { d } = prepare();
     const out = adaptObservationPublicationCandidate(d, d.sources![0] as PublicationObservationSource, measurement(), "Patient/p");

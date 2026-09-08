@@ -10,6 +10,7 @@ import { emitCQLImports } from "../../imports/emit";
 
 // REFACTOR:grounded (#320, plan587): actual CEL quantities drive the selected-value comparison.
 describe("Quantity publication CEL/CRE", () => {
+  // @kit source-representation:quantity-cel-outcomes
   it("preserves unit-only CEL quantities, computes determinate outcomes and pauses on absence", () => {
     const parent = path.resolve(os.tmpdir()), dir = mkdtempSync(path.join(parent,"crl-quantity-"));
     if (path.dirname(dir) !== parent || !path.basename(dir).startsWith("crl-quantity-")) throw Error("Unexpected test path");
