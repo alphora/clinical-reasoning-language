@@ -1,5 +1,5 @@
 {
-  "contract.json": "f15bb3adb73e51d0f6dcb0e2a4f1c903b56ce936cbc4ada1f8c1a494c6ea0802",
+  "contract.json": "fd2eb6cc1b7ddc7a45067362c33a475ae12f27a837a11abfd94d49ca22738042",
   "expected-frozen.json": "e568e1f3f5d5fcb743ee7361cdf432da87b34c94b41579450b899dcda4a84690",
   "package.json": "30609323e68c4d09c7e7e03faf807b5b1d961ae26176b3c0036460ffa8ad8b8b",
   "provenance/original-activities.crl.txt": "9a47afdd72db025165cb859836487cba1ba71598333b7d62af5c2a76e785194f",
@@ -14,5 +14,5 @@
   "emitted-inputs.json": "02172932278655a03fc407638c769d47a3839414867fff4ce92e115f2288a54a",
   "unknowns-frozen.json": "2b0b88ef86d20b1a6b3f0b134b44fa4435e13e44988d71f0ecdd21037c240177",
   "src/cel/unknowns.cel": "5d3c9beb4bcf786a6b3478d549e15b442cebee4bfe25848f8414371672819fd2",
-  "session.json": "bf2a4de44ff004313adbf577eee82b07a52701dea755b7fa55d5b9593c381cf9"
+  "session.json": "246f952fea6b2d252c322286aea66c1ae17a0f16111caf6a144a67c5e0d359a9"
 }

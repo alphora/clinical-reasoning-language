@@ -143,14 +143,14 @@ export function resolveJava(
  * `classify` would otherwise render as a bare "driver exited 1" for every case with no cause named.
  */
 // REFACTOR:grounded (#320, plan597): the delivered engine has a distinct identity and cache.
-/** CRL-maintained build of the reviewed 4.7 source plus Coding/extraction-ID fixes. */
+/** CRL-maintained build of the reviewed 4.7 source plus Coding/extraction-ID and default-on applicability-pause fixes. */
 export const ENGINE_JAR_SOURCE = {
-  buildId: "cqf-4.7-crl-bd2b1c19",
+  buildId: "cqf-4.7-crl-4aee6041",
   upstreamBase: "4.7.0",
-  sourceCommit: "bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73",
-  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/v4.122.0/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar",
-  sha256: "5eb708ece6ecbf307825e9dc25510b52c4e8c3b832a487bf546802443440dc4c",
-  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar",
+  sourceCommit: "4aee604184e3b8ea01d1778d116baf072bd73f79",
+  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/v4.122.0/cqf-fhir-cr-cli-4.7-crl-4aee6041.jar",
+  sha256: "9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e",
+  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-4.7-crl-4aee6041.jar",
 } as const;
 
 /** One identified cache location; never replace or discover an upstream Maven artifact. */

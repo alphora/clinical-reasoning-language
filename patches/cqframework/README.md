@@ -1,6 +1,6 @@
 # CQFramework extraction and generated-ID patches
 
-The separately reviewed [applicability pause follow-up](applicability-pause/README.md) adds default-on null pausing for ordered alternatives. Its patch bases include the two fixes below. It has not yet been incorporated into the CLI build recorded by `cli-build.json`.
+The separately reviewed [applicability pause follow-up](applicability-pause/README.md) adds default-on null pausing for ordered alternatives. Its patch bases include the two fixes below. It is incorporated into the CLI build recorded by `cli-build.json`.
 
 These source patches address two engine defects encountered when exercising CRL-generated artifacts with CQFramework's R4 `$apply` implementation (including its R5-operation backport). They are local patch sets, not an upstream release or an installed customer engine.
 
@@ -46,19 +46,27 @@ The runtime overlays used for these measurements were rebuilt byte-for-byte from
 The Bleph delivery candidate includes a full CLI jar built from the reviewed4.7 branch,
 not the test overlay. [cli-build.json](cli-build.json) records its source/tree, binary hash,
 embedded build version and build command. Its distinct build/cache identity is
-`cqf-4.7-crl-bd2b1c19`; it does not overwrite the upstream Maven4.7 artifact.
-The129 third-party nested dependency jars are byte-identical to original4.7.0;
-the three CQFramework modules are rebuilt from the recorded source tree.
+`cqf-4.7-crl-4aee6041`; it does not overwrite the upstream Maven4.7 artifact.
+126 third-party nested dependency jars are byte-identical to original 4.7.0;
+the CQFramework modules are rebuilt from the recorded source tree.
 Upstream Gradle names the branch snapshot `4.8.0-...-SNAPSHOT`; that metadata does not
 make this an upstream4.8 release. The runtime is derived from the pinned4.7 base plus
-the two reviewed patches. Publication and installed-artifact verification remain release gates.
+the two extraction/ID patches and the applicability-pause patch. Publication and installed-artifact verification remain release gates.
 
-The complete jar passes the 116-case Bleph native suite (49 pauses, 37 Met, 30 Unmet)
-and the four-stage full QuestionnaireResponse sequence: pause, Met, Unmet, pause.
-The explicit original-engine control passes only the first stage and exits with failure.
-The corrected run uses no overlay. Evidence: `tmp/597-bleph-full-engine`,
-`tmp/598-corrected-session`, `tmp/598-original-session`; review598 records the code review
-and provenance corrections. These are development executions, not installed-package acceptance.
+The complete jar passes all 116 Bleph native cases (49 pauses, 37 Met, 30 Unmet),
+with matching CRE expectations. The full QR-only session passes pause, Met, Unmet,
+pause with exactly 3, 11, 11, 3 groups. Both returned Q and QR shrink to three groups
+on clear; the next client request uses the current returned pair. No Q is submitted,
+contained or preloaded. The original engine fails all four current session targets.
+The initial native run executed all116 cases with zero infrastructure failures. Its old
+presence checker accepted80/116;36 verdicts were recomputed from unchanged saved
+Parameters after the reviewed request-frontier correction. Local ignored evidence
+`tmp/614-native-replay.json` records the full engine and final checker hashes. Session
+run summaries are also local verification records, not shipped assets. The final live rerun with the corrected checker also passed116/116 native and116/116
+CRE, with zero infrastructure or acceptance failures. The release verification
+attachment records this final execution and the installed-artifact gates.
+
+Earlier597/598 evidence belongs to the preceding extraction-only build.
 
 ## Remaining scope
 

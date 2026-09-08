@@ -13,7 +13,10 @@ const classNames=[
   'org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r4.ObservationResolver',
   'org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r5.ObservationResolver',
   'org.opencds.cqf.fhir.cr.common.IOperationRequest',
-  'org.opencds.cqf.fhir.utility.GeneratedIds'];
+  'org.opencds.cqf.fhir.utility.GeneratedIds',
+  'org.opencds.cqf.fhir.cr.CrSettings',
+  'org.opencds.cqf.fhir.cr.plandefinition.apply.ApplyRequest',
+  'org.opencds.cqf.fhir.cr.plandefinition.apply.ProcessAction'];
 function helperReady() {
   const m=JSON.parse(fs.readFileSync(path.join(classDir,'build.json'))),bytes=fs.readFileSync(path.join(classDir,'ApplySessionDriver.class'));
   assert.equal(m.sourceSha256,hash(fs.readFileSync(path.join(__dirname,'ApplySessionDriver.java'))),'Session source/class drift');
@@ -28,13 +31,21 @@ function sessionEngine(engineHash,overlay,current) {
   assert.ok(!overlay||original,'Test overlay is only compatible with the original4.7 engine');
   return original?{buildId:'upstream-4.7.0',sha256:originalEngineSha256,original:true,mode:overlay?'explicit-reviewed-overlay':'original-pinned-engine'}:{...current,original:false,mode:current.buildId};
 }
+const overlayClasses=new Set([
+  'org.opencds.cqf.fhir.cr.questionnaireresponse.extract.ProcessDefinitionItem',
+  'org.opencds.cqf.fhir.cr.questionnaire.populate.PopulateRequest',
+  'org.opencds.cqf.fhir.cr.questionnaireresponse.extract.ExtractProcessor',
+  'org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r4.ObservationResolver',
+  'org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r5.ObservationResolver',
+  'org.opencds.cqf.fhir.cr.common.IOperationRequest',
+  'org.opencds.cqf.fhir.utility.GeneratedIds']);
 function checkOrigins(text,jar,overlay,hasGeneratedIds=Boolean(overlay)) {
   const entries=text.trim().split(/\r?\n/).map(l=>l.split('\t'));
   assert.deepEqual(entries.map(e=>e[0]),classNames,'Missing/duplicate engine class origins');
   const jarPart=pathToFileURL(jar).href.slice('file:'.length).replace(/^\/\//,'');
-  for(const [i,[name,origin]] of entries.entries()) {
-    if(overlay&&i>0) assert.equal(origin,pathToFileURL(overlay).href.replace('file:///','file:/'),name+' overlay not loaded');
-    else if(!hasGeneratedIds&&i===7) assert.equal(origin,'ABSENT',name);
+  for(const [name,origin] of entries) {
+    if(overlay&&overlayClasses.has(name)) assert.equal(origin,pathToFileURL(overlay).href.replace('file:///','file:/'),name+' overlay not loaded');
+    else if(!hasGeneratedIds&&name==='org.opencds.cqf.fhir.utility.GeneratedIds') assert.equal(origin,'ABSENT',name);
     else assert.ok(decodeURI(origin).includes(decodeURI(jarPart))&&origin.includes('/!BOOT-INF/lib/'),name+' did not load from pinned nested jar: '+origin);
   }
 }
@@ -57,20 +68,59 @@ function checkEdit(previous,submitted,step,contract) {
   if(step.value===null)assert.equal(answer.length,0);
   else {assert.equal(answer.length,1);assert.equal(typeof step.value==='boolean'?answer[0].valueBoolean:answer[0].valueCoding?.code,step.value);}
 }
+const extractionUrls=new Set([
+  'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract',
+  'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue']);
+function carryExtractionBindings(q,qr) {
+  const submitted=structuredClone(qr),byId=new Map();
+  function collect(items) {
+    for(const item of items||[]) {
+      assert.ok(item.linkId&&!byId.has(item.linkId),'Missing/duplicate Questionnaire linkId');
+      byId.set(item.linkId,item);collect(item.item);
+    }
+  }
+  collect(q.item);
+  function copy(items) {
+    for(const item of items||[]) {
+      const source=byId.get(item.linkId);
+      assert.ok(source,'QR item has no matching Questionnaire item: '+item.linkId);
+      assert.equal(item.definition,source.definition,'Q/QR item definition mismatch: '+item.linkId);
+      const extensions=[...(item.extension||[]).filter(e=>!extractionUrls.has(e.url)),
+        ...structuredClone((source.extension||[]).filter(e=>extractionUrls.has(e.url)))];
+      if(extensions.length)item.extension=extensions;else delete item.extension;
+      copy(item.item);for(const answer of item.answer||[])copy(answer.item);
+    }
+  }
+  copy(submitted.item);return submitted;
+}
+function buildSessionResponse(q,qr,step,contract) {
+  return carryExtractionBindings(q,editResponse(q,qr,step,contract));
+}
+function sessionLogs(processResult,submittedQr) {
+  // Keep raw logs in evidence. Only this pinned engine's exact, recoverable lookup
+  // diagnostic is admitted; extraction checks must still prove patient-scoped data.
+  const expected=submittedQr?.questionnaire
+    ? '[main] ERROR org.opencds.cqf.fhir.cr.questionnaireresponse.QuestionnaireResponseProcessor - No resource of type Questionnaire found for url: '+submittedQr.questionnaire : null;
+  const lines=((processResult.stdout||'')+'\n'+(processResult.stderr||'')).split(/\r?\n/);
+  const diagnostics=[];let admitted=false;
+  const remaining=lines.filter(line=>{
+    if(expected&&line===expected&&!admitted){diagnostics.push(line);admitted=true;return false;}
+    return true;
+  }).join('\n');
+  return {remaining,diagnostics};
+}
 function checkExtraction({before,after,storedBefore,storedAfter,repoBefore,repoAfter,subject,contract,controls}) {
   const errors=[],expect=(v,m)=>{if(!v)errors.push(m);};
   expect(same(storedBefore.entry||[],storedAfter.entry||[]),'Stored Observations changed');
   expect(same(repoBefore,repoAfter),'Repository input bundle mutated');
   const resources=b=>(b.entry||[]).map(e=>e.resource),submitted=resources(before),returned=resources(after);
-  expect(submitted.every(r=>['Questionnaire','QuestionnaireResponse'].includes(r.resourceType)),'Manually injected answer data');
-  expect(returned.every(r=>['Questionnaire','QuestionnaireResponse','Observation'].includes(r.resourceType)),'Unexpected extracted resource type');
-  // applyR5 extends/reversions the supplied Questionnaire as it advances. The submitted
-  // response stays intact; the returned form's content is checked by nativeVerdict.
+  expect(submitted.every(r=>r.resourceType==='QuestionnaireResponse'),'Manually injected answer data or Questionnaire');
+  expect(objects(before,r=>r.resourceType==='Questionnaire').length===0&&objects(repoBefore,r=>r.resourceType==='Questionnaire').length===0,'Questionnaire sent/contained/preloaded');
+  expect(returned.every(r=>['QuestionnaireResponse','Observation'].includes(r.resourceType)),'Unexpected extracted resource type');
   expect(same(returned.filter(r=>r.resourceType==='QuestionnaireResponse'),submitted.filter(r=>r.resourceType==='QuestionnaireResponse')),'Submitted QR mutated');
-  expect(returned.filter(r=>r.resourceType==='Questionnaire').length===submitted.filter(r=>r.resourceType==='Questionnaire').length,'Request Questionnaire lost/duplicated');
   const observations=returned.filter(r=>r.resourceType==='Observation');
   if(!submitted.length){expect(observations.length===0,'Initial request extracted data');return {passed:!errors.length,errors,count:observations.length};}
-  expect(submitted.length===2&&submitted.filter(r=>r.resourceType==='Questionnaire').length===1&&submitted.filter(r=>r.resourceType==='QuestionnaireResponse').length===1,'Request must contain complete Q and QR');
+  expect(submitted.length===1&&submitted[0].resourceType==='QuestionnaireResponse','Request must contain only the complete QR');
   const qr=single(before,'QuestionnaireResponse'),items=objects(qr,r=>r.definition&&r.linkId&&r.definition.endsWith('#Observation.value[x]'));
   expect(observations.length===items.length,'Wrong extracted Observation count');
   for(const item of items) {
@@ -91,12 +141,13 @@ function checkExtraction({before,after,storedBefore,storedAfter,repoBefore,repoA
   }
   return {passed:!errors.length,errors,count:observations.length};
 }
-function sessionVerdict(result,entry,contract,step,subject,processResult) {
+function sessionVerdict(result,entry,contract,step,subject,processResult,submittedQr) {
   // Session form retention is explicit and separate from direct-data question presence.
   const c=structuredClone(contract),e=structuredClone(entry);e.caseId='session';e.expected=step.expected;
   c.unknownQuestionPresence.session=step.questions;
   // This helper writes Parameters to a file: stdout is ALL logging. The production
   // stdout-JSON driver's prefix parser must not hide errors or null witnesses here.
-  return nativeVerdict(result,e,c,subject,{...processResult,stdout:'',stderr:(processResult.stderr||'')+'\n'+(processResult.stdout||'')});
+  const logs=sessionLogs(processResult,submittedQr);
+  return {...nativeVerdict(result,e,c,subject,{...processResult,stdout:'',stderr:logs.remaining}),diagnostics:logs.diagnostics};
 }
-module.exports={sessionEngine,originalEngineSha256,classDir,overlaySha256,helperReady,checkOrigins,single,leaf,editResponse,checkEdit,checkExtraction,sessionVerdict};
+module.exports={sessionEngine,originalEngineSha256,classDir,overlaySha256,helperReady,checkOrigins,single,leaf,editResponse,checkEdit,checkExtraction,sessionVerdict,carryExtractionBindings,buildSessionResponse,sessionLogs};

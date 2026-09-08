@@ -65,6 +65,7 @@ function loadFixture(dir) {
       assert.ok(contract.activities[entry.expected.activity] && contract.routes[entry.expected.nodeId]);
     } else {
       assert.equal(entry.expected.activity, null);
+      assert.equal(entry.expected.nodeId, blephPauseFrontier(entry.answers), 'Pause frontier differs from authored decision order');
       assert.ok(Array.isArray(contract.pauseNullExpressions[entry.expected.nodeId]), 'Pause frontier lacks native witness contract');
       const required = pauseInputs(entry, contract);
       if (entry.suite === 'unknowns') {
@@ -77,6 +78,16 @@ function loadFixture(dir) {
     }
   }
   return { contract, entries, hashes, inputs };
+}
+
+// Fixture-specific independent decision order; never inferred from engine logs/results.
+function blephPauseFrontier(a) {
+  if (a.B === false && a.P === false) return null;
+  if (a.B !== true && a.P !== true) return 'when[0]';
+  if (a.cosmetic === true) return null;
+  if (a.cosmetic === null) return 'when[0]/when[0]';
+  if (a.B === null || a.P === null) return 'when[0]/when[1]';
+  return a.B && a.P ? 'when[0]/when[1]/when[0]' : 'when[0]/when[2]';
 }
 
 function pauseInputs(entry, contract) {
@@ -102,8 +113,11 @@ function checkNative(result, entry, contract, subject, stderr = '') {
   check(result?.resourceType === 'Parameters' && Array.isArray(result.parameter), 'Expected Parameters result');
   check(!hasEngineError(stderr), 'Engine logged an error');
   const nullExpressions = [...new Set([...stderr.matchAll(/Condition expression (.+) returned null/g)].map(m => m[1]))].sort();
-  const expectedNulls = entry.expected.kind === 'pause' ? contract.pauseNullExpressions?.[entry.expected.nodeId] : [];
-  check(Array.isArray(expectedNulls) && same(nullExpressions, [...(expectedNulls || [])].sort()), 'Wrong native null-condition witnesses');
+  // Nullable evaluation no longer emits legacy warning strings. A pause is checked
+  // below by the independently authored frontier, exact questions/answers and absent
+  // activity/route, never inferred from missing log messages alone.
+  if (entry.expected.kind === 'pause') check(Array.isArray(contract.pauseNullExpressions?.[entry.expected.nodeId]), 'Unknown expected pause frontier');
+  if (nullExpressions.length) check(same(nullExpressions, [...(entry.expected.kind === 'pause' ? contract.pauseNullExpressions?.[entry.expected.nodeId] || [] : [])].sort()), 'Unexpected legacy null-condition warnings');
   const resources = objects(result, r => typeof r.resourceType === 'string');
   check(!resources.some(r => r.resourceType === 'OperationOutcome'), 'Engine returned OperationOutcome');
   const qs = resources.filter(r => r.resourceType === 'Questionnaire');
@@ -135,10 +149,12 @@ function checkNative(result, entry, contract, subject, stderr = '') {
     const matches = questions.filter(i => i.definition === binding.definition);
     // Authored nesting: request inputs at root; cosmetic in the entered request arm;
     // qualification in its non-cosmetic branch; individual documentation in the both arm.
-    // This freezes the observed pinned-engine item set, not CQL short-circuit evaluation
-    // or client visibility. Later-action inputs can be included at a null frontier.
+    // Reached questions follow the authored branch frontier; a needed unknown blocks
+    // later branches. This checks native outputs, not a renderer or internal trace.
     const requestEntered = entry.answers.B === true || entry.answers.P === true;
-    const nonCosmetic = requestEntered && entry.answers.cosmetic === false;
+    // The both-requested condition is needed before either qualification branch.
+    const requestsDetermined = entry.answers.B !== null && entry.answers.P !== null;
+    const nonCosmetic = requestEntered && entry.answers.cosmetic === false && requestsDetermined;
     const present = entry.suite === 'unknowns' ? contract.unknownQuestionPresence[entry.caseId].includes(key)
       : ['B', 'P'].includes(key) || (key === 'cosmetic' ? requestEntered : ['bdoc', 'pdoc'].includes(key) ? nonCosmetic && entry.answers.B === true && entry.answers.P === true : nonCosmetic);
     check(matches.length === (present ? 1 : 0), `Wrong question presence: ${key}`);
@@ -229,4 +245,4 @@ function summarize(entries, rows, sourceDirty = null) {
     // A disagreeing CRE fails the paired suite, but never rewrites the native verdict.
     accepted: nativeAccepted && creAccepted };
 }
-module.exports = { hash, hasEngineError, loadFixture, caseKey, exactCases, objects, pauseInputs, checkNative, checkCre, nativeVerdict, summarize };
+module.exports = { blephPauseFrontier, hash, hasEngineError, loadFixture, caseKey, exactCases, objects, pauseInputs, checkNative, checkCre, nativeVerdict, summarize };

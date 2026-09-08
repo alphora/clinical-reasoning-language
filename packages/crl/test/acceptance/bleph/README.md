@@ -8,10 +8,10 @@ From the repository root, with dependencies installed and Java 17 or newer:
 
 ```sh
 npm run test:native:checks
-npm run test:native:bleph -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar --out /existing/parent/new-run
+npm run test:native:bleph -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-4aee6041.jar --out /existing/parent/new-run
 ```
 
-In PowerShell use `npm.cmd` for argument forwarding. The acceptance command's `pretest:native:bleph` hook builds the core before execution; do not invoke `run.cjs` directly as a source acceptance gate. Checker tests require built core driver helpers. Java or jar absence is an error, never a skipped pass. No download or installation occurs. The jar must match `ENGINE_JAR_SOURCE` in `src/results/spawn.ts`: CRL-maintained build `cqf-4.7-crl-bd2b1c19`, SHA256 `5eb708ece6ecbf307825e9dc25510b52c4e8c3b832a487bf546802443440dc4c`. Source/build provenance is in [cli-build.json](../../../../../patches/cqframework/cli-build.json). Historical original-engine measurements below identify what ran at that time, not the current engine selection.
+In PowerShell use `npm.cmd` for argument forwarding. The acceptance command's `pretest:native:bleph` hook builds the core before execution; do not invoke `run.cjs` directly as a source acceptance gate. Checker tests require built core driver helpers. Java or jar absence is an error, never a skipped pass. No download or installation occurs. The jar must match `ENGINE_JAR_SOURCE` in `src/results/spawn.ts`: CRL-maintained build `cqf-4.7-crl-4aee6041`, SHA256 `9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e`. Source/build provenance is in [cli-build.json](../../../../../patches/cqframework/cli-build.json). Historical original-engine measurements below identify what ran at that time, not the current engine selection.
 
 The output parent must exist and the final directory must be new and outside source/fixture directories. Outputs include exact inputs, emitted definitions/CQL, process logs, Parameters, per-case checks, toolchain/fixture/dist/harness hashes, and a completeness summary. Choose a drive with adequate space. `--java PATH` selects a runtime; `--workers 1..4` defaults to2. `--batch-size 1..32` defaults to8 cases per JVM; `--batch-size 1` starts a separate JVM for each case. `--order reverse` reverses the full case order for isolation checks; default is `forward`. Every mode runs all116 cases.
 
@@ -44,17 +44,24 @@ The intended rule is three-valued: false determines conjunction, true determines
 
 `unknowns-frozen.json` adds missing cosmetic purpose, indication, complaint, both individual-documentation answers, both demonstration answers, and both conformance answers. Each needed-unknown case names its unanswered input and a repair case that differs only by that input's value. Case-specific resource identities may differ. Complete photo/visual-field controls, a single-procedure indication pair, explicit negatives, true-OR and false-AND controls distinguish missing needed input from irrelevant unknowns. These expectations were fixed from the authored decision order and operator truth-table semantics before native execution. They cover these specific input combinations, not every possible missing-input combination.
 
-Question presence is a measured transport compatibility contract, separate from the independent clinical outcome: B/P are present; cosmetic only when either request is true; qualification inputs in the entered non-cosmetic arm; individual-documentation inputs only when both requests are true in that arm. The checker demands exactly present/answered, present/unanswered, or absent for every binding. An absent question never verifies its stored input value. The measured set is consistent with the engine gathering considered actions' inputs, including alternatives after a null condition; it must not be inferred from CQL short-circuit evaluation alone. This suite does not prove that causal mechanism or Questionnaire nesting/enableWhen behavior.
+Question presence is checked against the reached authored branch: B/P at the root; cosmetic when
+either request is true; qualification inputs after cosmetic=false and both request statuses are known; individual documentation when
+both requests are true in that branch. The needed unknown stops progression before a leaf. The
+nineteen explicit missing-input cases have pinned question sets; the request and cosmetic frontier
+sets exclude later qualification inputs. All six activity routes, both dispositions, five pause
+frontiers and per-suite counts are checked at fixture load.
 
-At a request or cosmetic null frontier, the engine can return later qualification inputs while the earlier determination is still missing. Recording that set does not endorse it as the desired user experience: limiting visible questions to the needed input remains an integration acceptance gap. The original97 cases retain their measured presence rule; the new19 cases use explicit per-case sets in `unknownQuestionPresence`. All six activity routes, both dispositions, five null frontiers and the per-suite outcome counts above are checked at fixture load.
-
-`contract.json` freezes mechanical FHIR bindings (definition URLs, value element types, coding systems, recommendation wrappers and action-route titles). These identities and title composition were observed in previously measured artifacts and cross-checked against the authored concept/decision mapping. They are an implementation compatibility contract, not an independently derived clinical oracle. Likewise `emitted-inputs.json` freezes the prior accepted CEL-emitted resource bytes; it detects unintended changes to what the engine receives. Intended identity or data-format migrations require an explicit review of these files.
+A pause requires the independently expected frontier, its named unanswered inputs, the exact returned
+question set, no activity/recommendation route, and no engine/OperationOutcome errors. The corrected
+engine's nullable path does not emit the old null-warning strings. Those logs are not required positive
+evidence; any observed legacy warnings are retained and checked against declared guard expressions.
+These checks establish observable behavior, not an internal engine execution trace.
 
 ## What a pass requires
 
 All116 inputs must be present exactly once, and every fixture file except the documented non-inputs must be hash-listed. Every case uses a fresh repository and processor with its exact emitted resources loaded once. Source validation and emission must succeed. Native process success, parseable complete Parameters, no OperationOutcome or logged engine error, exact activity route → recommendation wrapper → activity linkage and content, subject and Q/QR-version association, question status/required/options, and typed answers are checked independently of CRE. Activity notes are checked against their literal authored text, including Unicode.
 
-Pause additionally requires no activity or resource-bearing route, named unanswered inputs, the measured question set, and the expected native null-condition warnings. CQFramework logs the expression that returned null; this is useful native location evidence even though Parameters has no `paused` field. `contract.json` freezes the five guard/complement pairs for this pinned engine. These fixed activity cases have no such warnings, including the cases with irrelevant unknowns. Other policies or frontiers require their own witness contract. A future engine/logging change must be reviewed; it cannot silently remove the witness.
+Pause requires the independently authored frontier, named unanswered inputs, the exact question set and no activity/resource-bearing route. Fixture loading additionally checks the frontier against authored request/cosmetic/both-requested/qualification order, so relabeling a frontier fails independently of runtime logs. Legacy null warnings, if emitted, must match the declared expressions; the current engine does not emit them. This reviewed change uses structured output and subsequent repair transitions as positive evidence, not an engine trace of its internal program counter.
 
 Activity assertions cover identity, subject, status, prohibition, payload, reason code and profile, rather than every possible FHIR element. They do not seal unlisted extensions or fields. Object property order is irrelevant. Emitted data bytes are pinned; emitted definitions and CQL are preserved with executable hashes and tested behavior, not compared to a frozen whole-bundle hash. The manifest's invocation text describes the inspected shipped driver; its recorded class hash and actual per-case arguments identify what ran.
 
@@ -62,46 +69,38 @@ Run outputs inside the workspace are admitted only under `tmp/`; outputs outside
 
 The final summary separately reports `nativeAccepted`, `creAccepted`, their pass counts, infrastructure failures and native acceptance mismatches. `accepted` is the paired verdict and requires both plus complete coverage. CRE exceptions, malformed results and missing predictions remain failures in their own column and do not prevent valid emitted inputs from reaching native execution. `sourceDirty` is surfaced in the summary: working-tree development runs are supported because code must be tested before commit. A green development run is not evidence of review, release or installation.
 
-## Full QuestionnaireResponse session acceptance
+## QR-only session acceptance
 
 Run the separate four-step native operation gate with:
 
 ```sh
-npm run test:native:bleph-session -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-bd2b1c19.jar --out /existing/parent/new-session
+npm run test:native:bleph-session -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-4aee6041.jar --out /existing/parent/new-session
 ```
 
-This command builds the core and uses the same pinned jar. It starts with `missing-cosmetic`, submits
-the entire returned Questionnaire and QuestionnaireResponse with cosmetic=false, changes the complaint
-to `none-of-the-listed-complaints`, then clears cosmetic.answer. The target is pause → Met → Unmet →
-pause, always before any leaf activity when paused. `session.json` pins this sequence and its question
-sets; clinical outcomes reuse the independent direct-data expectations. The full form gains two
-documentation questions after the initial pause and retains them on clearing. Question retention is
-not evidence that a renderer shows all retained questions at once.
+This command builds the core and uses the pinned complete engine jar. It starts with `missing-cosmetic`,
+constructs the next QR from the preceding returned Q/QR, answers cosmetic=false, changes the complaint
+to `none-of-the-listed-complaints`, and clears cosmetic.answer. `session.json` pins pause → Met → Unmet →
+pause and the exact question sets: 3 → 11 → 11 → 3 groups. A pause is before any leaf activity.
 
-Each submission preserves the complete previous response except the selected answer and authored time.
-No answer Observations are injected by the runner. Native extraction must preserve explicit false,
-complete Coding values, local codes, subject and authored timestamps. Initial clinical data remains
-fixed; stored Observation queries and repository-input snapshots must remain unchanged. Request
-Questionnaires can expand/reversion during apply; submitted responses must remain intact. Returned
-activities, routes, null witnesses, questions and typed answers receive the existing native checks.
+The client copies `sdc-questionnaire-definitionExtract` and `sdc-questionnaire-definitionExtractValue`
+from each matching Q item to its QR item. Current Q bindings replace stale QR bindings, including an
+empty binding set; unrelated extensions and all other answers remain intact. Match both linkId and
+definition. Nested answer items are handled. Only the QR is submitted; the Q is neither contained nor
+preloaded in the repository. No client trimming or injected answer Observations is used.
 
-The complete corrected engine runs without an overlay. The session runner also admits the original
-4.7 jar (SHA256 `10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0`)
-as an explicit failure control; it loses Coding answers in this path. That is a failed acceptance
-result, never an expected-failure pass. To reproduce the earlier patch-overlay measurement with
-that original jar, explicitly pass
-`--engine-overlay /path/to/combined-4.7.0-overlay.jar`. Only SHA256
-`3d7c2ff9492006ad06e8d61e7e5f5aff9a2c3c062b9579611f1361c05a98c6f8` is admitted. This is a local test
-instrument, not a released or installed engine, and cannot be stacked on the corrected complete jar.
-All configurations have identical clinical targets;
-the summary returns failure if any stage or extraction check fails. Actual class origins distinguish
-the pinned nested engine dependencies from the selected overlay. See [patch provenance](../../../../../patches/cqframework/README.md).
+CQFramework explicitly reads these bindings on QR items. The published extension contexts do not list
+QR.item, so this is a documented engine-specific client convention. CQFramework also logs an unsuccessful
+lookup of the ephemeral Q canonical before successfully extracting from the QR instructions. The gate
+retains raw logs and reports that exact diagnostic separately; all other engine errors and every
+OperationOutcome remain failures. The exception is matched to the submitted canonical and admitted once.
+It cannot substitute for successful extraction checks.
 
-Verification on2026-09-07: the final public command passes all4 stages with the reviewed overlay in
-70 seconds, including extraction and non-persistence checks. The original engine completes the same
-sequence in68 seconds but passes only the initial stage and exits1. Final checker replay preserves
-both verdicts. All67 checker tests pass, including rejection of engine errors after a brace in stdout;
-this helper writes result JSON to files, so its entire stdout is treated as logs.
+Native extraction must preserve explicit false, complete Coding values, local codes, subject and authored
+time. Clinical data remains fixed; stored Observations and repository input must remain unchanged.
+Responses must remain intact. Activities, routes, structured pause evidence, exact questions and typed answers all
+receive independent checks. The complete engine needs no overlay. The original4.7 engine remains an
+explicit failure control, never a second passing contract. Runtime class-origin checks cover both the
+extraction classes and the applicability-pause classes. See [engine provenance](../../../../../patches/cqframework/cli-build.json).
 
 The session helper is test-only; the production ApplyDriver remains unchanged. Its committed Java17
 class and source hashes are checked at runtime. Maintainers rebuild with
@@ -121,3 +120,18 @@ separate and does not include this currently failing original-engine path.
 ## Direct-data suite limits
 
 This suite is direct-data acceptance. It does not certify QuestionnaireResponse edit/resubmit, `$extract`, persisted/session merging, repository side effects, client rendering, Patient age projection, requested-code value override, arbitrary action guards, installed VSIX/npm artifacts, or all of #320. Patient is the subject here. Request concepts are Boolean determinations, not editable requested-code values. No fixture run alone establishes release readiness or full narrative coverage. Those remaining integration and packaged-artifact gates are separate.
+
+## Current release verification and shared helper
+
+Release4.122.0 verification uses the complete engine identified in `cli-build.json`:
+116 native/116 CRE cases and four QR-only session stages pass. Earlier dated counts
+above are historical runs, not the current checklist. The original engine fails all
+four current stages on behavior; its JVM and class-origin checks succeed.
+
+`session.cjs` and `bmi-session.cjs` are the shared helper's production callers within
+the test harness. BMI retains its separate Q+QR request model and does not invoke
+Bleph's QR-only extraction checker. The original-engine Bleph control exercises the
+same helper/class-origin admission used by BMI. Unit checks cover both callers.
+The optional development overlay is built from the recorded extraction/ID patch
+source; it must satisfy the runner's exact supported base/hash pair. It is not a
+release artifact or a second accepted engine contract. Use the complete release jar.

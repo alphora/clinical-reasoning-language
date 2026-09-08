@@ -1,6 +1,6 @@
 # Pause on unknown applicability
 
-Reviewed source patch: [CQFramework PR #1104](https://github.com/cqframework/clinical-reasoning/pull/1104), stacked on the extraction/ID fixes in #1102. The 4.7 backport is pushed as `codex/apply-pause-on-unknown-r4`. These patches are not yet a released or installed CRL engine.
+Reviewed source patch: [CQFramework PR #1104](https://github.com/cqframework/clinical-reasoning/pull/1104), stacked on the extraction/ID fixes in #1102. The 4.7 backport is pushed as `codex/apply-pause-on-unknown-r4`. The complete CRL-maintained CLI build now includes these patches; see [build provenance](../cli-build.json).
 
 `CrSettings.pauseOnUnknownApplicability` defaults to **true**. Ordinary actions and ordered `any` groups share nullable condition evaluation:
 
@@ -31,8 +31,13 @@ Use the single patch from `main/` after upstream commit `234b879120d97e871bb518b
 - All 70 PlanDefinition tests pass on each branch, including 11 new focused methods. Java formatting and main checkstyle pass; the existing build skips test checkstyle.
 - Twelve native R4 `applyR5` controls pass: default settings, explicit enabled/disabled settings, true/false/null, and invalid CQL collections including `{true, null}`.
 - The unchanged migrated Bleph initial-pause fixture returns three reached question groups instead of nine, with no recommendation or OperationOutcome error. No emitter nesting rewrite is used for that result.
-- Native controls used the final compiled 4.7 patch classes with the previously pinned corrected runtime; class hashes match the final build. A complete replacement CLI jar and installed `emit_results` have **not** been built or certified for this patch.
+- Native controls used the final compiled 4.7 patch classes with the previously pinned corrected runtime; class hashes match the final build. The complete replacement CLI jar was subsequently built and verified with the QR-only Bleph session and 116-case native acceptance; installed-artifact results are recorded by the release gate.
 
-The engine still retains items from a caller-supplied Questionnaire. Removing stale later questions after an earlier answer is cleared is a separate required Bleph completion task. This patch does not establish final MV readiness, exhaustive clinical coverage, renderer behavior, or engine deployment.
+The engine retains items from a caller-supplied Questionnaire. The supported Bleph client
+copies extraction bindings onto matching QR items and submits only QR; fresh Q generation
+then returns 3 -> 11 -> 11 -> 3 groups with pause -> Met -> Unmet -> pause. This needs no
+question-pruning patch. `manifest.json`'s `deployed:false` records the original upstream
+patch handoff state; it does not deny inclusion in the separately identified CRL CLI build.
+This patch does not establish completed customer adoption or human Medical Validation.
 
 Local review records: `.vibe-tools/discussions/600-*` (plan) and `601-*` (code). Native review converged; the external reviewer was unavailable. Local execution evidence: `tmp/601-validation.json`, `tmp/601-native`, `tmp/601-native-cardinality`, and `tmp/601-bleph-native`.

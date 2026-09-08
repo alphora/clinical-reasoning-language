@@ -228,13 +228,7 @@
     "missing-cosmetic": [
       "B",
       "P",
-      "cosmetic",
-      "photoConform",
-      "vfConform",
-      "indication",
-      "complaint",
-      "photo",
-      "vf"
+      "cosmetic"
     ],
     "missing-indication": [
       "B",

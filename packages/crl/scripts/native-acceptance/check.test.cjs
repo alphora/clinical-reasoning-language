@@ -21,6 +21,7 @@ function sample(activity = false) {
   const entry = { answers: { B: true, P: activity ? false : null, choice: 'yes', cosmetic: false }, expected: { kind: activity ? 'activity' : 'pause', activity: activity ? 'Met' : null, nodeId: activity ? 'leaf' : 'guard' } };
   const q = { resourceType: 'Questionnaire', status: 'active', url: contract.questionnaireUrl, version: 'session1', item: Object.entries(contract.bindings).map(([key, b]) => ({ linkId: key, definition: b.definition, required: false, type: b.valueType === 'valueBoolean' ? 'boolean' : 'choice', ...(b.optionCodes ? { answerOption: b.optionCodes.map(code => ({ valueCoding: { system: b.system, code } })) } : {}) })) };
   const qr = { resourceType: 'QuestionnaireResponse', questionnaire: q.url + '|' + q.version, subject: { reference: subject }, item: q.item.map(i => ({ linkId: i.linkId, definition: i.definition, answer: entry.answers[i.linkId] === null ? [] : [{ [contract.bindings[i.linkId].valueType]: i.linkId === 'choice' ? { system: contract.bindings.choice.system, code: 'yes' } : entry.answers[i.linkId] }] })) };
+  if (!activity) { q.item = q.item.filter(i => i.linkId !== 'choice'); qr.item = qr.item.filter(i => i.linkId !== 'choice'); }
   const group = { resourceType: 'RequestGroup', id: 'plan', subject: { reference: subject }, action: [] };
   const resources = [q, qr, group];
   if (activity) {
@@ -34,19 +35,19 @@ const check = s => checkNative(s.result, s.entry, s.contract, s.subject, s.entry
 test('session file-output helper checks logs after braces', () => {
   const {sessionVerdict}=require('./session-check.cjs'),s=sample(true);
   s.contract.unknownQuestionPresence={};s.entry.suite='unknowns';
-  const step={expected:s.entry.expected,questions:Object.keys(s.contract.bindings)};
+  const step={expected:s.entry.expected,questions:s.q.item.map(i=>i.linkId)};
   const clean={exitCode:0,stdout:'INFO context={}\n',stderr:''};
   assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,clean).passed,true);
   const bad=sessionVerdict(s.result,s.entry,s.contract,step,s.subject,{...clean,stdout:clean.stdout+'ERROR extraction failed'});
   assert.equal(bad.passed,false);assert.equal(bad.failureKind,'infrastructure');
 });
-test('session pause witnesses after log braces remain visible', () => {
+test('session structured pause passes with or without legacy warning logs', () => {
   const {sessionVerdict}=require('./session-check.cjs'),s=sample();
   s.contract.unknownQuestionPresence={};s.entry.suite='unknowns';s.entry.expected.pauseInputs=['P'];
-  const step={expected:s.entry.expected,questions:Object.keys(s.contract.bindings)};
+  const step={expected:s.entry.expected,questions:s.q.item.map(i=>i.linkId)};
   const p={exitCode:0,stdout:'INFO context={}\nCondition expression example expression returned null',stderr:''};
   assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,p).passed,true);
-  assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,{...p,stdout:'INFO context={}'}).passed,false);
+  assert.equal(sessionVerdict(s.result,s.entry,s.contract,step,s.subject,{...p,stdout:'INFO context={}'}).passed,true);
 });
 test('positive native pause/activity controls preserve false and typed coding', () => {
   assert.equal(check(sample()).passed, true); assert.equal(check(sample(true)).passed, true);
@@ -76,10 +77,10 @@ test('no activity without named unanswered question is not pause', () => {
   const s = sample(); s.q.item.splice(1, 1); s.qr.item.splice(1, 1); assert.equal(check(s).passed, false);
   assert.equal(checkNative({}, s.entry, s.contract, s.subject).passed, false);
 });
-test('valid Questionnaire does not suppress logged errors or wrong null witnesses', () => {
+test('structured pause allows absent legacy logs but rejects errors and wrong warnings', () => {
   const s = sample();
   assert.equal(checkNative(s.result, s.entry, s.contract, s.subject, 'ERROR Could not resolve identifier Library').passed, false);
-  assert.equal(checkNative(s.result, s.entry, s.contract, s.subject, '').passed, false);
+  assert.equal(checkNative(s.result, s.entry, s.contract, s.subject, '').passed, true);
   const a = sample(true);
   assert.equal(checkNative(a.result, a.entry, a.contract, a.subject, 'Condition expression wrong returned null').passed, false);
   s.result.parameter.push({ name: 'unexpected', resource: { resourceType: 'ServiceRequest', id: 'other' } });
@@ -98,7 +99,9 @@ test('frozen case-set integrity and independent CRE/native verdicts', () => {
   assert.equal(summarize(f.entries, rows.slice(1)).accepted, false);
 });
 test('deeper pauses require valid named unanswered inputs and their returned questions', () => {
-  const s=sample(); s.entry.suite='unknowns'; s.entry.caseId='deep';
+  const s=sample(),complete=sample(true);
+  s.q.item.splice(2,0,complete.q.item[2]);s.qr.item.splice(2,0,complete.qr.item[2]);
+  s.entry.suite='unknowns'; s.entry.caseId='deep';
   s.entry.expected.pauseInputs=['choice']; s.entry.answers.choice=null; s.qr.item[2].answer=[];
   s.contract.unknownQuestionPresence={deep:Object.keys(s.contract.bindings)};
   assert.equal(check(s).passed,true);
@@ -202,4 +205,39 @@ test('timeout and cancellation terminate owned descendants before worker release
       assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
     } finally { clearTimeout(timer); }
   }
+});
+
+test('structured pause rejects an answered frontier, later question, or activity even without warnings',()=>{
+ for(const mutation of ['answer','later','activity']) {
+  const s=sample();
+  if(mutation==='answer')s.qr.item.find(i=>i.linkId==='P').answer=[{valueBoolean:false}];
+  if(mutation==='later'){const a=sample(true);s.q.item.push(structuredClone(a.q.item.find(i=>i.linkId==='choice')));s.qr.item.push(structuredClone(a.qr.item.find(i=>i.linkId==='choice')));}
+  if(mutation==='activity')s.result.parameter[0].resource.entry.push({resource:{resourceType:'CommunicationRequest',id:'unexpected',subject:{reference:s.subject}}});
+  const verdict=checkNative(s.result,s.entry,s.contract,s.subject,'');
+  assert.equal(verdict.passed,false);
+  assert.ok(verdict.errors.includes({answer:'Wrong answer count: P',later:'Wrong question presence: choice',activity:'Wrong/duplicate native activity'}[mutation]));
+  if(mutation==='later')assert.deepEqual(verdict.errors,['Wrong question presence: choice']);
+  if(mutation==='activity')assert.deepEqual(verdict.errors,['Wrong/duplicate native activity']);
+ }
+});
+
+
+test('Bleph frontier follows authored request/cosmetic/both/qualification order',()=>{
+ const {blephPauseFrontier}=require('./check.cjs');
+ for(const [a,want] of [
+  [{B:null,P:false,cosmetic:false},'when[0]'],
+  [{B:true,P:null,cosmetic:null},'when[0]/when[0]'],
+  [{B:true,P:null,cosmetic:false},'when[0]/when[1]'],
+  [{B:true,P:true,cosmetic:false},'when[0]/when[1]/when[0]'],
+  [{B:true,P:false,cosmetic:false},'when[0]/when[2]']
+ ]) assert.equal(blephPauseFrontier(a),want);
+ for(const [answers,expected] of [
+  [{B:null,P:true,cosmetic:null},'when[0]/when[0]'],
+  [{B:true,P:true,cosmetic:null},'when[0]/when[0]'],
+  [{B:false,P:null,cosmetic:null},'when[0]'],
+  [{B:null,P:true,cosmetic:false},'when[0]/when[1]'],
+  [{B:false,P:true,cosmetic:false},'when[0]/when[2]'],
+  [{B:true,P:true,cosmetic:true},null],
+  [{B:false,P:false,cosmetic:null},null]
+ ])assert.equal(blephPauseFrontier(answers),expected);
 });

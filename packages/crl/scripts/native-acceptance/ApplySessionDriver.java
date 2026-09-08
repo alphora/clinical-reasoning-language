@@ -29,7 +29,10 @@ public class ApplySessionDriver {
       "org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r4.ObservationResolver",
       "org.opencds.cqf.fhir.cr.questionnaireresponse.extract.r5.ObservationResolver",
       "org.opencds.cqf.fhir.cr.common.IOperationRequest",
-      "org.opencds.cqf.fhir.utility.GeneratedIds"
+      "org.opencds.cqf.fhir.utility.GeneratedIds",
+      "org.opencds.cqf.fhir.cr.CrSettings",
+      "org.opencds.cqf.fhir.cr.plandefinition.apply.ApplyRequest",
+      "org.opencds.cqf.fhir.cr.plandefinition.apply.ProcessAction"
     };
     StringBuilder origins = new StringBuilder();
     for (String name : names) {

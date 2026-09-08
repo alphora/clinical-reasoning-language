@@ -3,9 +3,9 @@
 // Native operation API test, not a client renderer or production driver replacement.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process');
-const {loadFixture,hash}=require('./check.cjs');
+const {loadFixture,hash,blephPauseFrontier}=require('./check.cjs');
 const {runBounded,childEnvironment}=require('./process.cjs');
-const {classDir,overlaySha256,helperReady,checkOrigins,sessionEngine,originalEngineSha256,single,editResponse,checkExtraction,sessionVerdict}=require('./session-check.cjs');
+const {classDir,overlaySha256,helperReady,checkOrigins,sessionEngine,originalEngineSha256,single,buildSessionResponse,checkExtraction,sessionVerdict}=require('./session-check.cjs');
 const pkg=path.resolve(__dirname,'../..'),workspace=fs.realpathSync(path.resolve(pkg,'../..')),fixture=path.join(pkg,'test/acceptance/bleph');
 const write=(p,v)=>fs.writeFileSync(p,typeof v==='string'?v:JSON.stringify(v,null,2)+'\n');
 const maxBytes=32*1024*1024;
@@ -49,7 +49,7 @@ async function main(args) {
     write(path.join(o.out,'manifest.json'),{schemaVersion:1,sourceHead:git('rev-parse','HEAD'),sourceStatus:git('status','--porcelain'),engine,
       overlay:o.overlay?{sha256:overlaySha256,label:'Reviewed local test instrument; not installed/shipped engine'}:null,
       helper,distHashes,harnessHashes,fixtureHashes:f.hashes,node:process.version,java:version.stderr+version.stdout,
-      invocation:'Native R4 applyR5, useServerData=true, complete Q+QR in dataBundle; fresh repository per call; fixed initial clinical data',
+      invocation:'Native R4 applyR5, useServerData=true, complete QR with copied extraction bindings in dataBundle; no Questionnaire sent/contained/preloaded; fresh repository per call; fixed initial clinical data',
       bounds:{timeoutMs:120000,maxBytes,heapMiB:768,activeProcessors:2},settings});
     const {resolveCelImports}=require('../../dist/cel/imports'),{emitCelToFhir}=require('../../dist/cel/emitter/emitFhir');
     const {emitCQLImports}=require('../../dist/imports/emit'),{emitFhirDefFromPath}=require('../../dist/fhir-emitter/closureOrchestrator');
@@ -73,10 +73,11 @@ async function main(args) {
       const dir=path.join(o.out,String(index)+'-'+step.name);fs.mkdirSync(dir);
       const repo=clone(base.bundle),request={resourceType:'Bundle',type:'collection',entry:[]};
       if(index) {
-        const submitted=editResponse(q,qr,step,f.contract);oracle.answers[step.key]=step.value;
-        repo.entry.push({resource:clone(q)});request.entry.push({resource:clone(q)},{resource:submitted});
-        write(path.join(dir,'edit-proof.json'),{fullQrPreservedExceptAnswerAndAuthored:true,key:step.key,authored:step.authored});
+        const submitted=buildSessionResponse(q,qr,step,f.contract);oracle.answers[step.key]=step.value;
+        request.entry.push({resource:submitted});
+        write(path.join(dir,'edit-proof.json'),{fullQrPreservedExceptAnswerAuthoredAndExtractionBindings:true,questionnaireSent:false,key:step.key,authored:step.authored});
       }
+      if(step.expected.kind==='pause')assert.equal(step.expected.nodeId,blephPauseFrontier(oracle.answers),'Session pause frontier differs from authored order at '+step.name);
       write(path.join(dir,'repo.json'),repo);write(path.join(dir,'request.json'),request);
       const prefix=path.join(dir,'apply'),loader=[classDir,o.overlay].filter(Boolean).join(',');
       const javaArgs=[...settings,'-Djava.io.tmpdir='+dir,'-Dloader.main=ApplySessionDriver','-Dloader.path='+loader,'-cp',o.jar,'org.springframework.boot.loader.launch.PropertiesLauncher',path.join(dir,'repo.json'),path.join(dir,'request.json'),f.contract.planId,subject,prefix];
@@ -85,7 +86,7 @@ async function main(args) {
       p.durationMs=Date.now()-began;write(path.join(dir,'stdout.log'),p.stdout);write(path.join(dir,'stderr.log'),p.stderr);write(path.join(dir,'process.json'),{...p,stdout:undefined,stderr:undefined});
       assert.ok(!p.failure&&p.exitCode===0,'Native process failed at '+step.name);
       checkOrigins(fs.readFileSync(prefix+'-origins.txt','utf8'),o.jar,o.overlay,!engine.original||Boolean(o.overlay));
-      const result=read(prefix+'-result.json'),native=sessionVerdict(result,oracle,f.contract,step,subject,p);
+      const result=read(prefix+'-result.json'),native=sessionVerdict(result,oracle,f.contract,step,subject,p,index?single(request,'QuestionnaireResponse'):undefined);
       const extraction=checkExtraction({before:read(prefix+'-request-before.json'),after:read(prefix+'-request-after.json'),
         storedBefore:read(prefix+'-stored-observations-before.json'),storedAfter:read(prefix+'-stored-observations-after.json'),
         repoBefore:read(prefix+'-repository-bundle-before.json'),repoAfter:read(prefix+'-repository-bundle-after.json'),subject,contract:f.contract,controls});

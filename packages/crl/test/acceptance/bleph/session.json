@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "initialCase": "missing-cosmetic",
   "controlCase": "complete-photograph",
-  "scope": "Native R4 applyR5 full Q/QR request-only loop; no renderer, persisted-answer deletion, or HTTP transport claim.",
+  "scope": "Native R4 applyR5 QR-only session with extraction bindings copied from returned Q; no Q sent/contained/preloaded, no renderer or HTTP transport claim.",
   "steps": [
     {
       "name": "initial-pause",
@@ -17,13 +17,7 @@
       "questions": [
         "B",
         "P",
-        "cosmetic",
-        "photoConform",
-        "vfConform",
-        "indication",
-        "complaint",
-        "photo",
-        "vf"
+        "cosmetic"
       ]
     },
     {
@@ -90,15 +84,7 @@
       "questions": [
         "B",
         "P",
-        "cosmetic",
-        "photoConform",
-        "vfConform",
-        "indication",
-        "complaint",
-        "photo",
-        "vf",
-        "bdoc",
-        "pdoc"
+        "cosmetic"
       ]
     }
   ]

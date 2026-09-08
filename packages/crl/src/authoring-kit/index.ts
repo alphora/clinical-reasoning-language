@@ -332,7 +332,8 @@ export type {
 // REFACTOR:grounded (#320, plan583): schemaVersion 1.32 → "1.33" retires legacy age and adds explicit uncoded publication.
 // REFACTOR:grounded (#320, plan595): schemaVersion 1.33 → "1.34": explicit BMI validity, legacy retirement and native verification limits.
 // CONTENT 1.34 → "1.35": corrected complete engine acquisition; no clinical semantics change.
-const SCHEMA_VERSION = "1.35";
+// CONTENT 1.35 → "1.36": complete engine includes applicability pause; acquisition identity changes.
+const SCHEMA_VERSION = "1.36";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
