@@ -86,7 +86,7 @@ describe("validateCRLImports", () => {
     expect(result.success).toBe(true);
   });
 
-  it("documents global-namespace visibility: any transitive declaration is visible to any library", () => {
+  it("validates a qualified reference to an explicitly included local library", () => {
     const root = path.join(FIXTURES, "cross-file-ref", "root.crl");
     const result = validateCRLImports(root);
     expect(result.success).toBe(true);

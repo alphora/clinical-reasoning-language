@@ -273,9 +273,9 @@ describe("#189 P2 — the SOURCE carrier lookup (`valueReadElementsAdmitting`)",
     expect(valueReadElementsAdmitting("Patient", "date")).toEqual(["birthDate"]);
   });
 
-  it("⚠ a boolean concept resolves NO carrier on a valueless resource — its truth is EXISTENCE", () => {
-    // Ruling `code`/`onset` readable does NOT make existence obsolete: `boolean` is admitted by neither, so
-    // a boolean Condition/Procedure concept still reads `exists`. That is the whole corpus today.
+  it("resolves no Boolean value carrier on the modeled valueless resources", () => {
+    // This model lookup proves no Boolean carrier is available. It does not
+    // determine producer behavior, missing-data semantics, or publication admission.
     for (const rt of ["Condition", "Procedure", "ServiceRequest", "MedicationRequest"]) {
       expect(valueReadElementsAdmitting(rt, "boolean"), rt).toEqual([]);
     }

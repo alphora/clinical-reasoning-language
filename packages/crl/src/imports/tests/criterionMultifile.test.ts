@@ -30,6 +30,7 @@ describe("criterion — multi-file semantic validation", () => {
     expect(dup.some((e) => /already declared as a criterion/.test(e.message))).toBe(true);
   });
 
+  // @kit library-scoping:criterion-local
   it("a library-qualified criterion ref → criterion-misuse (not 'no concept named X')", () => {
     const root = path.join(FIXTURES, "criterion-foreign-qualified", "root.crl");
     const result = validateCRLImports(root);

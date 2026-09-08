@@ -17,9 +17,13 @@ describe("#189 Piece 2 — CEL validator local-membership warning", () => {
   const r = validateCELFile(MEMBERSHIP_CEL);
   const memberWarnings = r.warnings.filter((w) => w.kind === "fact-code-not-in-local-set");
 
+  // @kit cel-cases:nonmember-warning
   it("is a WARNING, not an error (the wrong-code datum stays authorable)", () => {
     expect(r.errors.filter((e) => e.kind === "fact-code-not-in-local-set")).toEqual([]);
     expect(memberWarnings.length).toBeGreaterThan(0);
+    for (const warning of memberWarnings) {
+      expect(warning.message).toContain("Nonmembership is not a false answer");
+    }
   });
 
   it("fires for a wrong-code fact and a cross-concept fact; NOT for a correct or bare fact", () => {

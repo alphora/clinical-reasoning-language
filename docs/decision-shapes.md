@@ -254,9 +254,12 @@ Syntax and semantics:
 - **It is library-local.** Reference a criterion **unqualified** (a same-library
   self-qualification, `"CurrentLib"."X"`, also resolves — it is treated as the
   bare ref). What is rejected is a **foreign** library-qualified reference: once
-  the other library is `include`d, `"OtherLib"."X"` where `X` is a criterion
-  there is `criterion-misuse` ("cannot be library-qualified"); before it is
-  included, you get the more basic `external-library-not-included` first.
+  a foreign library resolves, `"OtherLib"."X"` where `X` is a criterion
+  there is `criterion-misuse` ("cannot be library-qualified"). A discovered
+  local sibling needs no include in project/path validation. A package library
+  needs an explicit include first; without it the package visibility check gives
+  `external-library-not-included`. Adding an include never makes a foreign
+  criterion reference legal. Inline single-file validation has no sibling context.
   Criteria are not cross-library exports — to share guard logic across libraries,
   share a **concept** *only when it names one genuine clinical fact* (a
   library-qualified concept ref, per rung 1 — not a container for distinct-criteria

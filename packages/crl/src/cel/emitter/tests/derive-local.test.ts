@@ -10,11 +10,12 @@ import { emitCelToFhir } from "../emitFhir";
 /**
  * #189 CEL-writer T3b (disc 490) — derive-local CI guard.
  *
- * A local `code is` fact's `{system, code}` must be DERIVED from the concept (NOT authored on the `.cel` fact)
- * via the SAME project resolution the CQL definition lane uses, so the emitted instance coding BYTE-MATCHES the
- * CQL retrieve's CodeSystem by construction. The real `PlanDefinition/$apply` proves the end-to-end round-trip
- * against the cqf engine (out-of-tree harness); this guards the derived BYTES + the loud floor in CI so a
- * regression in the resolution can't silently reintroduce the domain drift that denied every PA case.
+ * Without an explicit fact code, local `{system, code}` is derived from the concept
+ * via the same project resolution the CQL definition lane uses, so the emitted instance coding matches the
+ * CQL retrieve's CodeSystem by construction. This suite checks emitted bytes, not a native
+ * `PlanDefinition/$apply` round-trip. It guards derived codings and diagnostics so a
+ * regression in resolution cannot silently introduce domain drift. A well-formed authored
+ * nonmember code is preserved separately; it is membership input, not a false answer.
  *
  * Fixture: the real HCSC PA policy dme101-030 (pure-local Observations; `package.json` name `dme101-030` +
  * `crl.canonicalBase http://example.org/hcsc/dme101-030`).
@@ -66,10 +67,11 @@ describe("#189 T3b derive-local (dme101-030)", () => {
     }
   });
 
+  // @kit cel-cases:authored-nonmember-preserved
   it("#189 Piece 2 — a local fact's WELL-FORMED authored `code is` is the membership data input, emitted AS authored", () => {
     // Author a (wrong-code) token onto the local "Documented Tibial Nonunion" fact. Under the membership model
     // (disc 508) this is no longer a conflict — the code is the DATA INPUT: it routes to the resource coding as
-    // authored, and `$apply`'s system-qualified retrieve computes non-membership (a wrong code → concept false).
+    // authored. Nonmembership does not assert a false selected answer; this test checks only emitted coding.
     const original = readFileSync(DME_CEL, "utf-8");
     const src = original.replace(
       'fact "Documented Tibial Nonunion":\n- date is "2026-02-01".',
@@ -91,6 +93,7 @@ describe("#189 T3b derive-local (dme101-030)", () => {
     expect(authored).toBe(true);
   });
 
+  // @kit cel-cases:malformed-code-rejected
   it("#189 Piece 2 — loud floor — a MALFORMED authored `code is` token is an error and is SKIPPED", () => {
     // An empty-code token (`<system>|`) would emit `coding.code:""` — invalid FHIR `$apply` drops silently. It is
     // an error + skip (never a partial), distinct from a well-formed non-member (a legitimate wrong-code datum).

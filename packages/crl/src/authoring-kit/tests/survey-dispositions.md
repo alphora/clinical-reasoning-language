@@ -1,0 +1,97 @@
+# Broader survey dispositions
+
+In progress. Sources inspected on60e0cd0c/dcf63244, 2026-09-08. These are source-review
+dispositions, not new execution claims. Paths below are relative to `packages/crl/src`.
+The full discovery set and execution reports remain in test-inventory.json.
+Every mixed file retains its applicable cases for mapping; a legacy fixture is
+not silently excluded together with unrelated current behavior.
+
+## Imports — all20 test files read
+
+| File under imports/tests | Disposition of tests/rows |
+|---|---|
+| namespace.test.ts | Separate name maps and legacy flat first-wins view are internal. Same concept names in different libraries can be legal, but this flat map does not prove qualified lookup or emission. Criterion skip is a crash regression, not proof that criteria vanish semantically |
+| scoping-v21.test.ts | Map qualified local sibling, missing target, required external include, aliases ignored, redundant local include, duplicate names, cycles and self scope to library-scoping guidance. Soft diagnostics are validation mode only. Concept alias fixtures are legacy inputs, not authoring examples |
+| registry-and-resolver-v21.test.ts | Map explicit include/package priority, package prohibition on consumer-local fallback, duplicate local library names. Remaining registry/localLibraries bookkeeping is internal |
+| index.test.ts | Resolver failure/cycle/duplicate handling supports library scoping. Cross-kind/cross-library examples only prove registry namespace behavior. Anonymous-root skipped marker has no execution evidence. CMS22 layout is a legacy resolver fixture |
+| registry.test.ts | Nearest package.json and nested package boundaries support project guidance; duplicates support library-scoping. Broken unrelated local-file warning does not prove a broken dependency is usable. Anonymous skipped marker excluded |
+| resolver.test.ts | Missing includes and self/multi-file cycles support diagnostics guidance. Topological ordering/diamond dedup are internal, not authored precedence |
+| validate.test.ts | Qualified reference, unresolved attribution, cycles, duplicate-name scope and structural resolver errors support scoping. Final test title falsely claimed global transitive visibility from a directly included local-library fixture: narrow the title. Successful legacy content is not new-model certification |
+| overlay.test.ts | All rows test unsaved-buffer transport and attribution; no new language claim. Overlay fixtures use legacy definitions and must not be kit examples |
+| emit.test.ts | Current standalone-age row supports source-preservation in split CQL, not native evaluation. Import/collision failures, stable filenames/catalog closure and parameter routing are candidate bounded claims. Legacy aliases, exists reductions, implicit Scalar question lowering, per-CRL split strategies and local-domain seed collisions must not become new authoring recommendations. Internal split planning/idempotence excluded. Tests explicitly admit some negative include assertions are vacuous on failed emission |
+| criterionMultifile.test.ts | Map concept/criterion name collision in either order, library-local criterion references and cycle errors. Same criterion name in two libraries is not itself a cycle |
+| criterionTripwire.test.ts | All seven public callers assert presence of criterion-only dependencies. The CRE counterfactual uses legacy RecordSet presence semantics; do not teach missing answer as false. Candidate current dependency-closure evidence must use selected-publication owning tests. Provenance reachability is not source-fidelity proof |
+| criterionAcceptance.test.ts | Doubling-DAG count/body/size tests establish bounded emitted structure, not native execution. Serialized criterion body-once/reference-after is trace internals; no new author syntax. Legacy RecordSet inputs not delivered examples |
+| criterionEmitEndToEnd.test.ts | Named criterion define and dependency-input closure are candidate structural claims. Compound guard/criterion fixtures are legacy RecordSet. `unless` Coalesce tests document the old per-action path, not desired publication pause. Fixed-date repeated emit is determinism evidence only |
+| booleanCompositionCrossLib.test.ts | Entire file exercises legacy defined-as Boolean composition and its totality/alias limits. Excluded from positive selected-concept teaching; retained regression coverage does not authorize that form |
+| booleanCompositionInferred.test.ts | Entire file exercises legacy defined-as composition and scalar re-exports. Excluded from positive selected-concept teaching |
+| definedAsExistsInferred.test.ts | Entire file exercises legacy scalar existence/sem composition and explicit refusal of a subset of both-representation forms. Excluded from positive teaching; it cannot establish current absence-as-false semantics |
+| dispositionValidate.integration.test.ts | Map configured option closed set, communication request type and malformed config failures; no config means this validator does not enforce the optional option set. Filtered diagnostics do not prove full correctness; Condition guard fixture is legacy. Detailed disposition-model audit remains pending |
+| publicationEmit.test.ts | Current cross-library nullable value/record emission, physical routing, invisible package refusal and unsupported context are applicable. Snapshot/no-I/O mechanics excluded. See inspection notes624; map to publication/scoping claims, no native execution |
+| foreignPublicationInterface.test.ts | Foreign-only Boolean publication decision does not require an unused local publication; CQL physical-name collision errors. Old unused-local mutation is regression-only |
+| preparePublicationContext.test.ts | Explicit package-first, implicit local-first, package visibility, unsupported alias and consumer-local isolation are applicable. Admission/answer-domain closure and FHIR-only dependency preservation have separate publication evidence. Map/cache/freeze/snapshot details are internal |
+
+## Language services — all14 test files read
+
+These test editor adapters, often using incomplete or retired CRL and fake symbol
+indexes. Their suggestions are not an emitter capability list. No positive CRL
+example is taken from them. Any feature advertised in the kit needs the real
+extension adapter evidence as well as these headless functions.
+
+| File under language-services/tests | Disposition |
+|---|---|
+| contracts.test.ts | Entire file is coordinate conversion/defensive range internals; exclude from language teaching |
+| host.test.ts | Entire file is filesystem/overlay host behavior; exclude from language teaching |
+| refRanges.test.ts | Entire file is token-range/qualifier regression coverage; exclude from language teaching |
+| completion.test.ts | Slot filtering, grammar-list suggestions, snippets and fake-index precedence are editor behavior; no language admission claim. Grammar suggestion versus supported emission distinction belongs with concept-form |
+| hover.test.ts | Markdown/token selection is editor behavior. Patient parameter explanation needs independent emitter evidence before teaching; provided fake pattern is not proof of catalog support |
+| navigation.test.ts | Fake-index links/definition/reference/rename bounds are editor behavior. No broad cross-workspace rename claim. Library rename is explicitly unsupported by this function |
+| criterionRename.test.ts | Real-index rename updates concept/decision/criterion references including presentation scopes, preserving identical question prose. Useful editor capability; source identity versus wording claim already belongs to presentation. Parsing changed text does not establish emission or provenance integrity |
+| diagnostics.test.ts | Mapping, overlay, crash sentinel and multi-file attribution are adapter behavior. Information-level crash is not clean validation; no further language example |
+| celCompletion.test.ts | Decision result offers bare pause; Boolean result offers true/false; reference slots are distinguished. Map language semantics from CEL validator/CRE owners, not fake completion indexes. Multi-type Boolean suggestion is not publication admission |
+| celCompletion.integration.test.ts | Real index populates covered/sibling symbols and decision activity names. Legacy concept definitions only test editor discovery; no whole-policy semantic claim |
+| celDiagnostics.test.ts | CEL overlays, own-file filtering and source severity mapping are adapter behavior. Windows path case branch explicitly returns early elsewhere; passing status alone is not cross-platform evidence |
+| celHover.test.ts | Entire file is token-slot hover formatting and context construction; exclude as semantic evidence, link only if advertising editor hover |
+| celNavigation.test.ts | Fact/library/decision/arm locations and named-anchor versus fact reference distinction. Navigation internals; temporal language semantics need CEL owning tests |
+| celSymbols.test.ts | Covered closure works outside ProjectIndex's project-layout gate; local/package symbol shadowing. Editor symbol availability does not establish CRL package visibility; avoid conflating CEL resolution with CRL import rules |
+
+## FHIR model and migration — all4 test files read
+
+| File | Disposition |
+|---|---|
+| fhir-model/tests/elementPath.test.ts | Entire file is qualified-to-relative path normalization; internal, no author input recommendation |
+| fhir-model/tests/fhirValueModel.test.ts | R4 carrier table and malformed/unmodeled distinctions are model-layer evidence, not current publication type admission. Do not teach all11 modeled Observation value variants as implemented publications. Wiring/import allowlists are internal. Final Boolean-carrier test title incorrectly infers existence semantics from absence of a carrier; narrow to the asserted model lookup |
+| migration/tests/retiredFormCorpus.test.ts | Text scans guard tracked corpus against value-element and concept-level age-today forms; they do not establish correct replacement emission. Positive migration guidance belongs to current publication tests. Raw text scan includes comments and excludes ignored scratch by design |
+| migration/tests/migrationInventory.test.ts | Entire suite targets the previous migration classifier/inventory. Its Boolean-presence recipes and exemptions are not #320 migration instructions. A clean inventory does not mean Scalar retirement or new-model migration is complete. One test title claims missing type but actually supplies Observation; narrow that title. Reconciliation/closed-set/exclusion mechanics are internal |
+
+## CEL — all22 test files read by native reviewer626
+
+Paths in this table are relative to `cel/`. Limits describe the inspected before-state;
+review628 corrects the five teaching defects and the Quantity example. Remaining
+legacy fixtures are regression inputs, not positive kit examples.
+
+| File | Disposition and exact evidence boundary |
+|---|---|
+| `tests/index.test.ts` | **Applicable syntax candidates:** Boolean versus numeric/string/quantity literal parsing; qualified `defined by`; anchors, reference dates and cross-resource relation AST fields. **Exclude semantic claims:** these are parser assertions. The syntax-reference library is deliberately unresolved. CMS result literals are not executed here; preserving a `false` AST does not establish the intended clinical result. |
+| `tests/caseId.test.ts` | **Applicable:** explicit ID parsing/hoisting, allowed spelling, reserved generated-ID spelling, duplicate/multiple-ID diagnostics. **Limit:** does not establish that renaming a case preserves its emitted FHIR identities; do not equate authored case IDs with the emitter's naming inputs. |
+| `tests/definedByResolve.test.ts` | **Internal resolution coverage:** Concept/Activity target kind, source identity and local/package lookup. The same-name Concept/Activity rows establish first-declaration resolution, not unambiguous authoring. Do not advertise every qualified reference as necessarily identifying a concept. |
+| `tests/temporal.test.ts` | **Applicable bounded distinction:** accepted date syntax differs from comparability; table rows cover partial dates, offsets, leap seconds and precision. **Internal-only:** compatibility-comparator results are not the complete selected-publication ordering policy. In particular, do not promote its calendar-versus-timestamp indeterminacy into a universal selection rule. |
+| `tests/factDate.test.ts` | **Applicable:** reference date overrides a valid fact-body date; body date is fallback; undated facts remain undated even with `anchor is now`; Patient birth date is not effective date; authored `now` uses the supplied clock. Error rows cover missing/invalid anchors and unsupported arithmetic. **Limit:** helper calls with repeated references do not prove those references can coexist in emitted data. Month-end calendar arithmetic is not established by the away-from-boundary examples. |
+| `imports/tests/resolver.test.ts` | **Applicable:** project-root/covered-library resolution requirements. **Internal-only:** overlay and corpus registry assertions. Successful resolution is neither publication admission nor decision execution. |
+| `validator/tests/validator.test.ts` | **Applicable diagnostics:** bare resource versus qualified declaration references; result shape; Boolean result-leaf requirement; transitive activity arms, including resolvable cross-library delegation; duplicate names; unresolved references; include/soft-mode behavior. **Legacy fixtures:** self-referential/default-shape concepts, old existence/composition forms and source forms must not become positive examples. Several tests filter one diagnostic kind; “no such diagnostic” is not a clean pipeline. The empty-decision row accepts either parse failure or a branch error, so it does not establish a specific diagnostic. |
+| `validator/tests/booleanValueRules.test.ts` | **Legacy diagnostic regression:** bare/numeric value-reading interface assertions, explicit Boolean values, presence-only warning and sem-composite warning. Preserve conditional diagnostic evidence; do not teach implicit presence concepts or sem forms. Missing selected-record values require the replacement model's existing evidence, not this fixture's rejection rule. |
+| `validator/tests/numericValueRules.test.ts` | **Applicable claim candidate:** Quantity requires a nonempty unit-bearing literal; dimensionless values and coded values have different literal contracts. **Input migration required:** the fixture includes legacy/default and explicit Scalar declarations. Assertions generally isolate numeric diagnostics rather than establish complete success. |
+| `validator/tests/localMembershipWarning.test.ts` | **Applicable:** deliberately wrong local codes remain warnings; correct/default local codes do not warn; source nonmembers have a separate warning. **Legacy outcome exclusion:** the imported fixtures' closed-world approve/deny expectations are not established by these warning assertions and must not be promoted to selected-answer behavior. |
+| `validator/tests/bareFactWrongSystem.test.ts` | **Applicable diagnostic candidate:** a bare resource carrying a local code under the wrong system differs from the actual local CodeSystem; unrelated codes are not all near misses. **Legacy input:** Scalar declaration. Neither a warning nor its absence proves a selected answer or clinical determination. |
+| `validator/tests/factDate.test.ts` | **Applicable:** invalid authored dates are not repaired by an override; malformed/duplicate dates and anchors are diagnosed; partial Patient birth dates are accepted; undeclared clocks are not consulted. **Limit:** calendar acceptance does not prove selection ordering or native age calculation. |
+| `validator/tests/identityDiagnostics.test.ts` | **Applicable directly:** repeated emitting identity despite changed date/intent; Patient exceptions; ambient Encounter collisions; normalization collisions; cross-case reuse; resource-type distinction; separate names for separate resources. Tests assert actual emitted-case/resource results and validator agreement. These are the owning tests for finding3. |
+| `emitter/tests/emitter.test.ts` | **Internal corpus regression:** counts, field mapping, typed references, identity length, codes, Quantity carrier and encounter date. Selected individual field assertions do not establish complete profile conformance or the corpus's decision expectations. Keep legacy corpus concepts out of positive publication teaching. |
+| `emitter/tests/emit-fhir-golden.test.ts` | **Internal byte regression only:** compares serialized files and paths in normal mode. With `UPDATE_GOLDEN=1`, it regenerates and does not supply the same comparison evidence. Record that execution mode separately. Golden equality does not verify clinical intent or native `$apply`. |
+| `emitter/tests/resource-coverage.test.ts` | **Legacy resource-mapping regression:** asserts selected Patient/Observation/Procedure/MedicationRequest fields and profile tags. Its fixture uses old local existence determinations, including non-Observation concepts. Do not present it as an admitted publication example or complete QI-Core validation. The synthetic requester/default fields are not authored clinical facts. |
+| `emitter/tests/compartmentPathAuthority.test.ts` | **Internal path-authority coverage:** view-model and emitter agree on the Patient compartment and normalized resource directories. Useful support for “use returned paths”; not a clinical example. Fixture includes Scalar. |
+| `emitter/tests/bareTypeUncoded.test.ts` | **Applicable:** a bare coded-retrieve resource needs `code is`; putting a token in `value is` does not supply resource identity; Patient exemption; qualified local identity derivation. **Limit:** warning behavior and emitted data only, using a legacy supporting concept. |
+| `emitter/tests/classifyConceptRole.test.ts` | **Internal dispatch regression:** local/source/derived classification for historical concept forms. Classification does not prove assertion eligibility, emission or execution. Exclude the old sem, collection and age forms from positive teaching. |
+| `emitter/tests/derive-local.test.ts` | **Applicable:** default local identity derivation; preservation of a well-formed authored nonmember; malformed token rejection. **Legacy/native limit:** the comments' wrong-code-to-false and external `$apply` assertions are broader than this suite's byte assertions. Do not promote them as current selected-publication round-trip evidence. |
+| `emitter/tests/derivedRejectEmit.test.ts` | **Applicable bounded rejection:** code-less derived targets cannot be directly asserted; the typed/untyped rows check rejection and lack of emitted clinical resources. **Do not generalize:** coded computed publications intentionally retain local-answer capability. The Activity-name collision row checks dispatch behavior, not the correctness of ambiguous authoring. |
+| `emitter/tests/b4-coded-value.test.ts` | **Applicable distinction:** Observation identity coding and its CodeableConcept answer are separate; explicit answer token mapping; malformed/wrong literal diagnostics. **Legacy limits:** the imported both-representation fixture is not current publication teaching; bare-token rejection there does not invalidate current named-answer bare codes; a valueless emitted Observation does not prove a remote default or Q/QR session. |
+

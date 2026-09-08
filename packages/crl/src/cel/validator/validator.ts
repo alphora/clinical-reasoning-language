@@ -607,8 +607,9 @@ function validateFactCodeMembership(
         "fact-code-not-in-local-set",
         `Fact "${f.name}" authors code \`${codeField.value}\`, which is not a member of the local set of the ` +
           `concept it names ("${libName}"."${declName}" = \`${res.member.system}|${res.member.code}\`). If this is ` +
-          `a deliberate wrong-code test datum, ignore; otherwise the fact will not populate "${declName}" (both ` +
-          `lanes compute it absent / false).`,
+          `a deliberate nonmembership test datum, keep it; otherwise correct the code. This fact does not ` +
+          `supply a matching local record for "${declName}". Nonmembership is not a false answer; a selected ` +
+          `publication with no other candidate remains unknown, and the reached decision conditions determine whether it pauses.`,
         codeField.location,
         fp,
       ),

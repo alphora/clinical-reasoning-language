@@ -2317,16 +2317,16 @@
     },
     {
       "path": "packages/crl/src/authoring-kit/tests/authoring-kit.test.ts",
-      "sha256": "eb81f5df6674703cdb62e67398321af5823d0b160498099dbf4e553f878dcfe9",
+      "sha256": "966986d9e68e13298fa03b79e96661252e651819cf606b28f11bb86ec7c56dfc",
       "inspection": "unreviewed",
       "execution": {
-        "report": "tmp/625-followup-vitest.json",
-        "sourceSha256": "eb81f5df6674703cdb62e67398321af5823d0b160498099dbf4e553f878dcfe9",
+        "report": "tmp/628-followup-vitest.json",
+        "sourceSha256": "966986d9e68e13298fa03b79e96661252e651819cf606b28f11bb86ec7c56dfc",
         "status": "passed",
         "passed": 51,
         "failed": 0,
         "pending": 0,
-        "limits": "Vitest status only; no native engine execution. OS-conditional early returns require branch evidence."
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
       },
       "runner": "vitest crl",
       "sourceLoops": 32,
@@ -2593,13 +2593,13 @@
       "sha256": "137a2c9e13887fd9377fdcdc21da7fc4f3e0280fa43285ba27d57dc1c8467a49",
       "inspection": "unreviewed",
       "execution": {
-        "report": "tmp/625-followup-vitest.json",
+        "report": "tmp/628-followup-vitest.json",
         "sourceSha256": "137a2c9e13887fd9377fdcdc21da7fc4f3e0280fa43285ba27d57dc1c8467a49",
         "status": "passed",
         "passed": 29,
         "failed": 0,
         "pending": 0,
-        "limits": "Vitest status only; no native engine execution. OS-conditional early returns require branch evidence."
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
       },
       "runner": "vitest crl",
       "sourceLoops": 8,
@@ -2634,7 +2634,7 @@
     {
       "path": "packages/crl/src/cel/emitter/tests/b4-coded-value.test.ts",
       "sha256": "6f26c12f84734f21bf3033ec8408f40f684eb4dd42c689226b121f064dda9361",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 4,
@@ -2669,12 +2669,13 @@
           "title": "the committed fixture (no `value is`) still emits covered-device Observations with NO value element",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/bareTypeUncoded.test.ts",
       "sha256": "5eeab6fb37b9dd92f1adc44ff675d8edf82c87d34a8485320568081bf3d4c0b0",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -2704,12 +2705,13 @@
           "title": "stays silent on a local-concept fact, which derives its coding",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/classifyConceptRole.test.ts",
       "sha256": "596eac0204eb2875e42f132f3dbfe38d6170033656a50ef6decac56cb4194d5b",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 1,
@@ -2749,12 +2751,13 @@
           "title": "a code-less reduction over a named ref (no own datum) → 'derived'",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/compartmentPathAuthority.test.ts",
       "sha256": "706e816c9342e6dc73197e7fa5482b693a72335080aac1f4e957406288cde780",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 4,
@@ -2784,13 +2787,22 @@
           "title": "⚠ the compartment is ONE segment under `patient/`, not a library/case PAIR",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/derive-local.test.ts",
-      "sha256": "d550a802e3b91971fd287a2e8beeff85f83672eac5bbe8e0eeef7e32ce71ec5d",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "4939c51ad79a5a5ae2441eba25ad8723fda1db335c0db32cabf643d3ecb78ec6",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "66d82c2c11d07f8627faf49f828fa5df8bdd7d97de9aba15341f7994007769ea",
+        "status": "passed",
+        "passed": 5,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 2,
       "tests": [
@@ -2810,21 +2822,22 @@
           "call": "it"
         },
         {
-          "line": 69,
+          "line": 70,
           "title": "#189 Piece 2 — a local fact's WELL-FORMED authored `code is` is the membership data input, emitted AS authored",
           "call": "it"
         },
         {
-          "line": 94,
+          "line": 96,
           "title": "#189 Piece 2 — loud floor — a MALFORMED authored `code is` token is an error and is SKIPPED",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/derivedRejectEmit.test.ts",
       "sha256": "89bc9a3434e67d20c04d743fd133541294b6936a94a0c53e210c1510f9101229",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -2844,12 +2857,13 @@
           "title": "a Concept shadowed by an EARLIER same-named Activity binds the Activity — no (a) reject",
           "call": "test"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/emit-fhir-golden.test.ts",
       "sha256": "a6f62fa64bef6b9ab13b57062ff73b507f276d2bd2e0b720b8e928a8bb7c1ab7",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 7,
@@ -2864,12 +2878,13 @@
           "title": "golden file set matches the emitted set",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/emitter.test.ts",
       "sha256": "440cd4dd61198983e88e6c1c2cdd513b06b28e4f7ddb7361c541e407c4b9267e",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 8,
@@ -2939,12 +2954,13 @@
           "title": "resource outputPath matches patient/<patientId>/<type-lowercase> (KALM compartment) shape",
           "call": "test"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/emitter/tests/resource-coverage.test.ts",
       "sha256": "f661e2f5643283913e48a90bc3d5979e6c74beb1accef4ae15c74fcd9171c074",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -2974,12 +2990,13 @@
           "title": "MedicationRequest: status/intent + requester (us-core-21) + meta.profile qicore-medicationrequest",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/imports/tests/resolver.test.ts",
       "sha256": "e812e07fd90b395f11b66c29d17b124289f0a95796a645d1c300d58730d12432",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3014,12 +3031,13 @@
           "title": "overlay shadows on-disk source",
           "call": "test"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/tests/caseId.test.ts",
       "sha256": "3b1849d5c8c647ea3aaa74761ef73eb7dc51c958719bba781d3535c66f3d5d31",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3069,12 +3087,13 @@
           "title": "two `id is` fields in one case → multiple-case-ids",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/tests/definedByResolve.test.ts",
       "sha256": "27a7f7d46d4c1db442e514b660ef5d7595ca42ebe4362ad17cb357e19834503d",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3119,12 +3138,13 @@
           "title": "resolves against byNamePackage too (not only byNameLocal)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/tests/factDate.test.ts",
       "sha256": "ecb8214ea68f06f38ab378a6510c92a93e6c08a65062b137222f47e8eddbda3b",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 1,
@@ -3279,12 +3299,13 @@
           "title": "rejects an invalid injected now only when now was authored",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/tests/index.test.ts",
       "sha256": "a85b8623f22b29647df8d5bb3f39bbc8243e24cd4a24dd55152de4d0bcd01e94",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3424,12 +3445,13 @@
           "title": "two leading `#` lines — rejected (only a single optional header)",
           "call": "test"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/tests/temporal.test.ts",
       "sha256": "36048cb479ec5280d252e8bceb5434cdbf7013cbbbfa5f5ede4c752c0bb68a01",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3499,12 +3521,13 @@
           "title": "keeps legal but unrepresentable timestamp %s valid while refusing comparison",
           "call": "it.each([\"2016-12-31T23:59:60Z\", \"2026-02-01T13:00:00.0001Z\"])"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/bareFactWrongSystem.test.ts",
       "sha256": "a805f2f6763a13abf2631378df94eec4cd745139d0dc8a519d99a4f49224b4f6",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 1,
@@ -3529,12 +3552,13 @@
           "title": "⚠ the QUALIFIED spelling stays with its own rule, not this one",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/booleanValueRules.test.ts",
       "sha256": "cc10c68dd1f9d06b5f9465db57c293682de9e5cbab1e7ee1a26c4cba27452b55",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3574,12 +3598,13 @@
           "title": "a WRONG code naming the interface (non-member) → NO value-reading error (owned by fact-code-not-in-local-set)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/factDate.test.ts",
       "sha256": "e3e5b8d719351965784ee0f4a12c999ce2d3c2bc452062cbfb6cfa282d114d08",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -3644,152 +3669,180 @@
           "title": "accepts ordinary fixed, undated, and authored now forms with clock %s",
           "call": "it.each([\"2001-01-01T00:00:00.000Z\", \"2026-09-06T12:34:56.789Z\"])"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/identityDiagnostics.test.ts",
-      "sha256": "edfe90dbdb24814fcd95d67113a850ceff56d4b67aed31b8410955ddcbfdd5d8",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "cf3bb2ca58050a2af4df5d76e6dfdd08fddfdb17a821d808de010a2d7b841d5b",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "cf3bb2ca58050a2af4df5d76e6dfdd08fddfdb17a821d808de010a2d7b841d5b",
+        "status": "passed",
+        "passed": 11,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 1,
       "tests": [
         {
-          "line": 40,
+          "line": 41,
           "title": "reports repeated emitting fact identity at its case, despite different dates and intents",
           "call": "it"
         },
         {
-          "line": 64,
+          "line": 66,
           "title": "does not reject repeated skipped Patient refs, including the subject",
           "call": "it"
         },
         {
-          "line": 76,
+          "line": 79,
           "title": "includes the ambient Encounter in the collision check",
           "call": "it"
         },
         {
-          "line": 85,
+          "line": 89,
           "title": "detects distinct fact names that normalize to the same resource identity",
           "call": "it"
         },
         {
-          "line": 94,
+          "line": 98,
           "title": "checks paths across the graph and attributes a collision to the later case",
           "call": "it"
         },
         {
-          "line": 106,
+          "line": 111,
           "title": "allows the same reusable fact template in separate cases",
           "call": "it"
         },
         {
-          "line": 121,
+          "line": 126,
           "title": "uses actual type directories rather than rejecting every potential same-id pair",
           "call": "it"
         },
         {
-          "line": 136,
+          "line": 142,
           "title": "supports two distinctly named instances with the same authored content",
           "call": "it"
         },
         {
-          "line": 156,
+          "line": 162,
           "title": "returns no unrelated emission diagnostic and tolerates an unparsed graph",
           "call": "it"
         },
         {
-          "line": 170,
+          "line": 176,
           "title": "reports an invalid fact-body date once across repeated references and cases",
           "call": "it"
         },
         {
-          "line": 187,
+          "line": 193,
           "title": "keeps separate case-offset failures alongside the one declaration error",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/localMembershipWarning.test.ts",
-      "sha256": "d5f811e8fd61c98fac2ac7ad697aecd96e9f19ccbc5f28bec629f47a31541f75",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "ba471b917036ce88af10cc3c484f0cec5e5c249853e0fa93b766d21e2959713a",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "ba471b917036ce88af10cc3c484f0cec5e5c249853e0fa93b766d21e2959713a",
+        "status": "passed",
+        "passed": 4,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
-      "sourceLoops": 0,
+      "sourceLoops": 1,
       "tests": [
         {
-          "line": 20,
+          "line": 21,
           "title": "is a WARNING, not an error (the wrong-code datum stays authorable)",
           "call": "it"
         },
         {
-          "line": 25,
+          "line": 29,
           "title": "fires for a wrong-code fact and a cross-concept fact; NOT for a correct or bare fact",
           "call": "it"
         },
         {
-          "line": 47,
+          "line": 51,
           "title": "warns ONLY the non-member source ServiceRequest; not the covered member, not local/bare facts",
           "call": "it"
         },
         {
-          "line": 55,
+          "line": 59,
           "title": "is a WARNING, not an error (a deliberate non-covered datum stays authorable)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/numericValueRules.test.ts",
-      "sha256": "463b0ba5f05300daed60a433b0db7ba4068c4412ad88dd0d08661a2bb7b81beb",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "298638a9f0e77c2173c6855cb35416a0209ab788a2d87cd57e795103e1ca72d5",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-followup-vitest.json",
+        "sourceSha256": "298638a9f0e77c2173c6855cb35416a0209ab788a2d87cd57e795103e1ca72d5",
+        "status": "passed",
+        "passed": 7,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 98,
+          "line": 87,
           "title": "⭐ a Quantity target REQUIRES a unit — the shape that shipped dimensionless in seven goldens",
           "call": "it"
         },
         {
-          "line": 103,
-          "title": "⭐ a Quantity target WITH a unit is clean",
+          "line": 93,
+          "title": "a selected Quantity target with a unit has no numeric-literal diagnostics",
           "call": "it"
         },
         {
-          "line": 112,
+          "line": 103,
           "title": "⚠ an EMPTY unit is not a unit",
           "call": "it"
         },
         {
-          "line": 117,
+          "line": 108,
           "title": "⚠ an integer target FORBIDS a unit — a dimensionless datum is first-class, not an under-specified Quantity",
           "call": "it"
         },
         {
-          "line": 124,
+          "line": 115,
           "title": "an integer target WITHOUT a unit is clean",
           "call": "it"
         },
         {
-          "line": 133,
+          "line": 124,
           "title": "⭐ a NUMBER for a CodeableConcept target is a MISMATCH — the cms22 cell, silent until now",
           "call": "it"
         },
         {
-          "line": 142,
+          "line": 133,
           "title": "⚠ a bare-type fact declares no datum contract, so it is NOT judged here",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cel/validator/tests/validator.test.ts",
       "sha256": "2b76aafd6587a40391264cfc46189cf5d436ede4f77507926b8b6470c2b3729a",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -4039,7 +4092,8 @@
           "title": "works on a ResolvedCelGraph from resolveCelImports",
           "call": "test"
         }
-      ]
+      ],
+      "inspectionBy": "native CRL emit reviewer, review626"
     },
     {
       "path": "packages/crl/src/cli/tests/run-emitter.test.ts",
@@ -4103,12 +4157,13 @@
     },
     {
       "path": "packages/crl/src/cli/tests/run-mcp-server.test.mjs",
-      "sha256": "5b295a2f0796fb7e19bfbd770570aa48457f2bfa78abbca925def2c0e7e20182",
+      "sha256": "f96eb02f41ca96315713698f2717ef7f6153ac999c6788103d488b0f5e5d6898",
       "inspection": "unreviewed",
       "execution": {
-        "report": "tmp/625-mcp.log",
+        "report": "tmp/628-mcp-final.log",
+        "sourceSha256": "f96eb02f41ca96315713698f2717ef7f6153ac999c6788103d488b0f5e5d6898",
         "status": "passed",
-        "limits": "Complete isolated MCP smoke; no installed release or native engine claim."
+        "limits": "Complete isolated built MCP smoke; no installed or native execution claim."
       },
       "runner": "test:mcp",
       "sourceLoops": 0,
@@ -7309,13 +7364,13 @@
       "sha256": "ed84446389db34b39d57aa906d439675155db775fb1b5152304663d3a5186053",
       "inspection": "unreviewed",
       "execution": {
-        "report": "tmp/625-followup-vitest.json",
+        "report": "tmp/628-vitest.json",
         "sourceSha256": "ed84446389db34b39d57aa906d439675155db775fb1b5152304663d3a5186053",
         "status": "passed",
         "passed": 101,
         "failed": 0,
         "pending": 0,
-        "limits": "Vitest status only; no native engine execution. OS-conditional early returns require branch evidence."
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
       },
       "runner": "vitest crl",
       "sourceLoops": 8,
@@ -13059,7 +13114,7 @@
     {
       "path": "packages/crl/src/fhir-model/tests/elementPath.test.ts",
       "sha256": "a3a6717a54ff0a2920d104abfb029717e2afa95187ee6a09aa52d0344d3d8077",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -13084,12 +13139,13 @@
           "title": "does not strip a non-matching prefix",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/fhir-model/tests/fhirValueModel.test.ts",
-      "sha256": "2fd49dd42886fd9f57690993c0d474861ae1e73f391cfe5b6beb07a4b40893ff",
-      "inspection": "unreviewed",
+      "sha256": "d3ebf5fbe1c1cb1d438a55d91118c554c7ddbd20510b7018a03c8a15abb2d8a7",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 9,
@@ -13186,7 +13242,7 @@
         },
         {
           "line": 276,
-          "title": "⚠ a boolean concept resolves NO carrier on a valueless resource — its truth is EXISTENCE",
+          "title": "resolves no Boolean value carrier on the modeled valueless resources",
           "call": "it"
         },
         {
@@ -13194,7 +13250,8 @@
           "title": "fails closed on an unmodeled resource rather than defaulting to a carrier",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/flags/tests/buildFlagDraft.test.ts",
@@ -13750,7 +13807,7 @@
     {
       "path": "packages/crl/src/imports/tests/booleanCompositionCrossLib.test.ts",
       "sha256": "906d60cdc680260a0131922b8350d6c633e8f42c1faf63282b0b91c8173891f0",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -13800,12 +13857,13 @@
           "title": "the failure is `operand-not-total` naming the chained foreign operand — with the 0c-accurate note, NOT the stale 'gains a proof' text",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/booleanCompositionInferred.test.ts",
       "sha256": "ef5b4900988759d478a4f389b58617dd2af558edfc3a5c40ad04231f453aab10",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -13830,12 +13888,13 @@
           "title": "the Interface façade re-exports the composition BARE (never `.satisfied()` a scalar boolean)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/criterionAcceptance.test.ts",
       "sha256": "ac44a7a317d98cb0380139b6d7fb04f09155799135c4ce556e111f4de5792c69",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 4,
@@ -13855,12 +13914,13 @@
           "title": "a criterion referenced TWICE in a case yields exactly one bodied trace node + one reference node",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/criterionEmitEndToEnd.test.ts",
       "sha256": "2110df721edb6624ad25b99f13b1401f39d09f9eb8246b841d453ab3952c9a22",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 1,
@@ -13900,13 +13960,22 @@
           "title": "FHIR emit is DETERMINISTIC under a fixed date (repeated emit byte-identical)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/criterionMultifile.test.ts",
-      "sha256": "30463452ed3e895f7df115dfd519a9677a160c1ab56afe14f348a36c0a4746fd",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "15c8046bdcdab60e10c5e9fa7c4561b26e72f04ac79cd7d074ad32db901b94f8",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "15c8046bdcdab60e10c5e9fa7c4561b26e72f04ac79cd7d074ad32db901b94f8",
+        "status": "passed",
+        "passed": 5,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
@@ -13921,26 +13990,27 @@
           "call": "it"
         },
         {
-          "line": 33,
+          "line": 34,
           "title": "a library-qualified criterion ref → criterion-misuse (not 'no concept named X')",
           "call": "it"
         },
         {
-          "line": 43,
+          "line": 44,
           "title": "a criterion cycle is detected on the scoped path, attributed to its library/file",
           "call": "it"
         },
         {
-          "line": 52,
+          "line": 53,
           "title": "same criterion name in two libraries is NOT a cycle (per-(origin,library) graph isolation)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/criterionTripwire.test.ts",
       "sha256": "dd765b53d6d30eb5287e9e5ad761ef43b250a6c46cc05ad870c0fcb1dcf0269f",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -13980,12 +14050,13 @@
           "title": "generateProvenanceScaffold — no throw; the criterion-only concept appears in the scaffold (independent caller, PRESENCE)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/definedAsExistsInferred.test.ts",
       "sha256": "2cdab534174254b965c82d0a2d0c77d6149dc4c7d709e930b07dd2cbee089c51",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14015,12 +14086,13 @@
           "title": "refuses rather than silently drop the local-code fold on the canonical local-domain path",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/dispositionValidate.integration.test.ts",
       "sha256": "435034109214a43978e4de7f7be700c42bdc01b1f465c209f9aaef411cfbb59f",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14050,12 +14122,13 @@
           "title": "NO dispositions config → nothing enforced (today's behavior): arbitrary recommends validate clean",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/emit.test.ts",
       "sha256": "0bae03035c1f93a3fce6fa5129881b81020197252cb3ace987331c4ef4f7feaa",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 2,
@@ -14235,12 +14308,13 @@
           "title": "a standalone age posrep in a decision-bearing (code-is) library rides the Inferences lane, not dropped to a null layer",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/foreignPublicationInterface.test.ts",
       "sha256": "ca38e7755eb3023db2ad77c57ac57a799e6a9194388cff33b0a7f785b095b4ca",
-      "inspection": "read; claim disposition in progress",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 2,
@@ -14260,12 +14334,13 @@
           "title": "reserves the new Interface identity during collision preflight",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/index.test.ts",
       "sha256": "8c5f5d73874f8a2863ac228543a1d1cedfebef5d4bb8ee36c93cb51e42365f4f",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14320,12 +14395,13 @@
           "title": "surfaces a parse-failure warning when a local file is broken (resolution continues)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/namespace.test.ts",
       "sha256": "5abe3c49f09fd8db7d20ff102fe7df2f5e9fac4101b31f7c49b3e20f34be7fd3",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14355,12 +14431,13 @@
           "title": "first-wins (leaves-win) is the topo-order semantic",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/overlay.test.ts",
       "sha256": "ad1e29bdd1e83663a578aaaa2b9f3c2c19e7459d2d5367f0594d193f425b7dd1",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14380,13 +14457,22 @@
           "title": "uses overlay text for a NON-root file in the project (live sibling edits)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/preparePublicationContext.test.ts",
-      "sha256": "b097674cfe9b966041d565ada11f314a22871fa3fda160042d877c01fd77d18a",
-      "inspection": "read; claim disposition in progress",
-      "execution": "not run in broad audit",
+      "sha256": "bb820e4f1ccabc2b24b6181365e40ec4d6223a0015ed0a9576cd16b4510effd6",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "bb820e4f1ccabc2b24b6181365e40ec4d6223a0015ed0a9576cd16b4510effd6",
+        "status": "passed",
+        "passed": 17,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 3,
       "tests": [
@@ -14411,76 +14497,77 @@
           "call": "it"
         },
         {
-          "line": 183,
+          "line": 184,
           "title": "uses actual package-first precedence for an explicit include with a same-named local library",
           "call": "it"
         },
         {
-          "line": 199,
+          "line": 201,
           "title": "uses actual local-first precedence without the explicit include",
           "call": "it"
         },
         {
-          "line": 218,
+          "line": 221,
           "title": "enforces package visibility even when the full registry knows the target",
           "call": "it"
         },
         {
-          "line": 233,
+          "line": 236,
           "title": "keeps a known unrelated local target distinct from an unknown library",
           "call": "it"
         },
         {
-          "line": 245,
+          "line": 249,
           "title": "preserves the actual unsupported-alias boundary and still resolves the raw included name",
           "call": "it"
         },
         {
-          "line": 260,
+          "line": 265,
           "title": "does not expose a consumer-local library from a package owner's scope",
           "call": "it"
         },
         {
-          "line": 272,
+          "line": 277,
           "title": "retains a FHIR-only activity terminology dependency without enlarging the raw CQL closure",
           "call": "it"
         },
         {
-          "line": 291,
+          "line": 296,
           "title": "captures raw code-is and seed inputs once and keeps domain bases stable through later layer names",
           "call": "it"
         },
         {
-          "line": 328,
+          "line": 333,
           "title": "uses only caller-provided owning package metadata and preserves an absent dependency version",
           "call": "it"
         },
         {
-          "line": 350,
+          "line": 355,
           "title": "performs no project metadata reads after graph resolution",
           "call": "it"
         },
         {
-          "line": 365,
+          "line": 370,
           "title": "leaves graph, registry, raw nodes and import diagnostics unchanged",
           "call": "it"
         },
         {
-          "line": 388,
+          "line": 393,
           "title": "preserves source parse failures on the returned graph without inventing an empty-success claim",
           "call": "it"
         },
         {
-          "line": 399,
+          "line": 404,
           "title": "rejects an inconsistent registry name with the actual source identity",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/publicationEmit.test.ts",
       "sha256": "ce7a21e655ef154bcbab17e2de1a78c4d73b0fd8b5901df6850a7d11ff5808dd",
-      "inspection": "read; claim disposition in progress",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 5,
@@ -14540,12 +14627,13 @@
           "title": "does not permit a legacy reference merely because the target has a publication",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/registry-and-resolver-v21.test.ts",
       "sha256": "e9494f59aaf04b2f8778807333addeebd960b04bd59bad3175222c20527bf696",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14575,13 +14663,22 @@
           "title": "preserves registry-duplicate when root's library name collides with a sibling at a different path",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/registry.test.ts",
-      "sha256": "d4edc415a01130cf25da847e0f6f814f2cb777f93e690bdcc2a6d01efdf03148",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "9d38d59c520a03fd42572f040eac89aa9ad3cb696e0b1d4ee02452a80752b53e",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "9d38d59c520a03fd42572f040eac89aa9ad3cb696e0b1d4ee02452a80752b53e",
+        "status": "passed",
+        "passed": 10,
+        "failed": 0,
+        "pending": 1,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
@@ -14596,36 +14693,42 @@
           "call": "it"
         },
         {
-          "line": 24,
+          "line": 25,
+          "title": "discovers package %s with manifest=%s: %s",
+          "call": "it.each([ [\"node_modules/shared\", true, true], [\"node_modules/@example/shared\", true, true], [\"node_modules/shared\", false, false], [\"node_modules/outer/node_mo"
+        },
+        {
+          "line": 44,
           "title": "registers all libraries in cms22-split (4 layers: interface, inferred, asserted, concepts)",
           "call": "it"
         },
         {
-          "line": 34,
+          "line": 54,
           "title": "emits registry-duplicate when two local files declare the same library name",
           "call": "it"
         },
         {
-          "line": 48,
+          "line": 68,
           "title": "REMOVED v2.1.0: skips anonymous files silently",
           "call": "it.skip"
         },
         {
-          "line": 55,
+          "line": 76,
           "title": "respects sub-package boundaries (#75): subdir with its own package.json is invisible to parent scan",
           "call": "it"
         },
         {
-          "line": 87,
+          "line": 108,
           "title": "emits parse-failure warning for a broken local file but keeps going",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/resolver.test.ts",
       "sha256": "1067ee1d9a877d05cc746c2f3a7a376c2808cbcc2b23bfce8a0f8112569cdfe8",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14655,12 +14758,13 @@
           "title": "emits unresolved-include when an include name has no matching library",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/scoping-v21.test.ts",
       "sha256": "a526d16c4974ed957b47251012ef52ca3c799592e41cf650c22d5a9bb91b785b",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14745,13 +14849,22 @@
           "title": "FIX 1: a cross-library `use decision` to a non-included library fires external-library-not-included",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/imports/tests/validate.test.ts",
-      "sha256": "dbf3a71fde9d0753b161c02fc885105790be36132ed260ea674bf471d8e64921",
-      "inspection": "unreviewed",
-      "execution": "not run in broad audit",
+      "sha256": "8925c0640c5b426bfd2889333f9b5ccb2e65aab88e1c4704fff7fe0921fbcec0",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
+      "execution": {
+        "report": "tmp/628-vitest.json",
+        "sourceSha256": "8925c0640c5b426bfd2889333f9b5ccb2e65aab88e1c4704fff7fe0921fbcec0",
+        "status": "passed",
+        "passed": 10,
+        "failed": 0,
+        "pending": 0,
+        "limits": "Vitest assertions only; no native engine. Final derive-local header change is comment-only; execution hash retains tested bytes."
+      },
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
@@ -14802,15 +14915,16 @@
         },
         {
           "line": 89,
-          "title": "documents global-namespace visibility: any transitive declaration is visible to any library",
+          "title": "validates a qualified reference to an explicitly included local library",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/celCompletion.integration.test.ts",
       "sha256": "67abc7f24e9277bb01f651ff641e2889998f42b3d76a414d06cb928f481f4e8c",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -14850,12 +14964,13 @@
           "title": "result-bool (bare) → true/false (the concept boolean syntax `is true`)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/celCompletion.test.ts",
       "sha256": "68ffd0983c331cdcdc4702ac42bd1930af4be475176e738cb899a8d170e98c6b",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 1,
@@ -14985,12 +15100,13 @@
           "title": "celDocContextFromSource ignores covers/fact inside block comments + backtick strings",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/celDiagnostics.test.ts",
       "sha256": "19f3a705d884960f53f292dedb14e39442ed08b9cd08633e85a715e16d0930f2",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15020,12 +15136,13 @@
           "title": "a .cel with a bad result-is leaf → an error diagnostic on the .cel",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/celHover.test.ts",
       "sha256": "9d728bfe15c2101b76baad9569e7188f6fd4ac7233c75533f24719d19850503a",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15090,12 +15207,13 @@
           "title": "extracts facts with their defined-by + the covered library",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/celNavigation.test.ts",
       "sha256": "fb17f93e2924f613baf6ba0fb70bab44a0b440a02a3fa52e40d7e99d17329bf6",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15180,12 +15298,13 @@
           "title": "extracts fact declarations (name + range) + the covered library",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/celSymbols.test.ts",
       "sha256": "c9cefb4783c33b36fae72a3071fdf31e57a195c924d8023bd873d553b8c6ff08",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15200,12 +15319,13 @@
           "title": "local shadows package: a package library hidden by a same-name local is not exposed",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/completion.test.ts",
       "sha256": "19bfe441e2cc478eedab1f7eac219b8b28b3f00fe625b2d55cde4942cbb809bb",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15300,12 +15420,13 @@
           "title": "uses the prefix slice, not the whole line (cursor before EOL)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/contracts.test.ts",
       "sha256": "42d1579453025be61b1f2fee3f3c3ebbb305880d00ae4930072446d9fdce1fb5",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15330,12 +15451,13 @@
           "title": "clamps negatives to 0 (defensive)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/criterionRename.test.ts",
       "sha256": "ed20bc8b0ef2759ae058123d92aedf89c5bd615e8669754e5424fa82d8d75152",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 2,
@@ -15350,12 +15472,13 @@
           "title": "renames a criterion declaration, presentation scope, nested criterion, and decision guard together",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/diagnostics.test.ts",
       "sha256": "d8219f250ad70a044ebe7cb1c2178ab60cd8f33cedf6c30339c80207609c92d6",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 2,
@@ -15435,12 +15558,13 @@
           "title": "project: registry-duplicate surfaces on each file (real validators, multi-URI)",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/host.test.ts",
       "sha256": "9c82a117628eaf0b06bfd7eab1df94ce99e96cce55b19a8b18ff5647e7571991",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15485,12 +15609,13 @@
           "title": "workspaceRoots defaults to empty and is settable",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/hover.test.ts",
       "sha256": "2a7234d3102e7153b26b30445f67e6516baa33036536b6f4b9d0a491e938a8d8",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15575,12 +15700,13 @@
           "title": "returns null when the cursor is not on a quoted reference",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/navigation.test.ts",
       "sha256": "7bddcb58f58e445a2b02fe13c12ec55b3b814e392a949ece53ac96ea497085e6",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15670,12 +15796,13 @@
           "title": "unsupported target (library) → null",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/language-services/tests/refRanges.test.ts",
       "sha256": "5eca0a120ad1dd750598456a8a2c7652804b319fafaf09137d99b83127b20fed",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -15700,7 +15827,8 @@
           "title": "qualified ref through a multi-line location resolves name + qualifier on the start line",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/lexer/tests/basic-tokens.test.ts",
@@ -16549,8 +16677,8 @@
     },
     {
       "path": "packages/crl/src/migration/tests/migrationInventory.test.ts",
-      "sha256": "2e3279e23599c2d2369a235eddf814c7ad015d0184846838eb7d11659e0428b6",
-      "inspection": "unreviewed",
+      "sha256": "4fb11ab8443736361d9b3592adb5b1dcb33d31271d7cf85ac6cb3f6e440b781c",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 0,
@@ -16607,7 +16735,7 @@
         },
         {
           "line": 148,
-          "title": "missing `type is` defaults to Observation (admits CodeableConcept) → no blocker",
+          "title": "explicit Observation admits CodeableConcept in the legacy inventory → no blocker",
           "call": "it"
         },
         {
@@ -16680,12 +16808,13 @@
           "title": "FULL repo scan with the shipped manifest is clean — no dead rules, closed set, reconciled",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/migration/tests/retiredFormCorpus.test.ts",
       "sha256": "745ad3c6ef3a0f72e889046e0ef8f187384839efd66d07e55dc1c315eb583b98",
-      "inspection": "unreviewed",
+      "inspection": "read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress",
       "execution": "not run in broad audit",
       "runner": "vitest crl",
       "sourceLoops": 4,
@@ -16705,7 +16834,8 @@
           "title": "no tracked .crl authors the RETIRED concept-level `definition is age today`",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "lead"
     },
     {
       "path": "packages/crl/src/parser/tests/createParser.test.ts",
@@ -23431,5 +23561,6 @@
         }
       ]
     }
-  ]
+  ],
+  "latestInspectionBaseline": "dcf63244 plus review628 candidate"
 }

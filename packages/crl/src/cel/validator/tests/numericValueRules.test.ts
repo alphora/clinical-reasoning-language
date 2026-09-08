@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 
 import { validateCELFile } from "../validator";
 import type { CELValidationResult } from "../types";
+import { QUANTITY_EXAMPLE_POLICY, QUANTITY_EXAMPLE_FACT } from "../../../authoring-kit/quantityExample";
 
 /**
  * ⭐⭐ The NUMERIC cell of the value-type × literal-shape table (disc 529, both panel arms).
@@ -25,20 +26,7 @@ import type { CELValidationResult } from "../types";
  */
 
 const POLICY = [
-  "# P",
-  'library "L".',
-  'terminology "BMI VS":',
-  "- valueset is `http://example.org/v/ValueSet/bmi`.",
-  // a Quantity datum — the unit-REQUIRED arm
-  'concept "Body Weight":',
-  "- shape is Record.",
-  "- type is Observation.",
-  "- value type is Quantity.",
-  "- code is `weight`.",
-  "- definition is most recent this.",
-  "- source representation:",
-  "  - type is Observation.",
-  '  - coded from "BMI VS".',
+  QUANTITY_EXAMPLE_POLICY,
   // an integer datum — the unit-FORBIDDEN arm. ⭐ A dimensionless integer is a first-class shape; the
   // charter's own worked example declares `value type is integer`, so forcing `'1'` onto it would be noise.
   'concept "Visit Count":',
@@ -95,20 +83,23 @@ const withFact = (fact: string): string =>
   [fact, 'case "c":', '- subject is "Pat".', '- fact is "F".', '- result is "D" is "Deny".'].join("\n");
 
 describe("#189 — the NUMERIC value-type × literal-shape table", () => {
+  // @kit cel-quantity:unit-required
   it("⭐ a Quantity target REQUIRES a unit — the shape that shipped dimensionless in seven goldens", () => {
     const r = validateInline(withFact(['fact "F":', "- value is 90.", '- defined by "L"."Body Weight".'].join("\n")));
     expect(kinds(r)).toContain("quantity-value-missing-unit");
   });
 
-  it("⭐ a Quantity target WITH a unit is clean", () => {
+  // @kit cel-quantity:unit-bearing-literal
+  it("a selected Quantity target with a unit has no numeric-literal diagnostics", () => {
     const r = validateInline(
-      withFact(['fact "F":', "- value is 90 'kg'.", '- defined by "L"."Body Weight".'].join("\n")),
+      withFact(QUANTITY_EXAMPLE_FACT),
     );
     expect(kinds(r)).not.toContain("quantity-value-missing-unit");
     expect(kinds(r)).not.toContain("dimensionless-value-with-unit");
     expect(kinds(r)).not.toContain("value-type-mismatch");
   });
 
+  // @kit cel-quantity:nonempty-unit
   it("⚠ an EMPTY unit is not a unit", () => {
     const r = validateInline(withFact(['fact "F":', "- value is 90 ' '.", '- defined by "L"."Body Weight".'].join("\n")));
     expect(kinds(r)).toContain("quantity-value-empty-unit");

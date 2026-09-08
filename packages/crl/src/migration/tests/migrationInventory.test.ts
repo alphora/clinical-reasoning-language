@@ -145,7 +145,7 @@ concept "Cond Val":
     expect(valueReadPathBlocker(conceptNamed(ast, "Cond Val"))).toContain("modeled-valueless");
   });
 
-  it("missing `type is` defaults to Observation (admits CodeableConcept) → no blocker", () => {
+  it("explicit Observation admits CodeableConcept in the legacy inventory → no blocker", () => {
     const ast = parse(`library "T".
 concept "Bare CC":
 - value type is CodeableConcept.

@@ -1,6 +1,43 @@
 # Kit evidence ledger
 
-## Broad audit in progress — 624
+## Broad audit in progress — 624–628
+
+First batch committed as dcf63244. Second batch is review628. The discovery remains
+300 files; **93 have full source reads** (71 lead,22 native reviewer). This does not
+mean93 complete claim mappings. [survey-dispositions.md](survey-dispositions.md)
+records mixed applicable/internal/legacy cases; no entire mixed file is excluded.
+Historical execution rows retain the hash tested at that time, separately from
+the current source hash. Reading, passing tests and verified teaching are distinct.
+
+### CEL and library scope corrections — 628
+
+Intent: current selected answers retain unknown; resource identity is distinct
+from answer value. Logical declaration scope must be explicit to an AI author.
+Plan review627 and CEL audit626 accepted these corrections; code review628 tracks
+final verification. Source kit1.38 remains unreleased.
+
+| Tag / consumer | Exact owning evidence and input | Observation and limits |
+|---|---|---|
+| `cel-cases:nonmember-warning` | CEL `localMembershipWarning.test.ts`, warning-not-error case, membership CEL fixture | Well-formed wrong local codes warn and remain authorable; diagnostic explicitly avoids false-answer teaching. The legacy fixture's outcome expectations are not asserted here |
+| `cel-cases:authored-nonmember-preserved`, `:malformed-code-rejected` | CEL `derive-local.test.ts`, authored-code mutation and empty-code mutation of DME input | Authored valid coding appears in emitted data; malformed token produces error and no matching resource. These are coding/diagnostic assertions, not native outcomes |
+| `cel-identity:repeated-reference`, `:patient-exception`, `:ambient-encounter`, `:normalized-collision`, `:cross-case-reuse`, `:distinct-instances` | CEL `identityDiagnostics.test.ts`; `graphFrom`/`fact` and exact named cases | Changed date/intent does not create new identity; repeated Patient refs emit one Patient; Encounter/normalized collisions diagnosed; reused fact in two cases has different ids; two separately named instances produce two ServiceRequests. Other identity diagnostic helpers do not prove whole clinical validity |
+| `cel-quantity:unit-required`, `:unit-bearing-literal`, `:nonempty-unit` | CEL `numericValueRules.test.ts`; shared `quantityExample.ts` declaration/fact plus owning context | Missing/blank unit errors;90 'kg' avoids numeric-shape errors. Kit embeds exact declaration and fact excerpt; policy adds library L. Existing kit gate validates the declaration. Integer/coded legacy companion declarations are not delivered examples. This is not UCUM validation, dimensional compatibility, full CEL validation or native BMI evidence |
+| `library-scoping:package-discovery`, `:project-boundary` | `imports/tests/registry.test.ts`; four new manifest/location rows and existing nested-package row | Top-level plain/scoped `crl.libraries` packages discovered; missing manifest and nested node_modules not discovered; nested package excluded from parent project. Registry evidence, not execution |
+| `library-scoping:explicit-package-priority`, `:implicit-local-priority`, `:package-visibility`, `:aliases-unsupported`, `:package-owner-isolation` | `imports/tests/preparePublicationContext.test.ts`; matching named cases and generated package/local fixtures | Asserts actual owner/origin or unresolved/visibility diagnostics. Same-name package/local shadows are boundaries to avoid, not recommended architecture. No native execution |
+| `library-scoping:criterion-local` | `imports/tests/criterionMultifile.test.ts`, qualified criterion misuse fixture | Known foreign local criterion yields criterion-misuse; does not require an external-package include. Concept/criterion name collisions have both ordering rows in the same file |
+| `cel-cases` omission boundary / MCP `run_decision` | Existing `cre/tests/publication.test.ts`, determinate disjunction versus ordered unknown branch | OR true/unknown can approve; earlier unknown ordered branch pauses. Already mapped under guard-or-vs-sibling-or. No duplicate kit truth-table suite added |
+
+Library-scope example reuses the existing exact `answerExample.ts` library/terms
+closure with the imported-answer owning test; it does not purport to demonstrate
+package installation. Package boundaries are diagnostics guidance backed by the
+owning generated fixtures. Native outcomes, human policy fidelity and deployed
+client behavior are outside this batch's evidence.
+
+MCP partial-emission description is supported by inspection of `emitFhir.ts`:
+failed derive returns no resource while the caller continues collecting other
+resources. The identity suite tests skipped-reference diagnostic handling, not
+every possible partial-emission cause. This is source-reviewed behavior with a
+remaining exact owning-assertion gap; do not label it native or fully verified.
 
 Baseline 60e0cd0c; source kit 1.38 remains unreleased. The initial discovery now
 includes **300 tracked test files**, including CLI and native checker tests.

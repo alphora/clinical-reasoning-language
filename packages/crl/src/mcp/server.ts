@@ -633,14 +633,14 @@ export function createServer(): McpServer {
     {
       title: "Emit FHIR Instance Resources from CEL",
       description:
-        "Emit FHIR instance resources (Patient + 1-per-fact-reference per case) from a CEL (Case Example Language) document. " +
+        "Emit supported FHIR instance resources for each CEL (Case Example Language) case. Repeated emitting identities can invalidate a case; repeated Patient references do not add Patients. Inspect diagnostics and the returned resource/case manifests. " +
         "Pass `path` (an absolute .cel file path); the resolver walks to the nearest package.json to load the covered CRL closure. " +
         "Returns a SUMMARY envelope by default: " +
         "`{ success, caseCount, resourceCount, caseManifest:[{caseSlug, librarySlug, resourceCount}], resourceManifest:[{caseSlug, resourceType, id, outputPath}], diagnostics }`. " +
         "Pass `includeResources: true` to also receive the full `emittedCases[]` array (each case's full FHIR JSON bodies). " +
         "Writes the instance tree under the nearest package.json project root by default. Pass `out` (an ABSOLUTE root) to replace that root, retaining `tests/data/fhir/`; returns a `written` manifest. Use a scratch root for inspection because omission still writes. " +
         "success is true iff there are zero error-severity diagnostics; `unsupported-yet`, `result-deferred`, and `precondition-failed` (when not error) are warnings, surfaced but non-fatal. " +
-        "Diagnostic kinds: unsupported-yet (fact's `defined by` couldn't derive a bare FHIR type — case skipped), " +
+        "Diagnostic kinds: unsupported-yet (an underivable fact may emit no resource while other case resources remain), " +
         "result-deferred (`result is` is an expectation and emits no FHIR data resource), " +
         "precondition-failed (parse error / unresolved covers / etc. — case skipped).",
       inputSchema: {
@@ -717,7 +717,7 @@ export function createServer(): McpServer {
         "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
         "nearest package.json to load the covered CRL closure. Supported local/source representations check explicit code membership. A local concept without a derivable local code set fails loudly; some non-local forms use name-based presence, which is not a code check. " +
         "a pure question reads its stated boolean answer, with omission unknown. Branch/criterion guards preserve unknown. " +
-        "Supported `defined as` Boolean/sem composition preserves unknown; true OR unknown and false AND unknown remain determinate. CRL record existence is total; CRE legacy value-reading existence is not certified for present-but-unanswered records (#320). " +
+        "Use branch/criterion composition for current selected publications: true OR unknown and false AND unknown remain determinate. Legacy `defined as` Boolean/sem interpreter coverage is not support for composing selected publications that way. Legacy existence behavior is not certified for present-but-unanswered records (#320). " +
         "It walks the full decision shape (first:/all:/any:/otherwise + " +
         "`unless`/`only when` guards). An unquoted `result is \"Decision\" is pause` asserts CRE's prediction of " +
         "a reached unknown condition with no produced activity, after input validation; native $apply remains authoritative. " +

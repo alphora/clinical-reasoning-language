@@ -1,5 +1,6 @@
 import { ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_TERMS, ANSWER_EXAMPLE_CEL, answerExampleSource } from "./answerExample";
 import { SELECTION_REFERENCE_CRL, SELECTION_REFERENCE_CEL } from "./selectionExample";
+import { QUANTITY_EXAMPLE_DECLARATION, QUANTITY_EXAMPLE_FACT } from "./quantityExample";
 /**
  * `authoring_kit` — the self-contained authoring knowledge a fresh-context KE
  * agent needs to encode one Stage-1 (local-decision-support) artifact, served
@@ -824,10 +825,18 @@ const RULES: KitRule[] = [
     ref: "declarative-not-implementation",
   },
   {
+    id: "library-scoping",
+    edge: "cpg",
+    category: "process",
+    rule: 'Use logical CRL library and declaration names, not generated CQL filenames. Validate multifile content with validate_crl(path); inline code has no sibling context. The nearest package.json defines the project, and nested packages are separate projects. A qualified local sibling reference such as "Shared"."Choices" resolves without include, as in named-answer-reference.crl and named-answer-terms.crl. Installed packages must expose CRL files through package.json crl.libraries and be discoverable under the project\'s top-level node_modules (including scoped packages); nested dependency installations are not scanned. Each referencing CRL library must explicitly include a package library by its declared CRL name. Being installed, discovered or transitively included by another library does not grant reference visibility.',
+    why: 'Discovery, reference visibility and physical CQL routing are distinct. Explicit include resolves an installed package before a same-named local library; without that include, a local qualified reference resolves locally. Avoid ambiguous ownership names. Packages cannot fall back to consumer-local libraries. Include aliases are unsupported: use declared names. Fix missing imports, cycles and emitted-name collision diagnostics in the source/package configuration, not generated CQL. Criteria are library-local; a concept and criterion cannot share a name within one library, and including another library does not make its criteria exportable.',
+    ref: "imports/tests/preparePublicationContext.test.ts; imports/tests/registry.test.ts; imports/tests/criterionMultifile.test.ts; docs/decision-shapes.md",
+  },
+  {
     id: "cel-cases",
     edge: "cpg",
     category: "cel",
-    rule: "Author a companion `.cel`: `covers \"<CRL library>\"`; a Patient subject `fact` (`- defined by \"Patient\".`); one clinical `fact` per case-feature linked to its concept via `- defined by \"<library>\".\"<concept>\".`; and one `case` per path with `- subject is …`, the relevant `- fact is …`, and a `- result is \"<decision>\" is \"<branch>\".` oracle. For expected missing evidence before any activity, use `- result is \"<decision>\" is pause.` instead; a pause case must have exactly one result assertion. Quoted \"pause\" is an activity name. A passing pause assertion checks CRE's prediction only: native $apply is the source of truth, and each case requires independent error/activity/Questionnaire/QuestionnaireResponse answer-state checks. All-false empty results and partial `all:` activity production are not whole-decision pauses. CRE attribution currently identifies the decision condition, not an unknown compound operand. The CRE resolves concept-linked facts and checks code membership for supported representations; an explicit code must match the resolved representation set. CURRENT LIMIT: a local concept without a derivable local code set fails loudly. Some non-local forms still use name-based presence; this is not evidence of code membership. A bare concept-linked fact uses its declared local code. For a value-reading boolean question, write `value is true` or `value is false`; omission is UNKNOWN and pauses, not an implicit no. There is no absence code. Existence over records is different: no matching record gives false, and a value on a presence-only fact does not change its existence. A bare-type CEL fact without a code cannot match a coded retrieve; CEL validation emits warning `bare-type-fact-uncoded` for those resource types (#312). Patient is exempt because its retrieve is not code-scoped.",
+    rule: "Author a companion `.cel`: `covers \"<CRL library>\"`; a Patient subject `fact` (`- defined by \"Patient\".`); separately named clinical `fact` records linked to their concept via `- defined by \"<library>\".\"<concept>\".`; and one `case` per path with `- subject is …`, the relevant `- fact is …`, and a `- result is \"<decision>\" is \"<branch>\".` oracle. For expected missing evidence before any activity, use `- result is \"<decision>\" is pause.` instead; a pause case must have exactly one result assertion. Quoted \"pause\" is an activity name. A passing pause assertion checks CRE's prediction only: native $apply is the source of truth, and each case requires independent error/activity/Questionnaire/QuestionnaireResponse answer-state checks. All-false empty results and partial `all:` activity production are not whole-decision pauses. CRE attribution currently identifies the decision condition, not an unknown compound operand. The CRE resolves concept-linked facts and checks code membership for supported representations; a matching explicit resource code participates in that representation. A well-formed nonmember can be authored deliberately and may warn; it is not a false answer. Malformed tokens are errors. CURRENT LIMIT: a local concept without a derivable local code set fails loudly. Some non-local forms still use name-based presence; this is not evidence of code membership. A bare concept-linked fact uses its declared local code. For a value-reading boolean question, write `value is true` or `value is false`; omission preserves an UNKNOWN answer, not an implicit no. A pause depends on the reached conditions: an unreached missing answer or a determinate compound such as true OR unknown does not by itself pause the decision. There is no absence code. Legacy closed-world record-existence fixtures are not selected-answer examples. Current ServiceRequest existence projection produces no candidate without a matching witness; it does not turn absence into a false local answer. A bare-type CEL fact without a code cannot match a coded retrieve; CEL validation emits warning `bare-type-fact-uncoded` for those resource types (#312). Patient is exempt because its retrieve is not code-scoped.",
     ref: "pa-determination-reference.cel; src/cre/run.ts",
     clauses: [
       {
@@ -840,6 +849,20 @@ const RULES: KitRule[] = [
         force: "default",
       },
     ],
+  },
+  {
+    id: "cel-identity",
+    edge: "cpg",
+    category: "cel",
+    rule: "Use distinct fact names for distinct resources in a case. Referencing the same emitting fact twice with different dates or intents does not create new resource identities and can invalidate the case. Different names can also collide after identity normalization. Patient references do not create extra Patients; an ambient Encounter participates in identity checks. Reusing a fact in separate cases is supported. Inspect diagnostics and the returned case/resource manifest; do not assume every referenced fact emitted a resource or that a warning skipped the whole case.",
+    ref: "cel/validator/tests/identityDiagnostics.test.ts; emit_cel",
+  },
+  {
+    id: "cel-quantity",
+    edge: "cpg",
+    category: "cel",
+    rule: "For a concept-linked Quantity answer, use a unit-bearing CEL literal, for example value is 90 'kg'. A bare number or whitespace-only unit is rejected. Unit presence validation does not certify UCUM spelling or dimensional compatibility; the producer and native execution must support the intended units. A numeric literal is not a CodeableConcept answer. Do not infer support for integer or other publication types from legacy numeric-validator tests.",
+    ref: "cel/validator/tests/numericValueRules.test.ts; quantity-declaration; quantity-answer",
   },
   {
     id: "emit-output-root",
@@ -1008,6 +1031,9 @@ const TYPE_ALLOWLIST: TypeAllowlist = {
 };
 
 const EXAMPLES: KitExample[] = [
+  { title: "quantity-declaration", language: "crl", valid: true, snippet: QUANTITY_EXAMPLE_DECLARATION, note: "Exact current Quantity declaration from the owning CEL numeric-literal test. Supply package.json crl.canonicalBase for emission. This example defines a measurement, not a Boolean decision guard." },
+  { title: "quantity-answer", language: "cel", valid: true, snippet: QUANTITY_EXAMPLE_FACT, note: "Fact excerpt shared verbatim with numericValueRules.test.ts. Use within a CEL library covering L with a Patient subject and case referencing F. The owning test checks numeric-literal diagnostics; this excerpt does not establish BMI, unit conversion or native execution." },
+
   {
     title: "Instantiated terminology with authored displays",
     language: "crl",

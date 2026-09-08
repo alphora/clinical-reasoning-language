@@ -37,6 +37,7 @@ function collisionKinds(graph: ResolvedCelGraph): string[] {
 }
 
 describe("CEL emitted identity diagnostics", () => {
+  // @kit cel-identity:repeated-reference
   it("reports repeated emitting fact identity at its case, despite different dates and intents", () => {
     const graph = graphFrom(`${fact("Request", "ServiceRequest")}
 case "Two requests":
@@ -61,6 +62,7 @@ case "Two requests":
     }
   });
 
+  // @kit cel-identity:patient-exception
   it("does not reject repeated skipped Patient refs, including the subject", () => {
     const graph = graphFrom(`case "Patient references":
 - subject is "P".
@@ -73,6 +75,7 @@ case "Two requests":
     expect(emitted.emittedCases[0].resources.map((r) => r.resourceType)).toEqual(["Patient"]);
   });
 
+  // @kit cel-identity:ambient-encounter
   it("includes the ambient Encounter in the collision check", () => {
     const graph = graphFrom(`${fact("Visit", "Encounter")}
 case "Encounter references":
@@ -82,6 +85,7 @@ case "Encounter references":
     expect(collisionKinds(graph)).toEqual(["id-collision"]);
   });
 
+  // @kit cel-identity:normalized-collision
   it("detects distinct fact names that normalize to the same resource identity", () => {
     const graph = graphFrom(`${fact("Reading!")}${fact("Reading?")}
 case "Normalized facts":
@@ -103,6 +107,7 @@ case "Same?":
     expect(collisionKinds(graph)).toEqual(["id-collision"]);
   });
 
+  // @kit cel-identity:cross-case-reuse
   it("allows the same reusable fact template in separate cases", () => {
     const graph = graphFrom(`${fact("Reading")}
 case "First":
@@ -133,6 +138,7 @@ case "Different resource types":
     expect(observation.outputPath).not.toBe(encounter.outputPath);
   });
 
+  // @kit cel-identity:distinct-instances
   it("supports two distinctly named instances with the same authored content", () => {
     const graph = graphFrom(`${fact("Recommended Activity", "ServiceRequest")}
 ${fact("Follow-up Recommended Activity", "ServiceRequest")}

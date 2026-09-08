@@ -180,6 +180,7 @@ terminology "All":
     expect(prepared.publications.lookup(graph.rootPath, "Answer")).toMatchObject({ kind: "error" });
   });
 
+  // @kit library-scoping:explicit-package-priority
   it("uses actual package-first precedence for an explicit include with a same-named local library", () => {
     const graph = fixture("local-package-same-name");
     const prepared = preparePublicationContext(graph);
@@ -196,6 +197,7 @@ terminology "All":
     expect(prepared.rawCqlClosure.map((value) => value.filePath)).not.toContain(local.filePath);
   });
 
+  // @kit library-scoping:implicit-local-priority
   it("uses actual local-first precedence without the explicit include", () => {
     const rootPath = path.join(FIXTURES, "local-package-same-name", "root.crl");
     const graph = resolveImports(rootPath, {
@@ -215,6 +217,7 @@ terminology "All":
     expect(prepared.rawCqlClosure.some((value) => value.origin === "package")).toBe(false);
   });
 
+  // @kit library-scoping:package-visibility
   it("enforces package visibility even when the full registry knows the target", () => {
     const graph = fixture("qualified-ref-no-include");
     const target = graph.registry?.byNamePackage.get("SomePkg");
@@ -242,6 +245,7 @@ terminology "All":
     ).toMatchObject({ kind: "missing", reason: "library", detail: "library-not-known-in-scope" });
   });
 
+  // @kit library-scoping:aliases-unsupported
   it("preserves the actual unsupported-alias boundary and still resolves the raw included name", () => {
     const graph = fixture("alias-not-yet-supported");
     const prepared = preparePublicationContext(graph);
@@ -257,6 +261,7 @@ terminology "All":
     ).toBe("SomePkg");
   });
 
+  // @kit library-scoping:package-owner-isolation
   it("does not expose a consumer-local library from a package owner's scope", () => {
     const graph = fixture("package-include-local-no-fallback");
     const prepared = preparePublicationContext(graph);

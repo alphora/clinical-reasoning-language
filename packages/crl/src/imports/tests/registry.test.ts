@@ -21,6 +21,26 @@ describe("findProjectRoot", () => {
 });
 
 describe("buildRegistry", () => {
+  // @kit library-scoping:package-discovery
+  it.each([
+    ["node_modules/shared", true, true],
+    ["node_modules/@example/shared", true, true],
+    ["node_modules/shared", false, false],
+    ["node_modules/outer/node_modules/shared", true, false],
+  ] as const)("discovers package %s with manifest=%s: %s", (relative, manifest, expected) => {
+    const root = mkdtempSync(path.join(tmpdir(), "crl-package-discovery-"));
+    try {
+      writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "consumer", version: "0.0.0" }));
+      const directory = path.join(root, relative);
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(path.join(directory, "package.json"), JSON.stringify({ name: "shared", version: "0.0.0", ...(manifest ? { crl: { libraries: ["shared.crl"] } } : {}) }));
+      writeFileSync(path.join(directory, "shared.crl"), 'library "Shared".\nterminology "Codes":\n- system is `urn:example`.\n- code is `a`.\n');
+      const { registry, diagnostics } = buildRegistry(root);
+      expect(diagnostics.filter(d => d.severity === "error")).toEqual([]);
+      expect(registry.byNamePackage.has("Shared")).toBe(expected);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("registers all libraries in cms22-split (4 layers: interface, inferred, asserted, concepts)", () => {
     const projectRoot = path.join(FIXTURES, "cms22-split");
     const { registry, diagnostics } = buildRegistry(projectRoot);
@@ -52,6 +72,7 @@ describe("buildRegistry", () => {
   // T06 / #75: sub-package boundaries. A subdirectory carrying its own
   // package.json is its own CRL project — the parent's scan must skip it,
   // even when both declare overlapping library names.
+  // @kit library-scoping:project-boundary
   it("respects sub-package boundaries (#75): subdir with its own package.json is invisible to parent scan", () => {
     const root = mkdtempSync(path.join(tmpdir(), "crl-t06-"));
     try {
