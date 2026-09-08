@@ -123,31 +123,23 @@ Syntax and rules:
   (`not` is the emit-capable way to author a single-determination `first:`
   exclusion; the per-action `unless` is a different, menu-member-only construct
   that DOES coalesce — see "Per-action guards".)
-- **A branch guard's STRUCTURE lowers to action shape, never collapsing to one
-  opaque CQL boolean.** `and` becomes several ANDed applicability conditions on
-  one action. An INLINE `or` expands to disjunctive-normal-form arms whose
-  *placement is context-sensitive*: under an enclosing `first:` the arms splice in
-  as contiguous ordered siblings; under `all:` / flat / other contexts the arms
-  are wrapped in one synthesized `cqf-applicabilityBehavior: "any"` grouping
-  action (so exactly one arm applies). For an inline `or` the disjunction stays
-  **visible and auditable** as those arms in the emitted `PlanDefinition.action`;
-  a reviewer sees *which* atom failed. (A guard leaf that is a named `criterion`
-  is one identifier condition resolving to that criterion's own named define —
-  post-#236 its `or` lives inside the define, visible there + in the use-site
-  `input[]` + the cockpit view-model node, not as parent action arms; see the
-  criterion section.) This visible-atom property is what separates a branch guard
-  from inference (`defined as` / `sem-*`), which fuses distinct criteria into an
-  opaque CQL boolean asserting a false sameness. Keep decision logic in branch
-  guards and branches; keep alternative-representation logic in `defined as`.
+- **Branch guards preserve authored decision logic and dependency inputs.**
+  A guard whose dependency closure contains any admitted selected publication
+  (including through a named criterion or imported operand)
+  emits its whole Boolean expression as one `text/cql-expression` applicability
+  condition. Its Case Feature dependencies remain in `input[]`. Legacy guards
+  lower `and` to per-atom conditions and inline `or` to DNF action arms.
+  Source fidelity depends on retaining distinct criteria in decision logic,
+  not on the number of applicability conditions.
 
 ### The materialization envelope (a resource bound, not an authoring gate)
 
-Because an INLINE `or` expands to DNF arms, an inline `and`-of-`or`s multiplies:
+In the legacy lowering path, an INLINE `or` expands to DNF arms, so an inline `and`-of-`or`s multiplies:
 `( "A" or "B" ) and ( "C" or "D" )` materializes 2×2 = 4 arms. The emitter caps
 the materialized tree — **256 arms** (an ARM cap only; a guard's own `and`/`or`
 nesting is parser-bounded, not a separate emit cap). This is an envelope that
 keeps emit from exploding on a pathological *inline* tree; it is **not** an
-authoring-complexity gate, and a faithful clinical model never approaches it.
+authoring-complexity gate, and a faithful clinical model may still expose a capability gap.
 
 If you ever do hit the cap, the emitter reports it
 (`compound-guard-expansion-overflow`) rather than emitting a truncated resource —
@@ -170,38 +162,31 @@ a fabricated one.
 
 ### Priority exclusions — how an ordered `first:` stays ordered in FHIR (#189)
 
-`$apply` has **no ordering primitive and no halt primitive.** A `PlanDefinition`
-action whose condition evaluates *unknown* is simply **not applicable**, and the
-engine then evaluates the next sibling. So an ordered `first:` is not ordered by
-anything the engine does — precedence has to be written into the conditions.
-
-Every branch of an ordered `first:` therefore carries, in addition to its own
-guard, one `condition[]` entry per **prior** branch holding that prior's
-**null-propagating negation**:
+The emitted conditions encode authored precedence and preserve unknown. For a
+publication-reachable ordered branch, prior guards become null-propagating
+whole-expression exclusions. A false earlier guard permits a later sibling;
+an unknown earlier guard cannot become an explicit negative that selects a leaf.
 
 ```
 branch 1     G1
-branch 2     ¬G1 · G2
-branch 3     ¬G1 · ¬G2 · G3
-otherwise    ¬G1 · ¬G2 · ¬G3
+branch 2     not G1 and G2
+otherwise    not G1 and not G2
 ```
 
-`$apply` ANDs a `condition[]`, so these are separate entries, never one composed
-expression — which keeps the #224 invariant (a `text/cql-expression` only ever
-wraps `not <single-atom>`) and avoids a cross-product of arms.
+The legacy path handles every prior guard shape: directly lowerable guards use
+per-atom conditions; other compound priors use a generated named guard define
+and its negation. `priority-exclusion-inexpressible` concerns unresolved references,
+not compound shape. An unresolved reference can leave exclusions incomplete;
+resolve the diagnostic rather than accept that output. Generated-name collisions
+are hard errors (`guard-define-name-collision`).
 
-The negation is exact by shape: a positive prior `"X"` excludes as `not "X"`; a
-negated prior `not "X"` excludes as the positive `"X"`; an `or` prior becomes N
-separate negated conditions (De Morgan). None of them coalesce, and that is the
-point: an **unknown earlier guard poisons every later arm**, so no arm applies,
-traversal halts, and DTR asks the question instead of running on to a
-disposition. This is only emitted for `first:` — `all:` and `any:` branches are
-unordered and exclude nothing.
-
-⚠ Known gap: a prior whose guard is an `and` is skipped, because `¬(A and B)` is
-a disjunction and the #224 invariant requires disjunctions to lower to arms. Such
-a branch cannot yet exclude its successors; the fix is a named define per branch
-position, referenced as one `text/cql-identifier` condition.
+Only ordered `first:` branches receive these priority exclusions. `all:` branches
+and action menus do not acquire first-branch precedence. Do not make `otherwise`
+unconditional: an earlier unknown must not select a negative leaf. Runtime
+traversal also depends on the engine and configuration; verify the pinned engine.
+ Recommendation correctness
+alone does not establish Questionnaire reachability: verify both with the pinned
+CRL engine using `$apply`, including clear-answer and change-answer session cases.
 
 ## `criterion` — naming a reusable guard
 
@@ -246,7 +231,7 @@ Syntax and semantics:
 - **It lowers to a named define, referenced by identity (#236).** A `criterion`
   is emitted ONCE as a named boolean CQL define; a reference lowers to a single
   guard literal — one positive `text/cql-identifier` `condition[]`, or
-  `not Coalesce("Lib"."Name", false)` when negated — pointing at that define, NOT
+  `not "Lib"."Name"` when negated — pointing at that define, NOT
   its inline-expanded body. N references → the body is emitted once (a DAG of
   named defines, linear in distinct criteria). The atoms stay individually
   visible — in the criterion's transparent decomposable define body, in the
@@ -255,7 +240,7 @@ Syntax and semantics:
   does not hide them; it relocates *where* they surface (from per-atom action
   `condition[]`, as an inline guard would emit, to the define + `input[]`).
 - **It reduces the parent arm count when factoring a disjunction.** A criterion
-  reference is always one DNF leaf, so its body never multiplies the parent guard's
+  reference in a legacy parent is one DNF leaf, so its body never multiplies the parent guard's
   arm count: factoring two 4-way `or`s into two criteria yields a parent guard of
   **one** arm with two identifier conditions (each `or` lives in its own define,
   emitted once), not 16 inline arms. Precisely: naming reduces the arm count exactly
@@ -326,38 +311,33 @@ express it without duplicating the shared conjunct (`( "A" and "C" )` /
 **wins** over the disjunct-character choice below. Only when the `or` is the
 **whole** condition does the next rule apply.
 
-**3. Guard-`or` vs sibling-`or` (whole-condition `or`): same `first:` lowering,
-choose on audit granularity.** Under `first:`,
-`- when ( "A" or "B" ) then recommend activity "X".` and the two sibling branches
-`- when "A" then recommend activity "X".` / `- when "B" then recommend activity "X".`
-emit the **same** disjunctive applicability arms — both stay auditable (this is
-not the #168 line; both are structure, not inference). What differs is the
-*authored / cockpit* shape: one branch with a guard box vs two top-level nodes.
+**3. Guard-`or` and ordered siblings have different missing-data semantics.**
+A combined `when ( "A" or "B" )` is true when A is unknown and B is true.
+Ordered `first:` siblings `when "A"` / `when "B"` pause at A instead.
+The latter expresses precedence: resolve A before reaching B. Choose from the
+source intent and test unknown inputs; do not call these interchangeable solely
+because the fully known positive cases reach the same activity.
 
-> ⚠ This equivalence holds **only under `first:`**. Under `all:` (or flat), a
-> guard-`or` branch wraps its arms in one `"any"` group and fires its body
-> **once**; two same-disposition sibling `when`s under `all:` each fire, so the
-> disposition can be produced **twice**. If both may independently fire and you
-> intend a single disposition, use the guard; if you intend the branches to each
-> act, use siblings under `all:` deliberately.
+Under `all:`, two satisfied sibling branches each fire; a combined OR branch
+fires its body once. Source fidelity includes that difference as well.
 
-Given a whole-condition `or` under `first:`, choose:
+With those missing-data and multiplicity semantics established, choose:
 
 - **Different dispositions → sibling branches under `first:`.** One guard has one
   body, so different outcomes force siblings; order them, because under `first:`
   precedence is part of the rule (an exclusion-then-approval ordering is a
   decision, not an accident).
 - **An `or` of distinct, independently-meaningful criteria that each deserve
-  their own top-level node → sibling branches** (the default for a coverage
-  policy whose disjuncts a reviewer reads as separate qualifying pathways).
+  their own top-level node → sibling branches only if that precedence is intended.**
+  Audit granularity alone must not introduce a new pause.
 - **An `or` of interchangeable alternatives of one rule, sharing one body → a
-  guard is fine** (DRYer; an inline guard boxes each atom in `PlanDefinition.action`).
-  Promote the shared `or` to a named `criterion` when it recurs or needs arm-count
-  relief — but note the promotion is **not** emit-neutral post-#236: a named
-  criterion emits one identifier condition (its atoms in the define + use-site
-  `input[]` + cockpit view-model node), whereas an inline guard emits per-atom
-  action conditions. Both are faithful — an audit-granularity choice, not a
-  fidelity one.
+  guard is fine** (retain its expression and dependency inputs for audit).
+  Promote the shared `or` to a named `criterion` when it recurs. Under legacy DNF
+  lowering, promotion can also relieve arm count: a named criterion emits one
+  identifier condition (its atoms in the define + use-site `input[]` + cockpit
+  view-model node), whereas an inline guard emits per-atom action conditions.
+  Publication-reachable guards retain the combined expression; that legacy
+  arm-count distinction does not apply. Preserve source fidelity in either form.
 
 ```
 criterion "Failed Conservative Therapy":        // DISTINCT criteria (SEPARATE events) = or-guard
@@ -443,6 +423,14 @@ first:
 ```
 
 ### Per-action guards — `unless` / `only when`
+
+These are legacy menu constructs. Selected publications in action-guard positions
+are rejected (`publication-unsupported-context` in validation,
+`publication-action-guard-unsupported` in FHIR emission). CRE also refuses an unanswered
+action guard when any prepared publication exists in the closure, even if unused.
+Without publications, the legacy path can discard unknown as false and cannot
+certify a pause assertion. For question-driven pause, use supported ordered branch
+conditions; the coercion below is a current limitation, not desired null semantics.
 Inside a multi-action `any:` / `all:` block, a menu item may carry an **action
 guard** so the menu adapts per case — "offer this menu, minus the items this
 patient can't have". (This is a *per-action* guard — a different construct from a
@@ -600,7 +588,7 @@ Post-#236 each `criterion` lowers to its own named boolean define, and the paren
 guard `( "Left" and "Right" )` is a pure `and` of two identifier leaves — **one**
 arm with two `text/cql-identifier` conditions, NOT the 4×4 = 16 inline arms the
 same `or`s would materialize written directly in the guard. Each `or` lives inside
-its define (`define "Left": Coalesce("A", false) or …`), emitted once; the atoms
+its define (`define "Left": "A" or …`), emitted once; the atoms
 remain visible in the define bodies + the use-site `input[]`. So a `criterion` is
 both a *readability* aid and a genuine *arm-count* remedy for a reused or large-`or`
 sub-term. (If you are still near the 256-arm envelope with a **faithful** *inline*

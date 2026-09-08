@@ -74,6 +74,24 @@ ${extraCases}`);
 }
 
 describe("CRE selected Boolean publication", () => {
+  // @kit guard-or-vs-sibling-or:unknown-order
+  it("distinguishes a determinate disjunction from an earlier unknown ordered branch", () => {
+    const other = POLICY.slice(POLICY.indexOf('concept "Answer"'), POLICY.indexOf('activity "Approve"'))
+      .replace('"Answer"', '"Other"').replace('`answer`', '`other`');
+    const known = fact("Known", "true").replace('"Publication"."Answer"', '"Publication"."Other"');
+    const combined = DECISION.replace('when "Answer"', 'when ("Answer" or "Other")');
+    const ordered = DECISION.replace('- otherwise', '- when "Other" then recommend activity "Approve".\n- otherwise');
+    const whole = evaluate(known, ["Known"], combined, other, "Approve");
+    expect(whole.validation.errors).toEqual([]);
+    expect(whole.run.status).toBe("pass");
+    expect(whole.run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
+    const siblings = evaluate(known, ["Known"], ordered, other, "Approve");
+    expect(siblings.validation.errors).toEqual([]);
+    expect(siblings.run.status).toBe("fail"); // Approve oracle is intentionally not reached.
+    expect(siblings.run.produced).toEqual([]);
+    expect(siblings.run.trace[0].blockedUnknown).toBe(true);
+  });
+
   it.each([true, false])("preserves explicit %s", (value) => {
     const { run, emission, validation } = evaluate(fact("Answer", String(value)), ["Answer"], DECISION, "", value ? "Approve" : "Deny");
     expect(run.status).toBe("pass");
@@ -485,6 +503,7 @@ first:
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context: an unanswered action guard");
   });
 
+  // @kit guards:publication-boundary
   it.each([false, true])("makes the same-library publication activation boundary explicit (publication=%s)", (publication) => {
     // REFACTOR:suspect: without publications the legacy lane coerces missing to false.
     // The publication lane refuses that context even if its first publication is unused.
@@ -730,6 +749,7 @@ describe("CRE selected-datum membership production", () => {
     expect(run.trace[0].blockedUnknown).not.toBe(true);
   });
 
+  // @kit branch-guards:publication-error-boundary
   it("keeps a true OR sibling from masking an evaluated operand failure", () => {
     const policy = membershipPolicy + '\nconcept "Photo":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `photo`.\n- shape reduction is most recent.\n';
     const photo = fact("Photo", "true").replace('"Publication"."Answer"', '"Publication"."Photo"');
@@ -805,6 +825,7 @@ all:
     }
   });
 
+  // @kit branch-guards:publication-error-boundary
   it("does not cross a failed first: prerequisite to a later true activity or otherwise", () => {
     const decision = `decision "D":
 first:

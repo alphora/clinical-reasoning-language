@@ -10,32 +10,13 @@ import { runCel } from "../../cre/run";
 import { validateCRLImports } from "../../imports/validate";
 import { writeFhirResources } from "../writer";
 
-const base = "https://example.org/answers";
-const terms = `terminology "Choices":
-- system is \`${base}/CodeSystem/p-complaint-answer-codes\`.
-- code is \`none\` display is \`None\`.
-- system is \`urn:standard\`.
-- code is \`symptom\` display is \`Symptom\`.
-`;
-function source(publication: boolean, name = "Complaint") { return `library "P".
-concept "${name}":
-- shape is Record.
-- type is Observation.
-- value type is CodeableConcept.
-- code is \`complaint\`.
-${publication ? '- value domain is answer options.\n- shape reduction is most recent.' : '- definition is most recent this.'}
-- value from is "Shared"."Choices":
-  - not qualifying is \`none\`.
-concept "Qualifies":
-${publication ? '- shape is Record.\n- type is Observation.\n- shape reduction is most recent.' : '- shape is Scalar.'}
-- value type is boolean.
-- definition is "${name}" in qualifying.
-activity "Met": - request CPGCommunicationRequest. - with \`MET\`.
-activity "Unmet": - request CPGCommunicationRequest. - with \`UNMET\`.
-decision "D": first:
-- when "Qualifies" then recommend activity "Met".
-- otherwise then recommend activity "Unmet".
-`; }
+import { ANSWER_EXAMPLE_BASE as base, ANSWER_EXAMPLE_TERMS as terms, ANSWER_EXAMPLE_CEL, answerExampleSource } from "../../authoring-kit/answerExample";
+function source(publication: boolean, name = "Complaint") {
+  const current = answerExampleSource(name);
+  return publication ? current : current
+    .replace("- value domain is answer options.\n- shape reduction is most recent.", "- definition is most recent this.")
+    .replace("- shape is Record.\n- type is Observation.\n- shape reduction is most recent.", "- shape is Scalar.");
+}
 function withFixture(publication: boolean, fn: (file: string, directory: string) => void, rename?: string, extraTerms = "") {
   const directory = mkdtempSync(join(tmpdir(), "crl-named-answer-closure-"));
   try {
@@ -134,6 +115,8 @@ concept "Second Question":
 - code is \`${conflict ? "none" : "second"}\` display is \`Second display\`.
 `);
   });
+  // @kit named-answer-options:imported-classification
+  // @kit concept-presentation:emitted-text
   it.each([false, true])("uses an imported answer vocabulary in CQL, FHIR, CEL and CRE (publication=%s)", (publication) => {
     withFixture(publication, (file, directory) => {
       const cql = emitCQLImports(file);
@@ -141,26 +124,28 @@ concept "Second Question":
       expect(cql.cqlByLibrary!.map((entry) => entry.cql).join("\n")).toContain("publication-uninterpretable-value");
       const fhir = emitFhirDefFromPath(file, { date: "2026-09-08" });
       expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+      const plan = fhir.resources.find((r) => r.sourceKind === "Decision")!.resource as any;
+      const inputs = (nodes: any[]): any[] => nodes.flatMap((n) => [...(n.input ?? []), ...inputs(n.action ?? [])]);
+      const questionInput = inputs(plan.action).find((input) => input.extension?.some((e: any) => e.url.endsWith("cpg-input-text")));
+      expect(questionInput, JSON.stringify(plan)).toBeDefined();
+      expect(questionInput.extension).toEqual(expect.arrayContaining([
+        { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Which complaint supports this request?" },
+        { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description", valueMarkdown: "Select the documented complaint." },
+      ]));
       const owned = fhir.resources.filter((entry) => entry.resourceType === "CodeSystem" && (entry.resource as any).url === `${base}/CodeSystem/p-complaint-answer-codes`);
       expect(owned).toHaveLength(1);
       expect((owned[0].resource as any).concept).toEqual([{ code: "none", display: "None" }]);
       const valueSet = fhir.resources.find((entry) => entry.resourceType === "ValueSet" && (entry.resource as any).expansion?.contains?.some((code: any) => code.code === "symptom"))!;
       expect((valueSet.resource as any).expansion.contains.map((code: any) => code.system)).toEqual([`${base}/CodeSystem/p-complaint-answer-codes`, "urn:standard"]);
       const cel = join(directory, "cases.cel");
-      writeFileSync(cel, `library "Cases". covers "P".
-fact "Patient": - name is "Synthetic". - birth date is "1970-01-01". - defined by "Patient".
-fact "Positive": - value is "symptom". - date is "2026-09-08". - defined by "P"."Complaint".
-fact "Negative": - value is "none". - date is "2026-09-08". - defined by "P"."Complaint".
-case "Positive": - subject is "Patient". - fact is "Positive". - result is "D" is "Met".
-case "Negative": - subject is "Patient". - fact is "Negative". - result is "D" is "Unmet".
-`);
+      writeFileSync(cel, ANSWER_EXAMPLE_CEL);
       const graph = resolveCelImports(cel);
       const emission = emitCelToFhir(graph);
       expect(emission.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
       const observations = emission.emittedCases.flatMap((c) => c.resources).filter((r) => r.resourceType === "Observation");
       expect(observations.map((r) => (r.body.valueCodeableConcept as any)?.coding?.[0]?.system)).toEqual(["urn:standard", `${base}/CodeSystem/p-complaint-answer-codes`]);
       expect(runCel(graph).runs.map((run) => ({ status: run.status, produced: run.produced.map((p) => p.recommendation) })))
-        .toEqual([{ status: "pass", produced: ["Met"] }, { status: "pass", produced: ["Unmet"] }]);
+        .toEqual([{ status: "pass", produced: ["Met"] }, { status: "pass", produced: ["Unmet"] }, { status: "pass", produced: [] }]);
     });
   });
   it("preserves an authored local CodeSystem identity across concept rename", () => {

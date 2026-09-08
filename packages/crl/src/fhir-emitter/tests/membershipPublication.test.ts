@@ -121,6 +121,7 @@ describe("selected membership FHIR and CEL", () => {
     const approve = actionTree(plan.action).find((a) => a.definitionCanonical?.includes("approve"));
     expect(approve.input).toHaveLength(1);
   });
+  // @kit branch-guards:whole-publication-expression
   it.each(['"Photo" or "Answer"', 'not (not "Photo" and not "Answer")', '"Photo" or "Ready"'])(
     "preserves a whole publication condition and its inputs: %s", (guard) => {
       // The criterion vector's other leaf is legacy: only traversal THROUGH Ready finds a publication.
@@ -140,6 +141,7 @@ describe("selected membership FHIR and CEL", () => {
       expect(branches[1].input).toHaveLength(1);
       if (guard.includes("Ready")) expect(condition[0].expression.expression).toContain('."Ready"');
     });
+  // @kit branch-guards:priority-exclusion
   it("preserves the same compound failure boundary in first priority exclusions", () => {
     const { crl } = fixture(`library "Policy".\n${operand}${producer()}${photo}${actions}${decision.replace('when "Answer"', 'when ("Photo" or "Answer")')}`);
     const result = emitFhirDefFromPath(crl); expect(result.success, JSON.stringify(result.errors)).toBe(true);

@@ -46,6 +46,7 @@ presentation for "Complaint":
       expect(catalog.resolve("Complaint", context)).toMatchObject({ questionText: "Which complaint supports this request?", questionDescription: "Use the documented complaint." });
     }
   });
+  // @kit concept-presentation:overlap
   it("rejects overlapping decision and criterion contexts even inside one declaration", () => {
     const catalog = createPresentationCatalog(ast(head + base + `
 presentation for "Complaint":

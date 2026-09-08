@@ -58,13 +58,16 @@ activity "not-certify.EIU":
 - with \`Not certified — experimental/investigational/unproven (X12 278 HCR01 A3); a denial reason distinct from a medical-necessity not-certify (both are X12 A3), not a service order.\`.
 `;
 
-export const DECISION_REFERENCE_CRL = `# Decision Reference — Imaging Coverage (Stage 1 authoring exemplar)
+export const DECISION_REFERENCE_CRL = `// Legacy action-menu example: its cases explicitly answer the guards.
+// Use the selected-publication examples for question-driven pause; an unanswered
+// action guard in a closure with a publication is currently unsupported.
+# Decision Reference — Imaging Coverage (Stage 1 authoring exemplar)
 library "Imaging Coverage Reference".
 
 /*
 Canonical Stage-1 (local-decision-support) exemplar. Every concept is a LOCAL
 case-feature: \`type is\` + \`code is\` only — no \`source representation\` and no
-\`definition is\` / \`defined as\` (those are later stages). Dispositions are plain
+\`definition is\` / \`defined as\` (shown in separate examples). Dispositions are plain
 \`activity\` declarations; CRL has no approve/deny/pend verbs. The decision shows
 the full shape: \`first:\` ordered precedence with a required \`otherwise\`, and a
 matched branch opening an \`any:\` menu with per-action guards. "Order MRI" is

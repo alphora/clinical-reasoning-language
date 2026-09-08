@@ -138,8 +138,9 @@ export interface KitExample {
 }
 
 /** Independent proof methods; a reference may carry more than one. The payload legend states limits.
- * cre-run: this exact CRL/CEL pair runs in the kit suite; asserted recommendation membership only.
- * fhir-emit: this exact CRL emits successfully with case-feature SDs in the kit suite.
+ * cre-run: this exact CRL/CEL pair runs in the kit suite; asserted activity membership or whole-decision pause prediction.
+ * fhir-emit: this exact CRL emits the expected definition resources in the kit suite
+ * (case-feature SDs for decision examples, ValueSet for the terminology module).
  * engine-run: historical, point-in-time construct proof by an external engine harness.
  * validate-only: this artifact is built and validated, without an execution claim.
  */

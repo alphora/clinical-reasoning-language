@@ -403,11 +403,11 @@ in `emitCQL.ts` / `lowerLocalCodes.ts`; `packages/crl/src/cre/tests/pipelineFami
 These are representative entry points, not an exhaustive inventory. The replacement must reconcile all
 lanes. Existing tests describe behavior rather than settle its correctness.
 
-The 4.121.0 authoring kit (`packages/crl/src/authoring-kit/index.ts`) reports two further CRE limitations:
-unknown operands collapsed in composition, and name-based presence fallback when code membership cannot
-be resolved. These are recorded implementation debt to verify and eliminate, not target semantics or
-new execution findings from this documentation round. Existing QM cases supply capabilities to investigate,
-not an obligation to retain `sem-*` operators or their present semantics.
+CRE preserves unknown through supported Boolean composition. Local concepts without derivable code
+membership fail loudly; some non-local forms still use name-based presence, which does not establish
+code membership. Tests in `cre/tests/localMembership.test.ts` and `cre/tests/publication.test.ts`
+bound these claims; native `$apply` remains the execution authority. Existing QM cases supply
+capabilities to investigate, not an obligation to retain `sem-*` operators or their present semantics.
 
 Propagation debt is explicit: generated reviewer agents need supported regeneration and runtime reload;
 source catalog quotations in `CRLCommon.cql` and `CaseFeatureCommon.cql`, their golden copies, and authoring

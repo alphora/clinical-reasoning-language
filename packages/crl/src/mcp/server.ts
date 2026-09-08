@@ -715,7 +715,7 @@ export function createServer(): McpServer {
         "Evaluate the CRL decision(s) a CEL document covers over each case's facts and check the case's " +
         "`result is` oracle — the CRL Clinical Reasoning Engine (#115), an authoring-time interpreter " +
         "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
-        "nearest package.json to load the covered CRL closure. Supported local/source representations check explicit code membership; unsupported membership falls back to name-based presence and is not a code check. " +
+        "nearest package.json to load the covered CRL closure. Supported local/source representations check explicit code membership. A local concept without a derivable local code set fails loudly; some non-local forms use name-based presence, which is not a code check. " +
         "a pure question reads its stated boolean answer, with omission unknown. Branch/criterion guards preserve unknown. " +
         "Supported `defined as` Boolean/sem composition preserves unknown; true OR unknown and false AND unknown remain determinate. CRL record existence is total; CRE legacy value-reading existence is not certified for present-but-unanswered records (#320). " +
         "It walks the full decision shape (first:/all:/any:/otherwise + " +
@@ -898,8 +898,8 @@ export function createServer(): McpServer {
         "composition — the decision-composition / chaining source-fidelity checks invented-determination-" +
         "boundary / hollowed-criteria / dropped-or-added-criterion that have no mechanical home), and a " +
         "feedback URL. The verify loop separates CRE case proofs, FHIR emission, and engine execution. " +
-        "Supported local/source representations check code membership; unsupported membership falls back " +
-        "to name-based presence, so a green CRE run does not prove every code was checked. " +
+        "Supported local/source representations check code membership. A local concept without a derivable code set fails loudly; " +
+        "some non-local forms use name-based presence, so a green CRE run does not prove every code was checked. " +
         "The introductory examples cover local questions, shallow inference, and Patient age source " +
         "projections; broader language forms have separate implementation limits recorded in the kit. " +
         'USE CASE (#191 lattice): "cpg" (default) is the neutral base framework (≈ full CRL); "prior-auth" ' +

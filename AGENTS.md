@@ -138,6 +138,7 @@ Codex entry points live in `.agents/skills/` and load the canonical protocols:
 | crl-release | [.claude/skills/crl-release/SKILL.md](.claude/skills/crl-release/SKILL.md) |
 | stale-requirements | [.claude/skills/stale-requirements/SKILL.md](.claude/skills/stale-requirements/SKILL.md) |
 | large-refactor | [.claude/skills/large-refactor/SKILL.md](.claude/skills/large-refactor/SKILL.md) |
+| crl-kit-update | [.claude/skills/crl-kit-update/SKILL.md](.claude/skills/crl-kit-update/SKILL.md) |
 
 Use their stated triggers even when this client's skill catalog has not loaded
 the entry points: read the canonical file directly. Resolve their helper

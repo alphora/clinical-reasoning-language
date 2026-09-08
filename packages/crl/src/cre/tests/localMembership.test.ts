@@ -120,12 +120,14 @@ describe("#189 Piece 2 — CRE membership: missing canonicalBase (a real project
   const result = runCel(resolveCelImports(NOBASE_CEL));
   const byCase = (needle: string) => result.runs.find((r) => r.case.includes(needle))!;
 
+  // @kit cel-cases:missing-local-membership
   it("an AUTHORED-code local fact with no derivable base fails the run LOUD (never fabricates a verdict)", () => {
     const run = byCase("authored code with no canonicalBase");
     expect(run.status).toBe("error");
     expect(run.diagnostics.some((d) => /refusing to fabricate/.test(d))).toBe(true);
   });
 
+  // @kit cel-cases:missing-local-membership
   it("a BARE local fact in a real project with no base ALSO fails loud (canonicalBase is required, charter §4 — no exception)", () => {
     // charter §4: canonicalBase is required for local codes. A real project (projectRoot set) that declares local
     // concepts but omits it is misconfigured — the emitter refuses it (`localCodeSystemUrl` throws, #271), so the

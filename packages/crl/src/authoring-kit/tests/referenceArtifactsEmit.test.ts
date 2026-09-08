@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { getAuthoringKit } from "../index";
+import { ANSWER_EXAMPLE_BASE } from "../answerExample";
 import { emitFhirDefFromPath, validateCRL } from "../../index";
+import { validateCRLImports } from "../../imports/validate";
 import { parseInput } from "../../ast/tests/parseInput";
 
 /**
@@ -75,12 +77,20 @@ const PROJECT = {
 
 const emitArtifact = (name: string, source: string) => {
   const dir = mkdtempSync(join(tmpdir(), "crl-kit-emit-"));
-  for (const [f, body] of Object.entries(PROJECT)) writeFileSync(join(dir, f), body);
+  for (const [f, body] of Object.entries(PROJECT)) {
+    const config = JSON.parse(body);
+    if (name.startsWith("named-answer-")) {
+      config.crl.canonicalBase = ANSWER_EXAMPLE_BASE;
+      delete config.crl.dispositions;
+    }
+    writeFileSync(join(dir, f), JSON.stringify(config));
+  }
   // Every `.crl` artifact is written, so a cross-library reference resolves.
   for (const a of crlArtifacts)
     writeFileSync(join(dir, a.name), a.name === name ? source : a.source);
   const r = emitFhirDefFromPath(join(dir, name));
   return {
+    resources: r.resources,
     success: r.success,
     hardErrors: (r.errors ?? []).filter(isFhirDefError),
     caseFeatureSds: r.resources.filter((x) => x.resourceType === "StructureDefinition").length,
@@ -100,8 +110,18 @@ describe("every kit reference artifact does what its stamp claims", () => {
     });
 
     it(`⭐ ${a.name} VALIDATES clean`, () => {
-      const v = validateCRL(a.source) as unknown as { errors?: unknown[] };
-      expect(v.errors ?? []).toEqual([]);
+      if (a.name === "named-answer-reference.crl") {
+        const dir = mkdtempSync(join(tmpdir(), "crl-kit-imports-"));
+        writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "answers", version: "1.0.0", crl: { canonicalBase: ANSWER_EXAMPLE_BASE } }));
+        for (const dependency of crlArtifacts.filter((item) => item.name.startsWith("named-answer-")))
+          writeFileSync(join(dir, dependency.name), dependency.source);
+        const v = validateCRLImports(join(dir, a.name));
+        expect(v.importDiagnostics).toEqual([]);
+        expect(v.validationErrors).toEqual([]);
+      } else {
+        const v = validateCRL(a.source) as unknown as { errors?: unknown[] };
+        expect(v.errors ?? []).toEqual([]);
+      }
     });
 
     if (exemptReason) {
@@ -119,7 +139,7 @@ describe("every kit reference artifact does what its stamp claims", () => {
       continue;
     }
 
-    it(`⭐ ${a.name} EMITS, with at least one case-feature StructureDefinition`, () => {
+    it(`⭐ ${a.name} EMITS its expected definition resources`, () => {
       const r = emitArtifact(a.name, a.source);
       // The message names the artifact because this is what a KE copies: a failure here means the kit
       // is teaching a shape the emitter rejects.
@@ -128,7 +148,16 @@ describe("every kit reference artifact does what its stamp claims", () => {
         `${a.name} or its dependency closure does not emit: ${JSON.stringify(r.hardErrors)}`,
       ).toEqual([]);
       expect(r.success).toBe(true);
-      expect(r.caseFeatureSds).toBeGreaterThan(0);
+      if (a.name === "named-answer-terms.crl") {
+        expect(r.caseFeatureSds).toBe(0);
+        expect(r.resources.some((resource) => resource.resourceType === "ValueSet")).toBe(true);
+      } else {
+        expect(r.caseFeatureSds).toBeGreaterThan(0);
+        if (a.name === "named-answer-reference.crl") {
+          expect(r.resources.find((resource) => (resource.resource as any).url === `${ANSWER_EXAMPLE_BASE}/CodeSystem/p-complaint-answer-codes`)?.resource)
+            .toMatchObject({ concept: [{ code: "none", display: "None" }] });
+        }
+      }
     });
   }
 

@@ -31,6 +31,7 @@ import {
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "../reference";
 import { getAuthoringKit, STAGES, USE_CASE_NAMES } from "../index";
+import { answerExampleSource, ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_CEL, ANSWER_EXAMPLE_TERMS } from "../answerExample";
 import { fieldRulesOf } from "../../meta/registry";
 import { flagFieldRulesOf, validateFlagFields } from "../../flags/flagVocab"; // #212 step 4b: flag field rules live in the vocab now
 
@@ -45,6 +46,49 @@ function crlErrors(src: string) {
 }
 
 describe("authoring-kit — reference artifacts", () => {
+  it("serves the exact named-answer inputs used by the implementation test", () => {
+    for (const useCase of USE_CASE_NAMES) {
+      const artifacts = new Map(getAuthoringKit(undefined, useCase).referenceArtifacts.map((a) => [a.name, a.source]));
+      expect(artifacts.get("named-answer-reference.crl")).toBe(answerExampleSource());
+      expect(artifacts.get("named-answer-reference.cel")).toBe(ANSWER_EXAMPLE_CEL);
+      expect(artifacts.get("named-answer-terms.crl")).toBe(`library "Shared".\n${ANSWER_EXAMPLE_TERMS}`);
+    }
+  });
+
+  it("rejects the known stale PA instruction and teaches the named form on both chains", () => {
+    const obsoleteInstruction = /\b(?:use|author|prefer|write)\b[^.\n]*\binline\s+`value from:`/i;
+    const prose = (value: unknown): string[] => typeof value === "string" ? [value]
+      : value && typeof value === "object" ? Object.values(value).flatMap(prose) : [];
+    const hasObsoleteInstruction = (value: unknown) => prose(value).some((text) => obsoleteInstruction.test(text));
+    const bad = "Use inline `value from:` for local answer options.";
+    expect(hasObsoleteInstruction({ clauses: [{ text: bad }] })).toBe(true);
+    expect(hasObsoleteInstruction({ summary: bad })).toBe(true);
+    expect(hasObsoleteInstruction({ text: "The removed inline `value from:` form is rejected." })).toBe(false);
+    for (const useCase of USE_CASE_NAMES) {
+      const kit = getAuthoringKit(undefined, useCase);
+      expect(kit.rules.some((r) => r.id === "named-answer-options")).toBe(true);
+      const model = kit.conceptLayerModel.find((m) => m.form.startsWith("- shape is"));
+      expect(model?.scope).toBe("in");
+      expect(hasObsoleteInstruction(kit)).toBe(false);
+      for (const mutation of [
+        { ...kit, summary: bad },
+        { ...kit, rules: [...kit.rules, { clauses: [{ text: bad }] }] },
+        { ...kit, boundary: [{ text: bad }] },
+        { ...kit, referenceArtifacts: [{ purpose: bad }] },
+      ]) expect(hasObsoleteInstruction(mutation)).toBe(true);
+      const guard = kit.rules.find((r) => r.id === "guards")!;
+      expect(guard.rule).toContain("publication-unsupported-context");
+      const shared = kit.judgeLens.composition.find((c) => c.check === "invented-determination-boundary")!;
+      expect(shared.guidance).toContain("source-delegation OR a genuinely shared determination");
+      expect(shared.guidance).toContain("independent policies");
+      if (useCase === "prior-auth") {
+        const pa = kit.rules.find((r) => r.id === "pa-answers-not-records")!;
+        expect(pa.rule).toContain('value from is "Named Terminology"');
+        expect(pa.ref).toContain("named-answer-options");
+        expect(pa.ref).not.toContain("inline-answer-options");
+      }
+    }
+  });
   it("decision-reference.crl validates clean (self-contained)", () => {
     const errors = crlErrors(DECISION_REFERENCE_CRL);
     expect(errors).toEqual([]);
@@ -417,8 +461,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.37");
-    expect(kit.summary).toMatch(/local-decision-support/);
+    expect(kit.schemaVersion).toBe("1.38");
+    expect(kit.summary).toMatch(/Local decision support/);
   });
 
   it("an OMITTED useCase resolves to the neutral cpg base (fail-loud, NOT silent-PA)", () => {
@@ -468,6 +512,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(names).toEqual([
       "decision-reference.cel",
       "decision-reference.crl",
+      "named-answer-reference.cel",
+      "named-answer-reference.crl",
+      "named-answer-terms.crl",
       "patient-age-both-rep-reference.crl",
       "representation-reference.crl",
     ]);
@@ -478,7 +525,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("the prior-auth chain embeds the full 12-artifact set (cpg base + the PA edge, inheritance; shared lib removed)", () => {
+  it("the prior-auth chain embeds the full 15-artifact set (cpg base + the PA edge, inheritance; shared lib removed)", () => {
     const kit = getAuthoringKit(undefined, "prior-auth");
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
@@ -488,6 +535,9 @@ describe("authoring-kit — getAuthoringKit", () => {
       "decision-reference.crl",
       "disposition-arbitration-reference.cel",
       "disposition-arbitration-reference.crl",
+      "named-answer-reference.cel",
+      "named-answer-reference.crl",
+      "named-answer-terms.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
@@ -610,7 +660,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
-    expect(crePairs.length).toBe(5); // the 5 decision exemplars — a mechanical guard so the loop can't silently no-op
+    expect(crePairs.length).toBe(6); // six decision exemplars; prevents a vacuous loop
     for (const crl of crePairs) {
       const base = crl.name.replace(/\.crl$/, "");
       const cel = byName.get(`${base}.cel`);
@@ -623,13 +673,14 @@ describe("authoring-kit — getAuthoringKit", () => {
           version: "1.0.0",
           private: true,
           crl: {
-            canonicalBase: "http://example.org/authoring-kit-crerun",
+            canonicalBase: crl.name.startsWith("named-answer-") ? ANSWER_EXAMPLE_BASE : "http://example.org/authoring-kit-crerun",
             status: "draft",
             experimental: true,
           },
         }),
       );
-      writeFileSync(join(dir, crl.name), crl.source);
+      for (const dependency of kit.referenceArtifacts.filter((a) => a.language === "crl"))
+        writeFileSync(join(dir, dependency.name), dependency.source);
       const celPath = join(dir, `${base}.cel`);
       writeFileSync(celPath, cel!.source);
       const v = validateCELFile(celPath);
@@ -668,13 +719,13 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("conceptLayerModel marks `defined as` inference IN scope; predicates/external OUT", () => {
+  it("conceptLayerModel admits supported selected-publication shapes, producers and sources", () => {
     const kit = getAuthoringKit();
     const byForm = (frag: string) => kit.conceptLayerModel.find((e) => e.form.includes(frag))!;
     expect(byForm("code is").scope).toBe("in");
     expect(byForm("defined as").scope).toBe("in");
-    expect(byForm("definition is").scope).toBe("out");
-    expect(byForm("source representation").scope).toBe("out");
+    expect(byForm("definition is").scope).toBe("in");
+    expect(byForm("source representation").scope).toBe("in");
     // #168: `defined as` is framed as INFERENCE (one concept), and explicitly disclaims DECISION composition.
     // Assert the disclaimer is PRESENT (catch the class, not one stale phrasing) + the summary doesn't relapse.
     expect(byForm("defined as").meaning).toMatch(/inference/i);
@@ -1034,7 +1085,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
     // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
     expect(cpg.contentHash).toBe(
-      "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b",
+      "87bd21be696388ada111a3eb1668ecf46a020f5831a5d6a564e40d84c06175e8",
     );
     // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
     // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
@@ -1047,7 +1098,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
     //   1.25 re-syncs and gets the teaching for the new construct in the same step.
     expect(priorAuth.contentHash).toBe(
-      "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3",
+      "0773104991c59bce3f59660a8aa429b16ef01c4235808753264ac99f53af43ca",
     );
   });
 
@@ -1068,6 +1119,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
   const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
+    "1.38": { cpg: "87bd21be696388ada111a3eb1668ecf46a020f5831a5d6a564e40d84c06175e8", priorAuth: "0773104991c59bce3f59660a8aa429b16ef01c4235808753264ac99f53af43ca" },
     "1.37": { cpg: "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b", priorAuth: "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3" },
     "1.36": { cpg: "417b27c9557431cde15b1cf2c7f45f646a3598bb02bfdf559ffd7b260becdcfc", priorAuth: "183f26f2a9ff6f2b82087505f3a63e91e6a034ba3013b003bb71aa2a8a6882e9" },
     "1.35": { cpg: "72cdbf0d7f8db6fa7b3f843d3e82a76f6ca12558c7c560bff2dd3d913fff6c3a", priorAuth: "4d5004b9ff65d7370b83f3b352c7cf5d7662158c0f83cca4a1bb3c460f271423" },
@@ -1283,9 +1335,9 @@ describe("authoring-kit — getAuthoringKit", () => {
       )!;
       expect(dcInvariant.text).toMatch(/a named criterion as one identifier `condition\[\]`/i);
       const bg = kit.rules.find((r) => r.id === "branch-guards")!;
-      expect(bg.rule).toMatch(/a CRITERION atom is one `condition\[\]` naming the criterion/i);
+      expect(bg.rule).toMatch(/Publication-reachable branch guards[\s\S]*whole Boolean expression/);
       const bgClause = (bg.clauses ?? []).find((c) =>
-        /a CRITERION atom is one identifier/.test(c.text),
+        /Publication-reachable branch guards/.test(c.text),
       )!;
       expect(
         bgClause,
@@ -1386,7 +1438,7 @@ describe("authoring-kit — getAuthoringKit", () => {
       expect(vt!.rule).toMatch(/missing-value-type/);
       expect(vt!.rule).toMatch(/decision-guard-nonboolean/);
       // Published-shape (a SHAPE, not a scalar) + the ROLE heuristic (choose by RESULT, not resource type).
-      expect(vt!.rule).toMatch(/PUBLISHED result shape/);
+      expect(vt!.rule).toMatch(/datum\/value type; shape is separately/);
       expect(vt!.rule).toMatch(/CHOOSE BY ROLE/);
       // DIRECTIONAL doctrine assertions — a polarity/scope reversal must FAIL these, not just a deletion.
       // bare-ref alias = FULL equality (not "need not be equal"); only TOP-LEVEL sem-not/exists is boolean.
@@ -1400,7 +1452,7 @@ describe("authoring-kit — getAuthoringKit", () => {
       expect(vt!.rule).toMatch(/NORMATIVE vs SHIPPED/);
       expect(vt!.rule).toMatch(/#266/);
       // `defined as exists` is CAPABILITY-STATUS, NOT a usable Stage-1 form (run_decision status:errors, #270).
-      expect(vt!.rule).toMatch(/LANE MATRIX/);
+      expect(vt!.rule).toMatch(/Legacy record-existence capability/);
       expect(vt!.rule).toMatch(/not proof of arbitrary scalar reductions/);
       expect(vt!.rule).toMatch(/#270/);
       // CLAUSE FORCES — doctrine must NOT shelter under a `validator-enforced` tag (FORCE_MODEL §0). The
@@ -1419,9 +1471,9 @@ describe("authoring-kit — getAuthoringKit", () => {
       expect(shipped?.force, `shipped-checks clause must be validator-enforced in ${uc}`).toBe(
         "validator-enforced",
       );
-      // concept-form still preserves the Stage-1 producer exclusions (posreps / general `definition is` OUT).
+      // The same assembled payload admits the bounded publication forms it teaches.
       const cf = kit.rules.find((r) => r.id === "concept-form")!;
-      expect(cf.clauses?.[0]?.text).toMatch(/OUT this stage/);
+      expect(cf.clauses?.[0]?.text).toMatch(/Supported source representation and definition is forms are in scope/);
       expect(cf.rule).toMatch(/value type is/);
     }
   });
@@ -1507,7 +1559,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // rules-only check. contentHash is derived, so drop it.
     for (const useCase of USE_CASE_NAMES) {
       const { contentHash: _hash, ...payload } = getAuthoringKit(undefined, useCase);
-      expect(JSON.stringify(payload)).not.toMatch(/crl-content|hcsc|iehp|inland empire/i);
+      expect(JSON.stringify(payload)).not.toMatch(/crl-content|hcsc|iehp|inland empire|bleph/i);
     }
   });
 });

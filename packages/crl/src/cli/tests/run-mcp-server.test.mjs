@@ -254,20 +254,23 @@ try {
     assert.deepEqual(refNames, [
       "decision-reference.cel",
       "decision-reference.crl",
+      "named-answer-reference.cel",
+      "named-answer-reference.crl",
+      "named-answer-terms.crl",
       "patient-age-both-rep-reference.crl",
       "representation-reference.crl",
     ]);
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.37"); // named answer ValueSets and presentations
-    assert.equal(kit.contentHash, "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b");
+    assert.equal(kit.schemaVersion, "1.38"); // named answer ValueSets and presentations
+    assert.equal(kit.contentHash, "87bd21be696388ada111a3eb1668ecf46a020f5831a5d6a564e40d84c06175e8");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
-    // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
+    // Supported source/producer publications and legacy inference are distinct in-scope forms.
     const scopeOf = (frag) => kit.conceptLayerModel.find((e) => e.form.includes(frag))?.scope;
     assert.equal(scopeOf("defined as"), "in");
-    assert.equal(scopeOf("definition is"), "out");
+    assert.equal(scopeOf("definition is"), "in");
   });
 
   await check("authoring_kit useCase:'prior-auth' → the full inherited PA kit + pinned hash", async () => {
@@ -276,11 +279,11 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.37");
+    assert.equal(kit.schemaVersion, "1.38");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3");
+    assert.equal(kit.contentHash, "0773104991c59bce3f59660a8aa429b16ef01c4235808753264ac99f53af43ca");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
+    assert.equal(refNames.length, 15); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));
     assert.ok(!kit.facets, "advisory facets are retired");
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
