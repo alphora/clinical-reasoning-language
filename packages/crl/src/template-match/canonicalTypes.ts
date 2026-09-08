@@ -79,7 +79,7 @@ export interface TerminologyRefArg {
 }
 
 /**
- * ⭐⭐ A SUBSET of the SUBJECT's own inline answer options — `"X" in qualifying` (#189).
+ * ⭐⭐ A SUBSET of the SUBJECT's named answer options — `"X" in qualifying` (#189).
  *
  * ⚠⚠ IT IS NOT A `TerminologyRefArg`, AND REUSING ONE WOULD BE A REAL DEFECT. A terminology ref resolves
  * in the TERMINOLOGY namespace; `qualifying` resolves against THE SUBJECT CONCEPT'S OWN declaration. Passing

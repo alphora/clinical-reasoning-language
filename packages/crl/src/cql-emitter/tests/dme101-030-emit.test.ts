@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import * as path from "node:path";
 
 import { emitCQLImports } from "../../imports/emit";
+import { isFhirDefError } from "../../fhir-emitter/types";
 import { emitFhirDefFromPath } from "../../fhir-emitter/closureOrchestrator";
 import {
   proveWholeBoundaryTotality,
@@ -99,7 +100,7 @@ describe("#189 Piece 1 — dme101-030 both-rep value/interface flip emits", () =
 
   it("FHIR lane emits cleanly (no dangling cpg-featureExpression — Claude #10)", () => {
     const fhir = emitFhirDefFromPath(ROOT, { date: new Date("2020-01-01T00:00:00.000Z") });
-    const fhirErrors = ((fhir as { errors?: unknown[] }).errors ?? []) as unknown[];
+    const fhirErrors = fhir.errors.filter(isFhirDefError);
     expect(fhirErrors, JSON.stringify(fhirErrors)).toHaveLength(0);
     expect(fhir.success).toBe(true);
     // Covered Device gets a case-feature StructureDefinition (a record-bearing concept, North Star §4), and its

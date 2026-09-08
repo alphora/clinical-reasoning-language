@@ -91,48 +91,18 @@
           ],
           "input": [
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Diagnosis A?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Diagnosis A"
-                }
-              ],
               "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-a"
               ]
             },
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Diagnosis B?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Diagnosis B"
-                }
-              ],
               "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-b"
               ]
             },
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Diagnosis C?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Diagnosis C"
-                }
-              ],
               "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-c"

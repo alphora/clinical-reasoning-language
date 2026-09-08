@@ -2,7 +2,7 @@ import type { Concept, CRL, Location, ReferenceName } from "../ast/types";
 import { bmiRetirementReason } from "../template-match/bmiPublication";
 import type { CRLError } from "../types/errors";
 import { localCodeSystemUrl, caseFeatureUrlFromPolicyId } from "../fhir-emitter/slug";
-import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
+import { resolveAnswerDomain } from "./answerDomain";
 import { emittedValueSetUrl } from "../fhir-emitter/valueSet";
 import { matchNarrative } from "../template-match/matcher";
 import { publicationCodeKey, normalizePublicationCodes, readFinitePublicationTerminology } from "./publicationDomain";
@@ -209,14 +209,11 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
     const key = JSON.stringify([library.sourceIdentity, concept.name]);
     const cached = offeredSets.get(key);
     if (cached !== undefined) return cached;
-    if (concept.valueFrom.kind === "terminology") {
-      const result = finiteTerminology(library.sourceIdentity, concept.valueFrom.terminologyName, concept.valueFrom.location).codes;
-      offeredSets.set(key, result);
-      return result;
-    }
-    const set = inlineAnswerSet(concept as Concept, library.artifact.localDomainId ?? library.libraryName, library.artifact.canonicalBase!);
-    if (set === null) return fail("Inline answer domains require an owning local code.", concept.valueFrom.location, "publication-domain-answer-options");
-    const result = normalized(set.options.map((option) => ({ system: set.codeSystem.url, code: option.code })));
+    const hit = declarations.lookupTerminology(library.sourceIdentity, concept.valueFrom.terminologyName, concept.valueFrom.location);
+    if (hit.kind !== "hit") return fail("The answer ValueSet cannot resolve in its owning scope.", concept.valueFrom.location, "publication-domain-resolution");
+    const answer = resolveAnswerDomain(concept.valueFrom, hit.node);
+    if (answer.kind === "error") return fail(answer.message, answer.location ?? concept.valueFrom.location, answer.code);
+    const result = normalized(answer.members);
     offeredSets.set(key, result);
     return result;
   };
@@ -272,10 +269,8 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
           terminology: rep.terminologyName!, codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes });
       });
       let answerOptions: PublicationDescriptor["answerOptions"];
-      if (concept.valueFrom?.kind === "inline") {
-        const set = inlineAnswerSet(concept as Concept, library.artifact.localDomainId ?? library.libraryName, base!);
-        if (set !== null) answerOptions = Object.freeze({ valueSetUrl: set.allOptions.url, codes: offered(library, concept) });
-      } else if (concept.valueFrom?.kind === "terminology") {
+      // REFACTOR:grounded (#320, 615): only named answer ValueSets are supported.
+      if (concept.valueFrom !== undefined) {
         const term = declarations.lookupTerminology(library.sourceIdentity, concept.valueFrom.terminologyName, concept.valueFrom.location);
         if (term.kind !== "hit") fail("The offered answer terminology cannot resolve.", concept.valueFrom.location, "publication-domain-resolution");
         else {
@@ -285,6 +280,11 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
             term.library.artifact.canonicalBase!, term.library.artifact.policyId!), codes: offered(library, concept) });
         }
       }
+      if (concept.valueFrom && !concept.valueFrom.notQualifying?.length) warnings.push(Object.freeze({
+        ...diagnostic(`No nonqualifying answers are declared for "${concept.name}". Every answer in the referenced ValueSet will qualify.`, concept.valueFrom.location, "answer-options-all-qualifying"),
+        sourceIdentity: library.sourceIdentity,
+        ...(library.filePath === undefined ? {} : { filePath: library.filePath }),
+      }));
       const syntax = readPublicationMembership(concept);
       let producer: PublicationProducer | undefined;
       if (syntax !== undefined) {
@@ -303,19 +303,21 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         let qualifying: readonly PublicationCode[];
         if (syntax.predicate.kind === "terminology") qualifying = finiteTerminology(library.sourceIdentity, syntax.predicate.reference, syntax.location).codes;
         else {
-          if (operand.node.valueFrom?.kind !== "inline") return fail("`in qualifying` requires the operand's own inline answer options.", syntax.location, "publication-membership-inline-options-required");
-          const set = inlineAnswerSet(operand.node as Concept, operand.library.artifact.localDomainId ?? operand.library.libraryName, operand.library.artifact.canonicalBase!);
-          if (set === null || set.options.some((option) => option.qualifying === undefined))
-            return fail("Every inline option must explicitly state qualifying or not qualifying for this predicate.", syntax.location, "publication-membership-marker-required");
-          const classified = new Set(set.options.map((option) => publicationCodeKey({ system: set.codeSystem.url, code: option.code })));
-          if (domain.some((code) => !classified.has(publicationCodeKey(code))))
-            return fail("`in qualifying` requires explicit classification of every domain member by the operand's inline options.", syntax.location, "publication-membership-marker-required");
-          qualifying = normalized(set.options.filter((option) => option.qualifying === true).map((option) => ({ system: set.codeSystem.url, code: option.code })));
+          const valueFrom = operand.node.valueFrom;
+          if (!valueFrom) return fail("`in qualifying` requires a named answer ValueSet on its operand.", syntax.location, "publication-membership-answer-options-required");
+          const term = declarations.lookupTerminology(operand.library.sourceIdentity, valueFrom.terminologyName, valueFrom.location);
+          if (term.kind !== "hit") return fail("The operand's answer ValueSet cannot resolve.", syntax.location, "publication-domain-resolution");
+          const answer = resolveAnswerDomain(valueFrom, term.node);
+          if (answer.kind === "error") return fail(answer.message, answer.location, answer.code);
+          const offeredKeys = new Set(answer.members.map(publicationCodeKey));
+          if (domain.length !== offeredKeys.size || domain.some((code) => !offeredKeys.has(publicationCodeKey(code))))
+            return fail("`in qualifying` requires the interpreted domain to equal the offered answer ValueSet.", syntax.location, "publication-membership-domain-coverage");
+          qualifying = normalized(answer.qualifying);
         }
         const domainKeys = new Set(domain.map(publicationCodeKey));
         if (qualifying.some((code) => !domainKeys.has(publicationCodeKey(code))))
           return fail("Every qualifying code must belong to the operand's interpreted domain.", syntax.location, "publication-membership-domain-coverage");
-        if (qualifying.length === domain.length) warnings.push(Object.freeze({
+        if (syntax.predicate.kind === "terminology" && qualifying.length === domain.length) warnings.push(Object.freeze({
           ...diagnostic(`Membership producer "${concept.name}" has no negative value in its explicit domain.`, syntax.location, "publication-membership-no-negative-domain"),
           sourceIdentity: library.sourceIdentity,
           ...(library.filePath === undefined ? {} : { filePath: library.filePath }),

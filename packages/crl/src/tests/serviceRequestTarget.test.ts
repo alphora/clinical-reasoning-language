@@ -88,7 +88,7 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     };
     expect((v.errors ?? []).map((e) => e.kind)).toEqual([]);
     // The pre-flip cross-representation merge warning, exactly as the obesity target carries it.
-    expect((v.warnings ?? []).map((w) => w.kind)).toEqual(["reduction-shape"]);
+    expect((v.warnings ?? []).map((w) => w.kind)).toEqual(["presentation-question-text-missing", "answer-options-all-qualifying", "reduction-shape"]);
   });
 
   it("the membership predicate RESOLVES — it is not soft-compiled narrative", () => {

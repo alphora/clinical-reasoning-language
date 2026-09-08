@@ -91,16 +91,6 @@
           ],
           "input": [
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Service Requested?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Service Requested"
-                }
-              ],
               "type": "Observation",
               "profile": [
                 "http://example.org/crl/coded-question/StructureDefinition/coded-question-service-requested"
@@ -132,16 +122,6 @@
               ],
               "input": [
                 {
-                  "extension": [
-                    {
-                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                      "valueString": "Documented Symptom?"
-                    },
-                    {
-                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                      "valueMarkdown": "Documented Symptom"
-                    }
-                  ],
                   "type": "Observation",
                   "profile": [
                     "http://example.org/crl/coded-question/StructureDefinition/coded-question-documented-symptom"

@@ -16,7 +16,7 @@
  * composition / `when` autocomplete don't offer parameters the
  * validator would reject.
  */
-export type ExpectedRefKind = "concept" | "terminology" | "decision" | "activity" | "parameter" | "narrative" | "any";
+export type ExpectedRefKind = "concept" | "terminology" | "decision" | "activity" | "parameter" | "criterion" | "narrative" | "none" | "any";
 
 /**
  * Classify the line prefix to decide which declaration kinds should
@@ -41,6 +41,11 @@ export function detectExpectedKind(linePrefix: string): ExpectedRefKind {
   // can match the rest. The cursor sits at, or just after, the opening
   // quote of the ref being authored.
   const beforeQuote = stripTrailingOpenQuote(linePrefix);
+  // Presentation prose contains quoted text, not symbol references.
+  if (/^\s*-\s*(?:question text|question description)\s+is\b/.test(linePrefix)) return "none";
+  if (/\bpresentation\s+for\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "concept";
+  if (/\bin\s+decision\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "decision";
+  if (/\bin\s+criterion\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "criterion";
 
   // `coded from` — terminology only. Also matches `coded from "Lib"."`.
   if (/\bcoded\s+from\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";
@@ -48,7 +53,7 @@ export function detectExpectedKind(linePrefix: string): ExpectedRefKind {
   // `value from` — terminology only (a concept's ANSWER OPTIONS). Also matches `value from "Lib"."`.
   // ⚠ Without this the slot falls through to "any" and completion offers concepts/decisions/activities where
   // only a terminology can go — the same wrong-namespace suggestion the `coded from` rule above prevents.
-  if (/\bvalue\s+from\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";
+  if (/\bvalue\s+from\s+is\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";
 
   // `with` inside an activity body. `- with "T"` slot.
   if (/^\s*-\s*with\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "terminology";

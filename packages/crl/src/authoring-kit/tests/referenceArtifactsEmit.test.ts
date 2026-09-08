@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../../fhir-emitter/types";
 // REFACTOR:grounded (#320, plan595): BMI subsection emits; mammography exemption remains explicit.
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -81,7 +82,7 @@ const emitArtifact = (name: string, source: string) => {
   const r = emitFhirDefFromPath(join(dir, name));
   return {
     success: r.success,
-    hardErrors: (r.errors ?? []).filter((e) => e.severity !== "warning"),
+    hardErrors: (r.errors ?? []).filter(isFhirDefError),
     caseFeatureSds: r.resources.filter((x) => x.resourceType === "StructureDefinition").length,
   };
 };

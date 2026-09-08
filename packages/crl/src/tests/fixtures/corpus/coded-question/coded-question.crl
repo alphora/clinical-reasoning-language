@@ -1,20 +1,7 @@
-# ⭐⭐ THE INLINE ANSWER OPTIONS REFERENCE (#189) — a coverage determination driven by a CODED QUESTION.
-//
-// Deliberately GENERIC: no customer content, no real policy. Its job is to be the golden oracle for the
-// inline `value from:` construct and the `in qualifying` predicate, so a change to either shows up as a
-// reviewable diff in BOTH emit lanes.
-//
-// What it exercises, and why each piece is here:
-//
-//   · INLINE OPTIONS — the codes live on the question, written ONCE, in the concept's OWN CodeSystem. No
-//     system URL appears anywhere in this file, and none appears in the `.cel` beside it either.
-//   · THE `qualifying` / `not qualifying` MARKER — required because this concept IS the subject of an
-//     `in qualifying` predicate. Adding a fourth option cannot compile until it says what it does.
-//   · A "NONE OF THE LISTED …" OPTION — the reason a denial costs ONE answer instead of one per option. With
-//     the options unanswered the criterion is UNKNOWN and the tree PAUSES; answering `none` makes it a
-//     determinate FALSE. That is the whole point of the construct, and it is what the `.cel` proves.
-//   · A PURE QUESTION (`Service Requested`) — a plain local boolean with nothing that can compute it, so an
-//     unanswered run pauses at the gate rather than reaching the outer `otherwise`.
+# Legacy classifier regression fixture: named answer vocabulary with explicit negative exceptions.
+// This intentionally retains the old reduction lane to test emitted classifier parity.
+// New authoring uses Record + value domain + shape reduction, as in the Bleph acceptance fixture.
+// Codes, systems and displays belong to the named terminology; all offered answers qualify except none.
 library "Coded Question Reference".
 
 // The gate. A bare `code is` boolean: nothing derives it, so unanswered it is UNKNOWN — not false.
@@ -32,10 +19,8 @@ concept "Documented Symptom":
 - value type is CodeableConcept.
 - code is `documented-symptom`.
 - definition is most recent this.
-- value from:
-  - `functional-limitation` display is `Functional limitation affecting daily activity`, qualifying.
-  - `persistent-pain` display is `Persistent pain despite conservative therapy`, qualifying.
-  - `none-of-listed` display is `None of the listed symptoms is documented`, not qualifying.
+- value from is "Coded Question Reference Documented Symptom Answer Options":
+  - not qualifying is `none-of-listed`.
 
 // ⭐ THE PREDICATE. No `type is`: this is an ephemeral derivation — it publishes a computed boolean, emits no
 // resource, and gets no case-feature StructureDefinition.
@@ -60,3 +45,10 @@ first:
     - otherwise then recommend activity "not-certify.Unmet".
     end.
 - otherwise then recommend activity "not-certify.Unmet".
+
+
+terminology "Coded Question Reference Documented Symptom Answer Options":
+- system is `https://example.org/answer-codes`.
+- code is `functional-limitation` display is `Functional limitation affecting daily activity`.
+- code is `persistent-pain` display is `Persistent pain despite conservative therapy`.
+- code is `none-of-listed` display is `None of the listed symptoms is documented`.

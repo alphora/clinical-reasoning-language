@@ -37,7 +37,8 @@
         "system": "http://www.ama-assn.org/go/cpt",
         "concept": [
           {
-            "code": "37718"
+            "code": "37718",
+            "display": "Test service 37718"
           }
         ]
       }
@@ -48,7 +49,8 @@
     "contains": [
       {
         "system": "http://www.ama-assn.org/go/cpt",
-        "code": "37718"
+        "code": "37718",
+        "display": "Test service 37718"
       }
     ]
   }

@@ -66,13 +66,13 @@ library "Endoluminal Ablation Coverage".
 terminology "Requestable Services":
 - system is `http://www.ama-assn.org/go/cpt`.
 // `37718` is endoluminal RFA (the covered one); `37722` is a fem-pop bypass — requestable, NOT covered.
-- code is `37718`.
-- code is `37722`.
+- code is `37718` display is `Test service 37718`.
+- code is `37722` display is `Test service 37722`.
 
 // What this policy pays for. ⚠ A DIFFERENT set: see failure (2) above.
 terminology "Covered Services":
 - system is `http://www.ama-assn.org/go/cpt`.
-- code is `37718`.
+- code is `37718` display is `Test service 37718`.
 
 // THE QUESTION. Its arms are the local `code is` (a clinician answers the
 // dropdown directly) and the ServiceRequest the policy reads. `most recent this`
@@ -81,7 +81,7 @@ concept "Requested Service":
 - shape is Record.
 - type is Observation.
 - value type is CodeableConcept.
-- value from "Requestable Services".
+- value from is "Requestable Services".
 - code is `requested-service`.
 - definition is most recent this.
 - source representation:

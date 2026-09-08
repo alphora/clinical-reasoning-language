@@ -1,3 +1,4 @@
+import type { PresentationCatalog } from "../emit/presentation";
 /**
  * CRL Decision → cpg-strategydefinition / crmi-publishableplandefinition
  * PlanDefinition emit (Todo 3, Decision lane).
@@ -153,8 +154,10 @@ export type PublicationGuardTargetResolver = (ref: ReferenceName) => Publication
 
 /** One action-level case-feature input (DTR pattern). */
 export interface CaseFeatureInput {
-  /** the concept name (drives the `cpg-input-text`/`cpg-input-description` labels). */
+  /** CRL concept name, used as question text when no presentation is authored. */
   name: string;
+  /** Owning catalog; imported input presentation is inherited, never overridden by a namesake. */
+  presentationOwner?: PresentationCatalog;
   /** the canonical url of the concept's emitted case-feature StructureDefinition. */
   canonical: string;
   /**
@@ -372,6 +375,7 @@ export function emitDecisionPlanDefinition(
   // REFACTOR:grounded (#320): the raw prepared descriptor decides whether a guard reads a Record value.
   isPublication: (ref: ReferenceName) => boolean = () => false,
   publicationGuardTarget: PublicationGuardTargetResolver = () => undefined,
+  presentations?: PresentationCatalog,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -397,6 +401,8 @@ export function emitDecisionPlanDefinition(
 
   // Emit each top-level branch (when/otherwise); collect surviving actions.
   const ctx: EmitCtx = {
+    decisionName: decision.name,
+    presentations,
     libraryName,
     canonicalBase: metadata.canonicalBase,
     conceptResolver,
@@ -548,6 +554,9 @@ export function emitDecisionPlanDefinition(
 }
 
 interface EmitCtx {
+  decisionName: string;
+  presentations?: PresentationCatalog;
+  presentationCondition?: BranchCondition;
   libraryName: string;
   canonicalBase: string;
   conceptResolver: ConceptResolver;
@@ -707,14 +716,41 @@ function buildActionInputs(
   const seenCanonicals = new Set<string>();
   const inputs: Array<Record<string, unknown>> = [];
   for (const conceptName of conceptNames) {
-    for (const { name, canonical, resourceType } of ctx.caseFeatureInputResolver(conceptName)) {
+    for (const { name, canonical, resourceType, presentationOwner } of ctx.caseFeatureInputResolver(conceptName)) {
+      const catalog = presentationOwner ?? ctx.presentations;
+      const occurrenceContexts = catalog && catalog === ctx.presentations
+        ? catalog.contextsForInput(ctx.presentationCondition, canonical, ctx.caseFeatureInputResolver) : [undefined];
+      const resolutions = occurrenceContexts.map((criteria) => catalog?.resolveOccurrence(name, criteria === undefined ? undefined : {
+        decision: ctx.decisionName, criteria,
+      }));
+      const wordings = resolutions.map((result) => result?.wording);
+      const wording = wordings[0];
+      if (new Set(wordings.map((value) => JSON.stringify([value?.questionText ?? name, value?.questionDescription ?? ""]))).size > 1) {
+        const message = `Question input "${name}" (${canonical}) has conflicting presentations in the same action of decision "${ctx.decisionName}".`;
+        if (!ctx.errors.some((error) => error.kind === "presentation-overlap" && error.message === message)) {
+          ctx.errors.push({ type: "Validation", kind: "presentation-overlap", message });
+        }
+      }
+      for (const diagnostic of resolutions.flatMap((result) => result?.diagnostics ?? [])) {
+        if (!ctx.errors.some((e) => e.kind === diagnostic.kind && e.message === diagnostic.message)) ctx.errors.push({
+          type: "Validation", kind: diagnostic.kind, message: diagnostic.message,
+          line: diagnostic.location.start.line, column: diagnostic.location.start.column,
+        });
+      }
+      // The catalog warns once for entirely missing presentation, including unused concepts.
+      // Here diagnose an uncovered scoped use, or a standalone emitter call without a catalog.
+      if (!wording?.questionText && (!catalog || catalog.hasDeclaration(name)) && !seenCanonicals.has(canonical)) {
+        ctx.errors.push({ type: "Validation", kind: "presentation-question-text-missing",
+          message: `Question input "${name}" (${canonical}) has no authored question text. Add a presentation declaration; otherwise the question uses the concept name with no question description.` });
+      }
       if (seenCanonicals.has(canonical)) continue;
       seenCanonicals.add(canonical);
+      const extensions = [
+          ...(wording?.questionText ? [{ url: CPG_INPUT_TEXT_EXT, valueString: wording.questionText }] : []),
+          ...(wording?.questionDescription ? [{ url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: wording.questionDescription }] : []),
+        ];
       inputs.push({
-        extension: [
-          { url: CPG_INPUT_TEXT_EXT, valueString: `${name}?` },
-          { url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: name },
-        ],
+        ...(extensions.length ? { extension: extensions } : {}),
         // REFACTOR:grounded (charter §4) — the case-feature's NATURAL resource type (always present; the
         // resolver only yields an input for a resolved record). No `"Observation"` fallback — that was the hack.
         type: resourceType,
@@ -1055,6 +1091,15 @@ function withPublicationDependencies(ctx: EmitCtx, emit: () => EmitActionResult)
 }
 
 function emitWhenBlock(
+  wb: WhenBlock, ctx: EmitCtx, qualifier: BlockQualifier | undefined,
+): EmitActionResult {
+  const previous = ctx.presentationCondition;
+  ctx.presentationCondition = wb.condition;
+  try { return emitWhenBlockWithPresentation(wb, ctx, qualifier); }
+  finally { ctx.presentationCondition = previous; }
+}
+
+function emitWhenBlockWithPresentation(
   wbRaw: WhenBlock,
   ctx: EmitCtx,
   enclosingQualifier: BlockQualifier | undefined,
@@ -1293,7 +1338,10 @@ function emitCompoundWhenBlock(
         if (entry) for (const ref of entry.recursiveAtomClosure) armInputNames.push(ref.ref);
       }
     }
-    const inputs = buildActionInputs(armInputNames, ctx);
+    const armCondition: BranchCondition = arm.length === 1 ? arm[0] : {
+      type: "BranchConditionAnd", operands: [...arm], location: wb.condition.location,
+    };
+    const inputs = buildActionInputs(armInputNames, { ...ctx, presentationCondition: armCondition });
     return {
       title: armLabel,
       description: armLabel,
@@ -1527,7 +1575,7 @@ function emitBlockStatement(
   };
   if (guardCondition) action.condition = [guardCondition];
   if (guardInputName) {
-    const inputs = buildActionInputs([guardInputName], ctx);
+    const inputs = buildActionInputs([guardInputName], { ...ctx, presentationCondition: undefined });
     if (inputs) action.input = inputs;
   }
   action.definitionCanonical = leafResult;

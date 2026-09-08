@@ -25,7 +25,17 @@ export interface CRL extends ASTNode {
   library: LibraryDeclaration;
   includes: Include[];
   statements: Statement[];
+  presentations?: Presentation[];
   location: Location;
+}
+
+/** Presentation never introduces a computational symbol or changes a concept's identity. */
+export interface Presentation extends ASTNode {
+  type: "Presentation";
+  target: ReferenceName;
+  contexts: { kind: "decision" | "criterion"; ref: ReferenceName; location: Location }[];
+  questionText?: string;
+  questionDescription?: string;
 }
 
 // Union type for all possible statements. v2.2: parameter declarations
@@ -493,49 +503,19 @@ export type RecordUnionTerm =
   /** A PRODUCER stage's constructed candidate, identified by its 0-based stage index. */
   | { kind: "constructed"; stageIndex: number };
 
-/**
- * ⭐⭐ ONE OFFERED ANSWER of an INLINE `value from:` block (#189).
- *
- * The concept OWNS these codes — they live in that concept's own CodeSystem, not the artifact-local one
- * (which holds concept IDENTITIES). Two different vocabularies with two different jobs; see
- * `codeSystem.ts::emitReferenceStubCodeSystem` for why identity-bearing and option-bearing systems must not
- * be unified.
- */
-export interface InlineAnswerOption {
-  /** The option's code, scoped by the concept's own CodeSystem — so it may be short. */
+// REFACTOR:grounded (#320, 615): named answer membership plus explicit negative exceptions.
+export interface AnswerException {
   code: string;
-  /**
-   * The text a clinician READS in the generated questionnaire.
-   *
-   * ⚠ REQUIRED by the validator, and NEVER derived from the code by title-casing: that would manufacture
-   * clinician-facing text the author never wrote. The grammar cannot require it (an option line is shared
-   * with the unmarked form), so the check lives in the validator.
-   */
-  display: string;
-  /**
-   * What this option does to the determination. `true` = `qualifying`, `false` = `not qualifying`,
-   * `undefined` = UNMARKED.
-   *
-   * ⚠ UNMARKED IS NOT "does not qualify" — it is genuinely absent, and the distinction is load-bearing.
-   * The validator REQUIRES a marker exactly when the concept is the subject of an `in qualifying` predicate
-   * (operator ruling, 2026-09-02): a silent default would let a KE add an option, have a patient answer it
-   * honestly, and get a determinate `false -> deny` — the unrecoverable class, since a pause is recoverable
-   * but a spurious `false` looks like a decision. A plain dropdown that feeds no predicate needs no markers.
-   */
-  qualifying?: boolean;
   location: Location;
 }
 
-/**
- * The concept's OFFERED answer values — either a named terminology or inline options.
- *
- * ⚠ A DISCRIMINATED UNION on purpose. The two forms emit differently (a terminology reference resolves to
- * an authored ValueSet; inline options MINT a CodeSystem plus their ValueSets), so a shape where both fields
- * are optional would let a consumer read the wrong one and fail at emit rather than at the type.
- */
-export type ValueFrom =
-  | { kind: "terminology"; terminologyName: ReferenceName; location: Location }
-  | { kind: "inline"; options: InlineAnswerOption[]; location: Location };
+export interface ValueFrom {
+  kind: "terminology";
+  terminologyName: ReferenceName;
+  /** Every recognized offered member outside this list qualifies. Absence is legal and warned. */
+  notQualifying?: AnswerException[];
+  location: Location;
+}
 
 // REFACTOR:grounded (#320, review 562): finite interpreted values, never inferred from the UI options.
 export type ValueDomainTerm =

@@ -595,9 +595,8 @@ concept "Procedure":
 - code is \`procedure\`.
 - value domain is answer options.
 - shape reduction is most recent.
-- value from:
-  - \`yes\` display is \`Yes\`, qualifying.
-  - \`no\` display is \`No\`, not qualifying.
+- value from is "Publication Procedure Answer Options":
+  - not qualifying is \`no\`.
 concept "Answer":
 - shape is Record.
 - type is Observation.
@@ -610,6 +609,12 @@ activity "Approve":
 activity "Deny":
 - request CPGCommunicationRequest.
 - with \`DENIED\`.
+
+
+terminology "Publication Procedure Answer Options":
+- system is \`https://example.org/answer-codes\`.
+- code is \`yes\` display is \`Yes\`.
+- code is \`no\` display is \`No\`.
 `;
 const procedureFact = (name: string, value?: string, date?: string) => fact(name, value?.startsWith("`") ? JSON.stringify(value.slice(1, -1)) : value, date).replace('"Publication"."Answer"', '"Publication"."Procedure"');
 

@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../types";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import * as path from "path";
 
@@ -72,7 +73,7 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
   const result = emitFhirDefFromPath(FIXTURE, { date: FIXED_DATE });
 
   it("emits with no errors and no unmatched", () => {
-    expect(result.errors).toEqual([]);
+    expect(result.errors.filter(isFhirDefError)).toEqual([]);
     expect(result.unmatched).toEqual([]);
     expect(result.success).toBe(true);
   });

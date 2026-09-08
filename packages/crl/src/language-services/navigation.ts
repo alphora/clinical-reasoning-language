@@ -32,6 +32,7 @@ function symbolKindFor(kind: IndexedDeclaration["kind"]): LsSymbolKind {
     case "terminology":
       return "constant";
     case "decision":
+    case "criterion":
       return "function";
     case "activity":
       return "class";

@@ -83,7 +83,7 @@
         ],
         "binding": {
           "strength": "extensible",
-          "valueSet": "http://example.org/crl/coded-question/ValueSet/coded-question-documented-symptom-answer-options"
+          "valueSet": "http://example.org/crl/coded-question/ValueSet/coded-question-coded-question-reference-documented-0aa58b9d7a6e"
         }
       },
       {

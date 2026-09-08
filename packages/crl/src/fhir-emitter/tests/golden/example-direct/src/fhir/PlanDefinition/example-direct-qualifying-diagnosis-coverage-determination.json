@@ -91,16 +91,6 @@
           ],
           "input": [
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Qualifying Diagnosis?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Qualifying Diagnosis"
-                }
-              ],
               "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"

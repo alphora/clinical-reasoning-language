@@ -1,3 +1,5 @@
+import { readFiniteAnswerMembers } from "../emit/answerDomain";
+import { createPresentationCatalog, type PresentationText } from "../emit/presentation";
 /**
  * Headless CONCEPT layer (#166 Slice 1) — a sibling of `buildCrlStructure` (decision tree). Inventories ALL concept
  * declarations across the covered policy + every registry library as addressable nodes, each carrying a `nodeKey`
@@ -27,6 +29,8 @@ export interface CrlConceptNode {
   name: string;
   lib: string;
   label: string;
+  /** Authored default presentation. Identity remains name/lib/nodeKey. */
+  presentation?: PresentationText;
   location: LsLocation; // location-less concepts are skipped (mirrors the indexer, for nodeKey parity)
   conceptType?: ConceptType;
   /** The concept's authored value type(s) (`- value type is X.`), 0..* (`[]` when none) — a raw signal the
@@ -111,29 +115,7 @@ export function classifyConcept(c: CrlConceptNode): ConceptClassification {
   };
 }
 
-/**
- * ⭐⭐ THE ANSWERS A CONCEPT OFFERS — and there are THREE cases, not two.
- *
- * `value from` has two syntactic forms but three OUTCOMES, and conflating the last two is the bug this
- * exists to stop (an earlier comment here claimed a terminology "is not resolved" — true of a pure
- * reference, FALSE of an instantiated one, which is the form a policy is most likely to use):
- *
- *   1. INLINE `value from:` .................. options with displays, authored on the concept.
- *   2. `value from "X"`, X INSTANTIATED ...... `system is` + `code is` lines — WE KNOW THE CODES. They
- *      are in the same closure this function already walks, indexed by name (`STATEMENT_KIND` maps
- *      `Terminology`), so there is nothing external about them.
- *   3. `value from "X"`, X a pure REFERENCE ... `valueset is <url>` — membership resolves at DEPLOYMENT.
- *      We genuinely do not know it, and the one code we hold is the synthetic `reference-vs-stub`
- *      placeholder, which is NOT an answer. Surfacing that as one would show a reviewer a fake option
- *      with the same affordance as a real one.
- *
- * So (1) and (2) yield `answerOptions`; (3) yields `answersFromTerminology` — a NAME to point at, never
- * a list to expand. A renderer must not offer a disclosure for (3): a chevron promises content.
- *
- * ⚠ CASE 2 HAS NO DISPLAY TEXT. `terminologyCode` is `- code is \`15822\`.` and nothing else — there is
- * no display slot, while inline options REQUIRE one (#313). The code is used as its own display until
- * that closes; a bare code is honest and thin, and inventing text for it would not be.
- */
+/** Display the complete named answer domain, preserving authored labels. Opaque domains remain references. */
 function answerFields(
   c: Concept,
   lib: string,
@@ -141,9 +123,6 @@ function answerFields(
 ): { answerOptions?: { code: string; display: string }[]; answersFromTerminology?: string } {
   const vf = c.valueFrom;
   if (!vf) return {};
-  if (vf.kind === "inline") {
-    return { answerOptions: vf.options.map((o) => ({ code: o.code, display: o.display })) };
-  }
   const targetLib = getRefLibrary(vf.terminologyName) ?? lib;
   const name = getRefName(vf.terminologyName);
   const decl = libs
@@ -153,9 +132,8 @@ function answerFields(
   // Unresolved (a typo, or a library outside the closure) → neither field. The concept renders as it
   // always did rather than asserting an answer set we cannot stand behind.
   if (!decl) return {};
-  const body = (decl.node as Terminology).body;
-  const codes = body.filter((l): l is TerminologyCode => l.type === "TerminologyCode");
-  if (codes.length > 0) return { answerOptions: codes.map((l) => ({ code: l.code, display: l.code })) };
+  const resolved = readFiniteAnswerMembers(decl.node as Terminology);
+  if (resolved.kind === "resolved") return { answerOptions: resolved.members.map(({ code, display }) => ({ code, display })) };
   return { answersFromTerminology: name };
 }
 
@@ -168,6 +146,7 @@ export function buildCrlConceptLayer(
 
   const out: CrlConceptNode[] = [];
   for (const [lib, info] of libs) {
+    const presentations = createPresentationCatalog(info.entry.ast);
     // AST source order + filter to concepts (NOT the by-name decls map — avoids cross-kind same-name perturbation).
     for (const s of info.entry.ast.statements) {
       if (s.type !== "Concept") continue;
@@ -203,6 +182,7 @@ export function buildCrlConceptLayer(
         name: c.name,
         lib,
         label: `concept "${c.name}"`,
+        ...(Object.keys(presentations.resolve(c.name)).length ? { presentation: presentations.resolve(c.name) } : {}),
         location,
         ...(c.conceptType ? { conceptType: c.conceptType } : {}),
         valueTypes: c.valueTypes ?? [],

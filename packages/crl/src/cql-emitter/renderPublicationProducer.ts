@@ -20,6 +20,22 @@ export function renderPublicationCodeTable(codes: readonly { readonly system: st
   return `{ ${codes.map((code) => `Tuple { system: ${cqlStringLiteral(code.system)}, code: ${cqlStringLiteral(code.code)} }`).join(", ")} }`;
 }
 
+/** Shared classification for publication and legacy consumers; only recognized domain codes can decide. */
+export function renderAnswerClassification(value: string, domain: string, qualifying: string, conceptId: string): string {
+  const coding = `((${value}).coding)`;
+  const inDomain = `exists ((${domain}) D where D.system = C.system.value and D.code = C.code.value)`;
+  const inQualifying = `exists ((${qualifying}) Q where Q.system = C.system.value and Q.code = C.code.value)`;
+  const recognized = `(from ${coding} C where ${inDomain})`;
+  const positive = `exists (from ${coding} C where ${inDomain} and ${inQualifying})`;
+  const negative = `exists (from ${coding} C where ${inDomain} and not ${inQualifying})`;
+  return `if ${value} is null then null as System.Boolean
+  else if not exists ${recognized} then
+    Message(null as System.Boolean, true, 'publication-uninterpretable-value', 'Error', ${conceptId} + ': No recognized domain coding')
+  else if ${positive} and ${negative} then
+    Message(null as System.Boolean, true, 'publication-ambiguous-coded-value', 'Error', ${conceptId} + ': Recognized codings disagree')
+  else ${positive}`;
+}
+
 /** One identical parameterized constructor for coded/uncoded, unknown/known and dated/undated producers. */
 export function renderPublicationProducerHelpers(): string {
   const n = PUBLICATION_PRODUCER_FUNCTIONS;
@@ -52,16 +68,7 @@ define function ${q(n.interpret)}(publication ${result}, domain ${PUBLICATION_CO
 /* Interpret is the selected operand's domain authority. This repeated check protects the
    compiler helper invariant when Candidate/Classify receives a direct or foreign envelope. */
 define function ${q(n.classify)}(value FHIR.CodeableConcept, domain ${PUBLICATION_CODE_TABLE_TYPE}, qualifying ${PUBLICATION_CODE_TABLE_TYPE}, conceptId System.String):
-  if value is null then null as System.Boolean
-  else if not exists (${q(n.recognized)}(value, domain)) then
-    Message(null as System.Boolean, true, 'publication-uninterpretable-value', 'Error', conceptId + ': No recognized domain coding')
-  else if exists ((${q(n.recognized)}(value, domain)) C
-      where exists (qualifying Q where Q.system = C.system.value and Q.code = C.code.value))
-    and exists ((${q(n.recognized)}(value, domain)) C
-      where not exists (qualifying Q where Q.system = C.system.value and Q.code = C.code.value)) then
-    Message(null as System.Boolean, true, 'publication-ambiguous-coded-value', 'Error', conceptId + ': Recognized codings disagree')
-  else exists ((${q(n.recognized)}(value, domain)) C
-    where exists (qualifying Q where Q.system = C.system.value and Q.code = C.code.value))
+  ${renderAnswerClassification("value", "domain", "qualifying", "conceptId")}
 
 define function ${q(n.candidate)}(operand ${result}, producerId System.String, code FHIR.CodeableConcept,
   profile System.String, domain ${PUBLICATION_CODE_TABLE_TYPE}, qualifying ${PUBLICATION_CODE_TABLE_TYPE}, conceptId System.String, subjectReference System.String):

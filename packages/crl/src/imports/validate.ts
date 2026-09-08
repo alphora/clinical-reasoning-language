@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import type { CRL, Statement } from "../ast/types";
 import { resolveDispositionConfig } from "../dispositions";
+import { readCanonicalBase } from "../fhir-emitter/metadata";
 import { Validator, ValidationError } from "../validator/validator";
 
 import { resolveImports } from "./index";
@@ -103,7 +104,7 @@ export function validateCRLImports(
   const dispositionConfig = configHasErrors ? undefined : dispositionResolution?.config;
 
   const validator = new Validator();
-  const result = validator.validate(synthetic, { soft: options.soft, dispositionConfig }, sources);
+  const result = validator.validate(synthetic, { soft: options.soft, dispositionConfig, canonicalBase: projectRoot ? readCanonicalBase(projectRoot) : undefined }, sources);
 
   // Surface disposition-config problems as (package.json-anchored) import diagnostics — a malformed config MUST NOT
   // silently disable the guardrail. Error-severity ones block validation via the success check below.

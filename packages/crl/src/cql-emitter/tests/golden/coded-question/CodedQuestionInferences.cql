@@ -7,8 +7,6 @@ include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
 include CodedQuestionLocalPrimitives
 
-valueset "coded-question-documented-symptom-answer-options-qualifying": 'http://example.org/crl/coded-question/ValueSet/coded-question-documented-symptom-answer-options-qualifying'
-
 context Patient
 
 define "Service Requested":
@@ -21,5 +19,9 @@ define "Documented Symptom":
     )
 
 define "Qualifying Symptom Documented":
-  if ("Documented Symptom".value as FHIR.CodeableConcept) is null or not exists (("Documented Symptom".value as FHIR.CodeableConcept).coding) then null
-      else FHIRHelpers.ToConcept(("Documented Symptom".value as FHIR.CodeableConcept)) in "coded-question-documented-symptom-answer-options-qualifying"
+  if ("Documented Symptom".value as FHIR.CodeableConcept) is null then null as System.Boolean
+    else if not exists (from ((("Documented Symptom".value as FHIR.CodeableConcept)).coding) C where exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' }, Tuple { system: 'https://example.org/answer-codes', code: 'none-of-listed' } }) D where D.system = C.system.value and D.code = C.code.value)) then
+      Message(null as System.Boolean, true, 'publication-uninterpretable-value', 'Error', 'Documented Symptom' + ': No recognized domain coding')
+    else if exists (from ((("Documented Symptom".value as FHIR.CodeableConcept)).coding) C where exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' }, Tuple { system: 'https://example.org/answer-codes', code: 'none-of-listed' } }) D where D.system = C.system.value and D.code = C.code.value) and exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' } }) Q where Q.system = C.system.value and Q.code = C.code.value)) and exists (from ((("Documented Symptom".value as FHIR.CodeableConcept)).coding) C where exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' }, Tuple { system: 'https://example.org/answer-codes', code: 'none-of-listed' } }) D where D.system = C.system.value and D.code = C.code.value) and not exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' } }) Q where Q.system = C.system.value and Q.code = C.code.value)) then
+      Message(null as System.Boolean, true, 'publication-ambiguous-coded-value', 'Error', 'Documented Symptom' + ': Recognized codings disagree')
+    else exists (from ((("Documented Symptom".value as FHIR.CodeableConcept)).coding) C where exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' }, Tuple { system: 'https://example.org/answer-codes', code: 'none-of-listed' } }) D where D.system = C.system.value and D.code = C.code.value) and exists (({ Tuple { system: 'https://example.org/answer-codes', code: 'functional-limitation' }, Tuple { system: 'https://example.org/answer-codes', code: 'persistent-pain' } }) Q where Q.system = C.system.value and Q.code = C.code.value))

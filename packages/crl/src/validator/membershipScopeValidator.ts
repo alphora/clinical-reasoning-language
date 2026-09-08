@@ -181,23 +181,11 @@ export class MembershipScopeValidator {
     const subject = byName.get(subjectArg.value);
     if (!subject) return; // an unresolved operand is already a reference error
 
-    // ⚠ `in qualifying` names a subset of the SUBJECT'S declared options. Without an inline `value from:`
-    // there is no set to test against, and the CQL lowering has nothing to render — it throws at emit. An
-    // author-time error names the actual fix instead.
-    if (subsetArg && subject.valueFrom?.kind !== "inline") {
-      out.push({
-        kind: "membership-subset-subject-has-no-options",
-        conceptName: concept.name,
-        message:
-          `Concept "${concept.name}" tests \`in ${subsetArg.value}\`, but "${subjectArg.value}" declares no ` +
-          `inline \`value from:\` options, so there is no subset to test against. Give the subject an inline ` +
-          `\`value from:\` block whose options carry \`qualifying\` / \`not qualifying\` markers, or test ` +
-          `against a named terminology instead (\`in "<terminology>"\`).`,
-        location: concept.location,
-        severity: "error",
-        ...(attribution.libraryName ? { libraryName: attribution.libraryName } : {}),
-        ...(attribution.filePath ? { filePath: attribution.filePath } : {}),
-      } as MembershipScopeFinding);
+    // REFACTOR:grounded (#320, 615): the subject declares a named answer set and exclusions.
+    if (subsetArg && subject.valueFrom === undefined) {
+      out.push({ kind: "membership-subset-subject-has-no-options", conceptName: concept.name,
+        message: `Concept "${concept.name}" tests in qualifying but "${subjectArg.value}" has no value from is declaration.`,
+        location: concept.location, severity: "error", ...attribution } as MembershipScopeFinding);
       return;
     }
 

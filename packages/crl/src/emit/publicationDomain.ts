@@ -40,9 +40,18 @@ export function readFinitePublicationTerminology(
       location: unresolved.location,
     };
   let system: string | undefined;
+  let segmentCount = 0;
   const codes: PublicationCode[] = [];
   for (const line of terminology.body) {
-    if (line.type === "TerminologySystem") system = line.system;
+    // REFACTOR:grounded (#320, 615): an unenumerated system segment is not a finite domain.
+    if (line.type === "TerminologySystem") {
+      if (system !== undefined && segmentCount === 0) return {
+        kind: "error", code: "publication-domain-not-finite",
+        message: "Every system segment in a finite domain must enumerate its codes.", location: line.location,
+      };
+      system = line.system;
+      segmentCount = 0;
+    }
     if (line.type === "TerminologyCode") {
       if (system === undefined || system.trim() === "" || line.code.trim() === "")
         return {
@@ -52,9 +61,10 @@ export function readFinitePublicationTerminology(
           location: line.location,
         };
       codes.push({ system, code: line.code });
+      segmentCount++;
     }
   }
-  if (codes.length === 0)
+  if (codes.length === 0 || segmentCount === 0)
     return {
       kind: "error",
       code: "publication-domain-not-finite",

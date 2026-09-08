@@ -3,6 +3,7 @@ import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor
 
 import {
   CrlContext,
+  PresentationStatementContext,
   DecisionStatementContext,
   CriterionStatementContext,
   DecisionBodyContext,
@@ -138,6 +139,7 @@ import {
 } from "./types";
 import type {
   CRL,
+  Presentation,
   LibraryDeclaration,
   Include,
   ReferenceName,
@@ -145,7 +147,6 @@ import type {
   ValueFrom,
   ValueDomain,
   ValueDomainTerm,
-  InlineAnswerOption,
 } from "./types";
 
 function getLocation(ctx: ParserRuleContext): Location {
@@ -310,13 +311,15 @@ export class CRLAstBuilder
       .includeStatement()
       .map((i) => this.visitIncludeStatement(i));
 
-    const statements = ctx.statement().map((s) => this.visit(s) as Statement);
+    const statements = ctx.statement().filter((s) => !s.presentationStatement()).map((s) => this.visit(s) as Statement);
+    const presentations = ctx.statement().flatMap((s) => s.presentationStatement() ? [this.visitPresentationStatement(s.presentationStatement()!)] : []);
     return {
       type: "CRL",
       ...(header ? { header } : {}),
       library,
       includes,
       statements,
+      ...(presentations.length ? { presentations } : {}),
       location: getLocation(ctx),
     };
   }
@@ -358,6 +361,27 @@ export class CRLAstBuilder
   // `branchConditionFrom` builder as a `when` guard. Produces `BranchConditionRef`
   // atoms uniformly; the criterion-classification pass later rewrites a ref that
   // names a criterion into a distinct `BranchConditionCriterionRef`.
+  visitPresentationStatement(ctx: PresentationStatementContext): Presentation {
+    const node: Presentation = { type: "Presentation", target: refFromRefContext(ctx.conceptReference()),
+      contexts: [], location: getLocation(ctx) };
+    for (const line of ctx.presentationLine()) {
+      if (line.PRESENTATION_DECISION() || line.PRESENTATION_CRITERION()) {
+        node.contexts.push({ kind: line.PRESENTATION_DECISION() ? "decision" : "criterion",
+          ref: line.decisionReference() ? refFromRefContext(line.decisionReference()!) : refFromQualifiable(line.qualifiableReference()!),
+          location: getLocation(line) });
+      } else {
+        const key = line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
+        const value = (line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
+        if (node[key] !== undefined || !value.trim()) this.reportError("AstError", line,
+          { message: `Presentation ${key} must be nonempty and declared only once.` });
+        else node[key] = value;
+      }
+    }
+    if (!node.questionText?.trim()) this.reportError("AstError", ctx,
+      { message: "Presentation requires nonempty question text." });
+    return node;
+  }
+
   visitCriterionStatement(ctx: CriterionStatementContext): Criterion {
     const name = ctx.criterionIdentifier().text.slice(1, -1);
     const condition = this.branchConditionFrom(ctx.branchCondition());
@@ -1041,30 +1065,6 @@ export class CRLAstBuilder
     }
     const location = getLocation(lines[0]);
 
-    // ⭐⭐ #189 — INLINE OPTIONS. The concept declares its offered answers here, and OWNS their codes.
-    const optionLines = lines[0].inlineOptionLine?.() ?? [];
-    if (optionLines.length > 0) {
-      const options: InlineAnswerOption[] = [];
-      for (const ol of optionLines) {
-        const strs = ol.backtickString?.() ?? [];
-        // The grammar pins both: `- \`code\` display is \`text\`[, marker].` Defensive only.
-        if (strs.length < 2) continue;
-        const marker = ol.optionMarker?.();
-        // ⚠ UNMARKED stays `undefined`, never coerced to false — see `InlineAnswerOption.qualifying`. The
-        // validator decides whether absence is legal, because only IT can see whether the concept is the
-        // subject of an `in qualifying` predicate.
-        const qualifying =
-          marker === undefined ? undefined : !/^not/i.test(marker.text.replace(/\s+/g, ""));
-        options.push({
-          code: strs[0].text.slice(1, -1),
-          display: strs[1].text.slice(1, -1),
-          ...(qualifying === undefined ? {} : { qualifying }),
-          location: getLocation(ol),
-        });
-      }
-      return { kind: "inline", options, location };
-    }
-
     const termRefCtx = lines[0].terminologyReference?.();
     if (!termRefCtx) {
       this.reportError("AstError", ctx, {
@@ -1072,7 +1072,11 @@ export class CRLAstBuilder
       });
       return undefined;
     }
-    return { kind: "terminology", terminologyName: refFromRefContext(termRefCtx), location };
+    // REFACTOR:grounded (#320, 615): no positive markers or inline answer definitions.
+    const notQualifying = lines[0].notQualifyingLine().map((line) => ({
+      code: line.backtickString().text.slice(1, -1), location: getLocation(line),
+    }));
+    return { kind: "terminology", terminologyName: refFromRefContext(termRefCtx), notQualifying, location };
   }
 
   // The concept's own local code (`- code is `…`.`); the system is the package's

@@ -1,3 +1,4 @@
+import { answerTerminologyResolver } from "../../emit/answerDomain";
 import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
 import { ageMethod, hasAgeSource } from "../../emit/publicationAge";
 import {
@@ -25,7 +26,7 @@ import {
 } from "../../emit/effectiveRepresentation";
 import { readCanonicalBase, readPolicyId } from "../../fhir-emitter/metadata";
 import { createLocalDomainResolver, deriveLocalConceptCoding } from "../../fhir-emitter/localDomain";
-import { inlineAnswerSet } from "../../fhir-emitter/inlineAnswerSet";
+import { namedAnswerSet } from "../../fhir-emitter/namedAnswerSet";
 
 /** The resource a local `code is` concept carries when it declares no `type is` (charter §3). Mirrors the
  *  validators' constant of the same name — the emit lane must not disagree with the lane that accepted it. */
@@ -625,12 +626,12 @@ function writeCodedLocalValue(
   // CodeSystem. Without this the concept-level system — a MINTED url in no authored source — would have to
   // be typed by hand here, and a typo would silently make the value a NON-MEMBER: a confident deny in the
   // lane whose job is catching confident denies. Both review arms raised this independently as [critical].
-  const answerSet = inlineAnswerSet(concept, meta.meta.localDomainId, meta.meta.canonicalBase);
+  let answerError: string | undefined;
+  const answerSet = derived.owningEntry ? namedAnswerSet(concept, derived.owningEntry.ast, "", meta.meta.canonicalBase, (error) => { answerError = `${error.code}: ${error.message}`; }, ctx.graph.crlRegistry ? answerTerminologyResolver(derived.owningEntry, ctx.graph.crlRegistry) : undefined) : undefined;
+  if (answerError) return mkErr(`fact "${factName}": ${answerError}`);
   const parsed = parseCodedValueToken(
     rawValue,
-    answerSet
-      ? { system: answerSet.codeSystem.url, codes: new Set(answerSet.options.map((o: { code: string }) => o.code)) }
-      : undefined,
+    answerSet?.members,
   );
   if ("error" in parsed) return mkErr(`fact "${factName}": ${parsed.error}`);
   const jn = valueJsonName(carrier.element, "CodeableConcept");

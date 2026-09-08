@@ -1,3 +1,4 @@
+import { createPresentationCatalog, type PresentationDiagnostic } from "../emit/presentation";
 import { CRL } from "../ast/types";
 import type { LibraryDeclaration } from "../ast/types";
 import type { ResolvedDispositionConfig } from "../dispositions/types";
@@ -42,6 +43,7 @@ import { UseSiteTypeValidator } from "./useSiteTypeValidator";
  *                                         kind
  */
 export type ValidationErrorKind =
+  | PresentationDiagnostic["kind"]
   | "empty-name"
   | "duplicate-name"
   | "unresolved-reference"
@@ -121,10 +123,12 @@ export type ValidationErrorKind =
   | "recordset-unbounded"
   | "concept-no-substance"
   | "answer-options-missing"
-  // ⭐ #189 inline `value from:` options.
+  // REFACTOR:grounded (#320, 615): named answer ValueSets and exclusions.
   | "answer-options-missing-display"
   | "answer-options-duplicate-code"
-  | "answer-options-missing-marker"
+  | "answer-options-resolution"
+    | "answer-options-invalid-exception"
+    | "answer-options-duplicate-exception"
   | "answer-options-none-qualifying"
   | "answer-options-all-qualifying"
   | "publication-membership-no-negative-domain"
@@ -136,7 +140,7 @@ export type ValidationErrorKind =
   | "membership-subset-subject-has-no-options"
   | "membership-predicate-not-assertable"
   | "membership-subject-shape-unsupported"
-  // ⭐ #189 inline-options subset comparand (`"X" in qualifying`).
+  // ⭐ #189 named answer-options subset comparand (`"X" in qualifying`).
   | "membership-subset-cross-library"
   | "membership-subset-subject-has-no-options";
 
@@ -619,7 +623,7 @@ export interface MembershipScopeFinding extends ValidationErrorBase {
     | "membership-cross-library-subject"
     | "membership-predicate-not-assertable"
     | "membership-subject-shape-unsupported"
-    // ⭐ #189 — the inline-options subset comparand (`"X" in qualifying`). Both are ERRORS: a subset names
+    // ⭐ #189 — the named answer-options subset comparand (`"X" in qualifying`). Both are ERRORS: a subset names
     // part of the SUBJECT'S OWN declaration, so neither a foreign subject nor a subject without inline
     // options has anything to resolve against.
     | "membership-subset-cross-library"
@@ -643,17 +647,19 @@ export interface AnswerOptionsFinding extends ValidationErrorBase {
     | "answer-options-missing"
     | "answer-options-unanswerable"
     | "answer-options-not-coded"
-    // ⭐ #189 inline `value from:` options.
+    // REFACTOR:grounded (#320, 615): named answer ValueSets and exclusions.
     | "answer-options-missing-display"
     | "answer-options-duplicate-code"
-    | "answer-options-missing-marker"
-    | "answer-options-none-qualifying"
+    | "answer-options-resolution"
+    | "answer-options-invalid-exception"
+    | "answer-options-duplicate-exception"
     | "answer-options-all-qualifying"
     | "publication-membership-no-negative-domain";
   conceptName: string;
 }
 
 export type ValidationError =
+  | PresentationDiagnostic
   | EmptyNameError
   | DuplicateNameError
   | UnresolvedReferenceError
@@ -697,6 +703,8 @@ export interface ValidationResult {
  */
 export interface ValidatorOptions {
   soft?: boolean;
+  /** Project-aware checks for authored, locally owned terminology systems. */
+  canonicalBase?: string;
   /**
    * The resolved PA disposition config (feature: configurable PA leaves). Threaded in by the project-aware caller
    * (`validateCRLImports`) — the Validator is filesystem-free, so the caller resolves it. Absent in single-file /
@@ -784,6 +792,15 @@ export class Validator {
   ): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
+    const presentationOwners = new Set<CRL>(sources ? sources.map((source) => source.entry.ast) : [ast]);
+    const presentationFindings = new Set<string>();
+    for (const owner of presentationOwners) for (const diagnostic of createPresentationCatalog(owner, sources?.find((source) => source.entry.ast === owner)?.scope.filePath).diagnostics) {
+      const key = JSON.stringify([diagnostic.kind, diagnostic.severity, diagnostic.message, diagnostic.location, diagnostic.filePath]);
+      if (presentationFindings.has(key)) continue;
+      presentationFindings.add(key);
+      (diagnostic.severity === "warning" ? warnings : errors).push(diagnostic);
+    }
+
 
     const pushSplit = (results: ValidationError[]): void => {
       for (const e of results) {
@@ -840,7 +857,7 @@ export class Validator {
     // emits BOTH severities by intrinsic kind: `value from` on an unanswerable or non-coded concept is an
     // ERROR (the line can never do anything), while a coded question MISSING one is a WARNING today and
     // becomes an error at the flip — 9 in-tree concepts must migrate first (operator ruling, 2026-09-01).
-    pushSplit(this.answerOptionsValidator.validate(ast, sources));
+    pushSplit(this.answerOptionsValidator.validate(ast, sources, options.canonicalBase));
     // ⭐ #189 gap 3 — scope-equals-comparand. Intrinsically a WARNING (see the validator header): the
     // collapse is a tautology for the SOURCE arm only, so erroring would reject a concept whose local
     // answer arm still reaches a determinate `false`.

@@ -91,32 +91,12 @@
           ],
           "input": [
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Diagnosis A?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Diagnosis A"
-                }
-              ],
               "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-a"
               ]
             },
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Diagnosis B?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Diagnosis B"
-                }
-              ],
               "type": "Condition",
               "profile": [
                 "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b"

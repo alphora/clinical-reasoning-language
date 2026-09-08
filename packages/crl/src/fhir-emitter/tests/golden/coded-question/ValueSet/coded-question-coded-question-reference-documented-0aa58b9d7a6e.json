@@ -1,6 +1,6 @@
 {
   "resourceType": "ValueSet",
-  "id": "coded-question-documented-symptom-answer-options",
+  "id": "coded-question-coded-question-reference-documented-0aa58b9d7a6e",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -22,19 +22,19 @@
       "valueCode": "publishable"
     }
   ],
-  "url": "http://example.org/crl/coded-question/ValueSet/coded-question-documented-symptom-answer-options",
+  "url": "http://example.org/crl/coded-question/ValueSet/coded-question-coded-question-reference-documented-0aa58b9d7a6e",
   "version": "1.0.0",
-  "name": "CodedQuestionDocumentedSymptomAnswerOptions",
-  "title": "Inline answer options reference corpus",
+  "name": "CodedQuestionReferenceCodedQuestionReferenceDocumentedSymptomAnswerOptions",
+  "title": "Legacy named answer classifier regression corpus",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
-  "description": "Inline answer options reference corpus",
+  "description": "Legacy named answer classifier regression corpus",
   "compose": {
     "include": [
       {
-        "system": "http://example.org/crl/coded-question/CodeSystem/coded-question-documented-symptom-answer-codes",
+        "system": "https://example.org/answer-codes",
         "concept": [
           {
             "code": "functional-limitation",
@@ -56,17 +56,17 @@
     "timestamp": "2020-01-01T00:00:00.000Z",
     "contains": [
       {
-        "system": "http://example.org/crl/coded-question/CodeSystem/coded-question-documented-symptom-answer-codes",
+        "system": "https://example.org/answer-codes",
         "code": "functional-limitation",
         "display": "Functional limitation affecting daily activity"
       },
       {
-        "system": "http://example.org/crl/coded-question/CodeSystem/coded-question-documented-symptom-answer-codes",
+        "system": "https://example.org/answer-codes",
         "code": "persistent-pain",
         "display": "Persistent pain despite conservative therapy"
       },
       {
-        "system": "http://example.org/crl/coded-question/CodeSystem/coded-question-documented-symptom-answer-codes",
+        "system": "https://example.org/answer-codes",
         "code": "none-of-listed",
         "display": "None of the listed symptoms is documented"
       }

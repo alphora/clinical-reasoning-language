@@ -723,7 +723,7 @@ const conceptInTerminology: PatternMatcher = (els, loc) => {
 
 
 /**
- * ⭐⭐ `"<X>" in qualifying` → Membership(X, qualifying-subset-of-X) — #189 inline answer options.
+ * ⭐⭐ `"<X>" in qualifying` → Membership(X, qualifying-subset-of-X) — #320 named answer options.
  *
  * The sibling of `conceptInTerminology`, and the two are told apart by whether the comparand is QUOTED:
  *

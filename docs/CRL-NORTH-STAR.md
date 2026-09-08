@@ -89,6 +89,12 @@ PA can therefore operate on locally supplied answers while also sourcing Patient
 See `docs/decisions/0001-asserted-vs-sourced-data-model.md` for historical rationale; its particular
 mechanisms remain revisable. Neither local nor external origin alone authorizes compiler precedence.
 
+### Answer vocabulary and question presentation
+
+Operator-approved authoring separates concept identity from wording. Named terminology supplies answer ValueSets; `value from is` binds a concept and optional `not qualifying is` lines classify exceptions. Old inline answer lists are removed. Missing negatives warn but remain legal. Qualification interprets known domain codings; absent input stays unknown and invalid or conflicting interpretations raise errors.
+
+A presentation targets a concept with `code is`. Each declaration requires question text and may include question description; no separate label/short field is needed. Missing presentation warns. A base presentation plus one applicable scoped presentation is allowed. Multiple applicable scoped presentations are errors regardless of declaration order, and conflicting wording for one profile must not coexist in the generated form. Imported owner defaults are inherited; overriding an imported presentation remains #321. See [the language contract](named-answer-valuesets-and-presentation.md) for syntax, emitted fields, and current engine display limitations.
+
 ### Case Features and the iterative SDC session
 
 Operator-stated runtime contract (2026-09-06): in workflows using extraction, a concept with `code is`

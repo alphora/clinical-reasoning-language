@@ -20,24 +20,24 @@
       "required": false
     },
     "cosmetic": {
-      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-performed-for-cosmetic-purposes#Observation.value[x]",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-cosmetic-surgical-purpose#Observation.value[x]",
       "valueType": "valueBoolean",
       "required": false
     },
     "photoConform": {
-      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-submitted-photographs-conform-to-the-pho-d1d83b5999d4#Observation.value[x]",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photograph-submission-standards-met#Observation.value[x]",
       "valueType": "valueBoolean",
       "required": false
     },
     "vfConform": {
-      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-submitted-visual-field-examination-confo-ee893cad7c3f#Observation.value[x]",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-examination-standards-met#Observation.value[x]",
       "valueType": "valueBoolean",
       "required": false
     },
     "indication": {
-      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-which-listed-indication-is-this-function-32e19f6da13a#Observation.value[x]",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-functional-or-reconstructive-surgical-indication#Observation.value[x]",
       "valueType": "valueCoding",
-      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-functional-or-reconstructiv-71a963606a94-answer-codes",
+      "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
       "required": false,
       "optionCodes": [
         "near-or-far-vision-impairment-due-to-dermatochalasis",
@@ -55,7 +55,7 @@
     "complaint": {
       "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint#Observation.value[x]",
       "valueType": "valueCoding",
-      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-documented-patient-complaint-answer-codes",
+      "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
       "required": false,
       "optionCodes": [
         "complaint-of-interference-with-near-or-distance-vision",
@@ -71,7 +71,7 @@
     "photo": {
       "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted#Observation.value[x]",
       "valueType": "valueCoding",
-      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-photographic-demonstration-submitted-answer-codes",
+      "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-1f64a73b6291-answer-codes",
       "required": false,
       "optionCodes": [
         "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex",
@@ -84,7 +84,7 @@
     "vf": {
       "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-demonstration-submitted#Observation.value[x]",
       "valueType": "valueCoding",
-      "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-visual-field-demonstration-submitted-answer-codes",
+      "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes",
       "required": false,
       "optionCodes": [
         "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction",
@@ -93,12 +93,12 @@
       ]
     },
     "bdoc": {
-      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-the-requested-blepharoplasty-is-individu-1ea70810f676#Observation.value[x]",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-individual-blepharoplasty-documentation#Observation.value[x]",
       "valueType": "valueBoolean",
       "required": false
     },
     "pdoc": {
-      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-the-requested-blepharoptosis-repair-is-i-69707ff7d01e#Observation.value[x]",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-individual-blepharoptosis-repair-documentation#Observation.value[x]",
       "valueType": "valueBoolean",
       "required": false
     }
@@ -115,13 +115,13 @@
     "when[0]/when[0]/action[0]": [
       "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
       "Blepharoplasty Requested or Blepharoptosis Repair Requested",
-      "Performed For Cosmetic Purposes"
+      "Cosmetic Surgical Purpose"
     ],
     "when[0]/when[1]/when[0]/action[0]": [
       "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
       "Blepharoplasty Requested or Blepharoptosis Repair Requested",
       "Blepharoplasty Requested and Blepharoptosis Repair Requested",
-      "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted and The Requested Blepharoplasty Is Individually Documented and The Requested Blepharoptosis Repair Is Individually Documented"
+      "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted and Individual Blepharoplasty Documentation and Individual Blepharoptosis Repair Documentation"
     ],
     "when[0]/when[1]/otherwise/action[0]": [
       "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
@@ -150,12 +150,12 @@
       "not (FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoplasty Requested\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Blepharoptosis Repair Requested\").value as FHIR.boolean))"
     ],
     "when[0]/when[0]": [
-      "FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Performed For Cosmetic Purposes\").value as FHIR.boolean)",
-      "not FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Performed For Cosmetic Purposes\").value as FHIR.boolean)"
+      "FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Cosmetic Surgical Purpose\").value as FHIR.boolean)",
+      "not FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Cosmetic Surgical Purpose\").value as FHIR.boolean)"
     ],
     "when[0]/when[1]/when[0]": [
-      "\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\" and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoplasty Is Individually Documented\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoptosis Repair Is Individually Documented\").value as FHIR.boolean)",
-      "not (\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\" and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoplasty Is Individually Documented\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"The Requested Blepharoptosis Repair Is Individually Documented\").value as FHIR.boolean))"
+      "\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\" and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Individual Blepharoplasty Documentation\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Individual Blepharoptosis Repair Documentation\").value as FHIR.boolean)",
+      "not (\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\" and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Individual Blepharoplasty Documentation\").value as FHIR.boolean) and FHIRHelpers.ToBoolean((\"McpmBlephInterface\".\"Individual Blepharoptosis Repair Documentation\").value as FHIR.boolean))"
     ],
     "when[0]/when[2]": [
       "\"McpmBlephInterface\".\"Qualifying Functional Indication\" and \"McpmBlephInterface\".\"Qualifying Patient Complaint Documented\" and \"McpmBlephInterface\".\"Qualifying Objective Demonstration Submitted\"",

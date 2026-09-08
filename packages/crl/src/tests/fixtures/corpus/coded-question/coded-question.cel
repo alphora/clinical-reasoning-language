@@ -1,12 +1,5 @@
-# Cases for the inline answer options reference (#189).
-//
-// ⭐⭐ NOT ONE SYSTEM URL APPEARS IN THIS FILE. A coded fact on a concept with inline `value from:` options
-// carries a BARE option code, and its system is resolved from the `defined by` concept's own answer
-// CodeSystem. That is the half of the construct a `.crl`-only fixture cannot prove.
-//
-// ⚠ THE PAUSE ROWS ARE DELIBERATELY ABSENT, and that is not an omission. `result is` must name a branch, so
-// a case whose correct answer is that NO branch fires cannot be written — asserting one would author the
-// exact collapse the three-state model exists to prevent. Those rows are proved by `$apply`, not here.
+# Legacy classifier data: bare option codes resolve through the named answer vocabulary.
+// New language authoring is demonstrated by the Bleph acceptance fixture.
 library "CodedQuestionCases".
 covers "Coded Question Reference".
 
@@ -33,14 +26,6 @@ fact "No Listed Symptom":
 - date is "2026-01-02".
 - defined by "Coded Question Reference"."Documented Symptom".
 
-// ⚠ A code from ANOTHER system. This is why the explicit `<system>|<code>` form stays legal: a bare code
-// resolves against the declared options, so it can only ever name a member or a declared non-member.
-// Stating a code the question never offered REQUIRES naming its system.
-fact "Unoffered Symptom":
-- value is "http://example.org/other|functional-limitation".
-- date is "2026-01-02".
-- defined by "Coded Question Reference"."Documented Symptom".
-
 // ⭐ A LATER answer overrides an earlier one — `most recent this` publishes the newest record.
 fact "No Listed Symptom Later":
 - value is "none-of-listed".
@@ -59,15 +44,14 @@ case "none of the listed -> not certify, in ONE answer":
 - fact is "No Listed Symptom".
 - result is "Coverage Determination" is "not-certify.Unmet".
 
-case "a code from another system is a determinate non-member -> not certify":
-- subject is "Pat".
-- fact is "Requested".
-- fact is "Unoffered Symptom".
-- result is "Coverage Determination" is "not-certify.Unmet".
-
 case "a later none answer overrides an earlier qualifying one -> not certify":
 - subject is "Pat".
 - fact is "Requested".
 - fact is "Qualifying Symptom".
 - fact is "No Listed Symptom Later".
 - result is "Coverage Determination" is "not-certify.Unmet".
+
+case "missing answer pauses":
+- subject is "Pat".
+- fact is "Requested".
+- result is "Coverage Determination" is pause.

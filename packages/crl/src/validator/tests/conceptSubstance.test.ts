@@ -71,8 +71,12 @@ concept "Q":
 - shape is Record.
 - type is Observation.
 - value type is CodeableConcept.
-- value from:
-  - \`a\` display is \`A\`.
+- value from is "T Q Answer Options".
+
+
+terminology "T Q Answer Options":
+- system is \`https://example.org/answer-codes\`.
+- code is \`a\` display is \`A\`.
 `;
     const found = kinds(src);
     expect(found).toContain("concept-no-substance");

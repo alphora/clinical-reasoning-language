@@ -9,52 +9,52 @@ fact "Sample Patient":
 fact "Cosmetic Purpose":
 - date is "2026-01-01".
 - value is true.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Performed For Cosmetic Purposes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Cosmetic Surgical Purpose".
 
 fact "Cosmetic Purpose No":
 - date is "2026-01-01".
 - value is false.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Performed For Cosmetic Purposes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Cosmetic Surgical Purpose".
 
 fact "Photographs Conform":
 - date is "2026-01-01".
 - value is true.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Photographs Conform To The Photograph Submission Standards".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photograph Submission Standards Met".
 
 fact "Photographs Conform No":
 - date is "2026-01-01".
 - value is false.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Photographs Conform To The Photograph Submission Standards".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Photograph Submission Standards Met".
 
 fact "Visual Field Conforms":
 - date is "2026-01-01".
 - value is true.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Visual Field Examination Conforms To The Visual Field Examination Standards".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Examination Standards Met".
 
 fact "Visual Field Conforms No":
 - date is "2026-01-01".
 - value is false.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Submitted Visual Field Examination Conforms To The Visual Field Examination Standards".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Visual Field Examination Standards Met".
 
 fact "Blepharoplasty Documented":
 - date is "2026-01-01".
 - value is true.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoplasty Is Individually Documented".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Individual Blepharoplasty Documentation".
 
 fact "Blepharoplasty Documented No":
 - date is "2026-01-01".
 - value is false.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoplasty Is Individually Documented".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Individual Blepharoplasty Documentation".
 
 fact "Ptosis Repair Documented":
 - date is "2026-01-01".
 - value is true.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoptosis Repair Is Individually Documented".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Individual Blepharoptosis Repair Documentation".
 
 fact "Ptosis Repair Documented No":
 - date is "2026-01-01".
 - value is false.
-- defined by "Blepharoplasty And Blepharoptosis Repair"."The Requested Blepharoptosis Repair Is Individually Documented".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Individual Blepharoptosis Repair Documentation".
 
 fact "Complaint Vision Interference":
 - date is "2026-01-01".
@@ -99,52 +99,52 @@ fact "Complaint None":
 fact "Ind Vision Dermatochalasis":
 - date is "2026-01-01".
 - value is "near-or-far-vision-impairment-due-to-dermatochalasis".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Vision Blepharochalasis":
 - date is "2026-01-01".
 - value is "near-or-far-vision-impairment-due-to-blepharochalasis".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Vision Blepharoptosis":
 - date is "2026-01-01".
 - value is "near-or-far-vision-impairment-due-to-blepharoptosis".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Field Dermatochalasis":
 - date is "2026-01-01".
 - value is "visual-field-defect-due-to-dermatochalasis".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Field Blepharochalasis":
 - date is "2026-01-01".
 - value is "visual-field-defect-due-to-blepharochalasis".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Field Blepharoptosis":
 - date is "2026-01-01".
 - value is "visual-field-defect-due-to-blepharoptosis".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Redundant Skin":
 - date is "2026-01-01".
 - value is "symptomatic-redundant-skin-weighing-down-upper-lashes".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Pretarsal Dermatitis":
 - date is "2026-01-01".
 - value is "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Ind Prosthesis":
 - date is "2026-01-01".
 - value is "prosthesis-difficulties-in-an-anophthalmic-socket".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Indication None":
 - date is "2026-01-01".
 - value is "none-of-the-listed-indications".
-- defined by "Blepharoplasty And Blepharoptosis Repair"."Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Functional Or Reconstructive Surgical Indication".
 
 fact "Demo Photo Margin":
 - date is "2026-01-01".

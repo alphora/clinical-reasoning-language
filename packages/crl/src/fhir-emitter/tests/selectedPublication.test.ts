@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../types";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -70,7 +71,7 @@ function render(conditions: BranchCondition[], actionGuard?: "unless" | "only-wh
     true, { clock: () => new Date("2026-09-06T00:00:00Z") }, "SelectedBooleanInterface", undefined, undefined,
     "SelectedBooleanInterface", (r) => program.lookup(parsed.library.name, r).kind === "publication");
   if (actionGuard) expect(result.errors).toContainEqual(expect.objectContaining({ kind: "publication-action-guard-unsupported" }));
-  else expect(result.errors).toEqual([]);
+  else expect(result.errors.filter(isFhirDefError)).toEqual([]);
   expect(result.unmatched).toEqual([]);
   return result.resource!.resource;
 }
@@ -126,7 +127,7 @@ describe("selected Boolean Record FHIR publication", () => {
   it("emits one optional Boolean answer bound to the actual Inferences Record", () => {
     const path = fixture(`${base}\ndecision "Policy":\nfirst:\n- when "Answer" then recommend activity "Approve".\n- when not "Answer" then recommend activity "Deny".\n`);
     const result = emitFhirDefFromPath(path);
-    expect(result.errors, JSON.stringify(result.errors)).toEqual([]);
+    expect(result.errors.filter(isFhirDefError), JSON.stringify(result.errors)).toEqual([]);
     expect(result.success).toBe(true);
     const cql = emitCQLImports(path);
     expect(cql.success, JSON.stringify(cql.errors)).toBe(true);

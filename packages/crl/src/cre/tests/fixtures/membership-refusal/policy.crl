@@ -3,18 +3,18 @@ library "MembershipRefusal".
 
 terminology "Requestable Services":
 - system is `http://www.ama-assn.org/go/cpt`.
-- code is `37718`.
-- code is `37722`.
+- code is `37718` display is `Service 37718`.
+- code is `37722` display is `Service 37722`.
 
 terminology "Covered Services":
 - system is `http://www.ama-assn.org/go/cpt`.
-- code is `37718`.
+- code is `37718` display is `Service 37718`.
 
 concept "Requested Service":
 - shape is Record.
 - type is Observation.
 - value type is CodeableConcept.
-- value from "Requestable Services".
+- value from is "Requestable Services".
 - code is `requested-service`.
 - definition is most recent this.
 - source representation:

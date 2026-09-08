@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../types";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import * as path from "path";
 
@@ -77,7 +78,7 @@ describe("CRL → FHIR golden regression (locked truth-set examples)", () => {
       for (const res of r.resources) emittedByPath.set(res.relativePath, res);
 
       it("emits with no errors", () => {
-        expect(r.errors).toEqual([]);
+        expect(r.errors.filter(isFhirDefError)).toEqual([]);
       });
 
       // (a) Byte-match every materialized case-feature StructureDefinition.

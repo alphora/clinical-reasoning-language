@@ -10,7 +10,8 @@ const publication = `concept "Answer":
 - type is Observation.
 - value type is boolean.
 - code is \`answer\`.
-- shape reduction is most recent.`;
+- shape reduction is most recent.
+presentation for "Answer": - question text is "Is the finding present?".`;
 const activities = `activity "Approve":
 - request CPGCommunicationRequest.
 - with \`APPROVED\`.

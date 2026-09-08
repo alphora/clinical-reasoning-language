@@ -4,12 +4,12 @@
   "conceptNames": {
     "B": "Blepharoplasty Requested",
     "P": "Blepharoptosis Repair Requested",
-    "cosmetic": "Performed For Cosmetic Purposes",
-    "photoConform": "Submitted Photographs Conform To The Photograph Submission Standards",
-    "vfConform": "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards",
-    "bdoc": "The Requested Blepharoplasty Is Individually Documented",
-    "pdoc": "The Requested Blepharoptosis Repair Is Individually Documented",
-    "indication": "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct",
+    "cosmetic": "Cosmetic Surgical Purpose",
+    "photoConform": "Photograph Submission Standards Met",
+    "vfConform": "Visual Field Examination Standards Met",
+    "bdoc": "Individual Blepharoplasty Documentation",
+    "pdoc": "Individual Blepharoptosis Repair Documentation",
+    "indication": "Functional Or Reconstructive Surgical Indication",
     "complaint": "Documented Patient Complaint",
     "photo": "Photographic Demonstration Submitted",
     "vf": "Visual Field Demonstration Submitted"

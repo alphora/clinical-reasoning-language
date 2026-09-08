@@ -129,7 +129,7 @@ export function computeConceptRefCompletion(
 
 interface RefSuggestion {
   name: string;
-  kind: "concept" | "terminology" | "decision" | "activity" | "parameter";
+  kind: "concept" | "terminology" | "decision" | "activity" | "parameter" | "criterion";
   libraryName: string | undefined;
   origin: string | undefined;
   type?: string;
@@ -194,6 +194,7 @@ function completionKindFor(kind: RefSuggestion["kind"]): LsCompletionKind {
     case "terminology":
       return "reference";
     case "decision":
+    case "criterion":
       return "method";
     case "activity":
       return "class";

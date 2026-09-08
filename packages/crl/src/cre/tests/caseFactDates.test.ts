@@ -15,16 +15,16 @@ import { runCel } from "../run";
 const POLICY = `library "Case Dates".
 terminology "Choices":
 - system is \`http://example.org/choices\`.
-- code is \`yes\`.
-- code is \`no\`.
+- code is \`yes\` display is \`Yes\`.
+- code is \`no\` display is \`No\`.
 terminology "Qualifying":
 - system is \`http://example.org/choices\`.
-- code is \`yes\`.
+- code is \`yes\` display is \`Yes\`.
 concept "Selected Choice":
 - shape is Record.
 - type is Observation.
 - value type is CodeableConcept.
-- value from "Choices".
+- value from is "Choices".
 - code is \`selected-choice\`.
 - definition is most recent this.
 - source representation:

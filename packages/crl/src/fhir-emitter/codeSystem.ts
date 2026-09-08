@@ -29,8 +29,8 @@
  *     CQL `codesystem '<url>'` are byte-equal.
  *   - The selection of which codes to materialize is `lowerLocalCodes(ast)
  *     .localCodes` (consumed by the orchestrator) — the SAME code path that
- *     synthesizes the CQL terminology, so the CodeSystem carries EXACTLY the
- *     codes the CQL emits (no second predicate to drift).
+ *     synthesizes the CQL terminology, so this emitter contributes exactly the
+ *     concept-identity codes emitted in CQL. The closure also collects explicitly authored terminology members under the same system URL.
  *
  * Metadata pattern mirrors `emitValueSet` / `emitLibrary` exactly: same slug /
  * pascal-name pipeline, same metadata defaulting (`title`/`description` fall

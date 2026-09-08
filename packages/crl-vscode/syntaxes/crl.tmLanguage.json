@@ -6,6 +6,10 @@
       "match": "^\\s*#.*$"
     },
     {
+      "match": "\\b(presentation for|in decision|in criterion|question text is|question description is|value from is|not qualifying is)\\b",
+      "name": "keyword.control.crl"
+    },
+    {
       "name": "comment.line.double-slash.crl",
       "match": "(?<!:)//.*$"
     },

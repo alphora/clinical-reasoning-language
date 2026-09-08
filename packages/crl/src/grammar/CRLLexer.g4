@@ -1,6 +1,11 @@
 lexer grammar CRLLexer;
 
 // === Multi-word phrase tokens ===
+PRESENTATION_FOR : 'presentation for';
+PRESENTATION_DECISION : 'in decision';
+PRESENTATION_CRITERION : 'in criterion';
+QUESTION_TEXT_IS : 'question text is';
+QUESTION_DESCRIPTION_IS : 'question description is';
 RECOMMEND_ACTIVITY  : 'recommend activity';
 USE_DECISION        : 'use decision';
 TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
@@ -27,7 +32,9 @@ VALUE_PROJECTION_IS : 'value projection is';
 // status concept's `coded from` names WHICH observation, while its answers are never/former/current.
 // Diverges from `value type is` / `value element is` / `value projection is` at char 6 ('f'), so there is
 // no prefix conflict. No mode: a terminology reference is lexed in DEFAULT exactly as `coded from`'s is.
-VALUE_FROM          : 'value from';
+// REFACTOR:grounded (#320, 615): answer values come from a named ValueSet only.
+VALUE_FROM          : 'value from is';
+NOT_QUALIFYING_IS   : 'not qualifying is';
 // REFACTOR:grounded (#320, review 562): an explicit interpreted domain is separate from offered answers.
 VALUE_DOMAIN_IS     : 'value domain is';
 ANSWER_OPTIONS      : 'answer options';

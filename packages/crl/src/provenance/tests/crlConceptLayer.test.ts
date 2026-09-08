@@ -308,24 +308,24 @@ const VF = `# VF
 library "VF".
 terminology "Inline Codes":
 - system is \`http://www.ama-assn.org/go/cpt\`.
-- code is \`15822\`.
-- code is \`15823\`.
+- code is \`15822\` display is \`First offered service\`.
+- code is \`15823\` display is \`Second offered service\`.
 terminology "External VS":
 - valueset is \`http://example.org/ValueSet/requestable-services\`.
 concept "Instantiated Q":
 - type is Observation.
 - value type is CodeableConcept.
-- value from "Inline Codes".
+- value from is "Inline Codes".
 - code is \`iq\`.
 concept "Reference Q":
 - type is Observation.
 - value type is CodeableConcept.
-- value from "External VS".
+- value from is "External VS".
 - code is \`rq\`.
 concept "Missing Q":
 - type is Observation.
 - value type is CodeableConcept.
-- value from "Nonexistent VS".
+- value from is "Nonexistent VS".
 - code is \`mq\`.
 concept "Wraps Instantiated":
 - type is Observation.
@@ -350,8 +350,8 @@ describe("value from — instantiated vs reference terminology", () => {
   // ⚠ THE CASE THAT WAS WRONG. `system is` + `code is` means WE KNOW THE ANSWERS.
   it("an INSTANTIATED terminology's codes ARE the concept's answers", () => {
     expect(by.get("Instantiated Q")?.answerOptions).toEqual([
-      { code: "15822", display: "15822" },
-      { code: "15823", display: "15823" },
+      { code: "15822", display: "First offered service" },
+      { code: "15823", display: "Second offered service" },
     ]);
     expect(by.get("Instantiated Q")?.answersFromTerminology).toBeUndefined();
   });

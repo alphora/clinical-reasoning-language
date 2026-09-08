@@ -1,3 +1,4 @@
+import { answerTerminologyResolver } from "../emit/answerDomain";
 import { produceBMICandidate } from "../emit/publicationBMI";
 import { publicationProducerOperands } from "../emit/publicationProgram";
 /**
@@ -129,7 +130,7 @@ import { createPublicationContext } from "../emit/publicationContext";
 import { buildLibraryScopes, lookupKnownLibrary } from "../imports/scopes";
 import type { RegistryEntry } from "../imports/types";
 import { walkIncludes } from "../imports/resolver";
-import { inlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
+import { namedAnswerSet, type NamedAnswerSet } from "../fhir-emitter/namedAnswerSet";
 import { isValueReadingBooleanConcept, isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { resolveConceptPipeline } from "../template-match/resolvePipeline";
 import { bmiRetirementReason } from "../template-match/bmiPublication";
@@ -327,7 +328,7 @@ interface LocalMembershipIndex {
    * Without it the CRE would need the minted system typed by hand in the `.cel`, and a typo would silently
    * make the value a NON-MEMBER — a confident deny in the lane whose job is catching confident denies.
    */
-  answerSets: Map<Id, { system: string; codes: ReadonlySet<string> }>;
+  answerSets: Map<Id, NamedAnswerSet>;
   reverse: Map<string, Id>;
   /** `(fhirType, system, code)` keys claimed by ≥2 DISTINCT concepts. `concepts` is built from the whole registry
    *  (broader than the emitted closure `emit-duplicate-local-code` guards), so an unrelated same-domain/type/code
@@ -457,9 +458,9 @@ interface Ctx {
    *  `resolveDecision` is. `undefined` ⇒ unresolved, which the caller must REFUSE rather than read as
    *  an empty set (empty would mean "not a member" — a determinate wrong answer). */
   terminologyMembers: (lib: string, name: string) => readonly { system: string; code: string }[] | undefined;
-  /** ⭐ #189 — a concept's inline answer-option system + codes, keyed by concept id. Same descriptor the FHIR
+  /** ⭐ #189 — a concept's named answer-option systems and codes, keyed by concept id. Same descriptor the FHIR
    *  lane emits from, so the two lanes cannot disagree about who is a member of `qualifying`. */
-  answerSets: Map<Id, { system: string; codes: ReadonlySet<string> }>;
+  answerSets: Map<Id, NamedAnswerSet>;
   /** #236 — per-library criterion tables (`name → Criterion`), for reference-and-evaluate: a
    *  criterion guard resolves its body HERE instead of being inline-expanded up front. Keyed by library. */
   criterionTables: Map<string, CriterionTable>;
@@ -806,21 +807,9 @@ function evaluateMembership(stage: ResolvedStage, entry: ConceptEntry, ctx: Ctx)
 
   let members: readonly { system: string; code: string }[] | undefined;
   if (subsetArg) {
-    // ⚠ THE SUBSET RESOLVES AGAINST THE SUBJECT, never a global table — two different concepts may each
-    // declare a `qualifying` subset and they are DIFFERENT sets. The member set is the subject's options
-    // marked `qualifying`, read from the SAME descriptor the FHIR lane emits its ValueSet from, so the two
-    // lanes cannot disagree about who is a member.
-    //
-    // ⚠ `qualifying === true` ONLY. An UNMARKED option is not a member: absence is not "no". The validator
-    // requires a marker exactly when a concept is predicated on, so an unmarked option reaching here means
-    // validation was skipped — and counting it either way would manufacture a verdict nobody authored.
-    const subjEntry = ctx.concepts.get(idOf(entry.lib, subjectArg.value));
-    const opts = subjEntry?.node.valueFrom?.kind === "inline" ? subjEntry.node.valueFrom.options : undefined;
     const answerSet = ctx.answerSets.get(idOf(entry.lib, subjectArg.value));
-    if (opts === undefined || answerSet === undefined) return "not-evaluated";
-    members = opts
-      .filter((o) => o.qualifying === true)
-      .map((o) => ({ system: answerSet.system, code: o.code }));
+    if (!answerSet) return "not-evaluated";
+    members = answerSet.qualifying;
   } else {
     members = ctx.terminologyMembers(entry.lib, setArg!.value);
   }
@@ -876,6 +865,9 @@ function evaluateMembership(stage: ResolvedStage, entry: ConceptEntry, ctx: Ctx)
   const datum = newest.codedValue;
   if (datum === undefined) return null; // the winner carries no code to test → unknown → PAUSE
 
+  if (subsetArg && !ctx.answerSets.get(subjectId)?.members.some((m) => m.system === datum.system && m.code === datum.code)) {
+    return refusePipeline(entry, ctx, `publication-uninterpretable-value: subject "${subjectArg.value}" has no recognized answer-domain coding`);
+  }
   const hit = members.some((m) => m.system === datum.system && m.code === datum.code);
   // ⭐ EVIDENCE. The predicate is EPHEMERAL, so it has no facts of its own — the guard trace reads
   // `factsByConcept` for the PREDICATE's id and would show nothing. Attribute the winning SUBJECT fact, so a
@@ -1965,24 +1957,20 @@ function walkBranches(
 function buildLocalMembershipIndex(
   concepts: Map<Id, ConceptEntry>,
   graph: ResolvedCelGraph,
-): LocalMembershipIndex {
+): LocalMembershipIndex & { answerErrors: string[] } {
   const ctx = makeLocalDomainContext(graph);
   const forward = new Map<Id, LocalConceptMember>();
   const reverse = new Map<string, Id>();
   const collisions = new Set<string>();
-  const answerSets = new Map<Id, { system: string; codes: ReadonlySet<string> }>();
+  const answerSets = new Map<Id, NamedAnswerSet>();
+  const answerErrors: string[] = [];
   for (const [id, entry] of concepts) {
-    // ⚠ The domain id comes from the SAME resolver the emitted CodeSystem url uses, so the CRE and the FHIR
-    // lane cannot disagree about which system a bare option code resolves to.
-    const domainId = ctx.resolver?.domainIdFor({ filePath: entry.filePath, name: entry.entryName });
-    if (ctx.base !== undefined && domainId !== undefined) {
-      const set = inlineAnswerSet(entry.node, domainId, ctx.base);
-      if (set) {
-        answerSets.set(id, {
-          system: set.codeSystem.url,
-          codes: new Set(set.options.map((o: { code: string }) => o.code)),
-        });
-      }
+    const owner = [...(graph.crlRegistry?.byNameLocal.values() ?? []),
+      ...(graph.crlRegistry?.byNamePackage.values() ?? []), graph.coversTarget]
+      .find((candidate) => candidate?.filePath === entry.filePath);
+    if (owner && ctx.base !== undefined) {
+      const set = namedAnswerSet(entry.node, owner.ast, "", ctx.base, (error) => answerErrors.push(`${error.code}: ${error.message}`), graph.crlRegistry ? answerTerminologyResolver(owner, graph.crlRegistry) : undefined);
+      if (set) answerSets.set(id, set);
     }
     const res = localMemberOfConcept(
       entry.node,
@@ -1999,7 +1987,7 @@ function buildLocalMembershipIndex(
     if (prior !== undefined && prior !== id) collisions.add(key); // two DISTINCT concepts claim one set → ambiguous
     else reverse.set(key, id);
   }
-  return { forward, reverse, answerSets, collisions, hasProject: graph.projectRoot !== undefined };
+  return { forward, reverse, answerSets, collisions, answerErrors, hasProject: graph.projectRoot !== undefined };
 }
 
 /** #189 Piece 3 — the SOURCE-membership reverse index: `(fhirType, system, code)` → the concept id(s) whose source
@@ -2217,7 +2205,7 @@ function runCase(
     // a confident denial. The writer already errors loudly on the same token, so the author is told there.
     const codedFromValue =
       valueField?.value.kind === "string"
-        ? parseCodedValueToken(valueField.value.value, localIndex.answerSets.get(namedId))
+        ? parseCodedValueToken(valueField.value.value, localIndex.answerSets.get(namedId)?.members)
         : undefined;
     // REFACTOR:grounded (#320): both local and source candidates use the case-resolved date.
     const date = caseDates.dates.get(ref);
@@ -2874,6 +2862,7 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   // REFACTOR:grounded (#320, plan593): build indexes after prepared publication owners
   // have replaced any registry-default shadow, so resource membership shares that identity.
   const localIndex = buildLocalMembershipIndex(concepts, graph);
+  if (localIndex.answerErrors.length) return { success: false, runs: [], errors: localIndex.answerErrors };
   const sourceIndex = buildSourceMembershipIndex(concepts, graph);
   // REFACTOR:grounded (#320, review 556): share actual output identity diagnostics with authoring.
   const collisions = celIdentityDiagnostics(graph, { now });

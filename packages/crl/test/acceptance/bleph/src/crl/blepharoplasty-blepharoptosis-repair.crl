@@ -179,7 +179,7 @@ concept "Blepharoptosis Repair Requested":
   - coded from "Blepharoptosis Repair Service Codes".
   - value projection is exists this.
 
-concept "Performed For Cosmetic Purposes":
+concept "Cosmetic Surgical Purpose":
 - shape is Record.
 - shape reduction is most recent.
 - type is Observation.
@@ -230,31 +230,22 @@ let an unpaired combination qualify, dropping the causal attribution the source 
 The residual "surgery targets something not on the list" case is the `none of the listed` answer.
 */
 
-concept "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct":
+concept "Functional Or Reconstructive Surgical Indication":
 - shape is Record.
 - type is Observation.
 - value type is CodeableConcept.
 - code is `functional-or-reconstructive-surgery-performed-to-correct-indication`.
 - value domain is answer options.
 - shape reduction is most recent.
-- value from:
-  - `near-or-far-vision-impairment-due-to-dermatochalasis` display is `Impairment of near or far vision due to dermatochalasis`, qualifying.
-  - `near-or-far-vision-impairment-due-to-blepharochalasis` display is `Impairment of near or far vision due to blepharochalasis`, qualifying.
-  - `near-or-far-vision-impairment-due-to-blepharoptosis` display is `Impairment of near or far vision due to blepharoptosis`, qualifying.
-  - `visual-field-defect-due-to-dermatochalasis` display is `Visual field defect due to dermatochalasis`, qualifying.
-  - `visual-field-defect-due-to-blepharochalasis` display is `Visual field defect due to blepharochalasis`, qualifying.
-  - `visual-field-defect-due-to-blepharoptosis` display is `Visual field defect due to blepharoptosis`, qualifying.
-  - `symptomatic-redundant-skin-weighing-down-upper-lashes` display is `Symptomatic redundant skin weighing down upper lashes`, qualifying.
-  - `chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin` display is `Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin`, qualifying.
-  - `prosthesis-difficulties-in-an-anophthalmic-socket` display is `Prosthesis difficulties in an anophthalmic socket`, qualifying.
-  - `none-of-the-listed-indications` display is `None of the listed indications`, not qualifying.
+- value from is "Blepharoplasty And Blepharoptosis Repair Functional Or Reconstructive Surgical Indication Answer Options":
+  - not qualifying is `none-of-the-listed-indications`.
 
 concept "Qualifying Functional Indication Selected":
 - shape is Record.
 - shape reduction is most recent.
 - type is Observation.
 - value type is boolean.
-- definition is "Which Listed Indication Is This Functional Or Reconstructive Surgery Performed To Correct" in qualifying.
+- definition is "Functional Or Reconstructive Surgical Indication" in qualifying.
 
 concept "Documented Patient Complaint":
 - shape is Record.
@@ -263,15 +254,8 @@ concept "Documented Patient Complaint":
 - code is `documented-patient-complaint`.
 - value domain is answer options.
 - shape reduction is most recent.
-- value from:
-  - `complaint-of-interference-with-near-or-distance-vision` display is `Patient Reports Interference With Near Or Distance Vision`, qualifying.
-  - `complaint-of-interference-with-visual-field` display is `Patient Reports Interference With Visual Field`, qualifying.
-  - `complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Upper Eyelid Drooping`, qualifying.
-  - `complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Looking Through The Eyelashes`, qualifying.
-  - `complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Seeing The Upper Eyelid Skin`, qualifying.
-  - `complaint-of-chronic-blepharitis` display is `Patient Reports Chronic Blepharitis`, qualifying.
-  - `complaint-of-chronic-dermatitis` display is `Patient Reports Chronic Dermatitis`, qualifying.
-  - `none-of-the-listed-complaints` display is `None of the listed complaints`, not qualifying.
+- value from is "Blepharoplasty And Blepharoptosis Repair Documented Patient Complaint Answer Options":
+  - not qualifying is `none-of-the-listed-complaints`.
 
 concept "Qualifying Patient Complaint Reported":
 - shape is Record.
@@ -287,12 +271,8 @@ concept "Photographic Demonstration Submitted":
 - code is `photographic-demonstration-submitted`.
 - value domain is answer options.
 - shape reduction is most recent.
-- value from:
-  - `photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex` display is `Photograph Shows The Upper Eyelid Margin Within 2.5 Mm Equivalent To One Quarter Of The Visible Iris Diameter Of The Corneal Light Reflex`, qualifying.
-  - `photograph-upper-eyelid-skin-rests-on-the-eyelashes` display is `Photograph Shows The Upper Eyelid Skin Resting On The Eyelashes`, qualifying.
-  - `photograph-upper-eyelid-indicates-presence-of-dermatitis` display is `Photograph Shows The Upper Eyelid Indicating The Presence Of Dermatitis`, qualifying.
-  - `photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty` display is `Photograph Shows The Upper Eyelid Position Contributing To Difficulty Tolerating A Prosthesis In An Anophthalmic Socket`, qualifying.
-  - `none-of-the-listed-photographic-demonstrations` display is `None of the listed photographic demonstrations`, not qualifying.
+- value from is "Blepharoplasty And Blepharoptosis Repair Photographic Demonstration Submitted Answer Options":
+  - not qualifying is `none-of-the-listed-photographic-demonstrations`.
 
 concept "Qualifying Photographic Demonstration Shown":
 - shape is Record.
@@ -308,10 +288,8 @@ concept "Visual Field Demonstration Submitted":
 - code is `visual-field-demonstration-submitted`.
 - value domain is answer options.
 - shape reduction is most recent.
-- value from:
-  - `visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction` display is `Visual Field Printout Shows At Least 12 Degree Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction`, qualifying.
-  - `visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction` display is `Visual Field Printout Shows At Least 30 Percent Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction`, qualifying.
-  - `none-of-the-listed-visual-field-demonstrations` display is `None of the listed visual field demonstrations`, not qualifying.
+- value from is "Blepharoplasty And Blepharoptosis Repair Visual Field Demonstration Submitted Answer Options":
+  - not qualifying is `none-of-the-listed-visual-field-demonstrations`.
 
 concept "Qualifying Visual Field Demonstration Shown":
 - shape is Record.
@@ -327,14 +305,14 @@ concept "Qualifying Visual Field Demonstration Shown":
 // What is encoded is the DEMONSTRATED FINDING, never "a photograph was attached" - attachment is
 // administrative completeness for the PAS workflow; the finding is substantive.
 // ---------------------------------------------------------------------------------------------
-concept "Submitted Photographs Conform To The Photograph Submission Standards":
+concept "Photograph Submission Standards Met":
 - shape is Record.
 - type is Observation.
 - value type is boolean.
 - code is `submitted-photographs-conform-to-the-photograph-submission-standards`.
 - shape reduction is most recent.
 
-concept "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards":
+concept "Visual Field Examination Standards Met":
 - shape is Record.
 - type is Observation.
 - value type is boolean.
@@ -349,14 +327,14 @@ concept "Submitted Visual Field Examination Conforms To The Visual Field Examina
 // One opaque yes/no could not say WHICH procedure lacked documentation, and partial documentation
 // is a real state the source distinguishes.
 // ---------------------------------------------------------------------------------------------
-concept "The Requested Blepharoplasty Is Individually Documented":
+concept "Individual Blepharoplasty Documentation":
 - shape is Record.
 - shape reduction is most recent.
 - type is Observation.
 - value type is boolean.
 - code is `blepharoplasty-individually-documented`.
 
-concept "The Requested Blepharoptosis Repair Is Individually Documented":
+concept "Individual Blepharoptosis Repair Documentation":
 - shape is Record.
 - shape reduction is most recent.
 - type is Observation.
@@ -395,9 +373,9 @@ criterion "Qualifying Objective Demonstration Submitted":
 //
 // THE FINDINGS ARE A CODED QUESTION PER LANE - photographic, and visual field. As separate booleans
 // it cost one "no" per finding to deny this criterion; as a question per lane it costs one per lane.
-- when ( ( "Submitted Photographs Conform To The Photograph Submission Standards"
+- when ( ( "Photograph Submission Standards Met"
        and "Qualifying Photographic Demonstration Shown" )
-      or ( "Submitted Visual Field Examination Conforms To The Visual Field Examination Standards"
+      or ( "Visual Field Examination Standards Met"
        and "Qualifying Visual Field Demonstration Shown" ) ).
 
 // ---------------------------------------------------------------------------------------------
@@ -433,13 +411,99 @@ decision "Blepharoplasty And Blepharoptosis Repair Coverage Determination":
 first:
 - when ( "Blepharoplasty Requested" or "Blepharoptosis Repair Requested" ) then:
     first:
-    - when "Performed For Cosmetic Purposes" then recommend activity "Medical Policy Determination"."not-certify.Unmet".
+    - when "Cosmetic Surgical Purpose" then recommend activity "Medical Policy Determination"."not-certify.Unmet".
     - when ( "Blepharoplasty Requested" and "Blepharoptosis Repair Requested" ) then:
         first:
-        - when ( "Qualifying Functional Indication" and "Qualifying Patient Complaint Documented" and "Qualifying Objective Demonstration Submitted" and "The Requested Blepharoplasty Is Individually Documented" and "The Requested Blepharoptosis Repair Is Individually Documented" ) then recommend activity "Medical Policy Determination"."certify.Met".
+        - when ( "Qualifying Functional Indication" and "Qualifying Patient Complaint Documented" and "Qualifying Objective Demonstration Submitted" and "Individual Blepharoplasty Documentation" and "Individual Blepharoptosis Repair Documentation" ) then recommend activity "Medical Policy Determination"."certify.Met".
         - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
         end.
     - when ( "Qualifying Functional Indication" and "Qualifying Patient Complaint Documented" and "Qualifying Objective Demonstration Submitted" ) then recommend activity "Medical Policy Determination"."certify.Met".
     - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
     end.
 - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
+
+
+terminology "Blepharoplasty And Blepharoptosis Repair Visual Field Demonstration Submitted Answer Options":
+- system is `http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes`.
+- code is `visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction` display is `Visual Field Printout Shows At Least 12 Degree Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction`.
+- code is `visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction` display is `Visual Field Printout Shows At Least 30 Percent Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction`.
+- code is `none-of-the-listed-visual-field-demonstrations` display is `None of the listed visual field demonstrations`.
+
+
+terminology "Blepharoplasty And Blepharoptosis Repair Photographic Demonstration Submitted Answer Options":
+- system is `http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-1f64a73b6291-answer-codes`.
+- code is `photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex` display is `Photograph Shows The Upper Eyelid Margin Within 2.5 Mm Equivalent To One Quarter Of The Visible Iris Diameter Of The Corneal Light Reflex`.
+- code is `photograph-upper-eyelid-skin-rests-on-the-eyelashes` display is `Photograph Shows The Upper Eyelid Skin Resting On The Eyelashes`.
+- code is `photograph-upper-eyelid-indicates-presence-of-dermatitis` display is `Photograph Shows The Upper Eyelid Indicating The Presence Of Dermatitis`.
+- code is `photograph-upper-eyelid-position-contributes-to-prosthesis-difficulty` display is `Photograph Shows The Upper Eyelid Position Contributing To Difficulty Tolerating A Prosthesis In An Anophthalmic Socket`.
+- code is `none-of-the-listed-photographic-demonstrations` display is `None of the listed photographic demonstrations`.
+
+
+terminology "Blepharoplasty And Blepharoptosis Repair Documented Patient Complaint Answer Options":
+- system is `http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes`.
+- code is `complaint-of-interference-with-near-or-distance-vision` display is `Patient Reports Interference With Near Or Distance Vision`.
+- code is `complaint-of-interference-with-visual-field` display is `Patient Reports Interference With Visual Field`.
+- code is `complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Upper Eyelid Drooping`.
+- code is `complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Looking Through The Eyelashes`.
+- code is `complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin` display is `Patient Reports Difficulty Seeing At Distance Or Near Due To Seeing The Upper Eyelid Skin`.
+- code is `complaint-of-chronic-blepharitis` display is `Patient Reports Chronic Blepharitis`.
+- code is `complaint-of-chronic-dermatitis` display is `Patient Reports Chronic Dermatitis`.
+- code is `none-of-the-listed-complaints` display is `None of the listed complaints`.
+
+
+terminology "Blepharoplasty And Blepharoptosis Repair Functional Or Reconstructive Surgical Indication Answer Options":
+- system is `http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes`.
+- code is `near-or-far-vision-impairment-due-to-dermatochalasis` display is `Impairment of near or far vision due to dermatochalasis`.
+- code is `near-or-far-vision-impairment-due-to-blepharochalasis` display is `Impairment of near or far vision due to blepharochalasis`.
+- code is `near-or-far-vision-impairment-due-to-blepharoptosis` display is `Impairment of near or far vision due to blepharoptosis`.
+- code is `visual-field-defect-due-to-dermatochalasis` display is `Visual field defect due to dermatochalasis`.
+- code is `visual-field-defect-due-to-blepharochalasis` display is `Visual field defect due to blepharochalasis`.
+- code is `visual-field-defect-due-to-blepharoptosis` display is `Visual field defect due to blepharoptosis`.
+- code is `symptomatic-redundant-skin-weighing-down-upper-lashes` display is `Symptomatic redundant skin weighing down upper lashes`.
+- code is `chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin` display is `Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin`.
+- code is `prosthesis-difficulties-in-an-anophthalmic-socket` display is `Prosthesis difficulties in an anophthalmic socket`.
+- code is `none-of-the-listed-indications` display is `None of the listed indications`.
+
+presentation for "Blepharoplasty Requested":
+- question text is "Is blepharoplasty requested?".
+- question description is "Confirm whether this request includes blepharoplasty.".
+
+presentation for "Blepharoptosis Repair Requested":
+- question text is "Is blepharoptosis repair requested?".
+- question description is "Confirm whether this request includes blepharoptosis repair.".
+
+presentation for "Cosmetic Surgical Purpose":
+- question text is "Is the requested surgery being performed for cosmetic purposes?".
+- question description is "Answer for the purpose of the surgery under review.".
+
+presentation for "Functional Or Reconstructive Surgical Indication":
+- question text is "Which listed indication is this functional or reconstructive surgery performed to correct?".
+- question description is "Select the indication the requested surgery is intended to correct, including the stated causal relationship. Select none of the listed indications when none applies.".
+
+presentation for "Documented Patient Complaint":
+- question text is "Which complaint has the patient reported?".
+- question description is "Select the documented complaint supporting this request, or none of the listed complaints.".
+
+presentation for "Photographic Demonstration Submitted":
+- question text is "What does the submitted photograph demonstrate?".
+- question description is "Select the finding demonstrated by the photograph, or none of the listed photographic demonstrations. An attachment alone does not establish a finding.".
+
+presentation for "Visual Field Demonstration Submitted":
+- question text is "What does the submitted visual field examination demonstrate?".
+- question description is "Select the finding demonstrated by the visual field printout, or none of the listed visual field demonstrations.".
+
+presentation for "Photograph Submission Standards Met":
+- question text is "Do the submitted photographs conform to the photograph submission standards?".
+- question description is "Assess the submitted photographs against the policy's photograph submission standards.".
+
+presentation for "Visual Field Examination Standards Met":
+- question text is "Does the submitted visual field examination conform to the visual field examination standards?".
+- question description is "Assess the submitted examination against the policy's visual field examination standards.".
+
+presentation for "Individual Blepharoplasty Documentation":
+- question text is "Is the requested blepharoplasty individually documented?".
+- question description is "Assess the documentation supporting the blepharoplasty request independently of any concurrent blepharoptosis repair.".
+
+presentation for "Individual Blepharoptosis Repair Documentation":
+- question text is "Is the requested blepharoptosis repair individually documented?".
+- question description is "Assess the documentation supporting the blepharoptosis repair request independently of any concurrent blepharoplasty.".

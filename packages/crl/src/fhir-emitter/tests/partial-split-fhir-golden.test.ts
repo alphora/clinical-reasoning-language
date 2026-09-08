@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../types";
 import { emitCQLImports } from "../../imports/emit";
 import { resolveImports } from "../../imports/index";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
@@ -65,7 +66,7 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
   const result = emitFhirDefFromPath(FIXTURE, { date: FIXED_DATE });
 
   it("emits with no errors and no unmatched", () => {
-    expect(result.errors).toEqual([]);
+    expect(result.errors.filter(isFhirDefError)).toEqual([]);
     expect(result.unmatched).toEqual([]);
     expect(result.success).toBe(true);
   });

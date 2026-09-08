@@ -2,28 +2,12 @@ import { describe, it, expect } from "vitest";
 
 import { parseCodedValueToken } from "../../cel/canonicalToken";
 
-/**
- * ⭐⭐ #189 — A CEL CODED `value is` MAY BE A BARE INLINE-OPTION CODE.
- *
- * BOTH review arms raised this INDEPENDENTLY as [critical], and the reason is the point: without it the
- * inline-options design does not REMOVE the URL problem, it MOVES IT INTO `.cel` AND MAKES IT WORSE. The
- * concept-level answer CodeSystem is a MINTED url appearing in no authored source, so a CEL author would
- * have to reproduce the emitter's slug scheme by hand — and a typo'd system silently makes the value a
- * NON-MEMBER, i.e. a confident deny in the lane whose whole job is catching confident denies.
- *
- * ⚠ This pins the SHARED parse both lanes use. The CEL FHIR writer builds `valueCodeableConcept` from it and
- * the CRE evaluates membership from it; two hand-mirrored copies would be two chances to disagree on the
- * system axis, where a mismatch is silent.
- *
- * ⚠ END-TO-END is covered separately: `tmp/optprobe` runs a `.cel` whose facts type NO system at all and
- * gets approve/deny through the real CRE. This file pins the rule itself.
- */
-const SET = { system: "http://x/CodeSystem/q-answer-codes", codes: new Set(["chronic-blepharitis", "none-of-listed"]) };
+const SET = ["chronic-blepharitis", "none-of-listed"].map((code) => ({ system: "http://x/CodeSystem/q-answer-codes", code }));
 
 describe("#189 — a bare inline-option code resolves its system from the concept", () => {
   it("⭐ resolves a declared bare code against the concept's answer CodeSystem", () => {
     const r = parseCodedValueToken("chronic-blepharitis", SET);
-    expect(r).toEqual({ parts: { system: SET.system, code: "chronic-blepharitis" } });
+    expect(r).toEqual({ parts: { system: SET[0].system, code: "chronic-blepharitis" } });
   });
 
   it("⭐ the explicit `<system>|<code>` form still works — the adversarial rows need it", () => {

@@ -34,7 +34,7 @@
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
-  "description": "Inline answer options reference corpus",
+  "description": "Legacy named answer classifier regression corpus",
   "type": {
     "coding": [
       {

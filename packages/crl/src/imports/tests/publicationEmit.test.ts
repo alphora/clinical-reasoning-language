@@ -24,10 +24,15 @@ const choice = `concept "Choice":
 - value type is CodeableConcept.
 - code is \`choice\`.
 - value domain is answer options.
-- value from:
-  - \`yes\` display is \`Yes\`, qualifying.
-  - \`no\` display is \`No\`, not qualifying.
+- value from is "Fixture Choice Answer Options":
+  - not qualifying is \`no\`.
 - shape reduction is most recent.
+
+
+terminology "Fixture Choice Answer Options":
+- system is \`https://example.org/answer-codes\`.
+- code is \`yes\` display is \`Yes\`.
+- code is \`no\` display is \`No\`.
 `;
 const membership = (operand: string) => `concept "Result":
 - shape is Record.
@@ -79,10 +84,10 @@ describe("prepared publication imports emission", () => {
 
   it("preserves same-source envelope routing and nonblocking no-negative warning", () => {
     const directory = project({ "root.crl": 'library "Source".\n' +
-      choice.replace('  - `no` display is `No`, not qualifying.\n', '') + membership('"Choice"') });
+      choice.replace(/:\n  - not qualifying is[^\n]*\n/, ".\n") + membership('"Choice"') });
     const result = emitCQLImports(path.join(directory, "root.crl"));
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
-    expect(result.warnings?.some((warning) => warning.kind === "publication-membership-no-negative-domain")).toBe(true);
+    expect(result.warnings?.some((warning) => warning.kind === "answer-options-all-qualifying")).toBe(true);
     const producer = result.cqlByLibrary.find((item) => item.cql.includes('define "Result":'))!;
     expect(producer.cql).toContain('"__CRL_PublicationEnvelope_v1_Choice"');
     for (const item of result.cqlByLibrary) expect(item.includes).not.toContain(item.libraryName);

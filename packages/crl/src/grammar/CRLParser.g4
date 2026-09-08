@@ -63,6 +63,18 @@ statement
     | conceptStatement
     | parameterStatement
     | criterionStatement
+    | presentationStatement
+    ;
+
+// Presentation is an authored annotation, separate from computational declarations.
+presentationStatement
+    : PRESENTATION_FOR conceptReference COLON presentationLine+
+    ;
+presentationLine
+    : DASH (PRESENTATION_DECISION decisionReference
+           | PRESENTATION_CRITERION qualifiableReference
+           | QUESTION_TEXT_IS (QUOTED_STRING | backtickString)
+           | QUESTION_DESCRIPTION_IS (QUOTED_STRING | backtickString)) DOT
     ;
 
 // ============================
@@ -523,29 +535,12 @@ codedFromLine
 // unoffered code vanishes into the same empty set as no record at all — collapsing a determinate `false`
 // into `unknown` (`fixtures/service-request/policy.crl` exists to catch exactly that).
 valueFromLine
-    : DASH VALUE_FROM terminologyReference DOT
-    // ⭐⭐ #189 — INLINE ANSWER OPTIONS. The operator asked for this when `value from` was first built; the
-    // blocker was that inline codes have no `system`. They now get one: the concept's OWN CodeSystem.
-    //
-    // ⚠ THE MARKER IS OPTIONAL IN THE GRAMMAR AND REQUIRED BY THE VALIDATOR, and the split is deliberate
-    // (operator ruling, 2026-09-02). It is required IFF the concept is the subject of an `in qualifying`
-    // predicate — a plain dropdown that feeds no predicate would otherwise have to classify every option as
-    // qualifying-for-NOTHING and ship a qualifying ValueSet no predicate defines. Grammar cannot see use;
-    // the validator can.
-    | DASH VALUE_FROM COLON inlineOptionLine+
+    // REFACTOR:grounded (#320, 615): all recognized members qualify except explicit exclusions.
+    : DASH VALUE_FROM terminologyReference (DOT | COLON notQualifyingLine+)
     ;
 
-// One offered answer: a code the concept OWNS, the text a clinician READS, and what it does to the
-// determination. ⚠ `display is` is REQUIRED by the validator — never derive it by title-casing the code,
-// which manufactures clinician-facing text the author never wrote.
-inlineOptionLine
-    : DASH backtickString DISPLAY_IS backtickString (COMMA optionMarker)? DOT
-    ;
-
-// ⚠ `not qualifying` is TWO tokens on purpose — see the lexer's note on why no `NOT_QUALIFYING` exists.
-optionMarker
-    : QUALIFYING            # OptionQualifying
-    | NOT QUALIFYING        # OptionNotQualifying
+notQualifyingLine
+    : DASH NOT_QUALIFYING_IS backtickString DOT
     ;
 
 // `code is` declares the concept's OWN local code. The system is the package's
@@ -703,7 +698,7 @@ narrativeElement
     // ⚠ QUALIFYING and DISPLAY_IS are admitted here because the membership predicate is NARRATIVE:
     //   `- definition is "Patient Complaint" in qualifying.`
     // Without this the keyword would eat its own use site and the predicate could not parse.
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

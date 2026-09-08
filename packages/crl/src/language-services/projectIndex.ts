@@ -17,7 +17,7 @@ import { canonicalize } from "./paths";
 export interface IndexedDeclaration {
   /** The quoted name as written, without surrounding quotes. */
   name: string;
-  kind: "concept" | "terminology" | "decision" | "activity" | "parameter";
+  kind: "concept" | "terminology" | "decision" | "activity" | "parameter" | "criterion";
   /** The library this declaration belongs to. */
   libraryName: string;
   /** Absolute path of the .crl file containing the declaration. */
@@ -64,7 +64,7 @@ export interface IndexedLibrary {
 export interface IndexedReference {
   targetLibrary: string;
   targetName: string;
-  targetKind: "concept" | "terminology" | "decision" | "activity" | "parameter";
+  targetKind: "concept" | "terminology" | "decision" | "activity" | "parameter" | "criterion";
   filePath: string;
   /** Range of the name segment (inside the quotes). */
   nameRange: ZeroBasedRange;
@@ -380,6 +380,9 @@ function enumerateDeclarations(
             });
             break;
           }
+          case "Criterion":
+            out.push({ ...base, kind: "criterion" });
+            break;
           case "Terminology":
             out.push({ ...base, kind: "terminology" });
             break;
@@ -447,6 +450,7 @@ function enumerateLibraries(
  * graph so each ref-site lookup is O(1).
  */
 type LibKindNames = {
+  criterion: Set<string>;
   concept: Set<string>;
   parameter: Set<string>;
   terminology: Set<string>;
@@ -475,13 +479,14 @@ function buildLibNamespaces(graph: ResolvedGraph): LibNamespaces {
     const key = nsKey(entry.origin, entry.name);
     let names = out.get(key);
     if (!names) {
-      names = { concept: new Set(), parameter: new Set(), terminology: new Set(), decision: new Set(), activity: new Set() };
+      names = { criterion: new Set(), concept: new Set(), parameter: new Set(), terminology: new Set(), decision: new Set(), activity: new Set() };
       out.set(key, names);
     }
     for (const stmt of entry.ast.statements) {
       const name = (stmt as { name?: string }).name;
       if (!name) continue;
       switch ((stmt as { type?: string }).type) {
+        case "Criterion": names.criterion.add(name); break;
         case "Concept": names.concept.add(name); break;
         case "Parameter": names.parameter.add(name); break;
         case "Terminology": names.terminology.add(name); break;
@@ -506,13 +511,13 @@ function buildLibNamespaces(graph: ResolvedGraph): LibNamespaces {
  * Same-name-cross-origin libraries don't merge: a local "Foo" with
  * `concept X` and a package "Foo" with `parameter X` stay separate.
  */
-function resolveTargetKind(
+function resolveTargetKind<K extends "concept" | "parameter" | "criterion">(
   ref: unknown,
   owningLib: string,
   ownerOrigin: "local" | "package" | "root",
-  acceptableKinds: readonly ("concept" | "parameter")[],
+  acceptableKinds: readonly K[],
   ns: LibNamespaces,
-): "concept" | "parameter" {
+): K {
   const refLib = typeof ref === "string"
     ? owningLib
     : (ref as { libraryName?: string }).libraryName ?? owningLib;
@@ -560,6 +565,11 @@ function enumerateReferences(
       for (const stmt of entry.ast.statements) {
         walkStatementRefs(stmt, owningLib, owningOrigin, entry.filePath, source, ns, out);
       }
+      for (const presentation of entry.ast.presentations ?? []) {
+        addRef(presentation.target, "concept", owningLib, entry.filePath, source,
+          { ...presentation.location, end: { line: presentation.location.start.line, column: Number.MAX_SAFE_INTEGER } }, out);
+        for (const context of presentation.contexts) addRef(context.ref, context.kind, owningLib, entry.filePath, source, context.location, out);
+      }
     }
   };
   collect(graph.resolvedLibraries);
@@ -585,7 +595,7 @@ function walkStatementRefs(
         representations?: { valueProjection?: { body?: { elements?: unknown[] } } }[];
       };
       walkConceptBody(c.definition, owningLib, owningOrigin, filePath, source, ns, out);
-      // ⭐ `value from "VS"` — a terminology reference on the CONCEPT, not in its definition, so it needs its
+      // ⭐ `value from is "VS"` — a terminology reference on the CONCEPT, not in its definition, so it needs its
       // own index entry. Unindexed it would go stale on a rename of the terminology it names, exactly as an
       // unindexed projection ref would (the same defect a prior round caught there).
       if (c.valueFrom) {
@@ -603,10 +613,14 @@ function walkStatementRefs(
       }
       return;
     }
+    case "Criterion": {
+      indexConditionRefs((stmt as { condition: BranchCondition }).condition, owningLib, owningOrigin, filePath, source, ns, out);
+      return;
+    }
     case "Decision": {
       const d = stmt as { body?: { statements?: unknown[] } };
       for (const wb of d.body?.statements ?? []) {
-        walkWhenBlock(wb, owningLib, filePath, source, out);
+        walkWhenBlock(wb, owningLib, filePath, source, out, (condition) => indexConditionRefs(condition, owningLib, owningOrigin, filePath, source, ns, out));
       }
       return;
     }
@@ -753,12 +767,26 @@ function walkNarrativeElement(
   }
 }
 
+// REFACTOR:grounded — criterion and concept references retain their distinct rename identities.
+function indexConditionRefs(condition: BranchCondition | undefined, owningLib: string,
+  owningOrigin: "local" | "package" | "root", filePath: string, source: string,
+  ns: LibNamespaces, out: IndexedReference[]): void {
+  if (!condition) return;
+  if (condition.type === "BranchConditionRef" || condition.type === "BranchConditionCriterionRef") {
+    const kind = condition.type === "BranchConditionCriterionRef" ? "criterion" :
+      resolveTargetKind(condition.ref, owningLib, owningOrigin, ["concept", "criterion"], ns);
+    addRef(condition.ref, kind, owningLib, filePath, source, condition.location, out);
+  } else if (condition.type === "BranchConditionNot") indexConditionRefs(condition.operand, owningLib, owningOrigin, filePath, source, ns, out);
+  else if (Array.isArray(condition.operands)) for (const operand of condition.operands) indexConditionRefs(operand, owningLib, owningOrigin, filePath, source, ns, out);
+}
+
 function walkWhenBlock(
   wb: unknown,
   owningLib: string,
   filePath: string,
   source: string,
   out: IndexedReference[],
+  indexCondition: (condition: BranchCondition) => void,
 ): void {
   if (!wb || typeof wb !== "object") return;
   const w = wb as {
@@ -775,20 +803,18 @@ function walkWhenBlock(
     // the exact concept token (not the whole `when` line), and duplicate operands
     // stay distinct.
     if (w.condition) {
-      for (const atom of branchConditionRefs(w.condition as BranchCondition)) {
-        addRef(atom.ref, "concept", owningLib, filePath, source, atom.location, out);
-      }
+      indexCondition(w.condition as BranchCondition);
     }
-    walkWhenBlock(w.body, owningLib, filePath, source, out);
+    walkWhenBlock(w.body, owningLib, filePath, source, out, indexCondition);
     return;
   }
   if (w.type === "OtherwiseBlock") {
     // `otherwise` carries no condition ref — just index its body.
-    walkWhenBlock(w.body, owningLib, filePath, source, out);
+    walkWhenBlock(w.body, owningLib, filePath, source, out, indexCondition);
     return;
   }
   if (w.type === "BlockBody") {
-    for (const st of w.statements ?? []) walkWhenBlock(st, owningLib, filePath, source, out);
+    for (const st of w.statements ?? []) walkWhenBlock(st, owningLib, filePath, source, out, indexCondition);
     return;
   }
   if (w.type === "ActionStatement") {

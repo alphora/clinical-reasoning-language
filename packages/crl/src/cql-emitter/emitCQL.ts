@@ -41,7 +41,7 @@ import { hasAgeSource } from "../emit/publicationAge";
 import { branchConditionRefs } from "../ast/branchCondition";
 import { foreignCriterionScopeErrors } from "./criterionScope";
 import { renderPublicationSelectionHelpers, renderPublicationCandidateHelpers, PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_SELECTION_CQL_FUNCTIONS, PUBLICATION_LOCAL_BOOLEAN_CANDIDATE, PUBLICATION_LOCAL_CODEABLE_CANDIDATE, PUBLICATION_CANDIDATE_CQL_TYPE } from "./renderPublicationSelection";
-import { publicationEnvelopeName, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, PUBLICATION_PRODUCER_FUNCTIONS, renderPublicationProducerHelpers, renderPublicationCodeTable } from "./renderPublicationProducer";
+import { publicationEnvelopeName, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, PUBLICATION_PRODUCER_FUNCTIONS, renderPublicationProducerHelpers, renderPublicationCodeTable, renderAnswerClassification } from "./renderPublicationProducer";
 // #203 Todo 5 — status-aware meta emit. Direct `../meta` imports (NOT via `../index`) to avoid a barrel cycle:
 // emitCQL already pulls buildCRL from ../index, and meta/* does not import cql-emitter, so the edge is one-directional.
 import { parseMetaTag } from "../meta/parseMetaTag";
@@ -50,8 +50,8 @@ import { matchNarrative } from "../template-match";
 // #189 functional-VS slice — the SHARED ValueSet-url composition (leaf util; no cql→fhir-emitter cycle since
 // slug.ts imports only node:crypto), so the CQL `valueset '<url>'` byte-matches the FHIR `ValueSet.url`.
 import { valueSetUrl } from "../fhir-emitter/slug";
-import { buildInlineAnswerSetMap } from "../fhir-emitter/inlineAnswerSet";
-import type { InlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
+import { buildNamedAnswerSetMap } from "../fhir-emitter/namedAnswerSet";
+import type { NamedAnswerSet } from "../fhir-emitter/namedAnswerSet";
 import { findPatternCalls } from "../template-match/referenceRoles";
 import { cqlStringLiteral, cqlQuotedIdentifier } from "./cqlStrings";
 import { patternReturnShape, requireReturnShape } from "../template-match/patternCatalog";
@@ -315,15 +315,15 @@ export interface EmitOptions {
    */
   conceptShapesByName?: ReadonlyMap<string, Concept["shape"]>;
   /**
-   * ⭐⭐ #189 — `concept name → inline answer set`, built ONCE pre-split (`buildInlineAnswerSetMap`) and
+   * ⭐⭐ #189 — `concept name → resolved named answer set`, built ONCE pre-split (`buildNamedAnswerSetMap`) and
    * threaded to every layer emitter.
    *
-   * ⚠ REQUIRED for the cross-layer case, which is the NORMAL one: a concept declaring inline options is a
+   * ⚠ REQUIRED for the cross-layer case, which is the NORMAL one: a concept declaring named answer options is a
    * local primitive, while the `"X" in qualifying` predicate over it is an inference — different layers, so
    * this layer's own `conceptByName` cannot see the subject. Same construction and same reason as
    * `conceptShapesByName` above.
    */
-  inlineAnswerSetsByName?: ReadonlyMap<string, InlineAnswerSet>;
+  namedAnswerSetsByName?: ReadonlyMap<string, NamedAnswerSet>;
   /**
    * #189 Slice C boundary 2 (2a) — the AUTHORED (pre-lowering) boolean-totality obligation per concept name,
    * for the totality-ledger enrollment (`emitConcept`). Built by the caller from the RAW authored AST (BEFORE
@@ -695,23 +695,26 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
         },
       } };
     }
-    // ⭐⭐ #189 — the inline answer-option descriptors, captured HERE because this is the last point the ast
+    // ⭐⭐ #189 — the named answer-option descriptors, captured HERE because this is the last point the ast
     // is still AUTHORED. `lowerLocalCodes` below CLEARS `Concept.code`, and these ids key on it, so any
     // later build yields an EMPTY map and every `in qualifying` fails to resolve — MEASURED on the probe.
     //
     // ⚠ A CALLER-SUPPLIED map WINS. The orchestrated path builds it from the RAW entry ast before this
     // function ever sees a lowered one (`imports/emit.ts`), exactly as it does the authored totality
     // obligations; this self-build is the fallback for a direct caller.
-    const options_ = options.inlineAnswerSetsByName
+    const answerErrors: CRLError[] = [];
+    const options_ = options.namedAnswerSetsByName
       ? options
       : {
           ...options,
-          inlineAnswerSetsByName: buildInlineAnswerSetMap(
+          namedAnswerSetsByName: buildNamedAnswerSetMap(
             ast,
-            options.localDomainId ?? options.policyId ?? "",
+            options.policyId ?? "",
             options.canonicalBase ?? "",
+            (error) => answerErrors.push({ type: "Validation", kind: error.code, message: error.message, line: error.location?.start.line, column: error.location?.start.column }),
           ),
         };
+    if (answerErrors.length) return { success: false, errors: answerErrors };
     options = options_;
     // Slice 3 — lower concept-level `code is` local source codes into synthetic
     // Terminology + CodedFromDefinition BEFORE any indexing/classification, so
@@ -1039,7 +1042,7 @@ class Emitter {
       // `conceptByName` already holds every concept. INERT until the layered
       // reduction emit consumes it (build steps 2–4).
       conceptShapesByName: options.conceptShapesByName ?? new Map<string, Concept["shape"]>(),
-      inlineAnswerSetsByName: options.inlineAnswerSetsByName ?? new Map<string, InlineAnswerSet>(),
+      namedAnswerSetsByName: options.namedAnswerSetsByName ?? new Map<string, NamedAnswerSet>(),
       // #189 Slice C boundary 2 (2a) — authored (pre-lowering) obligations per concept name for ledger
       // enrollment. Empty when the caller supplied none; `emitCQLFromAST` builds a real map from its raw
       // input before construction and passes it here (direct none-lane callers) — see EmitOptions doc.
@@ -1220,23 +1223,6 @@ class Emitter {
     if (terminologies.length > 0) {
       sections.push(this.emitTerminologies(terminologies));
     }
-
-    // ⭐⭐ #189 — the qualifying value set behind every `"X" in qualifying` THIS LAYER emits.
-    //
-    // ⚠ DECLARED IN THE LAYER THAT USES IT, not in the one that owns the concept. The subject is normally a
-    // local primitive while the predicate is an inference, so the two are in DIFFERENT libraries; two
-    // libraries each declaring the same canonical is ordinary CQL, and it avoids a cross-layer qualifier kept
-    // in step by hand. Both declarations come from ONE descriptor, so they cannot disagree about the url.
-    //
-    // ⚠⚠ IT IS DELIBERATELY **OUTSIDE** THE `terminologies.length > 0` BLOCK, and that is not a style
-    // choice. It was written INSIDE it and MEASURED broken: the Inferences layer declares no terminologies of
-    // its own, so the block never ran and the layer emitted
-    // `… in "np-patient-complaint-answer-options-qualifying"` with NO declaration for it — emit reported
-    // SUCCESS and the library would fail to TRANSLATE ("Could not resolve identifier"). The predicate's layer
-    // is precisely the one LEAST likely to have authored terminologies, so the enclosing condition was
-    // anti-correlated with the need. Do not fold this back in.
-    const inlineDecls = this.emitInlineAnswerValuesets();
-    if (inlineDecls.length > 0) sections.push(inlineDecls);
 
     const parameters = this.emitParameters();
     if (parameters) sections.push(parameters);
@@ -4607,71 +4593,6 @@ class Emitter {
    * NOT reach through to the subject's representations — that would ignore the author's own reduction and
    * make the answer depend on machinery they cannot see.
    */
-  /**
-   * The `valueset` declarations for every inline-options subset this layer's predicates bind.
-   *
-   * ⚠ THE WALK IS RECURSIVE, via `findPatternCalls`. `matchNarrative` FOLDS a pipeline into a
-   * `NestedPatternArg`, so a scan of top-level args misses a membership buried in a stage — a bug that
-   * appeared in THREE separate readers earlier in #189 before the shared authority existed.
-   */
-  private emitInlineAnswerValuesets(): string {
-    const sets = new Map<string, InlineAnswerSet>();
-    for (const stmt of this.ast.statements) {
-      if (stmt.type !== "Concept" || stmt.definition?.type !== "DefinitionIsDefinition") continue;
-      for (const call of findPatternCalls(stmt.definition.body, "Membership")) {
-        if (!call.args.some((a: CanonicalArg) => a.type === "SubsetRefArg")) continue;
-        const subj = call.args.find((a: CanonicalArg) => a.type === "ConceptRefArg");
-        if (!subj || !("value" in subj)) continue;
-        const set = this.options.inlineAnswerSetsByName?.get(String(subj.value));
-        if (set) sets.set(set.qualifying.id, set);
-      }
-    }
-    // ⚠⚠ A GENERATED DECLARATION SHARES CQL'S TOP-LEVEL IDENTIFIER NAMESPACE with every authored one, and
-    // a clash is SILENT: MEASURED, an authored `terminology "<policy>-<code>-answer-options-qualifying"`
-    // produced TWO `valueset` decls with the SAME identifier and DIFFERENT urls, under `success: true`.
-    // The library then fails to translate, or binds to whichever the engine picks.
-    //
-    // ⚠ The FHIR side is already covered by the closure's url/path invariants (VERIFIED: an id clash there
-    // is a hard `closure-resource-url-collision`). This is the half those invariants cannot see, because a
-    // CQL identifier is not a resource url.
-    const taken = new Map<string, string>();
-    for (const st of this.ast.statements) {
-      const n = (st as { name?: string }).name;
-      if (typeof n === "string" && n !== "") taken.set(n, st.type);
-    }
-    for (const set of sets.values()) {
-      const clash = taken.get(set.qualifying.id);
-      if (clash === undefined) continue;
-      this.emitErrors.push({
-        type: "Validation",
-        kind: "emit-inline-answer-valueset-name-collision",
-        message:
-          `The generated \`valueset\` declaration for "${set.ownerConcept}"'s qualifying options is named ` +
-          `\`${set.qualifying.id}\`, which collides with an authored ${clash} of the same name in this ` +
-          `library. Both would emit a top-level CQL identifier, and the library would bind one of them ` +
-          `arbitrarily. Rename the authored declaration, or change the concept's \`code is\` (the generated ` +
-          `name derives from it).`,
-      });
-    }
-
-    return [...sets.values()]
-      .map((set) => `valueset ${cqlIdent(set.qualifying.id)}: ${cqlString(set.qualifying.url)}`)
-      .join(String.fromCharCode(10));
-  }
-
-  /** Resolve a subset comparand against its SUBJECT and render the layer-local `valueset` identifier. */
-  private renderSubsetComparand(subjArg: CanonicalArg | undefined, subsetName: string): string {
-    const name = subjArg?.type === "ConceptRefArg" ? subjArg.value : undefined;
-    const set = name === undefined ? undefined : this.options.inlineAnswerSetsByName?.get(name);
-    if (!set) {
-      throw new Error(
-        `\`in ${subsetName}\` names a subset of "${name ?? "?"}", but that concept declares no inline ` +
-          `\`value from:\` options, so there is no set to test against. (#189)`,
-      );
-    }
-    return cqlIdent(set.qualifying.id);
-  }
-
   private emitMembership(call: CanonicalPatternCall): string {
     // ⚠⚠ THE SUBJECT MUST PUBLISH ONE RECORD, AND THIS LANE CANNOT CHECK IT — the VALIDATOR does
     // (`membership-subject-shape-unsupported`). Recorded here because the gap is real: for a
@@ -4698,13 +4619,15 @@ class Emitter {
 
     const subject = this.emitArg(call.args[0]);
     const setArg = call.args[1];
-    // ⚠ A SUBSET comparand resolves against the SUBJECT, never against a global terminology table — two
-    // different subjects may each declare a `qualifying` subset, and they are different sets.
-    const set =
-      setArg?.type === "SubsetRefArg"
-        ? this.renderSubsetComparand(subjArg, setArg.value)
-        : this.emitArg(setArg);
     const datum = `(${subject}.value as FHIR.CodeableConcept)`;
+    if (setArg?.type === "SubsetRefArg") {
+      const name = subjArg?.type === "ConceptRefArg" ? subjArg.value : undefined;
+      const answers = name === undefined ? undefined : this.options.namedAnswerSetsByName?.get(name);
+      if (!answers) throw new Error(`in qualifying requires a complete named answer ValueSet on "${name ?? "?"}"`);
+      return renderAnswerClassification(datum, renderPublicationCodeTable(answers.members),
+        renderPublicationCodeTable(answers.qualifying), cqlStringLiteral(name!));
+    }
+    const set = this.emitArg(setArg);
     return (
       `if ${datum} is null or not exists (${datum}.coding) then null
 ` +

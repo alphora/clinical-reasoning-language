@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../types";
 import * as path from "path";
 
 import { describe, expect, it } from "vitest";
@@ -26,7 +27,7 @@ describe("patient-age both-rep recency merge (CRL → FHIR/CQL)", () => {
   const r = emitFhirDefFromPath(FIXTURE, { date: FIXED_DATE });
 
   it("emits with no errors", () => {
-    expect(r.errors).toEqual([]);
+    expect(r.errors.filter(isFhirDefError)).toEqual([]);
     expect(r.metadataErrors).toEqual([]);
   });
 

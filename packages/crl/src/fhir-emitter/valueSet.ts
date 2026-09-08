@@ -255,7 +255,7 @@ export function emitValueSet(
   // expands that binding into `Questionnaire.item.answerOption` → a clinician reads those labels. And the
   // `$apply` terminology provider evaluates from the EXPANSION, not the compose. So a display carried only
   // on the CodeSystem may never reach the questionnaire, and the answer list renders as RAW SLUGS — which
-  // would defeat the entire point of requiring authored displays on inline answer options.
+  // would defeat the entire point of requiring authored displays on finite answer members.
   //
   // ⚠ NO LONGER INERT (#313): `- code is `x` display is `y`.` now exists, so `buildCompose` supplies a
   // display whenever the author wrote one. The RULE it was written to protect is unchanged and still

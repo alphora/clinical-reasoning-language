@@ -2,581 +2,581 @@
   {
     "suite": "preserved",
     "case": "indication vision-dermatochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "b1f41ae0a89d261752e03a939f36d3879c2fe51d8a5ad6c1aa2bda528e676b31"
+    "resourcesSha256": "2fc747a4bad406d0c0d266e53f507a729533b7bdc98b431f9087cf904466c567"
   },
   {
     "suite": "preserved",
     "case": "indication vision-blepharochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "42c2c178df32c9f4f496eed2c0a00a2dbf9a03857d1b3fc162049c5f8e82855f"
+    "resourcesSha256": "fde04d10c5d4e0629f26a8235d6981d7405539f1181d6464b7bd42ee755b84b3"
   },
   {
     "suite": "preserved",
     "case": "indication vision-blepharoptosis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "8fe000d167037b741417da7f1416684d30f5385b5dbd22183fce3c5363865e75"
+    "resourcesSha256": "77a6152b739f24a2cb7c26ca7543cea1bc5462d8e6b6cdf2b3596ca050813742"
   },
   {
     "suite": "preserved",
     "case": "indication field-dermatochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "a2972c7da51c902b1b1b85edeeeee246ca5457d1eacd84de5926d3902ff7f711"
+    "resourcesSha256": "004d0c7f324682c3fd1dc5cd24ee5c18c07b876fe38ec85568f8908c00f39be1"
   },
   {
     "suite": "preserved",
     "case": "indication field-blepharochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "0f96dee9af1497e83231945524e9b4d18e2b9199a96f1dc8319afdf11a9058b3"
+    "resourcesSha256": "73c9d79ae95c704a9f108b0701a34060469c5de1815357f8067b810de05ca279"
   },
   {
     "suite": "preserved",
     "case": "indication field-blepharoptosis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "f4e86bec2e9057607780abc31f7971671d318ab4caf3f9ad18f5cd04fb7a2885"
+    "resourcesSha256": "94e8db1d2ea6f883158528d32a083d1d4121fe623d7ab8f65219913f47c13127"
   },
   {
     "suite": "preserved",
     "case": "indication redundant-skin selected as what the surgery corrects -> Met",
-    "resourcesSha256": "b168423b3b2a88de1e64d366d6ced0da7086a74aabeb73516a3dc97ae9ffe63f"
+    "resourcesSha256": "7e3d6755657a6fe2508b367e34cab00f3688626e1f733cc4f4949e9f71233d30"
   },
   {
     "suite": "preserved",
     "case": "indication pretarsal-dermatitis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "1f367b14ffe31876b08fbfc4a340a6bbf8d59098fe148b4cb417906077848a36"
+    "resourcesSha256": "f3a51dca8a54cc7bd23a806972549863193f385f305aab7d045fe444b299910b"
   },
   {
     "suite": "preserved",
     "case": "indication prosthesis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "3f5e394b81922f7128eb6e1cf45c2a9a2f39296433827b37d31205e0aea65792"
+    "resourcesSha256": "59b88547cbd0839ac4e0048ed8b3ae43495f962c9da4b4cb0f815a390d3d8961"
   },
   {
     "suite": "preserved",
     "case": "complaint vision-interference alone satisfies layer 2 -> Met",
-    "resourcesSha256": "6da7e0996eb28aef86dbe608bd0b254af6cd68a8dfbc085594e060cdcabed0f0"
+    "resourcesSha256": "f615ab244ef8e312f49b9f01a6fcad5d215ddbad6366d47fc8e10262a7ea0823"
   },
   {
     "suite": "preserved",
     "case": "complaint field-interference alone satisfies layer 2 -> Met",
-    "resourcesSha256": "fe3cdb68954fd5056b7c754011ff16fb53da24fc798d1aae51dac2ad8ac8c3c9"
+    "resourcesSha256": "ec2f33dd2a0dd5851161c2755b59edd49878daf92ec6acc85ca859fa17b22055"
   },
   {
     "suite": "preserved",
     "case": "complaint difficulty-drooping alone satisfies layer 2 -> Met",
-    "resourcesSha256": "230c0ad024264ea57709a619dd69cb36224e25328782972a34bce1bf43251021"
+    "resourcesSha256": "624bf3d9d8a066c0e692a33e89970c61106c0e19df4ca05bea3da00048f3f30c"
   },
   {
     "suite": "preserved",
     "case": "complaint difficulty-eyelashes alone satisfies layer 2 -> Met",
-    "resourcesSha256": "c7c9a55b626119769ee911bcf229dd0efa63222f178ee381ea09ffba050f36ef"
+    "resourcesSha256": "b01ed19af59d774f1b2036fc76371461b77c75c84dfc0769d83f5683ec6f2ded"
   },
   {
     "suite": "preserved",
     "case": "complaint difficulty-eyelid-skin alone satisfies layer 2 -> Met",
-    "resourcesSha256": "2e71a7063f507b4f734162f301d95f057c3beeeea77a792c85630fe30d3e7799"
+    "resourcesSha256": "2bab3f8133210c08d83760ec5772fa2da18553303be6bdefb567505a3b6431e9"
   },
   {
     "suite": "preserved",
     "case": "complaint blepharitis alone satisfies layer 2 -> Met",
-    "resourcesSha256": "d062af337d45732854df7471a84cbfb257ddffddd8f01110bee0c99850b2b516"
+    "resourcesSha256": "b8e9f6d017e07cbcc0b7e22359a3b8274cc8aad588a487118b2fd8d66295e057"
   },
   {
     "suite": "preserved",
     "case": "complaint dermatitis alone satisfies layer 2 -> Met",
-    "resourcesSha256": "85355d8292012d0704e0321ee8ae37bf3ccf6b6e7142c1433e8c49888abcb8de"
+    "resourcesSha256": "98d49f081b62978ccd3e291fea82c6887dd710fa848f9bae1e4e9f597fdc4004"
   },
   {
     "suite": "preserved",
     "case": "demonstration photo-margin with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "e9823f82c86ab5c6e3980c03238207a82a9ff23a3276fe1814ca5928b69dc63a"
+    "resourcesSha256": "5ee62de4019b2fb90465a0c418e8eff516de4412ed590cecd3b21c0259a833f4"
   },
   {
     "suite": "preserved",
     "case": "demonstration skin-on-lashes with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "5a4ac888ee2fbc25e463e729d857fac277f65b622cbbc995c290cca09f998d23"
+    "resourcesSha256": "e5c0fab05876870efd612da33043f5a68fb83a87d6df5de3ae4dde6f90ae9704"
   },
   {
     "suite": "preserved",
     "case": "demonstration photo-dermatitis with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "d6f136f8549849479e021a094efa303d1e882f50bea5527e453e848533be45de"
+    "resourcesSha256": "205ab3f92a8b3fae94d194142470de0dbcb3b761fae307c923fa407e224a1e28"
   },
   {
     "suite": "preserved",
     "case": "demonstration photo-prosthesis with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "dc1d22ce17ae7d6bdea7ccd486820674ade2c4bc73e5f52f2c63a337924ee246"
+    "resourcesSha256": "24f264cfe6889dadcfe3b83c864559138b77b18468849a863b1a4fd01a8d5a0d"
   },
   {
     "suite": "preserved",
     "case": "demonstration vf-12-degree with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "fa62787d471b85c3987c9c81f1cc5a1d546b4cacbb569fddd0db063cbf4a6736"
+    "resourcesSha256": "8459279d090c7fdf8c1b42a04a4c147ecc78f1774900b98890c664d87f426327"
   },
   {
     "suite": "preserved",
     "case": "demonstration vf-30-percent with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "4349bb1c547986ad02b4faf90d713186fe9bb1f60333756cab7a25f1170896a4"
+    "resourcesSha256": "c9db73d8a44855bd998110d4edde4bd159917c9cc137fdb4a6009418c201d795"
   },
   {
     "suite": "preserved",
     "case": "CONFORMANCE DISCRIMINATOR - a photograph SHOWS the skin resting on the eyelashes but does NOT meet the page-3 submission standards -> Unmet. This is the case the old fused Conforming-Photograph-Shows-X concept could not express at all.",
-    "resourcesSha256": "d53ca3c835bb31c3aaadd5f09a255a8df496ce461e401a8f01436d4208f5061c"
+    "resourcesSha256": "1dc6827b90826e0602c975f988f5d9114eb49030d26cf67dc91da86c6e6a465f"
   },
   {
     "suite": "preserved",
     "case": "CONFORMANCE DISCRIMINATOR - a visual field printout SHOWS 12-degree loss but the examination does NOT meet the page-3 standards -> Unmet",
-    "resourcesSha256": "f109790cc9dcdb3f1b9e2d8cedf08dd94bc9f4fcc3ee09dd8c64c31eda2e936f"
+    "resourcesSha256": "b09b1e379cf439ce248779c15d345ba63d207016af54f492b9cacb389be1a33f"
   },
   {
     "suite": "preserved",
     "case": "CONFORMANCE DISCRIMINATOR (the other direction) - both lanes conform but NEITHER demonstrates a listed finding (none of the listed) -> Unmet. Conformance alone is not evidence.",
-    "resourcesSha256": "f4b5167a951ff76c858fbbb32876e5e7388f3328f65bc4fb54b48cf433968b16"
+    "resourcesSha256": "e8ea371b52cb482383f572a8ad65a659b36f95b92e54b64cec49f35b1a0a722f"
   },
   {
     "suite": "preserved",
     "case": "blepharoptosis repair with all three layers -> Met",
-    "resourcesSha256": "1c85829fa85f182d864b717a190b2b7a75897ce561b58ec6bace79b6b05a0ef0"
+    "resourcesSha256": "dcd20898294bd08a827e0956990e93d7ea3102bd26e72c919ccd4aa51e764a23"
   },
   {
     "suite": "preserved",
     "case": "one requested, no qualifying indication (none of the listed) -> Unmet",
-    "resourcesSha256": "2f8e529494e5656bcb39c6f1ec38fd5b74387e5fbad5fa407bd7732a415c0d3b"
+    "resourcesSha256": "af72dc793738b90d67f4163a22689f6c784a8b176ee5479b210e2dfbfb24af61"
   },
   {
     "suite": "preserved",
     "case": "one requested, no documented complaint (none of the listed) -> Unmet",
-    "resourcesSha256": "cb143dc31dc12a6aab99345b96a65b8096c41147ed5840363e216da96a4fee79"
+    "resourcesSha256": "6140022707d8e837b1832d7e659569b50661b8e9e479646ebb28b60db4f73495"
   },
   {
     "suite": "preserved",
     "case": "one requested, no objective demonstration (none of the listed) -> Unmet",
-    "resourcesSha256": "a2e60fb0ca4021bec93ba488a7162c25f3ac44504f6ace5fbdab70a66dff7ea8"
+    "resourcesSha256": "110d291bcb3bc96a15ef9e7db54fb9482309d3fd23f7f25247725260c35af348"
   },
   {
     "suite": "preserved",
     "case": "requested with nothing documented -> Unmet",
-    "resourcesSha256": "608974ae9d57e9964821e20d7be869bfa8ccd71df8c2994d63a7dea6a28ab95e"
+    "resourcesSha256": "d8b064fbd998647dffd9e2605326dca312be8e7beeac4361fcb38dfa55e15820"
   },
   {
     "suite": "preserved",
     "case": "both procedures, three layers and both individually documented -> Met",
-    "resourcesSha256": "479e354eec7a39e4d01ae094b4c643d0f0278d900deb2f91ea2eda50864ba2f8"
+    "resourcesSha256": "532f6c6a791423ad82291f926e1a30abe7251be2f361cdb2a59f54a75c37d96e"
   },
   {
     "suite": "preserved",
     "case": "both requested, indication missing -> Unmet",
-    "resourcesSha256": "f346138aa07429f747556cefe44b5203859c1398578a1abcc34beed3032172a6"
+    "resourcesSha256": "600a00ac33459f5d8be7a7656fae1c4f000abd7f747c03e0b2fd41d23ba92fb6"
   },
   {
     "suite": "preserved",
     "case": "both requested, complaint missing -> Unmet",
-    "resourcesSha256": "d05d57c24b666667588b4c7f07bc017e1d2a817bcbdf01d5422bd55eec8ebdf3"
+    "resourcesSha256": "86bb8c0f8cd79dda41fe9407f0487deba22d9eef8eb312be36314d444488d4e0"
   },
   {
     "suite": "preserved",
     "case": "both requested, demonstration missing -> Unmet",
-    "resourcesSha256": "7d1dd87dd35713b6fe70a036c458a93ce128deeaf3a3d238d5d0413afb46eff6"
+    "resourcesSha256": "dc3cd4f15958842aa9ac5ead62466bd8547b781e41537b24edbaa359cde59e77"
   },
   {
     "suite": "preserved",
     "case": "both requested, blepharoplasty-documentation missing -> Unmet",
-    "resourcesSha256": "3fd6b2b0fd5339829b769404c2024d80bdb315cf4c3057c6c2ded311caa348d1"
+    "resourcesSha256": "b8c2129fe6f5201a0fb47a5bc0db9a9346810efadf4e38b01402432204a744ff"
   },
   {
     "suite": "preserved",
     "case": "both requested, ptosis-documentation missing -> Unmet",
-    "resourcesSha256": "d6e5e5e65f3e7d4da99f61872ebfe889aeaad122229dab56afce1cfdf6e57953"
+    "resourcesSha256": "3bddf04fa9f0b2b74981491b86a14f7a6e1e72c0281f54878366d5f8073f8e5d"
   },
   {
     "suite": "preserved",
     "case": "cosmetic purpose outranks a fully documented request -> Unmet",
-    "resourcesSha256": "f2e511b888bcbe6720fffe9c7d6c347c9602c9b071b39dd06cc8b2c398ec325d"
+    "resourcesSha256": "003de4bea1d937186a0d4f22d24e9d14f4872ffd75d266b7007030640c0cd46e"
   },
   {
     "suite": "preserved",
     "case": "PRECEDENCE DISCRIMINATOR - cosmetic purpose on a BOTH-procedure fully documented request -> Unmet. The cosmetic branch is hoisted ABOVE the both/one split; demote it and THIS goes red and nothing else does.",
-    "resourcesSha256": "2e5a23fce22c805b6a1d2c68b33fc1409f3f3941fdcef023edc4ccd1a67ae871"
+    "resourcesSha256": "5471eaa592f110677ac56fa4540586048c8e95760a1b609b341cb270905cf79c"
   },
   {
     "suite": "preserved",
     "case": "neither procedure requested -> Unmet",
-    "resourcesSha256": "34705ff47224c12d826e7e878f9c9ff6d45d3ec59e7407693ec8d0bfaa9404db"
+    "resourcesSha256": "e399b6065eb4d598f43f4d4f3c436a256666f334bbb5ea50f4b70dba063a5772"
   },
   {
     "suite": "preserved",
     "case": "PINNED per customer flag 9e2927f3 (resolved, correct as encoded) - the prosthesis indication with its purpose and matching photograph but no listed complaint -> Unmet",
-    "resourcesSha256": "5cf39fa521b5cc8fbbdd6fd1434531ff87aeb0bd9f48e85c0a9a5b526ff88d59"
+    "resourcesSha256": "b46b9cfa0022be9b8d72ff4be9a5d003c94aab48a0c7d0c19ed94d4539c46b83"
   },
   {
     "suite": "preserved",
     "case": "MULTI-ANSWER - a packet carrying BOTH a conforming photograph and a conforming visual field -> Met. These are two DIFFERENT coded questions, so they still co-occur after the migration.",
-    "resourcesSha256": "2b9cafe799792175de6e3d59eee4bebf28a2c61bb03616a1d93f3f0fc6f38bd5"
+    "resourcesSha256": "5f9e90d85cfb3d36bcbee60fffcbe77ff55c94999b83733f0ea7961d62c0f397"
   },
   {
     "suite": "preserved",
     "case": "OVERLAP ORACLE - photograph shows a listed finding but does NOT conform, while the visual field both conforms and demonstrates -> Met via the VF lane",
-    "resourcesSha256": "7ada0bc29438336f50f14e1320bf5de0c744c4945e68c8965155ec709fc1f796"
+    "resourcesSha256": "08f92f507289fb55ad0788b04249a8dce858a616b1f43baea194fc6f9f97e5d0"
   },
   {
     "suite": "preserved",
     "case": "OVERLAP ORACLE (the separator) - photograph conforms but demonstrates nothing listed, while the visual field demonstrates but does not conform -> Unmet. Neither lane is complete; a flattened conjunction would wrongly pass this.",
-    "resourcesSha256": "ea2f6be02ff27478777fbdb3a990a7c01e7fe9a5b5ec1d5237bc5e0f4fb389f9"
+    "resourcesSha256": "53c2dafc80a627210c3dd5956fea68757d9787e24fe8e44248271bed4e390d53"
   },
   {
     "suite": "preserved",
     "case": "RECORD ARM - no local attestation at all; a submitted ServiceRequest carrying CPT 15822 is what makes the request true -> Met",
-    "resourcesSha256": "f348ec7474b8cbc0cbcd3bd15ddbb631b3590571893b4ea85825fe26b2e193f2"
+    "resourcesSha256": "eaf6bca6ab12b1c2431caff05021b1bba6871b9c981b439d742f491f69ce3356"
   },
   {
     "suite": "preserved",
     "case": "BOTH ARMS - a local attestation AND a matching submitted ServiceRequest, same code. The recency arbitration runs and both candidates yield the same answer -> Met",
-    "resourcesSha256": "e78259ed5df54d5a99fab1cdbcf6ccc318c1edd50c0eb6882d7f95a510450f7e"
+    "resourcesSha256": "8bd97173c8967d1a3c18b141830bae7ce5736cb7b402219c84451069c4a984f0"
   },
   {
     "suite": "preserved",
     "case": "DENY DISCRIMINATOR - a REAL ServiceRequest exists, fully documented, but its code is outside both covered sets -> Unmet. This is what the covered-service value sets are FOR, and it is distinct from requesting nothing at all: absence and non-membership both deny, and only this case proves the second one.",
-    "resourcesSha256": "2d3d009bdd186d1f33cc4aedffbb08242b91589232f20ce908d35bd27b1c0234"
+    "resourcesSha256": "3731ac2006c37f66197dfecf8e6d01f9ac41ea357d254037306cc00a26ed095c"
   },
   {
     "suite": "preserved",
     "case": "RECORD ARM, both procedures - two submitted ServiceRequests, one per covered set, both individually documented -> Met",
-    "resourcesSha256": "5dbe55f52ab55dab2a1f1adeae692af71a9bc94ee33025ad4d1eb0582fabdc23"
+    "resourcesSha256": "e2120b311aa1d01e069f9865887937695abd696cb5116cf9c76b85142ee9a336"
   },
   {
     "suite": "completed",
     "case": "indication vision-dermatochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "3b1ad126584605e794cab38b3744e6968d9b5194b0df18ffdeae04057ac8209f"
+    "resourcesSha256": "e88cefaad2215efe59753e61de33f2eceba2d8c89eead8cf6b0ea0c4430ea865"
   },
   {
     "suite": "completed",
     "case": "indication vision-blepharochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "dc157c28bab53c929bdcb25908fa5544235d92187570fbac5154ccf5e10721be"
+    "resourcesSha256": "97a847bc8a83f2df91410ccac099bad178f13442768c4229029be9e547da6f22"
   },
   {
     "suite": "completed",
     "case": "indication vision-blepharoptosis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "ede1310dfe5a567cbaa649bd30f7eb91a7b59456e50c8b446caaa23b1514fe16"
+    "resourcesSha256": "e41af5bf04b467b9c08da53eebf9593065bd4386afbac07a507203d1f01e1793"
   },
   {
     "suite": "completed",
     "case": "indication field-dermatochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "61d0fc28398ece9e8c2bdd3270e8ab0072d81c54839175b85ab218560c7fd0f5"
+    "resourcesSha256": "b6134305efab840cc0f1257e540ee8aa92f96f7819fa014f055d72ba5ed029e0"
   },
   {
     "suite": "completed",
     "case": "indication field-blepharochalasis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "634f63d5346d98f6af1bf914dab36de6d638525936ed8bd15b592b7965f8c038"
+    "resourcesSha256": "2b21900bbd90cb9d090b2dd3c74e56b2f489923144ace3f4b2084fdd31d272d7"
   },
   {
     "suite": "completed",
     "case": "indication field-blepharoptosis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "d838face7da9d9558e49db0b1456a9a71d2435e730fe69805a257c48bf7a59e6"
+    "resourcesSha256": "15fd184d47a9085682b63d507529eb126e7162ef48924d7b58ac2791e2154812"
   },
   {
     "suite": "completed",
     "case": "indication redundant-skin selected as what the surgery corrects -> Met",
-    "resourcesSha256": "bb976420cf74030363083a4b16ed8cc649bf10e32d625f439086229f2202cc5d"
+    "resourcesSha256": "8946211773ac3644982861367c3495fabde1f8e53ce3f56fa5ef29c042837228"
   },
   {
     "suite": "completed",
     "case": "indication pretarsal-dermatitis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "9a6a9f3ddb59b679f161d2d1958cf0a6a498b8df76a348840d3c6f1e6514c677"
+    "resourcesSha256": "064cf10ba00916a8825808ae6ebac729557fbeeba9422b5bad0138feef1771f3"
   },
   {
     "suite": "completed",
     "case": "indication prosthesis selected as what the surgery corrects -> Met",
-    "resourcesSha256": "6b9c27b8b5d4da916b3b83c7980e0405a2bbde1165cd9799609efbe314e790c2"
+    "resourcesSha256": "f28121714b4729a740bb3d683716f3163998e5fd2a6d1203d992e143bfd74381"
   },
   {
     "suite": "completed",
     "case": "complaint vision-interference alone satisfies layer 2 -> Met",
-    "resourcesSha256": "bedfb2d98394406f5c1b6b062f6094e81c7b74126b6b34f8cf5600119a00ab06"
+    "resourcesSha256": "b3091ff9888bb1a12ea2cde6855c25120ad2bebe08fb9170fea745d96658c643"
   },
   {
     "suite": "completed",
     "case": "complaint field-interference alone satisfies layer 2 -> Met",
-    "resourcesSha256": "b8a2f2ad8dd043a19686436f90285e2510d062d7fde9218d0095dbf257d1be9a"
+    "resourcesSha256": "e89691a4719a19e2d80aac334b0d25dd7fc5dc84895be1efba4ec8dcf13ad3e1"
   },
   {
     "suite": "completed",
     "case": "complaint difficulty-drooping alone satisfies layer 2 -> Met",
-    "resourcesSha256": "514cd9e75133cb3d4f76c3fa17b1482edb67cf84f87a5e5efbe91b9b89f3d32c"
+    "resourcesSha256": "fc6d4f0e75018581a8507293d09a212fd530e456fdbe7d0a2a379a54b3334062"
   },
   {
     "suite": "completed",
     "case": "complaint difficulty-eyelashes alone satisfies layer 2 -> Met",
-    "resourcesSha256": "75d84e370acd93e5d81a280652e49d3a2dd2d0d7efdf685d54c96b00dee7eb5a"
+    "resourcesSha256": "a7dec9729f8b69558a159d74570271d3bdf01d7a297958f6d0b5f875bfaa2189"
   },
   {
     "suite": "completed",
     "case": "complaint difficulty-eyelid-skin alone satisfies layer 2 -> Met",
-    "resourcesSha256": "27e6df6d474b4275514c56fb7a9db2241fbbcbe32243d35af68e74c0a24fba7e"
+    "resourcesSha256": "95415547d5599a43c65d50d70ed48dbedfcf556c30303c61953cca0454a02bd2"
   },
   {
     "suite": "completed",
     "case": "complaint blepharitis alone satisfies layer 2 -> Met",
-    "resourcesSha256": "fb97c539c4ea573050af94de59d79f1d06d00b68c28cac3b6a36e6810493640e"
+    "resourcesSha256": "4607561750ea0950927c5766ee39e7fe5fbbe554982d573717d1c24bd843987d"
   },
   {
     "suite": "completed",
     "case": "complaint dermatitis alone satisfies layer 2 -> Met",
-    "resourcesSha256": "329a878f804e5cfb88df49d50cedab9e1e43da0547a660c910ce2ac2514237a1"
+    "resourcesSha256": "9437be2ececcddf4f24104f6e0f88932c7231fea03b7b1d9f6286781efc3f9a0"
   },
   {
     "suite": "completed",
     "case": "demonstration photo-margin with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "e0389fd4484e077da9ab61e9c43fa0ff947fb5e671be1e154a75e7be5bb3b130"
+    "resourcesSha256": "7348a89811db99885d14be6916059475e81ac79525c2282cf1be037314dad0a6"
   },
   {
     "suite": "completed",
     "case": "demonstration skin-on-lashes with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "2b91b979621ebea82f38f4c307cf760686748c6c18422b25797ccaeead588a67"
+    "resourcesSha256": "47a566925def9a8c1742e5f1eafb2c6e338b847db26f7c299ac05971c9ce1e28"
   },
   {
     "suite": "completed",
     "case": "demonstration photo-dermatitis with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "567a2960b34cca0cdc02edcdce07bf0504a584050d1602598dfd265aa2178601"
+    "resourcesSha256": "9da6e0aedb1ee67459d08f08c36c03e73a3fba061b0cc44a060b3419fa276b09"
   },
   {
     "suite": "completed",
     "case": "demonstration photo-prosthesis with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "96627db88378ffcc9514358a5b275b8045e5e1e4659e051b4deebaee481bd835"
+    "resourcesSha256": "e3382674d75c13544431b682776c072e61076773b5f3fb6eb704fd44bec0e8ee"
   },
   {
     "suite": "completed",
     "case": "demonstration vf-12-degree with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "89c5a20b738888069f5a162e7c9be466dc6a6bad2f9200c65b1f16e565ab4e2e"
+    "resourcesSha256": "76d64992893ad596832550fb9011b3251f11b46ca88d6bb9a43a11436ff8d1f2"
   },
   {
     "suite": "completed",
     "case": "demonstration vf-30-percent with its lane conformance satisfies layer 3 -> Met",
-    "resourcesSha256": "144f97784a59b00795d5d9dd315963bc4799803f7189f8cf6937b5a55a72cb95"
+    "resourcesSha256": "a29fe11540fda2b3c7b0d362e5aecd16413a661ed9a824e69917ab5c78d5d015"
   },
   {
     "suite": "completed",
     "case": "CONFORMANCE DISCRIMINATOR - a photograph SHOWS the skin resting on the eyelashes but does NOT meet the page-3 submission standards -> Unmet. This is the case the old fused Conforming-Photograph-Shows-X concept could not express at all.",
-    "resourcesSha256": "23408a7c3a71c5f846666edaa2b65de8788895f4a4ef0243eee58c9d236a959d"
+    "resourcesSha256": "a65894338cac73d074abce7bfe8c70e663e017950dac5962915a0329bd63c6d2"
   },
   {
     "suite": "completed",
     "case": "CONFORMANCE DISCRIMINATOR - a visual field printout SHOWS 12-degree loss but the examination does NOT meet the page-3 standards -> Unmet",
-    "resourcesSha256": "044dfc8c429679a317f1b908e11c920db16a4050ceaef9795bef7a9661bd270d"
+    "resourcesSha256": "e197a555ca43c8a482bdfd44d5afdb59bc8deeb633f3e2019c4bad2148ddfe60"
   },
   {
     "suite": "completed",
     "case": "CONFORMANCE DISCRIMINATOR (the other direction) - both lanes conform but NEITHER demonstrates a listed finding (none of the listed) -> Unmet. Conformance alone is not evidence.",
-    "resourcesSha256": "d4eb4c95d35088c0205e397c85fe3a3f14aec3b035edcfaaa3f17ed0ebddc308"
+    "resourcesSha256": "b4a484bc9334efe35c0cdabd07fb6adc4c7e9f1d9dd672975cc3465726125043"
   },
   {
     "suite": "completed",
     "case": "blepharoptosis repair with all three layers -> Met",
-    "resourcesSha256": "7f818f56d230d5c5c6eca998650e37669a605f2cbed6d94c38a64c5af11359dd"
+    "resourcesSha256": "6e4cfc2dd0e057a56350b9d66ae4924f2badbe7642cc4495ff8805da7f39f68f"
   },
   {
     "suite": "completed",
     "case": "one requested, no qualifying indication (none of the listed) -> Unmet",
-    "resourcesSha256": "9cdde84a9a15b85cb5612e1c03dcc5bc00375818c345bc986fe2ec772315d4c1"
+    "resourcesSha256": "0f20ca75beacf724e629455c60ca41b78d0bbfc7bace77ab1887f4099631d606"
   },
   {
     "suite": "completed",
     "case": "one requested, no documented complaint (none of the listed) -> Unmet",
-    "resourcesSha256": "7a9929a63baf57ac78820253caca0b85dac4c313040804382ed42ed7091e9354"
+    "resourcesSha256": "27baa2bd6594bc8a480075da5b0368e059898cfda5c87225159bb99a801c4767"
   },
   {
     "suite": "completed",
     "case": "one requested, no objective demonstration (none of the listed) -> Unmet",
-    "resourcesSha256": "e036efab3a383ee3f673afd1efeaa1afeade66a8c8b5955750823e0e490c77ed"
+    "resourcesSha256": "c7c0e0af3205fb89926a0910d0b9432f6d21e3a3b6e909647b2fb9fee14d11dc"
   },
   {
     "suite": "completed",
     "case": "requested with nothing documented -> Unmet",
-    "resourcesSha256": "d96adb1ad4ca43c06b31b29357013cf017639e57ac4ef23d23253ca8de54eee6"
+    "resourcesSha256": "b1e0b9cb7aaccbb9dcae58ee91a1110713bc29cc46f522f63046e597f69b3465"
   },
   {
     "suite": "completed",
     "case": "both procedures, three layers and both individually documented -> Met",
-    "resourcesSha256": "479e354eec7a39e4d01ae094b4c643d0f0278d900deb2f91ea2eda50864ba2f8"
+    "resourcesSha256": "532f6c6a791423ad82291f926e1a30abe7251be2f361cdb2a59f54a75c37d96e"
   },
   {
     "suite": "completed",
     "case": "both requested, indication missing -> Unmet",
-    "resourcesSha256": "f346138aa07429f747556cefe44b5203859c1398578a1abcc34beed3032172a6"
+    "resourcesSha256": "600a00ac33459f5d8be7a7656fae1c4f000abd7f747c03e0b2fd41d23ba92fb6"
   },
   {
     "suite": "completed",
     "case": "both requested, complaint missing -> Unmet",
-    "resourcesSha256": "d05d57c24b666667588b4c7f07bc017e1d2a817bcbdf01d5422bd55eec8ebdf3"
+    "resourcesSha256": "86bb8c0f8cd79dda41fe9407f0487deba22d9eef8eb312be36314d444488d4e0"
   },
   {
     "suite": "completed",
     "case": "both requested, demonstration missing -> Unmet",
-    "resourcesSha256": "7d1dd87dd35713b6fe70a036c458a93ce128deeaf3a3d238d5d0413afb46eff6"
+    "resourcesSha256": "dc3cd4f15958842aa9ac5ead62466bd8547b781e41537b24edbaa359cde59e77"
   },
   {
     "suite": "completed",
     "case": "both requested, blepharoplasty-documentation missing -> Unmet",
-    "resourcesSha256": "3fd6b2b0fd5339829b769404c2024d80bdb315cf4c3057c6c2ded311caa348d1"
+    "resourcesSha256": "b8c2129fe6f5201a0fb47a5bc0db9a9346810efadf4e38b01402432204a744ff"
   },
   {
     "suite": "completed",
     "case": "both requested, ptosis-documentation missing -> Unmet",
-    "resourcesSha256": "d6e5e5e65f3e7d4da99f61872ebfe889aeaad122229dab56afce1cfdf6e57953"
+    "resourcesSha256": "3bddf04fa9f0b2b74981491b86a14f7a6e1e72c0281f54878366d5f8073f8e5d"
   },
   {
     "suite": "completed",
     "case": "cosmetic purpose outranks a fully documented request -> Unmet",
-    "resourcesSha256": "aad3bb326836ec9ef5d048707db8d337abbefc4486e838e8cc92c913a719aa52"
+    "resourcesSha256": "9276fb9633a33e99e37acb4966b9eb9e71ecbdbba3f31758f628c047bb084c2d"
   },
   {
     "suite": "completed",
     "case": "PRECEDENCE DISCRIMINATOR - cosmetic purpose on a BOTH-procedure fully documented request -> Unmet. The cosmetic branch is hoisted ABOVE the both/one split; demote it and THIS goes red and nothing else does.",
-    "resourcesSha256": "2e5a23fce22c805b6a1d2c68b33fc1409f3f3941fdcef023edc4ccd1a67ae871"
+    "resourcesSha256": "5471eaa592f110677ac56fa4540586048c8e95760a1b609b341cb270905cf79c"
   },
   {
     "suite": "completed",
     "case": "neither procedure requested -> Unmet",
-    "resourcesSha256": "bfbc7911471cf35e775d16913587a99368d3df364997783cba21e107fe862fc1"
+    "resourcesSha256": "3cdfc86de463d5af5081be432ce7aa8dd8cf5ddef6dd305b81fc6f91de513856"
   },
   {
     "suite": "completed",
     "case": "PINNED per customer flag 9e2927f3 (resolved, correct as encoded) - the prosthesis indication with its purpose and matching photograph but no listed complaint -> Unmet",
-    "resourcesSha256": "682380a25f4956ef3f490178ec64e4da634c565550dfdc6ea54bc4bf4f0f8a3e"
+    "resourcesSha256": "fd4816947a6dd296dd6ea4f81d56e62033310ba871094071252da9bbeba0dc12"
   },
   {
     "suite": "completed",
     "case": "MULTI-ANSWER - a packet carrying BOTH a conforming photograph and a conforming visual field -> Met. These are two DIFFERENT coded questions, so they still co-occur after the migration.",
-    "resourcesSha256": "f4494eb424d4b6696f4b7f9aee69ec65e39fa2b63058d2f2aa840c2e4a40f13d"
+    "resourcesSha256": "cdd3404b2c3a4c3a618970c792e68d2d264f5ddbb821f7721c0655667437b1b1"
   },
   {
     "suite": "completed",
     "case": "OVERLAP ORACLE - photograph shows a listed finding but does NOT conform, while the visual field both conforms and demonstrates -> Met via the VF lane",
-    "resourcesSha256": "9ce3da9a2a4671b5bcc30830af8849eab3914d2bd944a30e7323c36c4e152a00"
+    "resourcesSha256": "7afa292176317bb47e06e523bf6f4a1506189ad2a97398a0b7056eb12a8b2dc8"
   },
   {
     "suite": "completed",
     "case": "OVERLAP ORACLE (the separator) - photograph conforms but demonstrates nothing listed, while the visual field demonstrates but does not conform -> Unmet. Neither lane is complete; a flattened conjunction would wrongly pass this.",
-    "resourcesSha256": "5dc13a7839b300384a935fa49acb3891b95412cba1b186078e1c916d030fe60d"
+    "resourcesSha256": "1abfd66e25068b615539bce3b56c7cdd00e1e77fff6c5904ef61e7f6b1d52df6"
   },
   {
     "suite": "completed",
     "case": "RECORD ARM - no local attestation at all; a submitted ServiceRequest carrying CPT 15822 is what makes the request true -> Met",
-    "resourcesSha256": "b64f7d482916990e551c029912a09b07d8a8f0a80cb9f75a611901d338038f4f"
+    "resourcesSha256": "73e23712ff7487680aa7fb2d90c75e2aa0a73fab0b6fd284a0fa36312a92b5ef"
   },
   {
     "suite": "completed",
     "case": "BOTH ARMS - a local attestation AND a matching submitted ServiceRequest, same code. The recency arbitration runs and both candidates yield the same answer -> Met",
-    "resourcesSha256": "af6a8029d43d141a1d7a8808baadaaf378cbf7416a8ce1de4093e42113966ba1"
+    "resourcesSha256": "151bd8b959cc4e947a8b804174cf3387f35d5b937c19a4d1a5b640be5591ef2c"
   },
   {
     "suite": "completed",
     "case": "DENY DISCRIMINATOR - a REAL ServiceRequest exists, fully documented, but its code is outside both covered sets -> Unmet. This is what the covered-service value sets are FOR, and it is distinct from requesting nothing at all: absence and non-membership both deny, and only this case proves the second one.",
-    "resourcesSha256": "cbb8d1dba2a8b3718fc56851a32e6048bf041c4cae114e4a52801c11102b27df"
+    "resourcesSha256": "d0b91840aeac6d13e3338315babf1598203b724605f9add9c4a663390bc140c0"
   },
   {
     "suite": "completed",
     "case": "RECORD ARM, both procedures - two submitted ServiceRequests, one per covered set, both individually documented -> Met",
-    "resourcesSha256": "5dbe55f52ab55dab2a1f1adeae692af71a9bc94ee33025ad4d1eb0582fabdc23"
+    "resourcesSha256": "e2120b311aa1d01e069f9865887937695abd696cb5116cf9c76b85142ee9a336"
   },
   {
     "suite": "supplemental",
     "case": "Local false wins equal-time positive ServiceRequest",
-    "resourcesSha256": "7574bcd7acadb5df7239c59799b73411ea5b562b0aa9647c8e223ab348a16872"
+    "resourcesSha256": "19b6424e8458de19af24b7d3f51e2f54ce002046a57145b82694c33e4de34827"
   },
   {
     "suite": "supplemental",
     "case": "Newer positive ServiceRequest wins older local false",
-    "resourcesSha256": "0ed811853cdd04d7064f4f5dee49406b36f71f402249854b31c38c10bc2cde23"
+    "resourcesSha256": "17106c700af3637e740bb90689bf41912ded41cd856bd613eb39b3821899b2a6"
   },
   {
     "suite": "supplemental",
     "case": "Newest local valueless answer displaces positive ServiceRequest",
-    "resourcesSha256": "28e17c3ef680c4c93e789cc4d628e5b4972a0b36ea6f1ddf8c04f8a7f864f377"
+    "resourcesSha256": "07f3cacd6b3180fd080d1b1b17384b9b45da0d5bc0f43f03b96f349a89d0f5a0"
   },
   {
     "suite": "unknowns",
     "case": "missing-cosmetic",
-    "resourcesSha256": "1bb3bc42c6063be7a068093e4882c656502b55b4e288d00f6dee38e366773944"
+    "resourcesSha256": "e2d20c7b567b4f6371ca4a6a7714f1345267874895493e2530ca7f813917d958"
   },
   {
     "suite": "unknowns",
     "case": "missing-indication",
-    "resourcesSha256": "eb95965d0064bf5797a6ff92acf1744b08dc26d3deea8145093a13b63f2b251a"
+    "resourcesSha256": "0c231f2fac3dac3b6ca27fe925ca5020ca99c990effe329aeb66ca4b5dc29261"
   },
   {
     "suite": "unknowns",
     "case": "missing-complaint",
-    "resourcesSha256": "a5492815b72fc7b1d42d458f02787f33099c11ceb7b7b5bdd67d5e0d5c8183e1"
+    "resourcesSha256": "e69da0bc960eaabb86b9227a0abda9104079e8843e81e770efb9242e07f0f14c"
   },
   {
     "suite": "unknowns",
     "case": "missing-bdoc",
-    "resourcesSha256": "09dcdfe930de1e1283e1c985b1a33225aa7a829fd191d33edaa6cb74ffc1fef8"
+    "resourcesSha256": "4331ef1e1a4a2ea537e79104de36274144edbe51931a05f51283e98d936713f7"
   },
   {
     "suite": "unknowns",
     "case": "missing-pdoc",
-    "resourcesSha256": "07310b3ee4702e42cef26f20e1f4c668ad75ccfd3a3b842d79eff2805855a1fc"
+    "resourcesSha256": "8070056e95f03fb3f657fa4de34f667331fd8273f27811eeb24d45198be1d347"
   },
   {
     "suite": "unknowns",
     "case": "missing-photo",
-    "resourcesSha256": "6d5006153240e16f85e01dbf48cf1a8a1ab9db57b4c17f8787b08e0ae03ce11e"
+    "resourcesSha256": "1149adfd6ca7af7c2d3e0dd57a8bfd114dc8b968ccd3a87abad81cfc205b11e6"
   },
   {
     "suite": "unknowns",
     "case": "missing-photoConform",
-    "resourcesSha256": "f488164d504c59791fe8dfc424ffe30541dc9e4801c7f70ec14b759468b6ab93"
+    "resourcesSha256": "c06ffa3ff79e2752f2d9543dc92825e33a8dae047b6a35ad29c451e38583f254"
   },
   {
     "suite": "unknowns",
     "case": "missing-vf",
-    "resourcesSha256": "8b3a8b159f878f2dc228d72c4f4189774eddb7549a5dd431ebd43bb88a6bf806"
+    "resourcesSha256": "a973e46955e98d4f859c015f5649fb9df837ccf5a4b573eb1f623f3cd0a78702"
   },
   {
     "suite": "unknowns",
     "case": "missing-vfConform",
-    "resourcesSha256": "fc8df44f7d5bdfea9868a48feb82be9626c79b2b5eb35629d743e292fe13ea07"
+    "resourcesSha256": "99a19bbd79cee5a02bdb065ee4beabb4c05f24c6b97845c533c1c8752d97baec"
   },
   {
     "suite": "unknowns",
     "case": "complete-photograph",
-    "resourcesSha256": "f2eb481ee1f48d6444321732697a21bfa98f81001b5ebc3b763a18cb201f3f79"
+    "resourcesSha256": "151eeea8eb05adb4065b12eae7542665d14384c05325f141b99edc6ffe36c7c4"
   },
   {
     "suite": "unknowns",
     "case": "complete-visual-field",
-    "resourcesSha256": "512b49faff42519c5b29b0feee830dfbf6d18f6c54f20edbf97cd734c7b30dd8"
+    "resourcesSha256": "994970b8f211575e14831c7f5aa0f07d0b03cad0bd1506cfee15bb14fb3870de"
   },
   {
     "suite": "unknowns",
     "case": "single-missing-indication",
-    "resourcesSha256": "0bac88e272135ba7cd8ac2dcabc4ff22e94ed88d6c5974c583b444eefd85dff9"
+    "resourcesSha256": "4cf9138f761adfc5c4d01ff5f755db4d278f92cfcc1135602cddf2037cda50c0"
   },
   {
     "suite": "unknowns",
     "case": "single-complete",
-    "resourcesSha256": "6b8e6e9caf1f5e82f7f5c55dab29eaeb13d2fa1cbd21da768fb6036e7c76c2f3"
+    "resourcesSha256": "4bb08dd0830fb4cd343f3b7741ff1150a748daa4419ee3284413725064e06199"
   },
   {
     "suite": "unknowns",
     "case": "explicit-negative-indication",
-    "resourcesSha256": "bdd8e1db8c514783b0936ec50bf287cb4d0a2bde0b38d716973278a454681fe4"
+    "resourcesSha256": "a002be0140a621069699d9a0c51dfb7b8c2130ceec79c24c94d07c743f39ee1e"
   },
   {
     "suite": "unknowns",
     "case": "visual-field-makes-photograph-unnecessary",
-    "resourcesSha256": "bd675293878e9df19c78dc2b6e148c3d86446bddf8ce95db2700d4f41674b74a"
+    "resourcesSha256": "8e25f27c51dc20eea45629742ac3a35cc50378b6b20f70eddc6df77866c454dc"
   },
   {
     "suite": "unknowns",
     "case": "photograph-makes-visual-field-unnecessary",
-    "resourcesSha256": "4fc012991b5c127214c8753de04feb2ccb993c22f25610951768595d3aabcbc4"
+    "resourcesSha256": "bf76d0dec4c05ca0b8429734abf85bba8b15b8ab33eb914225d2170adc8289c5"
   },
   {
     "suite": "unknowns",
     "case": "false-conformance-makes-demonstrations-unnecessary",
-    "resourcesSha256": "c0588ee14af5daed99956ef5379f9c0ec12090530a0051e29cc1f7876694d06e"
+    "resourcesSha256": "00cbaad864929d042d350cc16239fdccc178497a60bb70a1d6c37c5a30ffe16f"
   },
   {
     "suite": "unknowns",
     "case": "negative-indication-makes-complaint-unnecessary",
-    "resourcesSha256": "bb9203a3931656fa59f3315f9522813f2e56dc47044324486330e4350655f782"
+    "resourcesSha256": "b8c2ff51fe8d7cc27a098794972aa4aa6b066518949a1558e1ebde3a19780260"
   },
   {
     "suite": "unknowns",
     "case": "cosmetic-makes-later-inputs-unnecessary",
-    "resourcesSha256": "f1481f3ab615e6573c0a8efc1f5761aa29979277cc7ec84226266f5705095983"
+    "resourcesSha256": "1f6a3ff0b043e8b79dd2bdc533960be03ea5145ccb216aa7e7dcc4fb0efa449b"
   }
 ]

@@ -129,6 +129,18 @@ activity "Refer To Specialist":
 activity "Deny":
 - request CPGCommunicationRequest.
 - with \`Imaging is not covered for this presentation.\`.
+
+presentation for "Hard Exclusion":
+- question text is "Does a hard exclusion apply?".
+
+presentation for "Qualifying Indication":
+- question text is "Is a qualifying indication documented?".
+
+presentation for "Contrast Allergy":
+- question text is "Does the patient have a contrast allergy?".
+
+presentation for "Complex Case":
+- question text is "Is this a complex case?".
 `;
 
 /**
@@ -322,6 +334,21 @@ first:
     - otherwise then recommend activity "not-certify.Deny".
     end.
 - otherwise then recommend activity "not-certify.Deny".
+
+presentation for "Has Qualifying Diagnosis":
+- question text is "Is a qualifying diagnosis documented?".
+
+presentation for "Failed Drug Therapy":
+- question text is "Has drug therapy failed?".
+
+presentation for "Failed Physical Therapy":
+- question text is "Has physical therapy failed?".
+
+presentation for "Viral Load Below Threshold Lab Result":
+- question text is "Is the documented viral load below the required threshold?".
+
+presentation for "Viral Suppression Charted By Clinician":
+- question text is "Has the clinician documented viral suppression?".
 ` + DETERMINATION_ACTIVITIES;
 
 export const CRITERIA_DECISION_REFERENCE_CEL = `# Criteria Decision Reference — cases (Stage 1)
@@ -471,6 +498,9 @@ decision "Coverage Determination":
 first:
 - when "Has Qualifying Diagnosis" then recommend activity "certify.Approve".
 - otherwise then recommend activity "not-certify.Deny".
+
+presentation for "Has Qualifying Diagnosis":
+- question text is "Is a qualifying diagnosis documented?".
 ` + DETERMINATION_ACTIVITIES;
 
 export const PA_DETERMINATION_REFERENCE_CEL = `# PA Determination Reference — cases (Stage 1 PA exemplar)
@@ -559,6 +589,15 @@ decision "Continuation of Therapy Determination":
 first:
 - when "Demonstrated Response" then recommend activity "certify.Approve".
 - otherwise then recommend activity "not-certify.Deny".
+
+presentation for "Continuation Request":
+- question text is "Is this a continuation request?".
+
+presentation for "Demonstrated Response":
+- question text is "Has a response to treatment been demonstrated?".
+
+presentation for "Clinically Indicated":
+- question text is "Is the requested treatment clinically indicated?".
 ` + DETERMINATION_ACTIVITIES;
 
 export const SOURCE_DELEGATED_DECISION_REFERENCE_CEL = `# Source-Delegated Decision Reference — cases (Stage 1)
@@ -712,6 +751,18 @@ first:
 - when ( "Has Indication Y" and "Has Severe Markers" ) then recommend activity "certify.Approve".
 - when ( "Has Indication X" or "Has Indication Y" ) then recommend activity "not-certify.Deny".
 - otherwise then recommend activity "not-certify.EIU".
+
+presentation for "Has Indication X":
+- question text is "Is indication X documented?".
+
+presentation for "Failed Standard Therapy":
+- question text is "Has standard therapy failed?".
+
+presentation for "Has Indication Y":
+- question text is "Is indication Y documented?".
+
+presentation for "Has Severe Markers":
+- question text is "Are severe markers documented?".
 ` + DETERMINATION_ACTIVITIES_WITH_EIU;
 
 export const DISPOSITION_ARBITRATION_REFERENCE_CEL = `# Disposition-Arbitration Reference — cases (Stage 1)
@@ -860,6 +911,12 @@ activity "Approve":
 activity "Deny":
 - request CPGCommunicationRequest.
 - with \`Eligibility: DENY — age criterion not met.\`.
+
+presentation for "Age 18 Or Older":
+- question text is "Is the patient at least 18 years old?".
+
+presentation for "Patient Under Twenty One Years":
+- question text is "Is the patient younger than 21 years?".
 `;
 
 /**

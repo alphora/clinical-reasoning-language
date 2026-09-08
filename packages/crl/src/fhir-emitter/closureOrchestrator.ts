@@ -1,3 +1,6 @@
+import { answerTerminologyResolver } from "../emit/answerDomain";
+import { checkPresentationReachability } from "./presentationReachability";
+import { createPresentationCatalog } from "../emit/presentation";
 import { publicationProducerOperands } from "../emit/publicationProgram";
 /**
  * CRL → FHIR Definition emit — closure orchestrator (Todo 4 of #73).
@@ -69,8 +72,8 @@ import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./s
 import { hasAgeSource } from "../emit/publicationAge";
 import { resolveCaseFeatureRecord, type CaseFeatureRecordResolution, resolveFeatureExpressionTarget } from "./caseFeatureRecord";
 import { emitLocalCodeSystem, emitReferenceStubCodeSystem } from "./codeSystem";
-import { emitInlineAnswerResources, inlineAnswerSet } from "./inlineAnswerSet";
-import type { InlineAnswerSet } from "./inlineAnswerSet";
+import { emitOwnedValueSetCodeSystems, namedAnswerSet } from "./namedAnswerSet";
+import type { NamedAnswerSet } from "./namedAnswerSet";
 import {
   emitDecisionPlanDefinition,
   type ActivityResolver,
@@ -1202,7 +1205,7 @@ export function emitFhirDefClosure(
   // ⭐⭐ #189 — ONE descriptor per inline-options concept, built ONCE and read by BOTH the resource emit
   // and the StructureDefinition binding. Deriving it twice would let the emitted ValueSet url and the url
   // the binding points at drift apart — silently, since nothing validates binding targets today.
-  const inlineSetByConcept = new Map<string, InlineAnswerSet>();
+  const answerSetByConcept = new Map<string, NamedAnswerSet>();
 
   const localDomainResolver = prepared.localDomainResolver;
 
@@ -1236,6 +1239,8 @@ export function emitFhirDefClosure(
       return { libraryName, filePath, isPrimarySeed, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
     });
 
+  const presentationCatalogs = new Map(libraries.map((lib) => [lib.filePath, createPresentationCatalog(lib.ast, lib.filePath)]));
+
   // Build the index ONCE (O(N) over closure).
   const index = buildAllLibrariesIndex(libraries);
 
@@ -1245,19 +1250,13 @@ export function emitFhirDefClosure(
 
   // Per-library emit (1-4) + per-decision emit with closure-aware resolvers.
   for (const lib of libraries) {
-    // ⭐⭐ #189 — INLINE ANSWER OPTIONS materialize the concept's OWN vocabulary: one CodeSystem plus the
-    // all-options and qualifying ValueSets. See `inlineAnswerSet.ts` for why the CodeSystem is per-CONCEPT
-    // and why `lowerLocalCodes` is untouched.
+    // Named answer vocabularies are owned by the authored CRL library and concept.
     for (const st of lib.ast.statements) {
       if (st.type !== "Concept") continue;
-      const domainId = localDomainResolver.domainIdFor({
-        filePath: lib.filePath,
-        name: lib.libraryName,
-      }) as string;
-      const set = inlineAnswerSet(st, domainId, metadata.canonicalBase);
+      const set = namedAnswerSet(st, lib.ast, metadata.name, metadata.canonicalBase, (error) => errors.push({ type: "Validation", kind: error.code, message: error.message, line: error.location?.start.line, column: error.location?.start.column }), answerTerminologyResolver(prepared.rawFhirClosure.find((entry) => entry.filePath === lib.filePath)!, graph.registry));
       if (!set) continue;
-      inlineSetByConcept.set(st.name, set);
-      resources.push(...emitInlineAnswerResources(set, metadata, resolvedOpts));
+      answerSetByConcept.set(`${lib.libraryName}\0${st.name}`, set);
+
     }
 
     // Build per-source-library resolvers.
@@ -1287,8 +1286,8 @@ export function emitFhirDefClosure(
     // (mixed code+definition, empty code, missing type, duplicate code) would
     // otherwise be skipped on the FHIR-only path (MCP `emit_crl_fhir`), which
     // never goes through the CQL lane. We use the SAME pass's `localCodes` to
-    // select which codes to materialize, so the CodeSystem carries EXACTLY the
-    // codes the CQL emits (one source of truth, no second predicate to drift).
+    // select which codes to materialize, so this contribution carries exactly the
+    // concept-identity codes the CQL emits. Named terminology contributions are collected later from emitted ValueSets.
     // The lowering kinds are already hard errors (not in FHIR_DEF_WARNING_KINDS),
     // so push them as-is — re-keying would only lose the actionable subtype. On
     // a lowering error, surface it and emit NO CodeSystem for this library.
@@ -1916,7 +1915,7 @@ export function emitFhirDefClosure(
     const caseFeatureInputResolver: CaseFeatureInputResolver = (ref) => {
       const publicationInputs = publicationCaseFeatures(prepared.publications, lib.filePath, ref).flatMap((descriptor) => {
         gatheredPublications.set(descriptor.identity.key, descriptor);
-        return descriptor.profileUrl === undefined ? [] : [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType }];
+        return descriptor.profileUrl === undefined ? [] : [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType, presentationOwner: presentationCatalogs.get(descriptor.identity.sourceIdentity) }];
       });
       const normalized = normalizeLocalRef(ref, lib.libraryName);
       const legacy = (isQualifiedRef(normalized) ? [] : caseFeatures.inputsByCondition.get(normalized) ?? []).flatMap((c) => {
@@ -1925,6 +1924,7 @@ export function emitFhirDefClosure(
         return [
           {
             name: c.name,
+            presentationOwner: presentationCatalogs.get(lib.filePath),
             canonical: caseFeatureCanonicalUrl(metadata, c.name),
             resourceType: res.descriptor.resourceType,
           },
@@ -1941,6 +1941,7 @@ export function emitFhirDefClosure(
     // builds). Threaded to the decision emit so a guard referencing a criterion is expanded
     // at `emitWhenBlock` entry (sole-ref collapse + the overflow diagnostic live there).
     const libCriterionTable = buildCriterionTable(lib.ast.statements);
+    const presentations = presentationCatalogs.get(lib.filePath)!;
     // ⚠ #189 — the guard-define name check runs in THIS lane too, not only in the CQL lane where the
     // duplicate `define` would materialize. A FHIR-only emit writes `not "<Lib>"."Guard L…C…"` just the
     // same, and if an author declared that name the condition silently negates THEIR declaration.
@@ -1975,6 +1976,7 @@ export function emitFhirDefClosure(
           const entry = target && cqlByLibrary.find((candidate) => candidate.libraryName === target.libraryName);
           return target && entry ? { ...target, canonical: libraryCanonicalUrl(metadata, identityForEntry(entry)) } : undefined;
         },
+        presentations,
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);
@@ -2066,62 +2068,18 @@ export function emitFhirDefClosure(
             ? { valueElement: answerCarrier.element, datumValueType: answerCarrier.valueType }
             : undefined);
 
-        // ⭐⭐ RESOLVE `value from` TO THE CANONICAL ITS VALUESET ACTUALLY EMITS AT.
-        //
-        // ⚠ Routed through `emittedValueSetUrl` — the same authority `emitValueSet` uses — because the answer
-        // depends on the terminology's KIND: a pure reference emits at its DECLARED canonical, everything else
-        // at our slug url. A binding that assumed either one would dangle for the other half of the corpus.
-        //
-        // ⚠ A QUALIFIED (cross-library) `value from` is REFUSED, not guessed. The existing terminology resolver
-        // already draws that boundary ("cross-library terminology unsupported in v0") and returns a CQL
-        // identifier rather than a canonical, so there is no cross-library canonical to resolve yet. Emitting a
-        // locally-reconstructed url instead would produce a binding that resolves to nothing in the package —
-        // silently, since nothing validates binding targets today.
+        // REFACTOR:grounded — finite classification and plain binding share the actual owner resolver.
+        // Opaque ValueSets can bind a question even when they cannot define finite qualification.
         let answerOptions: { valueSetUrl: string } | undefined;
         const vfConcept = conceptByNameForGate.get(name);
-        // ⚠ The INLINE form binds the ALL-OPTIONS set, never the qualifying one: the binding IS the
-        // dropdown, and offering only the qualifying answers would make "none of the listed" unpickable —
-        // which is precisely the answer that lets a user reach a determinate `false` in one step.
-        const inlineSet = inlineSetByConcept.get(name);
-        if (inlineSet) {
-          answerOptions = { valueSetUrl: inlineSet.allOptions.url };
-        } else if (vfConcept?.valueFrom?.kind === "terminology") {
-          // ⚠ NORMALIZE FIRST. A ref qualified with THIS library's own name (`value from "L"."Opts"` inside
-          // library L) is LOCAL, and every other terminology consumer normalizes before deciding — the
-          // sibling resolver does it on the line it resolves. Testing `isQualifiedRef` raw refused a form that
-          // validates clean and that `coded from` accepts, i.e. validate-clean then emit-refuse on the same
-          // spelling. MEASURED before the fix (Claude arm, code review r13).
-          const vfRef = normalizeLocalRef(vfConcept.valueFrom.terminologyName, lib.libraryName);
-          if (isQualifiedRef(vfRef)) {
-            errors.push({
-              type: "Validation",
-              kind: "emit-value-from-cross-library",
-              message:
-                `Concept "${name}" names a cross-library answer option set in \`value from\`. ` +
-                `Resolving a terminology canonical across libraries is not supported yet, and a locally ` +
-                `reconstructed url would bind to nothing in the package. Declare it in this library.`,
-              line: vfConcept.valueFrom.location?.start.line,
-              column: vfConcept.valueFrom.location?.start.column,
-            } as CRLError);
-          } else {
-            const vfName = getRefName(vfRef);
-            const term = lib.ast.statements.find(
-              (st): st is Terminology => st.type === "Terminology" && st.name === vfName,
-            );
-            // An unresolvable name is already a validator error; emit stays silent rather than double-reporting.
-            if (term !== undefined) {
-              // ⚠ WHETHER THERE IS AN ANSWER SLOT TO BIND IS NOT DECIDED HERE, and deliberately so. The
-              // registry admits a `value[x]` element only for a datum at the STANDARD `value` carrier, and
-              // `resourceEmitRegistry` may only be imported by the sanctioned lane sites (the SD emitter is
-              // one; this orchestrator is not). A first cut predicted the answer here with a WEAKER local
-              // test (`valueDatum === undefined`), which would have let a non-standard carrier drop the
-              // authored line SILENTLY — two predicates free to drift, which is the defect rather than the
-              // guard against it. The SD emitter diagnoses it where the element is actually decided.
-              answerOptions = {
-                valueSetUrl: emittedValueSetUrl(term, metadata.canonicalBase, metadata.name),
-              };
-            }
-          }
+        const namedSet = answerSetByConcept.get(`${lib.libraryName}\0${name}`);
+        if (namedSet) {
+          answerOptions = { valueSetUrl: namedSet.allOptions.url };
+        } else if (vfConcept?.valueFrom) {
+          const owner = prepared.rawFhirClosure.find((entry) => entry.filePath === lib.filePath)!;
+          const term = answerTerminologyResolver(owner, graph.registry)(vfConcept.valueFrom.terminologyName);
+          // Unknown/hidden names are already validator errors. The SD emitter owns answer-slot validation.
+          if (term) answerOptions = { valueSetUrl: emittedValueSetUrl(term, metadata.canonicalBase, metadata.name) };
         }
 
         // ⚠⚠ NO DIAGNOSTIC HERE YET, AND THE FIRST ATTEMPT AT ONE WAS INSTRUCTIVE. Round 4 asked for a loud
@@ -2171,11 +2129,19 @@ export function emitFhirDefClosure(
           // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
           entryLocalDomainId,
           publication !== undefined,
+          undefined,
         );
         if (cfResult.resource) resources.push(cfResult.resource);
         errors.push(...cfResult.errors);
       }
     }
+  }
+
+  for (const catalog of presentationCatalogs.values()) {
+    for (const d of catalog.diagnostics) if (!errors.some((e) => e.kind === d.kind && e.message === d.message)) errors.push({
+      type: "Validation", kind: d.kind, message: d.message,
+      line: d.location.start.line, column: d.location.start.column,
+    });
   }
 
   // Profiles gathered through a producer belong to the operand's raw owner, even when that
@@ -2253,6 +2219,10 @@ export function emitFhirDefClosure(
     if (stubCs.resource) resources.push(stubCs.resource);
   }
 
+  resources.push(...emitOwnedValueSetCodeSystems(resources, metadata, resolvedOpts, (error) => errors.push({
+    type: "Validation", kind: error.code, message: error.message,
+  })));
+
   // Closure invariants — locked sequence per plan v3.2 (+ slice 4 Inv 0).
   // Inv 0: url uniqueness across the FULL emitted set (before Inv 1 drops on
   // relativePath) so a same-url collision is reported even if the two colliders'
@@ -2291,11 +2261,12 @@ export function emitFhirDefClosure(
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
   // success). Hard errors (non-warning CRLErrors) + any unmatched still flip
   // success to false; warning-kind errors do not.
+  errors.push(...checkPresentationReachability(inv1.surviving, inv1.droppedPaths));
   const success = errors.filter(isFhirDefError).length === 0 && unmatched.length === 0;
 
   return {
     success,
-    resources: inv1.surviving,
+    resources: errors.some((e) => e.kind === "presentation-overlap" && isFhirDefError(e)) ? [] : inv1.surviving,
     errors,
     unmatched,
   };

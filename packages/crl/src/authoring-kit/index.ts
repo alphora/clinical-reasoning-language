@@ -333,7 +333,9 @@ export type {
 // REFACTOR:grounded (#320, plan595): schemaVersion 1.33 → "1.34": explicit BMI validity, legacy retirement and native verification limits.
 // CONTENT 1.34 → "1.35": corrected complete engine acquisition; no clinical semantics change.
 // CONTENT 1.35 → "1.36": complete engine includes applicability pause; acquisition identity changes.
-const SCHEMA_VERSION = "1.36";
+// CONTENT 1.36 → 1.37: named answer ValueSets and independent presentation declarations.
+// schemaVersion → "1.37": named answer ValueSets, explicit question presentation, and migrated worked references.
+const SCHEMA_VERSION = "1.37";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -521,129 +523,60 @@ const RULES: KitRule[] = [
     ],
   },
   {
-    id: "inline-answer-options",
-    edge: "cpg",
-    category: "concept-model",
-    rule:
-      "A CODED QUESTION DECLARES ITS OWN ANSWER OPTIONS INLINE, and the predicate that reads them names a " +
-      "SUBSET of that same declaration \u2014 so the codes are written ONCE, on the question they belong to. " +
-      "`- value from:` takes option lines of the form \`<code>\` display is \`<text a clinician reads>\`, " +
-      "<marker>. The marker is `qualifying` or `not qualifying`. A separate boolean concept then tests " +
-      '`definition is "<question>" in qualifying.` \u2014 no terminology, no system URL, no second list. ' +
-      "THE OPTION CODES LIVE IN THE CONCEPT'S OWN CodeSystem, minted from its `code is`; an author never " +
-      "writes a system anywhere, including in CEL, where a fact may carry a BARE option code " +
-      '(`- value is "chronic-blepharitis".`) and its system is resolved from the `defined by` concept. ' +
-      "THE MARKER IS REQUIRED EXACTLY WHEN the concept is the subject of an `in qualifying` predicate \u2014 a " +
-      "plain dropdown that feeds no predicate needs none, and forcing one would classify options as " +
-      'qualifying-for-nothing. ALWAYS OFFER A "NONE OF THE LISTED \u2026" OPTION, marked `not qualifying`: it ' +
-      "is what lets an honest user reach a DETERMINATE false in ONE answer instead of leaving the criterion " +
-      'unknown, and the word "listed" is load-bearing \u2014 a patient may genuinely have the finding without ' +
-      "having a LISTED one. Membership stays OFFERED, NOT ADMISSIBLE: a present code that was never offered " +
-      "is a determinate NON-member (false), not an error, and CEL states one with the explicit " +
-      "\`<system>|<code>\` form. THE SUBJECT MUST PUBLISH ONE RECORD (`shape is Record` + a reduction such " +
-      "as `definition is most recent this`); a `RecordSet` subject is REFUSED (multi-select is not built). " +
-      "A cross-library subject is REFUSED: a subset names part of the subject's OWN declaration and cannot " +
-      "be resolved across libraries, and a foreign subject's unknown would be totalized to false \u2014 denying " +
-      "an unanswered question instead of pausing. USE THE NAMED-TERMINOLOGY FORM " +
-      '(`value from "<terminology>"`) INSTEAD when the options are an EXTERNAL code set (CPT, ICD-10) or ' +
-      "when two predicates need DIFFERENT qualifying subsets of one question.",
-    why:
-      "Declaring the options twice \u2014 once as an offered set and again as the qualifying set \u2014 is the " +
-      "CONFIDENT-DENY hazard in its purest form: a KE adds an option, forgets to mirror it, and an honest " +
-      "answer computes false and DENIES. A pause is recoverable; a spurious false looks like a decision. " +
-      "One list with a required marker makes that mistake fail to compile instead of failing a patient.",
-    ref: "src/validator/answerOptionsValidator.ts; src/validator/membershipScopeValidator.ts; src/fhir-emitter/inlineAnswerSet.ts; #189",
-    clauses: [
+    "id": "named-answer-options",
+    "edge": "cpg",
+    "category": "concept-model",
+    "rule": "Declare offered answers once in a named terminology and reference it with value from is \"<terminology>\". Inline value from: lists and per-option qualifying markers are removed. Each finite answer member needs an authored display. The concept lists only not qualifying is `<code>` exceptions beneath its value from is declaration. Recognized members other than these exceptions qualify. A missing answer remains unknown; an unrecognized or conflicting coded answer is an error, never a clinical negative.",
+    "why": "The terminology owns answer identity and wording; the concept owns the classification. A KE should not duplicate a positive list or confuse an unrecognized code with a negative answer.",
+    "ref": "docs/named-answer-valuesets-and-presentation.md; src/emit/answerDomain.ts; src/validator/answerOptionsValidator.ts",
+    "clauses": [
       {
-        text:
-          "Options are declared INLINE on the question: `- value from:` then one line per option \u2014 " +
-          "\`<code>\` display is \`<text>\`, qualifying|not qualifying. The predicate is a separate boolean " +
-          'concept: `definition is "<question>" in qualifying.`',
-        force: "default",
+        "text": "Use the logical CRL library name plus concept name plus Answer Options for a concept-specific terminology. The local Answer Codes CodeSystem uses the same logical owner names and the existing capped/hash ID helper; never use a physical split CQL Library ID. External systems keep their authored canonical URLs. IDs and code/system comparisons do not depend on question wording.",
+        "force": "default"
       },
       {
-        text:
-          "A `display` is REQUIRED on every inline option (`answer-options-missing-display`). It is the text " +
-          "a clinician reads; it is never derived from the code.",
-        force: "validator-enforced",
+        "text": "Omitting not qualifying is is legal and always warns (answer-options-all-qualifying), even when no predicate consumes the question. Every member may be marked nonqualifying. Duplicate or unknown exceptions are errors; a bare exception shared by multiple systems is ambiguous and must be resolved in the authored answer domain.",
+        "force": "validator-enforced"
       },
       {
-        text:
-          "The `qualifying` / `not qualifying` marker is REQUIRED on every option of a concept that IS the " +
-          "subject of an `in qualifying` predicate (`answer-options-missing-marker`), and is not required " +
-          "otherwise. Adding an option therefore cannot compile until you say what it does.",
-        force: "validator-enforced",
+        "text": "Use definition is \"Question\" in qualifying to classify the selected question answer. For the publication model, declare Record, Observation, CodeableConcept, value domain is answer options, and shape reduction is most recent on the question. The offered and interpreted domains must match. A separately named predicate, in \"Other Terminology\", remains a distinct operation and is not an alternative spelling of the question's exceptions.",
+        "force": "default"
       },
       {
-        text:
-          'Offer a "none of the listed \u2026" option marked `not qualifying`. Without it a denial costs one ' +
-          "answer per option instead of one answer total, because an unanswered disjunct leaves the " +
-          "criterion UNKNOWN. If EVERY option qualifies the validator warns (`answer-options-all-qualifying`); " +
-          "if NONE does it errors (`answer-options-none-qualifying`).",
-        force: "validator-enforced",
+        "text": "An opaque external ValueSet can be bound as an offered set, but finite membership interpretation cannot guess its expansion. Referenced/mixed/unenumerated system segments are rejected wherever complete answer-domain classification is required.",
+        "force": "validator-enforced"
       },
       {
-        text:
-          "The subject must publish ONE record: `shape is Record` plus a reduction (`definition is most " +
-          "recent this`). A `RecordSet` subject is refused (`membership-subject-shape-unsupported`) \u2014 " +
-          "multi-select is not built.",
-        force: "validator-enforced",
+        "text": "A CEL bare coded value resolves only when exactly one offered system/code member has that code. Use explicit <system>|<code> for disambiguation and invalid-input test cases. An explicit unrecognized coding does not become a determinate false in qualifying. Preserve complete clinical answer codes and authored displays when moving them into the terminology.",
+        "force": "default"
+      }
+    ]
+  },
+  {
+    "id": "concept-presentation",
+    "edge": "cpg",
+    "category": "concept-model",
+    "rule": "Keep concept identity separate from human wording. Author presentation for \"Concept\": with required question text is and optional question description is double-quoted text fields. Question text must be nonempty. A base presentation supplies defaults. Optional repeatable in decision \"Name\" and in criterion \"Name\" entries are alternative contexts; a matching scoped presentation inherits omitted fields.",
+    "why": "Concept names identify knowledge. Questionnaire text asks a question in context; changing wording must not change computation, codes, or canonicals.",
+    "ref": "docs/named-answer-valuesets-and-presentation.md; src/emit/presentation.ts; src/fhir-emitter/decision.ts",
+    "clauses": [
+      {
+        "text": "Explicit scopes for one target must not overlap, even if text is identical or different fields are supplied. There is no last-declaration, decision-vs-criterion, or file-order precedence. A profile cannot silently retain the first of conflicting presentations in one form.",
+        "force": "validator-enforced"
       },
       {
-        text:
-          "A cross-library subject is refused (`membership-subset-cross-library`), as is a subject with no " +
-          "inline options (`membership-subset-subject-has-no-options`).",
-        force: "validator-enforced",
+        "text": "Question text maps to cpg-input-text, question description to cpg-input-description. The concept name remains the short label; presentation does not add a separate label field. Concept identity remains unchanged.",
+        "force": "default"
       },
       {
-        text:
-          'In CEL, a fact on such a concept carries a BARE option code (`- value is "<code>".`); the system ' +
-          "is resolved from the concept. The explicit \`<system>|<code>\` form remains legal and is how you " +
-          "author a deliberate NON-member (an unoffered or external code), which evaluates to a determinate " +
-          "false, not an error.",
-        force: "default",
+        "text": "Every Bleph question must have explicit authored question text. Every concept declaring code is is eligible for presentation, across answer types. Missing presentation warns even if not currently reached by a decision. Presentation on an uncoded concept errors. Missing wording on an emitted input also warns; engine fallback to profile metadata is not approved question authoring. Native $apply results, including descriptions and pause/leaf behavior, are the release proof.",
+        "force": "default"
       },
       {
-        text:
-          'Use `value from "<terminology>"` instead when the options are an EXTERNAL code set, or when two ' +
-          "predicates need different qualifying subsets of one question.",
-        force: "default",
-      },
-      {
-        text:
-          "MIGRATING N BOOLEAN LEAVES INTO ONE CODED QUESTION: each leaf's `code is` becomes an OPTION code " +
-          "(keep the code text \u2014 it is the clinical identity, and shortening it loses the distinctions the " +
-          "leaves were carrying), its concept NAME becomes the `display`, and the criterion's disjunction is " +
-          'replaced by `definition is "<question>" in qualifying`. ADD a "none of the listed \u2026" option ' +
-          "\u2014 without it the migration does not reduce the denial cost at all.",
-        force: "default",
-      },
-      {
-        text:
-          "\u26a0 MIGRATION CHANGES BEHAVIOUR, and the change is worth stating to whoever owns the policy: N " +
-          "booleans are N INDEPENDENT facts that COEXIST, while a coded question has ONE answer slot arbitrated " +
-          "by `most recent this`. So a later answer OVERRIDES an earlier one, where before both stood. It also " +
-          "means only ONE qualifying answer can be recorded \u2014 harmless for a disjunctive criterion (one " +
-          "qualifying answer decides it), but a real loss if anything downstream needs the full set.",
-        force: "default",
-      },
-      {
-        text:
-          "\u26a0 DO NOT COLLAPSE A LAYER WHOSE LEAVES ARE CHARTABLE. A boolean leaf can grow an evidence arm " +
-          "later (`coded from` over external records, additively, one leaf at a time); a coded question cannot, " +
-          "because its options live in a LOCAL system that external codes are never members of. Collapse the " +
-          "layers whose answers are ASSERTED (patient-reported, reviewer-attested); leave the layers whose " +
-          "answers are, or may become, READ FROM THE CHART.",
-        force: "default",
-      },
-      {
-        text:
-          "\u26a0 A concept with inline options and a CODED `source representation` is a contradiction the " +
-          "validator warns about: the options live in a minted LOCAL system, so a source-supplied datum can " +
-          "never be a member and every such record computes a determinate FALSE.",
-        force: "validator-enforced",
-      },
-    ],
+        "text": "Imported questions inherit their owning library's presentation. Importing-library presentation overrides are deferred to issue #321; do not author unsupported overrides. The future rule is most local presentation wins by import hierarchy, not textual order.",
+        "force": "default"
+      }
+    ]
   },
   {
     "id": "bmi-publication",
@@ -690,7 +623,7 @@ const RULES: KitRule[] = [
     id: "interface-concept-naming",
     edge: "cpg",
     category: "concept-model",
-    rule: "Name an answerable case-feature concept as an ASKABLE phrase: the emitter appends `?` to its name for the generated question prompt, so omit trailing question punctuation. For an inferred condition, inspect the emitted action.input closure; a computed concept label is not automatically an answerable question. #317/#318 remain unresolved. Questionnaire generation and population must be checked through emit_results, not inferred from a green CRE run.",
+    rule: "Name a concept as a clinical concept. Put the question's wording in a separate presentation declaration with required question text and optional question description. Presentation has no separate short label. Check generated questionnaires and population through emit_results; a green CRE run does not establish the questionnaire behavior.",
     why: "A prompt should name the determination the reviewer can answer. A computed condition and the records feeding it are different surfaces.",
     ref: "docs/CRL-NORTH-STAR.md §4; #317; #318",
   },
@@ -978,7 +911,7 @@ const RULES: KitRule[] = [
     id: "terminology-forms",
     edge: "cpg",
     category: "concept-model",
-    rule: 'A terminology has three forms. Pure `valueset is` is a reference: when its final path segment is a FHIR id (1-64 letters, digits, dot or hyphen), the emitted placeholder uses that declared canonical, and deployment supplies the real membership there. CURRENT LIMIT: a canonical without that id-legal tail, including a URN OID, falls back to a policy slug canonical. This does not satisfy the fixed-canonical deployment model; inspect emitted identity and report the mismatch rather than assuming the swap works. `system is` plus `code is` entries instantiates membership. Mixed `valueset is` plus codes emits ONE policy-owned ValueSet identity and includes the authored external canonical by reference alongside its explicit codes; CQL references that same policy-owned identity. Do not assume a named reference contains a usable dropdown: instantiate the offered codes or deploy the real terminology. `value from` offers answer values, never scopes retrieves or constrains runtime evaluation; representation-local `coded from` selects which source records participate. They may name the same terminology when those roles genuinely coincide. A terminology code may carry optional `display is`; an inline answer option requires its display. Displays are authored, never inferred. Example instantiated terminology:\nterminology "Example Choices":\n- system is `http://example.org/CodeSystem/choices`.\n- code is `a` display is `Choice A`.\n- code is `b` display is `Choice B`.\nA coded question without `value from` still warns `answer-options-missing`. #313 remains open: this release adds displays but does not fix the titled codeless-reference defect.',
+    rule: 'A terminology has three forms. Pure `valueset is` is a reference: when its final path segment is a FHIR id (1-64 letters, digits, dot or hyphen), the emitted placeholder uses that declared canonical, and deployment supplies the real membership there. CURRENT LIMIT: a canonical without that id-legal tail, including a URN OID, falls back to a policy slug canonical. This does not satisfy the fixed-canonical deployment model; inspect emitted identity and report the mismatch rather than assuming the swap works. `system is` plus `code is` entries instantiates membership. Mixed `valueset is` plus codes emits ONE policy-owned ValueSet identity and includes the authored external canonical by reference alongside its explicit codes; CQL references that same policy-owned identity. Do not assume a named reference contains a usable dropdown: instantiate the offered codes or deploy the real terminology. `value from` offers answer values, never scopes retrieves or constrains runtime evaluation; representation-local `coded from` selects which source records participate. They may name the same terminology when those roles genuinely coincide. A terminology code may carry optional `display is`; each finite answer ValueSet member requires its display. Displays are authored, never inferred. Example instantiated terminology:\nterminology "Example Choices":\n- system is `http://example.org/CodeSystem/choices`.\n- code is `a` display is `Choice A`.\n- code is `b` display is `Choice B`.\nA coded question without `value from` still warns `answer-options-missing`. #313 remains open: this release adds displays but does not fix the titled codeless-reference defect.',
     ref: "docs/CRL-NORTH-STAR.md; #313; #316",
   },
   {

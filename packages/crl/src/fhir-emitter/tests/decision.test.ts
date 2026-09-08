@@ -922,16 +922,9 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
         ? [{ name: "Severe Flare", canonical: CF_URL_2, resourceType: "Condition" }]
         : [];
 
-  // A case-feature input carries BOTH the cpg-input-text label and the cpg-input-description
-  // (valueMarkdown), per the truth-set example goldens, and its NATURAL resource `type` (#189 2d).
-  const cfInput = (name: string, canonical: string, resourceType: string): Record<string, unknown> => ({
-    extension: [
-      { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: `${name}?` },
-      { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description", valueMarkdown: name },
-    ],
-    type: resourceType,
-    profile: [canonical],
-  });
+  // Without authored presentation this low-level fixture supplies only the profile/type.
+  // Authored wording and its missing-text diagnostic have dedicated presentation emission tests.
+  const cfInput = (_name: string, canonical: string, resourceType: string): Record<string, unknown> => ({ type: resourceType, profile: [canonical] });
 
   function whenQualified(libraryName: string, name: string, body: WhenBlockBody): WhenBlock {
     return {
@@ -946,7 +939,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     };
   }
 
-  it("a `when` LocalPrimitives-boolean concept gets one action.input with the right profile + cpg-input-text \"<name>?\"", () => {
+  it("a `when` LocalPrimitives-boolean concept gets one action.input with the right profile and a missing-wording warning", () => {
     const d = decision("Triage", [when("Active Crohns Disease", leaf(recommend("Refer to GI")))]);
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,

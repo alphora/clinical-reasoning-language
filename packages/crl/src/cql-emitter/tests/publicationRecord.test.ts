@@ -15,10 +15,10 @@ concept "Answer":
 - code is \`answer\`.
 - shape reduction is most recent.
 `;
-function emit(text = source, policyId?: string) {
+function emit(text = source, policyId: string | null = "membership-policy") {
   const parsed = buildCRL(text);
   expect(parsed.success, JSON.stringify(parsed.errors)).toBe(true);
-  return emitCQLFromAST(parsed.result!, { canonicalBase: "https://example.org", ...(policyId === undefined ? {} : { policyId }) });
+  return emitCQLFromAST(parsed.result!, { canonicalBase: "https://example.org", ...(policyId === null ? {} : { policyId }) });
 }
 
 describe("direct selected Record publication", () => {
@@ -92,7 +92,7 @@ describe("direct selected Record publication", () => {
   it("locates an authored reserved constructor name when a generated constructor is demanded", () => {
     const parsed = buildCRL('library "P".\nconcept "Demand":\n- type is Observation.\n- code is `demand`.\nconcept "CRLConstructObservationBoolean":\n- type is Observation.\n- code is `reserved`.\n');
     expect(parsed.success).toBe(true);
-    const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org" });
+    const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org", policyId: "membership-policy" });
     expect(lowered.errors).toEqual([]);
     const resolved = resolveConstructor("Observation", "boolean");
     if (resolved.kind !== "resolved") throw new Error("Observation Boolean constructor unavailable");
@@ -116,15 +116,20 @@ concept "Procedure":
 - code is \`procedure\`.
 - value domain is answer options.
 - shape reduction is most recent.
-- value from:
-  - \`yes\` display is \`Yes\`, qualifying.
-  - \`no\` display is \`No\`, not qualifying.
+- value from is "P Procedure Answer Options":
+  - not qualifying is \`no\`.
 concept "Qualifies":
 - shape is Record.
 - type is Observation.
 - value type is boolean.
 - definition is "Procedure" in qualifying.
 - shape reduction is most recent.
+
+
+terminology "P Procedure Answer Options":
+- system is \`https://example.org/answer-codes\`.
+- code is \`yes\` display is \`Yes\`.
+- code is \`no\` display is \`No\`.
 `;
 
 describe("selected-datum membership publication emit", () => {
@@ -163,11 +168,11 @@ describe("selected-datum membership publication emit", () => {
     expect(result.result).toContain("^[A-Za-z0-9.-]{1,64}$");
   });
 
-  it("requires owning policy metadata for a coded producer's profile without narrowing uncoded or local-only emit", () => {
-    const coded = emit(membershipSource.replace('- definition is "Procedure" in qualifying.', '- code is `qualifies`.\n- definition is "Procedure" in qualifying.'));
+  it("requires owning policy metadata for a named answer ValueSet, including uncoded producers", () => {
+    const coded = emit(membershipSource.replace('- definition is "Procedure" in qualifying.', '- code is `qualifies`.\n- definition is "Procedure" in qualifying.'), null);
     expect(coded.success).toBe(false);
-    expect(coded.errors?.some((error) => typeof error === "object" && error.kind === "publication-producer-profile-identity-missing")).toBe(true);
-    expect(emit(membershipSource).success).toBe(true);
+    expect(coded.errors?.some((error) => typeof error === "object" && error.kind === "publication-answer-identity-missing")).toBe(true);
+    expect(emit(membershipSource, null).success).toBe(false);
     expect(emit(source).success).toBe(true);
   });
 
@@ -198,7 +203,7 @@ describe("selected-datum membership publication emit", () => {
   it.each(['"Procedure"', '"P"."Procedure"'])("refuses an already-lowered non-Boolean guard without a scope (%s)", (guard) => {
     const parsed = buildCRL(membershipSource + `\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with \`APPROVED\`.\ndecision "D":\nfirst:\n- when ${guard} then recommend activity "Approve".\n`);
     expect(parsed.success).toBe(true);
-    const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org" });
+    const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org", policyId: "membership-policy" });
     expect(lowered.errors).toEqual([]);
     expect(lowered.ast.statements.some((statement) => statement.type === "Concept" && statement.__publication?.role === "public")).toBe(true);
     const result = emitCQLFromAST(lowered.ast, { canonicalBase: "https://example.org" });
@@ -209,7 +214,7 @@ describe("selected-datum membership publication emit", () => {
   it("diagnoses a lowered producer emitted without its operand or a physical target", () => {
     const parsed = buildCRL(membershipSource);
     expect(parsed.success).toBe(true);
-    const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org" });
+    const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org", policyId: "membership-policy" });
     expect(lowered.errors).toEqual([]);
     const producer = lowered.ast.statements.find((statement) => statement.type === "Concept" && statement.name === "Qualifies")!;
     const result = emitCQLFromAST({ ...lowered.ast, statements: [producer] });

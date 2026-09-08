@@ -22,9 +22,14 @@ const operand = `concept "Choice":
 - code is \`choice\`.
 - shape reduction is most recent.
 - value domain is answer options.
-- value from:
-  - \`yes\` display is \`Yes\`, qualifying.
-  - \`no\` display is \`No\`, not qualifying.
+- value from is "Fixture Choice Answer Options":
+  - not qualifying is \`no\`.
+
+
+terminology "Fixture Choice Answer Options":
+- system is \`https://example.org/answer-codes\`.
+- code is \`yes\` display is \`Yes\`.
+- code is \`no\` display is \`No\`.
 `;
 const producer = (name = "Answer", ref = '"Choice"', code = "") => `concept "${name}":
 - shape is Record.
@@ -163,7 +168,7 @@ describe("selected membership FHIR and CEL", () => {
   });
   it("gathers same-named qualified operands from two owners without decisions", () => {
     const main = `library "Policy".\n${producer("Answer", '"Left"."Choice"')}${producer("Other", '"Right"."Choice"')}${actions}${decision.replace('when "Answer"', 'when ("Answer" and "Other")')}`;
-    const { crl } = fixture(main, [`library "Left".\n${operand}`, `library "Right".\n${operand}`]);
+    const { crl } = fixture(main, [`library "Left".\n${operand.replaceAll("Fixture Choice", "Left Choice")}`, `library "Right".\n${operand.replaceAll("Fixture Choice", "Right Choice")}`]);
     const result = emitFhirDefFromPath(crl);
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
     const sds = profiles(result); expect(sds).toHaveLength(2);
@@ -201,12 +206,12 @@ describe("selected membership FHIR and CEL", () => {
     expect(emitCelToFhir(half.graph).emittedCases).toEqual([]);
   });
   it("surfaces the shared no-negative-domain warning without blocking", () => {
-    const { crl, graph } = fixture(source().replace("display is `No`, not qualifying.", "display is `No`, qualifying."), [], '"yes"');
+    const { crl, graph } = fixture(source().replace(/:\n  - not qualifying is[^\n]*\n/, ".\n"), [], '"yes"');
     const fhir = emitFhirDefFromPath(crl); expect(fhir.success).toBe(true);
-    expect(fhir.errors.filter((e) => e.kind === "publication-membership-no-negative-domain")).toHaveLength(1);
-    expect(emitCelToFhir(graph).diagnostics.filter((d) => d.kind === "publication-membership-no-negative-domain")).toMatchObject([{ severity: "warning" }]);
-    expect(emitCelToFhir(graph).diagnostics.find((d) => d.kind === "publication-membership-no-negative-domain")).toHaveProperty("filePath", crl);
-    expect(validateCEL(graph).warnings.find((d) => d.kind === "publication-membership-no-negative-domain")).toHaveProperty("filePath", crl);
+    expect(fhir.errors.filter((e) => e.kind === "answer-options-all-qualifying")).toHaveLength(1);
+    expect(emitCelToFhir(graph).diagnostics.filter((d) => d.kind === "answer-options-all-qualifying")).toMatchObject([{ severity: "warning" }]);
+    expect(emitCelToFhir(graph).diagnostics.find((d) => d.kind === "answer-options-all-qualifying")).toHaveProperty("filePath", crl);
+    expect(validateCEL(graph).warnings.find((d) => d.kind === "answer-options-all-qualifying")).toHaveProperty("filePath", crl);
   });
   it("CEL uses the qualified operand owner's exact coding and profile", () => {
     const main = `library "Policy".\n${producer("Answer", '"Foreign"."Choice"')}${actions}${decision}`;
@@ -217,18 +222,18 @@ describe("selected membership FHIR and CEL", () => {
     const sd = profiles(emitFhirDefFromPath(crl))[0]!;
     expect(observation.meta.profile).toEqual([sd.url]);
     expect(observation.code.coding[0]).toEqual(sd.differential.element.find((e: any) => e.path === "Observation.code").patternCodeableConcept.coding.map(({ system, code }: any) => ({ system, code }))[0]);
-    expect(observation.valueCodeableConcept.coding[0].system).toContain("publication-foreign-choice");
+    expect(observation.valueCodeableConcept.coding[0].system).toBe("https://example.org/answer-codes");
   });
-  it("routes a foreign producer warning to that producer's CRL file", () => {
+  it("routes a missing-exclusion warning to the foreign answer owner's CRL file", () => {
     const main = `library "Policy".\n${actions}${decision.replace('when "Answer"', 'when "Derived"."Answer"')}`;
-    const options = `library "Options".\n${operand.replace("display is `No`, not qualifying.", "display is `No`, qualifying.")}`;
+    const options = `library "Options".\n${operand.replace(/:\n  - not qualifying is[^\n]*\n/, ".\n")}`;
     const derived = `library "Derived".\n${producer("Answer", '"Options"."Choice"')}`;
     const { crl, graph } = fixture(main, [options, derived], '"yes"', "Choice", "Options");
-    const expectedPath = join(crl, "..", "s1.crl");
-    const emitted = emitCelToFhir(graph).diagnostics.find((d) => d.kind === "publication-membership-no-negative-domain");
-    const validated = validateCEL(graph).warnings.find((d) => d.kind === "publication-membership-no-negative-domain");
-    expect(emitted).toMatchObject({ filePath: expectedPath, location: { start: { line: 6 } } });
-    expect(validated).toMatchObject({ filePath: expectedPath, location: { start: { line: 6 } } });
+    const expectedPath = join(crl, "..", "s0.crl");
+    const emitted = emitCelToFhir(graph).diagnostics.find((d) => d.kind === "answer-options-all-qualifying");
+    const validated = validateCEL(graph).warnings.find((d) => d.kind === "answer-options-all-qualifying");
+    expect(emitted).toMatchObject({ filePath: expectedPath, location: { start: { line: 9 } } });
+    expect(validated).toMatchObject({ filePath: expectedPath, location: { start: { line: 9 } } });
     expect(expectedPath).not.toBe(crl);
     expect(expectedPath).not.toBe(graph.filePath);
   });

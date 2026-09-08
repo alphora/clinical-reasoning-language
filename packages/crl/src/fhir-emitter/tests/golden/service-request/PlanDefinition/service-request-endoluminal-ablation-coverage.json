@@ -91,16 +91,6 @@
           ],
           "input": [
             {
-              "extension": [
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-                  "valueString": "Requested Service?"
-                },
-                {
-                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-                  "valueMarkdown": "Requested Service"
-                }
-              ],
               "type": "Observation",
               "profile": [
                 "http://example.org/endoluminal-ablation/StructureDefinition/service-request-requested-service"

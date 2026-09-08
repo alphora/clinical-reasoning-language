@@ -260,8 +260,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.36"); // corrected complete engine acquisition
-    assert.equal(kit.contentHash, "417b27c9557431cde15b1cf2c7f45f646a3598bb02bfdf559ffd7b260becdcfc");
+    assert.equal(kit.schemaVersion, "1.37"); // named answer ValueSets and presentations
+    assert.equal(kit.contentHash, "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -276,9 +276,9 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.36");
+    assert.equal(kit.schemaVersion, "1.37");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "183f26f2a9ff6f2b82087505f3a63e91e6a034ba3013b003bb71aa2a8a6882e9");
+    assert.equal(kit.contentHash, "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 12); // shared medical-policy-determination.crl removed (config-driven local activities); representation-reference.crl added
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

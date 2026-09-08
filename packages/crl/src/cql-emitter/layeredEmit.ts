@@ -47,8 +47,8 @@ import { publicationProducerOperands } from "../emit/publicationProgram";
  */
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
-import { buildInlineAnswerSetMap } from "../fhir-emitter/inlineAnswerSet";
-import type { InlineAnswerSet } from "../fhir-emitter/inlineAnswerSet";
+import { buildNamedAnswerSetMap } from "../fhir-emitter/namedAnswerSet";
+import type { NamedAnswerSet } from "../fhir-emitter/namedAnswerSet";
 import { isRecordBooleanGuardSource, resolveRecordBooleanGuardCarrier } from "../emit/recordBooleanGuard";
 import type {
   CRL,
@@ -1639,9 +1639,11 @@ export function emitPartitioned(
   // and every `in qualifying` fails to resolve. The orchestrator builds it from the RAW entry ast
   // (`imports/emit.ts`), exactly as it does the authored totality obligations, and for the same reason.
   // The local build is the fallback for a direct caller whose ast is still authored.
-  const inlineAnswerSetsByName =
-    baseOptions.inlineAnswerSetsByName ??
-    buildInlineAnswerSetMap(ast, baseOptions.localDomainId ?? policyId, baseOptions.canonicalBase ?? "");
+  const answerErrors: CRLError[] = [];
+  const namedAnswerSetsByName =
+    baseOptions.namedAnswerSetsByName ??
+    buildNamedAnswerSetMap(ast, policyId, baseOptions.canonicalBase ?? "", (error) => answerErrors.push({ type: "Validation", kind: error.code, message: error.message, line: error.location?.start.line, column: error.location?.start.column }));
+  if (answerErrors.length) return { success: false, entries: [], errors: answerErrors };
   // R2 — synthesize the Interface re-exports (FULL split only). They are appended
   // to a WORKING AST so the existing classify/sweep/emit loop materializes the
   // `Interface` layer with no special casing. `buildNameLayerMaps` already
@@ -1768,7 +1770,7 @@ export function emitPartitioned(
       libraryName,
       crossLibraryIncludes,
       conceptShapesByName,
-      inlineAnswerSetsByName,
+      namedAnswerSetsByName,
       partitionedGuardCriteria: guardCriteria,
       // #189 Slice 0c — augment the source-bound totality service with THIS source's rendered-layer names, so the
       // per-layer pivot/discharge classify a cross-layer operand as same-source (not misread as cross-library).

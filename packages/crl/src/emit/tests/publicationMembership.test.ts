@@ -22,10 +22,15 @@ const input = `concept "Answer":
 - value type is CodeableConcept.
 - code is \`answer\`.
 - value domain is answer options.
-- value from:
-  - \`yes\` display is \`Listed\`, qualifying.
-  - \`no\` display is \`None listed\`, not qualifying.
+- value from is "Fixture Answer Answer Options":
+  - not qualifying is \`no\`.
 - shape reduction is most recent.
+
+
+terminology "Fixture Answer Answer Options":
+- system is \`https://example.org/answer-codes\`.
+- code is \`yes\` display is \`Listed\`.
+- code is \`no\` display is \`None listed\`.
 `;
 const producer = `concept "Qualifies":
 - shape is Record.
@@ -128,7 +133,7 @@ describe("qualified finite domain preparation", () => {
       kind: "publication-producer-profile-identity-missing",
     }));
     expect(prepareSingleLibraryPublication(coded, artifact).diagnostics).toEqual([]);
-    expect(prepareSingleLibraryPublication(ast(), withoutPolicy).diagnostics).toEqual([]);
+    expect(prepareSingleLibraryPublication(ast(), withoutPolicy).diagnostics.some((d) => d.kind === "publication-answer-identity-missing")).toBe(true);
   });
 
   // REFACTOR:grounded (#320, code review 563): mixed terminology is a union
@@ -136,7 +141,7 @@ describe("qualified finite domain preparation", () => {
   it.each(["domain", "qualifying", "offered"])("rejects unresolved mixed membership used as %s", (site) => {
     const mixed = 'terminology "Mixed": - valueset is `https://external/vs`. - system is `urn:external`. - code is `yes`.\n';
     const body = site === "domain" ? input.replace("value domain is answer options.", 'value domain is "Mixed".')
-      : site === "offered" ? input.replace(/- value from:[\s\S]*?- shape reduction/, '- value from "Mixed".\n- shape reduction')
+      : site === "offered" ? input.replace(/- value from is[^\n]*\n(?:  - not qualifying is[^\n]*\n)*- shape reduction/, '- value from is "Mixed".\n- shape reduction')
       : input;
     const definition = site === "qualifying" ? producer.replace("in qualifying", 'in "Mixed"') : producer;
     const result = program(`library "P".\n${body}${definition}${mixed}`);
@@ -151,7 +156,7 @@ describe("qualified finite domain preparation", () => {
         'terminology "Stub": - valueset is `https://external/vs`.\n',
       "publication-domain-not-finite",
     ],
-    [input.replace(", not qualifying", ""), "publication-membership-marker-required"],
+    [input.replace("not qualifying is `no`", "not qualifying is `missing`"), "answer-options-invalid-exception"],
     [
       input.replace("answer options.", '"OnlyYes".') +
         'terminology "OnlyYes": - system is `other`. - code is `yes`.\n',
@@ -167,7 +172,7 @@ describe("qualified finite domain preparation", () => {
       'library "Shared". terminology "Domain": - system is `urn:shared`. - code is `yes`. - code is `no`. terminology "Positive": - system is `urn:shared`. - code is `yes`.',
     );
     const local = ast(
-      `library "P".\n${input.replace("- value domain is answer options.", '- value domain is "Alias"."Domain".').replace(/- value from:[\s\S]*?- shape reduction/, "- shape reduction")}${producer.replace("in qualifying", 'in "Alias"."Positive"')}terminology "Domain": - system is \`urn:wrong\`. - code is \`wrong\`.`,
+      `library "P".\n${input.replace("- value domain is answer options.", '- value domain is "Alias"."Domain".').replace(/- value from is[^\n]*\n(?:  - not qualifying is[^\n]*\n)*- shape reduction/, "- shape reduction")}${producer.replace("in qualifying", 'in "Alias"."Positive"')}terminology "Domain": - system is \`urn:wrong\`. - code is \`wrong\`.`,
     );
     const p = preparePublicationProgram(
       createPublicationContext({
@@ -195,7 +200,7 @@ describe("qualified finite domain preparation", () => {
       'terminology "D": - system is `urn:x`. - code is `a`. terminology "Outside": - system is `urn:x`. - code is `b`.';
     const operand = input
       .replace("- value domain is answer options.", '- value domain is "D", "P"."D".')
-      .replace(/- value from:[\s\S]*?- shape reduction/, "- shape reduction");
+      .replace(/- value from is[^\n]*\n(?:  - not qualifying is[^\n]*\n)*- shape reduction/, "- shape reduction");
     expect(
       program(`library "P". ${operand}${domain}`).diagnostics.some(
         (d) => d.kind === "publication-domain-duplicate-term",
@@ -208,9 +213,9 @@ describe("qualified finite domain preparation", () => {
     ).toBe(true);
   });
   it("warns but admits a domain with no negative member", () => {
-    const p = program(`library "P". ${input.replace("not qualifying", "qualifying")}${producer}`);
+    const p = program(`library "P". ${input.replace(/:\n  - not qualifying is[^\n]*\n/, ".\n")}${producer}`);
     expect(p.diagnostics).toEqual([]);
-    expect(p.warnings.map((w) => w.kind)).toEqual(["publication-membership-no-negative-domain"]);
+    expect(p.warnings.map((w) => w.kind)).toEqual(["answer-options-all-qualifying"]);
   });
   it("rejects a Boolean downstream operand and cycles explicitly", () => {
     const tail = producer

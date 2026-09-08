@@ -23,7 +23,7 @@ const HEAD = [
   "",
   'terminology "Opts":',
   "- system is `http://www.ama-assn.org/go/cpt`.",
-  "- code is `37718`.",
+  "- code is `37718` display is `Test procedure`.",
   "",
 ];
 
@@ -46,8 +46,8 @@ const CODED_QUESTION = [
 
 describe("#189 gap 2 — value from", () => {
   it("⭐ a coded question WITH answer options is clean", () => {
-    const r = validate([...CODED_QUESTION.slice(0, 3), '- value from "Opts".', ...CODED_QUESTION.slice(3)]);
-    expect(answerKinds(r)).toEqual([]);
+    const r = validate([...CODED_QUESTION.slice(0, 3), '- value from is "Opts".', ...CODED_QUESTION.slice(3)]);
+    expect(answerKinds(r)).toEqual(["answer-options-all-qualifying"]);
   });
 
   it("⭐⭐ a coded question with NO answer options WARNS, and stays VALID", () => {
@@ -66,7 +66,7 @@ describe("#189 gap 2 — value from", () => {
       "- shape is Record.",
       "- type is Observation.",
       "- value type is CodeableConcept.",
-      '- value from "Opts".',
+      '- value from is "Opts".',
       '- coded from "Opts".',
     ]);
     expect(answerKinds(r)).toContain("answer-options-unanswerable");
@@ -77,7 +77,7 @@ describe("#189 gap 2 — value from", () => {
       "- shape is Record.",
       "- type is Observation.",
       "- value type is Quantity.",
-      '- value from "Opts".',
+      '- value from is "Opts".',
       "- code is `c`.",
       "- definition is most recent this.",
     ]);
@@ -107,8 +107,8 @@ describe("#189 gap 2 — value from", () => {
         "",
         'concept "C":',
         ...CODED_QUESTION.slice(0, 3),
-        '- value from "Opts".',
-        '- value from "Other".',
+        '- value from is "Opts".',
+        '- value from is "Other".',
         ...CODED_QUESTION.slice(3),
       ].join("\n"),
     );

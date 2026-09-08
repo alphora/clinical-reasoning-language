@@ -3,6 +3,7 @@ import * as path from "path";
 
 import { describe, expect, it } from "vitest";
 
+import { isFhirDefError } from "../types";
 import { emitFhirDefFromPath } from "../closureOrchestrator";
 
 /**
@@ -57,7 +58,7 @@ function emitCorpus(crlRel: string): { files: Map<string, string>; unmatched: st
   const r = emitFhirDefFromPath(path.join(REPO_ROOT, "src/tests/fixtures/corpus", crlRel), {
     date: FIXED_DATE,
   });
-  if (r.errors.length) {
+  if (r.errors.some(isFhirDefError)) {
     throw new Error(`CRL→FHIR errors for ${crlRel}: ${JSON.stringify(r.errors)}`);
   }
   const files = new Map<string, string>();

@@ -70,6 +70,8 @@ import type { CRLError } from "../types/errors";
  * Any CRLError whose kind is NOT in this set is treated as a hard error.
  */
 export const FHIR_DEF_WARNING_KINDS: ReadonlySet<string> = new Set([
+  "presentation-question-text-missing",
+  "answer-options-all-qualifying",
   "non-ascii-slug-fallback",
   "empty-terminology",
   // REFACTOR:grounded (#320, review 563): an explicit all-positive domain is legal; keep its warning nonblocking.
@@ -350,7 +352,7 @@ export interface EmittedResource {
     // is production vocabulary, the stub is `experimental` and is replaced at packaging.
     | "ReferenceStubCodeSystem"
     // ⭐ A concept's OWN answer vocabulary + its two ValueSets, from an inline `value from:` block.
-    | "InlineAnswerOptions"
+    | "AnswerOptions"
     | "CaseFeature";
   sourceName?: string;
   location?: Location;

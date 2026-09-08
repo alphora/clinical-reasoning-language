@@ -1,3 +1,4 @@
+import { isFhirDefError } from "../types";
 import * as path from "path";
 
 import { describe, expect, it } from "vitest";
@@ -92,7 +93,7 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
     // case-feature behavior (previously this skipped, emitting ZERO).
     const fixture = path.join(HERE, "fixtures", "casefeature-inferred", "casefeature-inferred.crl");
     const result = emitFhirDefFromPath(fixture, FIXED);
-    expect(result.errors).toEqual([]);
+    expect(result.errors.filter(isFhirDefError)).toEqual([]);
     expect(result.success).toBe(true);
     const sds = result.resources.filter((r) => r.resourceType === "StructureDefinition");
     expect(sds).toHaveLength(1);
@@ -124,7 +125,7 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
     // unresolved-action-input-profile, and each action.input.profile byte-equals its SD url.
     const fixture = path.join(HERE, "fixtures", "casefeature-truncation", "casefeature-truncation.crl");
     const result = emitFhirDefFromPath(fixture, FIXED);
-    expect(result.errors).toEqual([]);
+    expect(result.errors.filter(isFhirDefError)).toEqual([]);
     expect(result.success).toBe(true);
 
     const sds = result.resources.filter((r) => r.resourceType === "StructureDefinition");

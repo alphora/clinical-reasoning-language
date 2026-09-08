@@ -65,7 +65,7 @@ function emitRaw(opts: { terminology: string[]; valueFrom: string | null; concep
         "- shape is Record.",
         `- type is ${rt}.`,
         "- value type is CodeableConcept.",
-        ...(opts.valueFrom !== null ? [`- value from ${opts.valueFrom}.`] : []),
+        ...(opts.valueFrom !== null ? [`- value from is ${opts.valueFrom}.`] : []),
         "- code is `requested-service`.",
         "- definition is most recent this.",
         "- source representation:",
@@ -119,7 +119,7 @@ const answerValueSetUrl = (resources: Record<string, unknown>[]): string | undef
     | string
     | undefined;
 
-const INSTANTIATED = ["- system is `" + CPT + "`.", "- code is `37718`.", "- code is `37722`."];
+const INSTANTIATED = ["- system is `" + CPT + "`.", "- code is `37718` display is `Test service 37718`.", "- code is `37722` display is `Test service 37722`."];
 
 describe("#189 gap 2 — value[x].binding", () => {
   it("⭐⭐ an INSTANTIATED answer set binds the url its ValueSet actually EMITS at", () => {
@@ -168,7 +168,7 @@ describe("#189 gap 2 — value[x].binding", () => {
 
   it("⭐ a SELF-qualified ref is LOCAL, not cross-library", () => {
     // ⚠ MEASURED before the fix (Claude arm, code review r13): testing `isQualifiedRef` on the RAW ref refused
-    // `value from "Ao"."Opts"` inside library `Ao` — a form that validates clean and that the sibling
+    // `value from is "Ao"."Opts"` inside library `Ao` — a form that validates clean and that the sibling
     // `coded from` accepts. Every other terminology consumer normalizes against the current library first.
     expect(bindingOf(emit({ terminology: INSTANTIATED, valueFrom: '"Ao"."Opts"' }))).toBeDefined();
   });
