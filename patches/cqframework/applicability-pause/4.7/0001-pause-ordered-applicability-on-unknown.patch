@@ -1,0 +1,527 @@
+From 4aee604184e3b8ea01d1778d116baf072bd73f79 Mon Sep 17 00:00:00 2001
+From: rob-reynolds <rob@alphora.com>
+Date: Tue, 8 Sep 2026 02:15:26 -0400
+Subject: [PATCH] fix: pause ordered applicability on unknown by default
+
+---
+ .../org/opencds/cqf/fhir/cr/CrSettings.java   |  22 +++
+ .../PlanDefinitionProcessor.java              |  37 ++--
+ .../cr/plandefinition/apply/ApplyRequest.java |  14 +-
+ .../plandefinition/apply/ProcessAction.java   |  93 +++++++++-
+ .../apply/ProcessActionTests.java             | 174 +++++++++++++++++-
+ docs/src/doc/docs/operations.md               |  34 +++-
+ 6 files changed, 343 insertions(+), 31 deletions(-)
+
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/CrSettings.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/CrSettings.java
+index f5ae66c..9d76067 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/CrSettings.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/CrSettings.java
+@@ -6,6 +6,28 @@ import org.opencds.cqf.fhir.utility.client.TerminologyServerClientSettings;
+ public class CrSettings {
+     private EvaluationSettings evaluationSettings;
+     private TerminologyServerClientSettings terminologyServerClientSettings;
++    private boolean pauseOnUnknownApplicability = true;
++
++    /**
++     * Whether ordered ANY action groups stop at an unresolved applicability condition.
++     * Defaults to true. When enabled, the unresolved action's
++     * inputs remain available, but its descendants and later alternatives are not applied.
++     * Disabling this setting treats unknown as non-applicable and permits ordered fallthrough.
++     * Independent ALL actions remain independently evaluated. This does not remove items
++     * from a Questionnaire supplied by the caller.
++     */
++    public boolean isPauseOnUnknownApplicability() {
++        return pauseOnUnknownApplicability;
++    }
++
++    public void setPauseOnUnknownApplicability(boolean pauseOnUnknownApplicability) {
++        this.pauseOnUnknownApplicability = pauseOnUnknownApplicability;
++    }
++
++    public CrSettings withPauseOnUnknownApplicability(boolean pauseOnUnknownApplicability) {
++        setPauseOnUnknownApplicability(pauseOnUnknownApplicability);
++        return this;
++    }
+ 
+     public static CrSettings getDefault() {
+         return new CrSettings();
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/PlanDefinitionProcessor.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/PlanDefinitionProcessor.java
+index dc1573c..5d2accd 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/PlanDefinitionProcessor.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/PlanDefinitionProcessor.java
+@@ -155,22 +155,27 @@ public class PlanDefinitionProcessor {
+             throw new IllegalArgumentException("Missing required parameter: 'subject'");
+         }
+         return new ApplyRequest(
+-                resolvePlanDefinition(planDefinition),
+-                Ids.newId(fhirVersion, Ids.ensureIdType(subject, "Patient")),
+-                encounter == null ? null : Ids.newId(fhirVersion, Ids.ensureIdType(encounter, "Encounter")),
+-                practitioner == null ? null : Ids.newId(fhirVersion, Ids.ensureIdType(practitioner, "Practitioner")),
+-                organization == null ? null : Ids.newId(fhirVersion, Ids.ensureIdType(organization, "Organization")),
+-                userType,
+-                userLanguage,
+-                userTaskContext,
+-                setting,
+-                settingContext,
+-                parameters,
+-                data,
+-                prefetchData,
+-                libraryEngine,
+-                modelResolver,
+-                null);
++                        resolvePlanDefinition(planDefinition),
++                        Ids.newId(fhirVersion, Ids.ensureIdType(subject, "Patient")),
++                        encounter == null ? null : Ids.newId(fhirVersion, Ids.ensureIdType(encounter, "Encounter")),
++                        practitioner == null
++                                ? null
++                                : Ids.newId(fhirVersion, Ids.ensureIdType(practitioner, "Practitioner")),
++                        organization == null
++                                ? null
++                                : Ids.newId(fhirVersion, Ids.ensureIdType(organization, "Organization")),
++                        userType,
++                        userLanguage,
++                        userTaskContext,
++                        setting,
++                        settingContext,
++                        parameters,
++                        data,
++                        prefetchData,
++                        libraryEngine,
++                        modelResolver,
++                        null)
++                .setPauseOnUnknownApplicability(crSettings.isPauseOnUnknownApplicability());
+     }
+ 
+     public <C extends IPrimitiveType<String>, R extends IBaseResource> IBaseResource apply(
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java
+index a7e2e24..6cf4cf4 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java
+@@ -72,6 +72,17 @@ public class ApplyRequest implements ICpgRequest {
+     private IQuestionnaireAdapter questionnaireAdapter;
+     private IQuestionnaireResponseAdapter questionnaireResponseAdapter;
+     private Boolean containResources;
++    private boolean pauseOnUnknownApplicability = true;
++
++    public boolean isPauseOnUnknownApplicability() {
++        return pauseOnUnknownApplicability;
++    }
++
++    public ApplyRequest setPauseOnUnknownApplicability(boolean pauseOnUnknownApplicability) {
++        this.pauseOnUnknownApplicability = pauseOnUnknownApplicability;
++        return this;
++    }
++
+     private Set<String> questionnaireDefinitions;
+     // actionId is used to ensure all actions have an Id so they can be mapped
+     private int actionId;
+@@ -153,7 +164,8 @@ public class ApplyRequest implements ICpgRequest {
+                         inputParameterResolver)
+                 .setQuestionnaire(getQuestionnaireAdapter())
+                 .setQuestionnaireResponse(getQuestionnaireResponseAdapter())
+-                .setContainResources(containResources);
++                .setContainResources(containResources)
++                .setPauseOnUnknownApplicability(pauseOnUnknownApplicability);
+     }
+ 
+     public org.opencds.cqf.fhir.cr.activitydefinition.apply.ApplyRequest toActivityRequest(
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
+index e5d0ab4..100363f 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
+@@ -53,12 +53,22 @@ public class ProcessAction {
+             IBaseResource requestOrchestration,
+             List<String> metConditions,
+             IPlanDefinitionActionAdapter action) {
++        return processAction(request, requestOrchestration, metConditions, action, meetsConditions(request, action));
++    }
++
++    private IBaseBackboneElement processAction(
++            ApplyRequest request,
++            IBaseResource requestOrchestration,
++            List<String> metConditions,
++            IPlanDefinitionActionAdapter action,
++            Boolean applicable) {
++        // Keep the reached action's question available, including when its answer is unknown.
+         // Create Questionnaire items for any input profiles that are present on the action
+         if (!request.getFhirVersion().equals(FhirVersionEnum.DSTU3) && request.getQuestionnaire() != null) {
+             addQuestionnaireItemForInput(request, action);
+         }
+ 
+-        if (Boolean.TRUE.equals(meetsConditions(request, action))) {
++        if (Boolean.TRUE.equals(applicable)) {
+             metConditions.add(action.hasId() ? action.getId() : request.getNextActionId());
+             var requestAction = generateRequestAction(action);
+             extensionProcessor.processExtensions(
+@@ -101,12 +111,15 @@ public class ProcessAction {
+         }
+         var metConditionsCount = metConditions.size();
+         for (var childAction : childActions) {
+-            var childRequestAction = processAction(request, requestOrchestration, metConditions, childAction);
++            var applicable = meetsConditions(request, childAction);
++            var childRequestAction =
++                    processAction(request, requestOrchestration, metConditions, childAction, applicable);
+             if (childRequestAction != null) {
+                 requestAction.addAction(childRequestAction);
+             }
+             if (applicabilityBehavior.equals(CqfApplicabilityBehavior.ANY)
+-                    && metConditionsCount < metConditions.size()) {
++                    && (metConditionsCount < metConditions.size()
++                            || (request.isPauseOnUnknownApplicability() && applicable == null))) {
+                 break;
+             }
+         }
+@@ -161,6 +174,9 @@ public class ProcessAction {
+     }
+ 
+     protected Boolean meetsConditions(ApplyRequest request, IPlanDefinitionActionAdapter action) {
++        if (request.isPauseOnUnknownApplicability()) {
++            return evaluateNullableConditions(request, action);
++        }
+         var conditions = action.getCondition().stream()
+                 .filter(c -> "applicability".equals(request.resolvePathString(c, "kind")))
+                 .toList();
+@@ -195,6 +211,77 @@ public class ProcessAction {
+         return true;
+     }
+ 
++    /** Three-state conjunction, with evaluation failures taking precedence over false. */
++    private Boolean evaluateNullableConditions(ApplyRequest request, IPlanDefinitionActionAdapter action) {
++        var conditions = action.getCondition().stream()
++                .filter(c -> "applicability".equals(request.resolvePathString(c, "kind")))
++                .toList();
++        if (conditions.isEmpty()) {
++            return true;
++        }
++        boolean unknown = false;
++        boolean knownFalse = false;
++        boolean failed = false;
++        try {
++            var inputParams = request.resolveInputParameters(action.getInputDataRequirement().stream()
++                    .map(IDataRequirementAdapter::get)
++                    .map(ICompositeType.class::cast)
++                    .toList());
++            for (var condition : conditions) {
++                try {
++                    var expression = expressionProcessor.getCqfExpressionForElement(request, condition);
++                    if (expression == null
++                            || expression.getExpression() == null
++                            || expression.getExpression().isBlank()
++                            || expression.getLanguage() == null
++                            || expression.getLanguage().isBlank()) {
++                        throw new IllegalArgumentException("Applicability condition has no executable expression");
++                    }
++                    var results = request.getLibraryEngine()
++                            .resolveExpression(
++                                    request.getSubjectId().getIdPart(),
++                                    expression,
++                                    inputParams == null ? request.getParameters() : inputParams,
++                                    request.getRawParameters(),
++                                    request.getData(),
++                                    request.getContextVariable(),
++                                    request.getResourceVariable());
++                    if (results != null && results.size() > 1) {
++                        throw new IllegalArgumentException(
++                                "Applicability condition must return a single Boolean value");
++                    }
++                    var result = results == null || results.isEmpty() ? null : results.get(0);
++                    if (result == null) {
++                        unknown = true;
++                    } else if (result instanceof IBaseBooleanDatatype value) {
++                        if (value.getValue() == null) {
++                            unknown = true;
++                        } else if (Boolean.FALSE.equals(value.getValue())) {
++                            knownFalse = true;
++                        }
++                    } else {
++                        throw new IllegalArgumentException("Applicability condition returned a non-Boolean value");
++                    }
++                } catch (Exception e) {
++                    failed = true;
++                    request.logException("Error evaluating applicability for action %s: %s"
++                            .formatted(action.getId(), e.getMessage()));
++                }
++            }
++        } catch (Exception e) {
++            failed = true;
++            request.logException(
++                    "Error resolving applicability inputs for action %s: %s".formatted(action.getId(), e.getMessage()));
++        }
++        if (failed) {
++            return null;
++        }
++        if (knownFalse) {
++            return false;
++        }
++        return unknown ? null : Boolean.TRUE;
++    }
++
+     protected boolean validateResult(IBase result, String expression) {
+         if (result == null) {
+             logger.warn("Condition expression {} returned null", expression);
+diff --git a/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessActionTests.java b/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessActionTests.java
+index 189ba39..475ec66 100644
+--- a/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessActionTests.java
++++ b/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessActionTests.java
+@@ -117,7 +117,8 @@ class ProcessActionTests {
+                 .setExpression(
+                         new Expression().setLanguage("text/cql-expression").setExpression(expression));
+         var request = RequestHelpers.newPDApplyRequestForVersion(
+-                FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver);
++                        FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver)
++                .setPauseOnUnknownApplicability(false);
+         doThrow(new IllegalArgumentException())
+                 .when(libraryEngine)
+                 .resolveExpression(eq(RequestHelpers.PATIENT_ID), any(), eq(null), eq(null), eq(null), any(), eq(null));
+@@ -138,7 +139,8 @@ class ProcessActionTests {
+         var expression = new Expression().setLanguage("text/fhirpath").setExpression("null");
+         action.addCondition().setKind(ActionConditionKind.APPLICABILITY).setExpression(expression);
+         var request = RequestHelpers.newPDApplyRequestForVersion(
+-                FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver);
++                        FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver)
++                .setPauseOnUnknownApplicability(false);
+         doReturn(null)
+                 .when(libraryEngine)
+                 .resolveExpression(eq(RequestHelpers.PATIENT_ID), any(), eq(null), any(), any(), any(), eq(null));
+@@ -155,7 +157,8 @@ class ProcessActionTests {
+         var expression = new Expression().setLanguage("text/fhirpath").setExpression("null");
+         action.addCondition().setKind(ActionConditionKind.APPLICABILITY).setExpression(expression);
+         var request = RequestHelpers.newPDApplyRequestForVersion(
+-                FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver);
++                        FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver)
++                .setPauseOnUnknownApplicability(false);
+         doReturn(List.of(new StringType("Test")))
+                 .when(libraryEngine)
+                 .resolveExpression(eq(RequestHelpers.PATIENT_ID), any(), eq(null), any(), any(), any(), eq(null));
+@@ -226,4 +229,169 @@ class ProcessActionTests {
+         fixture.processChildActions(request, requestOrchestration, metConditions, actionAdapter, requestAction);
+         assertTrue(requestAction.getAction().isEmpty());
+     }
++
++    private PlanDefinitionActionComponent conditionAction(String id, String... expressions) {
++        var action = new PlanDefinitionActionComponent();
++        action.setId(id);
++        for (var expression : expressions) {
++            action.addCondition()
++                    .setKind(ActionConditionKind.APPLICABILITY)
++                    .setExpression(
++                            new Expression().setLanguage("text/cql-expression").setExpression(expression));
++        }
++        return action;
++    }
++
++    private ApplyRequest interactiveRequest(boolean enabled) {
++        return RequestHelpers.newPDApplyRequestForVersion(
++                        FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver)
++                .setPauseOnUnknownApplicability(enabled);
++    }
++
++    private IPlanDefinitionActionAdapter adapt(PlanDefinitionActionComponent action) {
++        return (IPlanDefinitionActionAdapter) IAdapterFactory.createAdapterForBase(FhirVersionEnum.R4, action);
++    }
++
++    private void literalResults() {
++        org.mockito.Mockito.doAnswer(invocation -> {
++                    var expression = (org.opencds.cqf.fhir.utility.CqfExpression) invocation.getArgument(1);
++                    return switch (expression.getExpression()) {
++                        case "true" -> List.of(new BooleanType(true));
++                        case "false" -> List.of(new BooleanType(false));
++                        case "null" -> List.of();
++                        case "emptyBoolean" -> List.of(new BooleanType());
++                        case "multiple" -> List.of(new BooleanType(true), new BooleanType(false));
++                        case "multipleWithNull" -> java.util.Arrays.asList(new BooleanType(true), new BooleanType());
++                        case "nonBoolean" -> List.of(new StringType("invalid"));
++                        case "throws" -> throw new IllegalArgumentException("test evaluation failure");
++                        default -> throw new IllegalArgumentException("unexpected test expression");
++                    };
++                })
++                .when(libraryEngine)
++                .resolveExpression(eq(RequestHelpers.PATIENT_ID), any(), eq(null), any(), any(), any(), eq(null));
++    }
++
++    @Test
++    void interactiveConjunctionPreservesFalseAndUnknown() {
++        literalResults();
++        for (var pair : List.of(List.of("false", "null"), List.of("null", "false"))) {
++            var request = interactiveRequest(true);
++            Assertions.assertFalse(
++                    fixture.meetsConditions(request, adapt(conditionAction("a", pair.toArray(String[]::new)))));
++            assertNull(request.getOperationOutcome());
++        }
++        assertNull(fixture.meetsConditions(interactiveRequest(true), adapt(conditionAction("a", "true", "null"))));
++        assertNull(fixture.meetsConditions(interactiveRequest(true), adapt(conditionAction("a", "emptyBoolean"))));
++        Assertions.assertTrue(fixture.meetsConditions(interactiveRequest(true), adapt(conditionAction("a", "true"))));
++        Assertions.assertTrue(fixture.meetsConditions(interactiveRequest(true), adapt(conditionAction("a"))));
++    }
++
++    @Test
++    void interactiveErrorsBlockEvenWhenAnotherConditionIsFalse() {
++        literalResults();
++        for (var invalid : List.of("throws", "nonBoolean", "multiple", "multipleWithNull")) {
++            for (var pair : List.of(List.of("false", invalid), List.of(invalid, "false"))) {
++                var request = interactiveRequest(true);
++                assertNull(fixture.meetsConditions(request, adapt(conditionAction("a", pair.toArray(String[]::new)))));
++                Assertions.assertNotNull(request.getOperationOutcome(), pair.toString());
++            }
++        }
++    }
++
++    @Test
++    void interactiveMissingExpressionIsAnError() {
++        var action = conditionAction("a");
++        action.addCondition().setKind(ActionConditionKind.APPLICABILITY);
++        var request = interactiveRequest(true);
++        assertNull(fixture.meetsConditions(request, adapt(action)));
++        Assertions.assertNotNull(request.getOperationOutcome());
++    }
++
++    private List<String> visitGroup(String behavior, boolean enabled, String expression) {
++        var first = conditionAction("first", expression);
++        first.addAction(conditionAction("descendant"));
++        var group = conditionAction("group");
++        group.addExtension(CQF_APPLICABILITY_BEHAVIOR, new CodeType(behavior));
++        group.setAction(List.of(first, conditionAction("fallback")));
++        var request = interactiveRequest(enabled).setQuestionnaire(new org.hl7.fhir.r4.model.Questionnaire());
++        var visited = new ArrayList<String>();
++        org.mockito.Mockito.doAnswer(invocation -> {
++                    visited.add(((IPlanDefinitionActionAdapter) invocation.getArgument(1)).getId());
++                    return null;
++                })
++                .when(fixture)
++                .addQuestionnaireItemForInput(eq(request), any());
++        var result = fixture.generateRequestAction(adapt(group));
++        fixture.processChildActions(request, new RequestGroup(), new ArrayList<>(), adapt(group), result);
++        if (enabled && behavior.equals("any") && expression.equals("null")) {
++            assertTrue(result.getAction().isEmpty());
++        }
++        return visited;
++    }
++
++    @Test
++    void interactiveAnyStopsAtUnknownAndKeepsOnlyReachedQuestion() {
++        literalResults();
++        assertEquals(List.of("first"), visitGroup("any", true, "null"));
++        org.mockito.Mockito.verify(libraryEngine, org.mockito.Mockito.times(1))
++                .resolveExpression(eq(RequestHelpers.PATIENT_ID), any(), eq(null), any(), any(), any(), eq(null));
++    }
++
++    @Test
++    void disabledPauseAnyStillFallsThroughUnknown() {
++        literalResults();
++        assertEquals(List.of("first", "fallback"), visitGroup("any", false, "null"));
++    }
++
++    @Test
++    void interactiveFalsePrunesDescendantsAndReachesSibling() {
++        literalResults();
++        assertEquals(List.of("first", "fallback"), visitGroup("any", true, "false"));
++    }
++
++    @Test
++    void interactiveTruePrunesLaterSibling() {
++        literalResults();
++        assertEquals(List.of("first", "descendant"), visitGroup("any", true, "true"));
++    }
++
++    @Test
++    void interactiveAllKeepsIndependentSibling() {
++        literalResults();
++        assertEquals(List.of("first", "fallback"), visitGroup("all", true, "null"));
++    }
++
++    @Test
++    void interactiveNestedAnyDoesNotEscapePausedSelectedBranch() {
++        literalResults();
++        var inner = conditionAction("selected");
++        inner.addExtension(CQF_APPLICABILITY_BEHAVIOR, new CodeType("any"));
++        inner.setAction(List.of(conditionAction("unknown", "null"), conditionAction("innerFallback")));
++        var outer = conditionAction("outer");
++        outer.addExtension(CQF_APPLICABILITY_BEHAVIOR, new CodeType("any"));
++        outer.setAction(List.of(inner, conditionAction("outerFallback")));
++        var result = fixture.generateRequestAction(adapt(outer));
++        fixture.processChildActions(
++                interactiveRequest(true), new RequestGroup(), new ArrayList<>(), adapt(outer), result);
++        assertEquals(1, result.getAction().size());
++        assertEquals("selected", result.getAction().get(0).getId());
++        assertTrue(result.getAction().get(0).getAction().isEmpty());
++    }
++
++    @Test
++    void interactiveSettingIsRequestScopedAndCopiedToNestedPlan() {
++        assertTrue(RequestHelpers.newPDApplyRequestForVersion(
++                        FhirVersionEnum.R4, libraryEngine, null, null, inputParameterResolver)
++                .isPauseOnUnknownApplicability());
++        var request = interactiveRequest(false);
++        Assertions.assertFalse(request.isPauseOnUnknownApplicability());
++        request.setPauseOnUnknownApplicability(true);
++        assertTrue(request.copy(request.getPlanDefinition()).isPauseOnUnknownApplicability());
++        Assertions.assertFalse(interactiveRequest(false).isPauseOnUnknownApplicability());
++        var settings = org.opencds.cqf.fhir.cr.CrSettings.getDefault();
++        assertTrue(settings.isPauseOnUnknownApplicability());
++        assertTrue(settings.withPauseOnUnknownApplicability(true).isPauseOnUnknownApplicability());
++        settings.setPauseOnUnknownApplicability(false);
++        Assertions.assertFalse(settings.isPauseOnUnknownApplicability());
++    }
+ }
+diff --git a/docs/src/doc/docs/operations.md b/docs/src/doc/docs/operations.md
+index ba1ed42..1c2c579 100644
+--- a/docs/src/doc/docs/operations.md
++++ b/docs/src/doc/docs/operations.md
+@@ -10,8 +10,8 @@ Analyzes an IG and produces a module-definition Library listing all dependencies
+ 
+ **Parameters:**
+ 
+-- `artifactEndpointConfiguration` — endpoint configuration for resolving canonical artifacts
+-- `terminologyEndpoint` — endpoint for resolving terminology resources not available locally
++- `artifactEndpointConfiguration` â€” endpoint configuration for resolving canonical artifacts
++- `terminologyEndpoint` â€” endpoint for resolving terminology resources not available locally
+ 
+ ### 2. `Library/$infer-manifest-parameters`
+ 
+@@ -23,15 +23,15 @@ Converts the module-definition Library from step 1 into an asset-collection mani
+ 
+ ### 3. `Library/$release-manifest`
+ 
+-Releases the manifest by resolving unversioned dependency references and updating metadata. Unlike `$release`, this operation does not re-discover dependencies through component traversal — it trusts the pre-computed `depends-on` entries from step 2.
++Releases the manifest by resolving unversioned dependency references and updating metadata. Unlike `$release`, this operation does not re-discover dependencies through component traversal â€” it trusts the pre-computed `depends-on` entries from step 2.
+ 
+ **Parameters:**
+ 
+-- `version` (required) — the version to assign to the released manifest
+-- `versionBehavior` (required) — how to apply the version (`default`, `check`, `force`)
+-- `latestFromTxServer` — whether to resolve unversioned references from the terminology server (default: `false`)
+-- `terminologyEndpoint` — FHIR Endpoint resource with authentication headers for terminology resolution (required when `latestFromTxServer=true`)
+-- `releaseLabel` — optional label to apply to the released manifest
++- `version` (required) â€” the version to assign to the released manifest
++- `versionBehavior` (required) â€” how to apply the version (`default`, `check`, `force`)
++- `latestFromTxServer` â€” whether to resolve unversioned references from the terminology server (default: `false`)
++- `terminologyEndpoint` â€” FHIR Endpoint resource with authentication headers for terminology resolution (required when `latestFromTxServer=true`)
++- `releaseLabel` â€” optional label to apply to the released manifest
+ 
+ **Example terminology endpoint:**
+ 
+@@ -55,3 +55,21 @@ Releases the manifest by resolving unversioned dependency references and updatin
+     ]
+ }
+ ```
++
++
++## PlanDefinition applicability and missing data
++
++Applicability processing pauses on unknown by default. An action with an unresolved condition keeps its input questions available but does not apply its descendants or definition. In an ordered `any` group, an unresolved child also stops evaluation of later alternatives. A false child excludes its descendants and permits the next alternative; a true child is selected and stops later alternatives. Independent `all` children remain independently evaluated.
++
++This is a runtime policy for missing data in addition to the first-true selection described by [FHIR-50150](https://jira.hl7.org/browse/FHIR-50150). Hosts can explicitly select the previous non-applicable-on-null behavior through the existing settings API:
++
++```java
++var settings = CrSettings.getDefault().withPauseOnUnknownApplicability(false);
++var processor = new PlanDefinitionProcessor(repository, settings);
++```
++
++The setting applies to shared applicability evaluation for ordinary actions and ordered groups, including nested PlanDefinitions. Disabling it does not make null true: descendants of that action are still excluded, but later ordered alternatives may apply.
++
++With pausing enabled, multiple applicability conditions form a three-state conjunction: known false dominates unknown. Invalid or missing executable expressions, non-Boolean/multiple results, and evaluation failures report OperationOutcome errors and block that ordered branch even if another condition is false. Such errors are not successful requests for a missing answer. Each reached condition is evaluated once per action traversal.
++
++Input questions for a reached action remain available even when its condition is false, so an answer can be corrected. Questions beneath an excluded parent and later alternatives after an ordered pause are not newly generated. Existing items in a caller-supplied Questionnaire are retained; this setting does not retract a previously expanded form. A generated Questionnaire/QuestionnaireResponse and no activity alone are not a guarantee that every missing datum is answerable.
+-- 
+2.44.0.windows.1
+

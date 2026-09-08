@@ -1,0 +1,39 @@
+{
+  "defaultPauseOnUnknownApplicability": true,
+  "deployed": false,
+  "validation": {
+    "4.7": {
+      "tests": 70,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": 7
+    },
+    "upstream": {
+      "tests": 70,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": 7
+    },
+    "nativeClassesMatchFinalBuild": true
+  },
+  "series": {
+    "upstream": {
+      "base": "234b879120d97e871bb518b5b7e2ccd9e9bdd884",
+      "commit": "36c49a056af2bf8762a1fe3c4b163af3e0e05f32",
+      "resultTree": "ac0a8d577947a0f41f3f4ec1f04c303aba3195e5",
+      "path": "main/0001-pause-ordered-applicability-on-unknown.patch",
+      "sha256": "82c1243f9b4cd619e385ba190ccf9f10d83eae2aa38ac030bd3516bbd1129e2b",
+      "reapplyMatches": true
+    },
+    "4.7": {
+      "base": "bd2b1c19cb5b9d93db3c8f58bb827a85d752ac73",
+      "commit": "4aee604184e3b8ea01d1778d116baf072bd73f79",
+      "resultTree": "4dee56c68e5c96240464df880106bce73cdf9368",
+      "path": "4.7/0001-pause-ordered-applicability-on-unknown.patch",
+      "sha256": "7881ce9f1624e862d429f181bcff948c9c5c91f41aa0de6fa6a0b6d37dbca95c",
+      "reapplyMatches": true
+    }
+  }
+}

@@ -1,5 +1,7 @@
 # CQFramework extraction and generated-ID patches
 
+The separately reviewed [applicability pause follow-up](applicability-pause/README.md) adds default-on null pausing for ordered alternatives. Its patch bases include the two fixes below. It has not yet been incorporated into the CLI build recorded by `cli-build.json`.
+
 These source patches address two engine defects encountered when exercising CRL-generated artifacts with CQFramework's R4 `$apply` implementation (including its R5-operation backport). They are local patch sets, not an upstream release or an installed customer engine.
 
 Upstream review: [Coding extraction PR #1101](https://github.com/cqframework/clinical-reasoning/pull/1101) targets main; [generated IDs PR #1102](https://github.com/cqframework/clinical-reasoning/pull/1102) is stacked on the Coding branch. Merge #1101 first, then retarget #1102 to main. The tested [4.7 backport branch](https://github.com/cqframework/clinical-reasoning/tree/codex/qr-extraction-backport) is also pushed; no 4.7 maintenance branch currently exists for a backport PR. These submissions do not constitute a release or installation.
