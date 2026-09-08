@@ -132,39 +132,43 @@ check("authoring_kit (default = cpg base) → PA-free payload + embedded referen
     assert.equal(kit.useCase, "cpg"); // omitted useCase → the neutral base, NOT PA (#191, fail-loud)
     assert.deepEqual(kit.chain, ["cpg"]);
     assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
-    // The bundled server ships the un-fused cpg base — the PA-FREE artifact set (pure-CDS decision + patient-age).
+    // The bundled server ships the PA-free, audited reference set.
     assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
-      "decision-reference.cel",
-      "decision-reference.crl",
+      "named-answer-reference.cel",
+      "named-answer-reference.crl",
+      "named-answer-terms.crl",
       "patient-age-both-rep-reference.crl",
-      "representation-reference.crl",
+      "publication-reference.crl",
+      "selection-reference.cel",
+      "selection-reference.crl",
     ]);
     // No PA content leaked into the base bundle.
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
-    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const crl = kit.referenceArtifacts.find((a) => a.name === "selection-reference.crl").source;
     const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
     assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
   });
 
-check("authoring_kit useCase:'prior-auth' → the full inherited 11-artifact set + dispositionModel", async () => {
+check("authoring_kit useCase:'prior-auth' → the full inherited 13-artifact set + dispositionModel", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
     assert.ok(!r.isError, "should not be a tool error");
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    // Durable guard that the bundled server carries the full PA kit — the 11-artifact set (config-driven; the shared
+    // Durable guard that the bundled server carries the full PA kit — the 13-artifact set (config-driven; the shared
     // medical-policy-determination.crl was removed — determinations are now local `<category>.<key>` activities).
     assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
-      "criteria-decision-reference.cel",
-      "criteria-decision-reference.crl",
-      "decision-reference.cel",
-      "decision-reference.crl",
       "disposition-arbitration-reference.cel",
       "disposition-arbitration-reference.crl",
+      "named-answer-reference.cel",
+      "named-answer-reference.crl",
+      "named-answer-terms.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
-      "representation-reference.crl",
+      "publication-reference.crl",
+      "selection-reference.cel",
+      "selection-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);

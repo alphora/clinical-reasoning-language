@@ -6,52 +6,31 @@ Clinical Reasoning Language (CRL) provides a structured way to model clinical de
 
 ## Overview
 
-See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices. For the **CLI and MCP tool reference** (emit, validate, the 7 MCP tools — for both CRL and CEL), see [TOOLING.md](./TOOLING.md).
+See the [User Guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl/USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices. For the **CLI and MCP tool reference** (emit, validate, the MCP tools — for both CRL and CEL), see [TOOLING.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl/TOOLING.md).
 
 CRL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CRL documents.
 
 ## Metadata annotations
 
-CRL concepts can carry typed metadata via an `@tag` convention on `meta` lines (e.g. `@description`, `@ke-feedback`, `@kg-concept`) — for descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance. See the [metadata model](./spec/metadata-model.md) and the canonical [tag registry](./spec/metadata-registry.json). *(Draft: the convention parses today; Validator enforcement is forthcoming.)*
+CRL concepts can carry typed metadata via an `@tag` convention on `meta` lines (e.g. `@description`, `@ke-feedback`, `@kg-concept`) — for descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance. See the [metadata model](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl/spec/metadata-model.md) and the canonical [tag registry](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl/spec/metadata-registry.json). *(Draft: the convention parses today; Validator enforcement is forthcoming.)*
 
 ## Installation
 
-This is a private package. To install it, you need:
-
-1. An npm account with access to `@smile-digital-health` packages
-   - Contact your team lead to request access
-   - You will receive an invitation to join the organization
-   - Each developer should use their own npm account
-
-2. Set up authentication:
-
-   ```bash
-   # Log in to npm - recommended for individual developers
-   npm login
-   ```
-
-  Or create/edit `~/.npmrc` with your personal access token (note the second line is **NOT a comment**):
-
-  ```npmc
-@smile-digital-health:registry=https://registry.npmjs.org/
-//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
-   ```
-
-   > **Security Note:** Always use your personal npm token. Do not share tokens between team members.
-
-Once authenticated, install the package:
+The package is publicly available from npm; installation does not require an npm account or token.
 
 ```bash
-npm install @smile-digital-health/crl
+npm install @smile-digital-health/crl@5.0.0
 ```
 
-Or add it to your `package.json`:
+For a dependency that accepts compatible CRL5 updates:
 
 ```json
 "dependencies": {
-  "@smile-digital-health/crl": "^0.6.1"
+  "@smile-digital-health/crl": "^5.0.0"
 }
 ```
+
+CRL5 is a breaking language transition. Migrate existing content using the current authoring kit before upgrading; a `^4` dependency does not select5.x. The release notes describe the migration and distinguish changes already shipped in4.123.0.
 
 ### For Package Maintainers
 
@@ -181,7 +160,7 @@ The FSH-to-CRL transformer converts FHIR Shorthand (FSH) files into Clinical Rea
 - **Deduplication and Suffixing**: Terminology blocks are unique by identifier and body. If a duplicate identifier is encountered with a different body, a numeric suffix (e.g., `_2`) is added to the identifier. If both identifier and body are the same, the block is not duplicated.
 - **Extraction Logic**: For `medicationCodeableConcept`, the transformer uses `system`, `code`, and `identifier` from the FSH object. For `dynamicValue.expression.expression` (where `path = "code.coding"`), the transformer uses `system` and `code` from the CQL code expression string and `identifier` from the corresponding description.
 
-For more details, see the [User Guide](./USER_GUIDE.md) and the technical mapping documentation.
+For more details, see the [User Guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl/USER_GUIDE.md) and the technical mapping documentation.
 
 ## CLI Tool Usage
 
@@ -199,7 +178,7 @@ npm run cli:lexer
 
 Replace `<module>` with the desired CLI module name (e.g., `lexer`, `parser`, etc.).
 
-## FHIR Definition Emit (v2.4.0)
+## FHIR Definition Emit
 
 CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) alongside the existing CQL emit.
 
@@ -207,9 +186,9 @@ CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, Activi
 crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
 ```
 
-Output lands at `<project-root>/fhir/<ResourceType>/<id>.json`. CQL emit (the existing `--target cql` / default behavior) lands at `<project-root>/cql/<library-name>.cql`. Library content references the CQL file via the relative path `../../cql/<library-name>.cql`.
+Output lands at `<project-root>/src/fhir/<ResourceType>/<id>.json`. CQL emit (the existing `--target cql` / default behavior) lands at `<project-root>/src/cql/<library-name>.cql`. Library content references the CQL file via the relative path `../../cql/<library-name>.cql`.
 
-For semantic rules, layout details, deliberate spec deviations, and the MCP `emit_crl_fhir` tool, see [`USER_GUIDE.md` §"Emitting FHIR Definition resources"](USER_GUIDE.md#emitting-fhir-definition-resources).
+For semantic rules, layout details, deliberate spec deviations, and the MCP `emit_crl` tool, see [`USER_GUIDE.md` §"Emitting FHIR Definition resources"](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl/USER_GUIDE.md#emitting-fhir-definition-resources).
 
 ## API Usage & Reference
 
@@ -277,7 +256,7 @@ if (result.success) {
 
 ### 4. Validation
 
-> ⚠️ **Note:** Validation functionality is not yet implemented. The `validateCRL` function is a placeholder and will likely throw or return an error if used.
+`validateCRL` performs single-file semantic validation. Inspect `success`, `errors` and `warnings`; use the path-based CLI or MCP validator when imports need project context.
 
 ```typescript
 import { validateCRL } from '@smile-digital-health/crl';
@@ -511,7 +490,7 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 >
 > The authoritative release checklist and instructions are maintained in a single location:
 > 
-> **[.github/PULL_REQUEST_TEMPLATE/release.md](../../.github/PULL_REQUEST_TEMPLATE/release.md)**
+> **[.github/PULL_REQUEST_TEMPLATE/release.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/.github/PULL_REQUEST_TEMPLATE/release.md)**
 >
 > Always follow the steps in this file when preparing a new release. This ensures consistency and reduces maintenance overhead. If you need to update the release process, update the PR template only.
 
@@ -525,7 +504,7 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 - **Generated Files:** Auto-generated files (e.g., ANTLR outputs, grammar-driven types) are ignored by git and should never be edited manually. Always use the provided scripts to regenerate them.
 - **Documentation:** Keep all documentation referencing the release checklist up-to-date by linking to the PR template.
 
-For more details, see the [release PR template](../../.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
+For more details, see the [release PR template](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
 
 ### Error Handling Strategy
 
@@ -568,7 +547,7 @@ We provide a Visual Studio Code extension for CRL files:
 - Comment support
 - Language basics for a better editing experience
 
-For installation instructions and full details, see [crl-vscode/README.md](../crl-vscode/README.md)
+For installation instructions and full details, see [crl-vscode/README.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.0.0/packages/crl-vscode/README.md)
 
 ## License
 

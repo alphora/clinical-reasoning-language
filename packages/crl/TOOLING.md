@@ -64,7 +64,7 @@ A single CLI binary (`crl-emit`) dispatches all three emit paths by the input fi
 
 ## Installation
 
-The package is **not yet published to the public npm registry**. Until it is, three delivery vectors are available — pick the one that matches your use case:
+The package is publicly available from npm: `npm install @smile-digital-health/crl@5.0.0`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL5 requires content migration; consult its release notes before updating an existing4.x project.
 
 ### Option A — VS Code extension (vsix) — for interactive authoring + MCP
 
@@ -75,7 +75,7 @@ Lowest-friction path if you want the language server, validation, and the MCP to
    ```bash
    code --install-extension crl-language-support-X.Y.Z.vsix --force
    ```
-3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up all 19 tools on its next start.
+3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up the19 default tools on its next start, or20 when `emit_results` is enabled.
 
 ### Option B — npm tarball (`.tgz`) — for host apps + downstream code
 
@@ -106,9 +106,9 @@ npm run build
 npm link    # or invoke binaries directly via dist/cli/run-*.js
 ```
 
-### Once npm publish goes public
+### After installation or upgrade
 
-The intent is for the package to become publicly installable as `npm install @smile-digital-health/crl`. Until that happens, Options A–C above are the supported vectors. This document will be updated when the registry vector goes live.
+Reload the VS Code extension host and restart the MCP client so it launches the newly staged server. Check the live authoring kit schema and content hash against the release notes; a previously running MCP process continues using its loaded code until restarted.
 
 ---
 
@@ -208,7 +208,7 @@ esac
 
 ## MCP reference
 
-The bundled MCP server registers **19 tools** for interactive AI workflows. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining seven (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`, `check_fhir_ids`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
+The bundled MCP server registers **19 tools by default**, plus `emit_results` when enabled (`CRL_ENABLE_RESULTS=1`, or VS Code User setting `crl.enableResults`). The live enabled surface has20 tools. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining seven (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`, `check_fhir_ids`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
 
 | Tool | Input | Returns | Use when |
 |---|---|---|---|
@@ -337,15 +337,15 @@ const { success, result, unmatched, futureExpressions } =
 
 This is the same pattern the bundled `crl-language-support` extension uses internally to consume its own npm package. The shape:
 
-1. **Add the tarball to your extension's `package.json`** as a regular dependency:
+1. **Add CRL to your extension's `package.json`** as a regular dependency:
    ```json
    {
      "dependencies": {
-       "@smile-digital-health/crl": "file:./vendor/smile-digital-health-crl-2.5.1.tgz"
+       "@smile-digital-health/crl": "^5.0.0"
      }
    }
    ```
-   (Or, once the npm publish vector goes live, drop the `file:` prefix and pin a semver range.)
+   (For an offline installation, use `file:./vendor/smile-digital-health-crl-5.0.0.tgz` after downloading that release asset.)
 
 2. **Bundle the dep into your extension** with esbuild / webpack / your bundler of choice. VS Code extensions ship as a single `dist/extension.js`; the CRL code gets inlined just like any other dep.
 
