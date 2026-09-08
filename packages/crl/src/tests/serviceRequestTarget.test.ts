@@ -10,31 +10,11 @@ import { resolveCelImports } from "../cel/imports";
 import { runCel } from "../cre/run";
 
 /**
- * ⭐ THE CANONICAL TARGET for the ServiceRequest membership chain (#189) — `fixtures/service-request/`.
- *
- * The acceptance criterion (operator, 2026-08-30):
- *
- *   an SR whose code IS in the value set         -> true  -> Approve
- *   an SR whose code is NOT in it, nothing newer -> false -> Deny
- *
- * ⭐⭐ "it" is the COVERED set, NOT the retrieve set (RULED, operator 2026-09-02). Row 2 says *we
- * adjudicate this kind of request, and this one is not covered.* A ServiceRequest this policy was never
- * asked about — a colonoscopy under a blepharoplasty policy — is not an instance of the concept at all,
- * so it correctly PAUSES rather than denying. See the fixture header for why that makes `coded from`
- * load-bearing rather than an optimization.
- *   no SR at all, OR the SR carries no code      -> unanswered: pause and ask
- *
- * ⭐ ROWS 2 AND 3 MUST DIFFER, and that is the entire reason this fixture exists. A request for another
- * service is a determinate NO — the request was read and it is not covered. No request at all is a question
- * nobody has answered. `exists this` cannot tell them apart because both retrieve nothing; `matches this`
- * can, because it reads the DATUM of a record that WAS retrieved.
- *
- * ⚠ THIS TEST PINS FAILURE ON PURPOSE. The policy is the CORRECT model; the implementation catches up to it
- * (`feedback_fixture-is-oracle-emit-catches-up`). Each pin states the value that must be reached beside the
- * value produced today, so closing a gap is a visible, deliberate edit to this file — and an accidental
- * regression is indistinguishable from progress, because both change a pin.
- *
- * ⚠ NEVER re-author the policy or a case to make a lane pass.
+ * Legacy ServiceRequest membership regression fixture. It distinguishes a retrieved
+ * nonmember value from a missing request, but its Scalar and old reduction syntax is
+ * not a current authoring model. Current examples live in the Bleph acceptance fixture.
+ * CRE outcomes, source traces and recorded native-debt rows have different evidence
+ * strength; this suite does not execute the native pause cases.
  */
 
 const FIXTURE = path.resolve(__dirname, "fixtures/service-request");
@@ -81,7 +61,7 @@ function guardTrace(r: Run): { satisfied?: boolean; facts: string[] } {
 }
 
 describe("ServiceRequest membership target — fixtures/service-request", () => {
-  it("the policy validates with ZERO errors (the oracle bar; emit may lag, validation may not)", () => {
+  it("the legacy fixture has zero validation errors on its retained path", () => {
     const v = validateCRL(readFileSync(POLICY, "utf8"), { soft: true }) as unknown as {
       errors?: { kind?: string }[];
       warnings?: { kind?: string }[];
@@ -196,7 +176,7 @@ describe("ServiceRequest membership target — fixtures/service-request", () => 
     expect(covered.facts).toEqual(["RFA Request"]);
   });
 
-  it("⭐⭐ THE DEFECT THIS FIXTURE EXISTS TO CATCH: a wrong-code request produces NO evidence", () => {
+  it("a retrieved nonmember request is false and retains its source evidence", () => {
     const runs = runFixture();
     const wrongCode = guardTrace(runs.find((r) => r.case!.includes("different service"))!);
 

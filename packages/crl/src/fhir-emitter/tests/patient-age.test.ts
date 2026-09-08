@@ -6,24 +6,15 @@ import { describe, expect, it } from "vitest";
 import { emitFhirDefFromPath } from "../closureOrchestrator";
 
 /**
- * Patient-age both-representation RECENCY merge — end-to-end CRL → FHIR/CQL.
- *
- * The fixture concept "Age 18 Or Older" carries BOTH a `code is` local assertion
- * AND a `definition is age today at least 18 years` computation. The Inferences
- * layer must RECENCY-MERGE them (newest valid local Observation vs the live
- * computed age) via `CFH.recencyAgeTruths(...)`, and the age concept must STILL
- * get its case-feature input/StructureDefinition (the case-3 human-assert
- * fallback that seeds the very Observation cases 1/2 read).
- *
- * The behavioral proof (computed TRUE/FALSE, asserted-newer overrides live,
- * stale-assertion-ignored, not-determined) is the $r5.apply harness; this test
- * pins the emitted CQL SHAPE + the retained input in the jest suite.
+ * Current explicit Record/Observation age publication with a Patient source projection.
+ * Checks emission diagnostics, an Inferences Library, profile and action input presence.
+ * This suite does not inspect the age CQL algorithm or execute native age arbitration.
  */
 
 const FIXTURE = path.join(__dirname, "fixtures", "patient-age", "src", "crl", "patient-age.crl");
 const FIXED_DATE = new Date("2026-01-01T00:00:00.000Z");
 
-describe("patient-age both-rep recency merge (CRL → FHIR/CQL)", () => {
+describe("patient-age publication FHIR artifacts", () => {
   const r = emitFhirDefFromPath(FIXTURE, { date: FIXED_DATE });
 
   it("emits with no errors", () => {
@@ -31,11 +22,7 @@ describe("patient-age both-rep recency merge (CRL → FHIR/CQL)", () => {
     expect(r.metadataErrors).toEqual([]);
   });
 
-  it("emits the four-layer split incl. the Inferences Library (recency merge lives in its sibling CQL)", () => {
-    // The recency CQL SHAPE (CFH.recencyAgeTruths + newest-Observation filter +
-    // computed AtLeast(AgeAt(), Q)) is asserted directly in the cql-emitter suite
-    // (lowerLocalCodes.test.ts); here we confirm the FHIR closure emits the
-    // Inferences Library whose content attachment points at that CQL.
+  it("emits an Inferences Library", () => {
     const inferred = r.resources.find(
       (res) => res.relativePath === "Library/PatientAgeInferences.json",
     );

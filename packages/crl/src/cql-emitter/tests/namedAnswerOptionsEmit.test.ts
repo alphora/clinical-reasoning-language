@@ -1,3 +1,5 @@
+// Legacy layered-renderer coverage; not a current authoring example.
+// Current admitted imported-answer examples live in namedAnswerClosure.test.ts.
 import { describe, expect, it } from "vitest";
 import { buildCRL } from "../../index";
 import { emitPartitioned, FULL_PARTITION } from "../layeredEmit";

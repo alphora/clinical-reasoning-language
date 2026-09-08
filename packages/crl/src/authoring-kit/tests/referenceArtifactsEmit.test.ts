@@ -7,29 +7,16 @@ import { join } from "node:path";
 
 import { getAuthoringKit } from "../index";
 import { ANSWER_EXAMPLE_BASE } from "../answerExample";
-import { emitFhirDefFromPath, validateCRL } from "../../index";
+import { emitFhirDefFromPath } from "../../index";
 import { validateCRLImports } from "../../imports/validate";
 import { publicationAdmissionReason } from "../../emit/publicationProgram";
 import { parseInput } from "../../ast/tests/parseInput";
 
 /**
- * ⭐⭐ EVERY REFERENCE ARTIFACT MUST EMIT. This is the gate whose absence let SIX of seven ship broken.
- *
- * ⚠ HOW THE KIT SHIPPED NON-EMITTING EXEMPLARS. Ten locally-coded boolean criteria were authored
- * `type is Condition` (and one `AllergyIntolerance`) — the clinically honest type, and the one a KE
- * reaches for. A local `code is` boolean with no source representation is an ANSWER, and an answer is
- * stored as an Observation; a non-Observation type is emittable only as an INFERENCE over records
- * (`definition is exists this`). Bare `code is` on a non-Observation type is neither, so it emitted no
- * case-feature StructureDefinition at all.
- *
- * ⚠ NOTHING CAUGHT IT because every artifact was stamped `verification: "cre-run"` and the CRE never
- * consults the FHIR emitter. The kit suite validated them, the CRE ran them, and both passed while
- * `pa-determination-reference.crl` — the artifact a KE copies to author a PA criterion — produced ZERO
- * case features. A knowledge engineer lost a day to it and reported it; it took an external report,
- * because no test here related an exemplar to the emitter.
- *
- * ⭐ THE PROPERTY WORTH HAVING, in the reporter's words: a verification claim must FAIL when the
- * artifact stops satisfying it, not record that someone once checked. That is what this file is.
+ * Each delivered CRL reference must validate in its actual project/dependency
+ * context and emit its advertised resources. Emission is separate from CRE/native
+ * behavior. Current local answers use selected Observation publications;
+ * non-Observation source questions do not have a universal existence rewrite.
  */
 
 const kit = getAuthoringKit("local-decision-support", "prior-auth");
@@ -50,27 +37,33 @@ const PROJECT = {
         mode: "embedded",
         options: {
           certify: { Approve: { label: "Certified" } },
-          "not-certify": { Deny: { label: "Not certified" } },
+          "not-certify": { Deny: { label: "Not certified" }, EIU: { label: "Experimental/investigational/unproven" } },
         },
       },
     },
   }),
 };
 
-const emitArtifact = (name: string, source: string) => {
+const materializeArtifact = (name: string, source: string) => {
   const dir = mkdtempSync(join(tmpdir(), "crl-kit-emit-"));
   for (const [f, body] of Object.entries(PROJECT)) {
     const config = JSON.parse(body);
     if (name.startsWith("named-answer-")) {
       config.crl.canonicalBase = ANSWER_EXAMPLE_BASE;
-      delete config.crl.dispositions;
     }
+    if (!["pa-determination-reference.crl", "source-delegated-decision-reference.crl", "disposition-arbitration-reference.crl"].includes(name)) delete config.crl.dispositions;
     writeFileSync(join(dir, f), JSON.stringify(config));
   }
-  // Every `.crl` artifact is written, so a cross-library reference resolves.
-  for (const a of crlArtifacts)
-    writeFileSync(join(dir, a.name), a.name === name ? source : a.source);
-  const r = emitFhirDefFromPath(join(dir, name));
+  // Materialize only this example and its actual dependency closure.
+  writeFileSync(join(dir, name), source);
+  if (name === "named-answer-reference.crl") {
+    const terms = crlArtifacts.find(a => a.name === "named-answer-terms.crl")!;
+    writeFileSync(join(dir, terms.name), terms.source);
+  }
+  return join(dir, name);
+};
+const emitArtifact = (name: string, source: string) => {
+  const r = emitFhirDefFromPath(materializeArtifact(name, source));
   return {
     resources: r.resources,
     success: r.success,
@@ -92,18 +85,9 @@ describe("every kit reference artifact does what its stamp claims", () => {
     });
 
     it(`⭐ ${a.name} VALIDATES clean`, () => {
-      if (a.name === "named-answer-reference.crl") {
-        const dir = mkdtempSync(join(tmpdir(), "crl-kit-imports-"));
-        writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "answers", version: "1.0.0", crl: { canonicalBase: ANSWER_EXAMPLE_BASE } }));
-        for (const dependency of crlArtifacts.filter((item) => item.name.startsWith("named-answer-")))
-          writeFileSync(join(dir, dependency.name), dependency.source);
-        const v = validateCRLImports(join(dir, a.name));
-        expect(v.importDiagnostics).toEqual([]);
-        expect(v.validationErrors).toEqual([]);
-      } else {
-        const v = validateCRL(a.source) as unknown as { errors?: unknown[] };
-        expect(v.errors ?? []).toEqual([]);
-      }
+      const v = validateCRLImports(materializeArtifact(a.name, a.source));
+      expect(v.importDiagnostics).toEqual([]);
+      expect(v.validationErrors).toEqual([]);
     });
 
     it(`⭐ ${a.name} EMITS its expected definition resources`, () => {

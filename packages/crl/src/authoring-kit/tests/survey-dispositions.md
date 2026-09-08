@@ -243,3 +243,170 @@ Before-state source dispositions;632 corrects accepted teaching/fixture findings
 | `lexer/tests/integration.test.ts` | Token stream sequencing across nested structures, terminology, comments and whitespace. Some inputs are fragments or omit required parser punctuation; some menu shapes are semantically restricted. Skipped old inferred forms remain historical. Do not convert these token fixtures into accepted full-source examples. |
 | `lexer/tests/parameter.test.ts` | Lexical parameter modes/types, invalid type and retired spelling rejection, comments/mode transitions, plus AST Parameter construction through `buildCRL`. Separate the latter’s source evidence from token-only rows. No parameter binding, runtime value or publication claim is established; no extra kit teaching is necessary now. |
 | `lexer/tests/structures.test.ts` | Token sequences for declarations and nested structures, including deliberately expected errors and skipped old forms. This is mixed lexical acceptance/rejection, not semantic structure admission. Existing decision/body guidance should use its parser/validator owners instead. |
+
+## Final source census — 637
+
+Before-state dispositions at1da9f59c. Review637 corrects accepted findings. Full reads do not recertify historical native results or complete claim mappings.
+
+
+### Review631
+
+| Test file | Mixed disposition |
+|---|---|
+| `ageChainAssertionPoints` | Applicable: admitted Patient/local age assertion points. Limited: catalog scan does not prove global absence of another capability. |
+| `ageProjectionRetirement` | Applicable: explicit coded/uncoded age, unsupported projection and retired-form refusal. Internal: private marker rejection. Comparator table proves emission acceptance only. |
+| `bmiRetirement` | Applicable: explicit validity, finite-source requirements, closure-wide retirement refusal, invalid/missing operands, current kit subsection emission and CRE outcomes. Internal: preparation/lowering entry consistency and dependency deduplication. Historical native stamps are not this run. |
+| `caseFeatureGuards` | Internal/legacy: direct versus partitioned legacy composition, reference resolution and reduction coherence. No current publication authoring example. |
+| `compositionErrorKinds` | Internal/legacy: Scalar Boolean classification, precedence and coherence errors. Nullable expression checks do not admit publication composition. |
+| `constructorCelParity` | Internal/legacy: registry-derived field spellings, subject/default plumbing and recorded divergences. Neither current publication round-trip nor executed CQL parity. |
+| `criterionCollision` | Internal: criterion/parameter/terminology name collision handling. Fixture concepts are legacy. |
+| `criterionLoweringPin` | Internal: criterion preservation through lowering. |
+| `definedAsExistsLowering` | Legacy/internal: exact existence lowering over old resource-list forms; no completeness inference for current determinations. |
+| `dme101-030-emit` | Mixed: current age fixture; legacy device merge and existence-based local determinations. CQL/FHIR structure checks do not certify the clinical policy. |
+| `emit-golden` | Internal: exact output contents and file set across ten entrypoints. Mixed current age and legacy fixtures. No translation/execution proof. |
+| `emitCQL-meta` | Applicable: metadata comments, escaping and deferred-expression reporting. Internal: envelope plumbing. Legacy highest-value definitions are not current producer guidance. |
+| `emitCQL-parameters` | Applicable: explicit Period/Patient handling and removal of ValueSet stubs. Internal/negative: manually constructed unsupported context combinations, shadowing and malformed inputs accepted by direct paths. Those cases must not become authoring advice. |
+| `emitCriterionDefine` | Applicable: Boolean expression/negation rendering without inserted totalization. Internal: qualifiers and names. Text-only evidence. |
+| `emitsScalarValue` | Internal/legacy: classifier and alias recursion. Exclude from current published-shape guidance. |
+| `foreignCriterionScope` | Internal: logical foreign ownership through direct/layered/custom partitions and namesakes. Supports existing identity guidance, not new syntax. |
+| `functionalVsBinding` | Applicable terminology distinction, bounded by text emission. Internal: declaration selection. Does not prove runtime membership or CQL/FHIR parity. |
+| `guardDefineBothLanes` | Internal cross-artifact symbol consistency over legacy fixtures. No runtime unknown-propagation proof. |
+| `heterogeneousSourceEmit` | Legacy: resource conversion, dropping valueless candidates and existence interfaces. Internal: parenthesization/profile plumbing; repeat carrier refusal. |
+| `layeredEmit` | Internal: partitioning, dependency closure, identities, qualification and guard placement. Legacy: reductions, truth-set composition and natural resource shapes. Applicable current tail: publication envelopes and unsupported publication consumers. |
+| `leafEligibleConcepts` | Internal: leaf eligibility and failure propagation. Legacy source shapes do not establish current admission. |
+| `ledgerEnrollment2a` | Internal: complete enrollment, datatype annotations and proof-error reporting. Legacy: totality classifiers/obligations. Current criterion cases preserve nullable expression rendering; ledger consistency is not execution correctness. |
+| `lowerLocalCodes` | Internal: identity generation, collisions, deduplication and diagnostic propagation. Legacy: Scalar/existence/count/recency/source-union lowering. Applicable negative coverage: invalid value reads and old age rejection; revise forced-existence advice. |
+| `meta-emit-registry` | Applicable: recognized metadata/status behavior and suppression boundaries. Internal: exact registry and removed flags. Metadata/deferred text does not implement a producer. |
+| `namedAnswerOptionsEmit` | Applicable claim: complete interpreted domain and negative exceptions. Legacy owning authoring fixture should migrate or be labeled. Internal identity/hash disambiguation remains useful. |
+| `publicationRecord` | Applicable: explicit Record publication, nullable selected Boolean consumption, coded/uncoded producer behavior, domains and unsupported consumers. Internal: envelope, reserved names, ledger and constructor deduplication. Emission evidence only. |
+| `pureQuestionEmit` | Legacy: implicit/Scalar question twins and existence-derived determinations. Internal nullable-text and collision regressions; do not teach its fixture as current syntax. |
+| `recencyRecordMerge` | Legacy: opaque-ValueSet source merge, early filtering and old recency pipeline. Internal bytes only. |
+| `recencyTieBreak` | Legacy generic local-preference/null behavior. Applicable narrow boundary: age no longer uses that generic helper. Do not derive current selector policy from the legacy helper. |
+| `recordUnionTerms` | Internal/legacy: ordered lowered union terms and markers. |
+| `reductionExistsEmit` | Internal/legacy: exact `exists` rendering over a RecordSet. Neither universal operand-shape support nor broad negative determination. |
+| `renderConstructorCall` | Internal/legacy: argument placement, wrappers and boundary construction. Revise general unknown-dropping/maximum-validity claims. |
+| `renderPublicationSelection` | Applicable: explicit resource selection, missing/unknown/false, ordering, temporal ambiguity, identity and error distinctions. Actual native execution exists only in its opt-in branch; ordinary symbol checks do not run those vectors. Shared temporal table fully read. |
+| `renderRecordConstructor` | Internal/legacy: generic resource constructor syntax, binding types and registry requirements. Historical engine claims are separate from current text assertions. |
+| `semnotLowering` | Legacy positive cases and refusal diagnostics; applicable current replacement is a nullable age criterion. Do not promote anchored sem composition. |
+| `terminologyIdentifierCollision` | Applicable: pure references versus instantiated terminology and required metadata. Internal: identifier collision postflight. No native membership proof. |
+| `totalScalarBoolean` | Internal/legacy: classifier, resolver scope, cycles and retired markers. Exclude as author-facing Boolean totality doctrine. |
+| `truthsetProbe` | Internal historical inventory reporter. Regex extraction, skipped failures and one nonempty-output assertion are not exhaustive semantic or migration verification. |
+| `unmatched-narrative` | Applicable negative coverage: unmatched diagnostics, locations and unsuccessful emission; old age refusal. Legacy positive narrative templates do not establish current publication admission or native behavior. |
+
+
+### Review633
+
+| File — all read fully | Disposition |
+|---|---|
+| `activity.test.ts` | **Applicable/Internal:** request-kind mapping, `with` handling, configured labels/reasons, escaping and collision diagnostics. Interface-bound terminology refusal is a capability boundary. JSON assertions do not prove instantiated requests or native behavior. |
+| `answerOptionsBinding.test.ts` | **Applicable/Internal/Legacy:** exact offered-ValueSet binding identity and unsupported answer-slot diagnostics are useful. The principal source fixture uses old reduction/Scalar plumbing; do not reuse that declaration as current authoring. Binding-strength assertions do not establish native dropdown behavior. |
+| `blephPresentation.test.ts` | **Applicable/Internal:** checks all eleven authored text/description pairs at every encountered profile occurrence, with non-vacuity. It proves propagation, not clinical adequacy, rendered descriptions or the fixture header’s historical modeling claims. |
+| `caseFeatureCollection.test.ts` | **Internal/Legacy:** recursive old `defined as`/sem collection, ordering, deduplication and cycles. Collector order is not decision precedence or source-fidelity proof. |
+| `caseFeatureRecord.test.ts` | **Internal/Legacy**, with applicable rejection boundaries. Natural-resource handling, absent carriers and RecordSet behavior are mixed old paths. Do not promote bare-code/`exists this` repairs or blanket “only Boolean” comments into the selected-publication contract. |
+| `ccScreeningRoundTrip.test.ts` | **Internal/Legacy:** structural comparison and canonical resolution. Counts and profile assertions do not establish complete source round-trip, CQL equivalence or clinical fidelity. |
+| `checkIds.test.ts` | **Applicable/Internal:** ID limits, Bundle recursion and incomplete scans. Appropriate teaching is `pass && complete`; this is not general FHIR validation. |
+| `closureOrchestrator.test.ts` | **Applicable/Internal/Legacy:** applicable catalog/version distinctions, canonical integrity, malformed disposition handling and cross-library binding mechanics. Legacy reduction/alias cases and synthetic invariant objects remain internal. Source comments about earlier split/gating states are not current capability authority. |
+| `codeSystem.test.ts` | **Applicable/Internal:** local code identity, authored display, required metadata and duplicate-code diagnostics. No clinical terminology validation. |
+| `collectCaseFeatures.test.ts` | **Internal/Legacy:** both the foreign-clobber case and action-guard-only collection use legacy paths. Correct the ineffective order control in finding 4 before claiming that regression is covered. |
+| `corpusProbe.test.ts` | **Internal/Legacy:** CMS22/CMS69 structural emission counts and diagnostic mixtures. Stub resolvers and legacy narratives do not support clinical correctness or current concept-authoring examples. |
+| `cpgActivityProfiles.test.ts` | **Applicable/Internal:** fixed request/profile/kind mapping. The hardcoded mapping table is not independent validation against an IG or a native engine. |
+| `criterionEmit.test.ts` | **Applicable/Internal/Legacy:** criterion identity, undefined/cyclic-reference refusal, transparent named defines and dependency behavior. Separate publication-reachable conditions from legacy DNF/prior-exclusion cases; low-level synthetic resolver acceptance is not public admission. |
+| `decision.test.ts` | **Internal/Legacy**, with applicable structural plumbing. Most guard/menu cases use synthetic ASTs and legacy lowering. DNF splitting, per-arm inputs and envelope tests cannot establish whole-expression publication behavior or native pause/order semantics. |
+| `emit-fhir-golden.test.ts` | **Internal/Legacy:** exact resource snapshots and file-set comparison for its four corpora. Golden equality records output; it does not establish current authoring intent or independent correctness. |
+| `example-fhir-golden.test.ts` | **Internal/Legacy:** four active legacy examples, one explicitly parked both-representation example. It compares existing golden SDs and flattened inputs, not every possible extra emitted SD or full clinical behavior. Do not present its “spec truth” wording as authority. |
+| `idFormatter.test.ts` | **Applicable/Internal:** bounded, deterministic IDs and canonical agreement, including real overflow cases. Does not establish universal collision freedom. |
+| `library.test.ts` | **Applicable/Internal:** Library metadata, identities, dependency deduplication and attachment strings. Attachment-string checks alone do not prove the file exists or compiles. |
+| `membershipPublication.test.ts` | **Applicable/Internal/Legacy:** current selected answers, producer dependencies, qualified owner identity, typed CEL data and whole-expression applicability are strong bounded candidates. Some mixed cases deliberately include legacy leaves. The CEL emission rows all construct an `Approve` expectation but do not execute it; those rows are data-shape evidence only. |
+| `metadata.test.ts` | **Applicable/Internal:** required package metadata, policy-name constraints, canonical normalization and malformed inputs. Useful project preconditions, not resource conformance or clinical evidence. |
+| `namedAnswerClosure.test.ts` | **Applicable/Internal/Legacy:** the shared current example and `publication=true` row are suitable imported-domain evidence, including exact CRE positive/negative/pause expectations. The `false` row and opaque-binding fixture retain legacy forms; classify them separately. CodeSystem replacement tests prove replacement of that written resource, not pruning the whole output tree. |
+| `partial-split-author-vs-golden.test.ts` | **Internal/Legacy:** actual layer dependencies, local/external terminology routing and golden equality. Historical two-layer prose is not the current emitted topology. |
+| `partial-split-fhir-golden.test.ts` | **Applicable/Internal/Legacy:** manifest/content referential integrity, malformed manifests, identity collisions and exact snapshots. The empty-manifest helper no-op is distinct from the public entrypoint’s refusal. No native library-loading proof. |
+| `patient-age.test.ts` | **Applicable/Internal:** current explicit age fixture; bounded emission and retained-input checks. Retired lowering documentation needs finding 5’s correction. |
+| `presentationEmit.test.ts` | **Applicable/Internal:** current presentations, scoped inheritance, imported ownership, overlap refusal and missing-presentation warning behavior. Generated extensions are not renderer/session evidence. |
+| `presentationReachability.test.ts` | **Applicable/Internal:** effective wording compatibility across synthetic reachable forms, delegation and fallback. These are graph-analysis tests, not observed native form navigation. |
+| `recommendation.test.ts` | **Applicable/Internal:** wrapper profile, ActivityDefinition canonical and library binding. Its nominal long-library example does not itself create the described overflow; real overflow evidence is in `idFormatter.test.ts`. |
+| `referenceStub.test.ts` | **Applicable/Internal:** placeholder identity and synthetic membership, including canonical-tail limitations. The synthetic code is explicitly not a real external expansion. Stable `terminology-forms` guidance already preserves that boundary. |
+| `reproDate.test.ts` | **Applicable/Internal:** date precedence, invalid environment values, missing publishable date, capability/profile stamping and executable refusal. Profile claims are not external conformance validation. |
+| `selectedPublication.test.ts` | **Applicable/Internal:** prepared bindings, explicit answer carriers, whole-condition projection and rejection of action guards/unprepared publication emit. CQL-string/JSON assertions do not execute selection or native applicability. |
+| `slug.test.ts` | **Internal:** deterministic normalization, bounds, hash suffixes and acknowledged normalization collisions. Useful identity mechanics, not a concept-model example. |
+| `structureDefinition.test.ts` | **Internal/Legacy**, with applicable integrity boundaries. Most source fixtures exercise valueless/existence or old inference collection. Do not apply their carrier/category requirements wholesale to current selected publications. |
+| `terminologyCodeDisplay.test.ts` | **Applicable/Internal:** authored display propagation and absence preservation. Old inline-options commentary is not a supported syntax recipe; synthetic labels are not clinically verified. |
+| `valueSet.test.ts` | **Applicable/Internal:** pure-reference versus instantiated/mixed identity, membership serialization, reproducible expansion fields and collision handling. Placeholder success does not supply deployable clinical membership. |
+| `writer.test.ts` | **Applicable/Internal:** output paths, directory creation, serialization and traversal refusal. It proves neither transactional writing nor obsolete-file pruning; the stable kit already discloses the latter. |
+
+
+### Review635
+
+| File, all under `packages/crl/src/cre/tests/` | Mixed disposition |
+|---|---|
+| `branchConditionEval.test.ts` | Applicable compound trace/VM wiring; legacy valueless presence leaves make missing=false, so its truth tables are not selected-answer teaching. |
+| `caseFactDates.test.ts` | Applicable effective dates, overrides, anchors, invalid dates and identity collisions; legacy membership/selection fixture portions remain internal regression evidence. |
+| `composition.test.ts` | Legacy sem/composition interpreter and cycle diagnostics; no current publication-composition authority. External drop-one fixture uses missing-as-false and unverified clinical intent. |
+| `conceptTruth.test.ts` | Applicable projection identity and isolation; legacy off-path presence/cycle values require scope. Error-run empty rows support finding2. |
+| `criterionEval.test.ts` | Applicable named criterion traces, memoization, repeated-use rendering, refusal and isolation; positive truth examples use legacy presence leaves. |
+| `decisionResolver.test.ts` | Internal resolution/map identity controls, not delegated execution or prepared-publication package parity. |
+| `inlineAnswerBareCode.test.ts` | Applicable token parsing and ambiguous/missing-system refusal; semantic commentary needs finding3 correction. |
+| `interfaceOwnValue.test.ts` | Legacy direct-value/interface OR, conflict and valueless behavior; internal regression only, not current selected-publication guidance. |
+| `localMembership.test.ts` | Applicable canonical-base and intent refusal; positive Condition presence and cross-concept coding cases are legacy, clinically unverified. |
+| `membershipRefusal.test.ts` | Legacy membership selection/refusal regression; neither a universal tie policy nor current publication proof. |
+| `pauseResult.test.ts` | Applicable explicit pause, unknown traces, all-false/partial-all distinction, input errors and local delegation; legacy sem truth tables and menu guards remain scoped internal cases. |
+| `pipelineFamily.test.ts` | Legacy pipeline/existence behavior and refusal. Agreement-without-selection and presence cases must not become current selector rules. |
+| `publication.test.ts` | Applicable selected true/false/unknown, ordering, admission, ownership, membership errors, independent-all outcomes and local delegation; legacy activation controls remain negative/internal. |
+| `publicationAge.test.ts` | Applicable fixed-clock birthday, older/same-day answers, missing input and partial/future validity; FHIR method assertions are not full Q/QR evidence. |
+| `publicationBMI.test.ts` | Applicable synthetic arithmetic, missing operands, clearing and local override; split-library emission assertions do not themselves execute that split through CRE. |
+| `publicationImports.test.ts` | Applicable prepared ownership, imported operands, source/local inputs, shadows and refusal; package mutations remain CRE-only where stated. |
+| `publicationQuantity.test.ts` | Applicable unit-aware threshold, unknown, local/source and imported publication cases; emitted-data assertions are narrower than native quantity round-trip proof. |
+| `run.test.ts` | Applicable trace/arm/delegation mechanics; most behavioral examples use legacy presence/menu paths. Cross-library successes cannot certify publication delegation. Finding4 headers need qualification. |
+| `unsatisfiedFrontier.test.ts` | Internal display algebra, identity, grouping and degraded-trace controls; final integration fixture uses legacy absence=false. |
+| `viewModel.test.ts` | Applicable tree/provenance/delegation projection mechanics; legacy guard/menu/sem fixtures are not selected-answer or native evidence. |
+
+| File | Mixed disposition |
+|---|---|
+| `agePredicate.test.ts` | Applicable explicit age admission and retired-form, comparator/unit/carrier rejection; anchored-age and sem cases test only the filtered age validator, not whole-form support. |
+| `answerOptions.test.ts` | Applicable option-presence warning, misuse and duplicate declaration checks; positive fixture uses legacy reduction. Historical questionnaire claim is not executed here. |
+| `conceptSubstance.test.ts` | Applicable build-versus-validation separation and multiple diagnostics; “accepts substance” checks only absence of the substance rule. |
+| `criterionSemantics.test.ts` | Applicable names, cycles, misuse, scoped reference checks and hard severity; many operands are legacy, and filtered acceptance is not full publication admission. |
+| `cycleDetector.test.ts` | Internal synthetic AST graph tests, identity and severity; no parser or native execution claim. |
+| `decisionShape.test.ts` | Applicable structural legality and guard placement; source refs intentionally unresolved. Menu shape acceptance is separate from publication admission. |
+| `definedAsBooleanComposition-t2.test.ts` | Legacy Scalar composition type/coherence and corpus-regression controls; unsupported as positive new authoring. Corpus reads in this audit remain partial. |
+| `dispositionValidation.test.ts` | Applicable config-gated vocabulary, request type, nesting and finality; legacy gate fixture. No configured options means no enforcement. |
+| `emitCapability.test.ts` | Applicable warning registry checks only; absence of this warning does not establish successful emission or current publication support. |
+| `metaTag.test.ts` | Applicable tag parsing, error/warning and removed flag-tag behavior; soft-mode test actually asserts only retained invalid-enum error, not the missing-field demotion named in its title. |
+| `namedAnswerOptions.test.ts` | Applicable filtered finite-domain, display, exception and retired-spelling checks; positive fixture omits final selection, so zero answer-option findings is not full admission. |
+| `nameUniqueness.test.ts` | Internal synthetic declaration-bucket checks; empty decision AST controls are not parseable authoring examples. |
+| `parameter.test.ts` | Applicable name and typed-slot resolution; positive filtered narrative cases do not establish producer execution. |
+| `pipelineStage.test.ts` | Applicable malformed/unmatched stage and slot diagnostics; positive legacy pipelines are not current publication producer examples. Selection→filter gap is explicitly untested. |
+| `publication.test.ts` | Applicable current admission, severity and unsupported-context controls; misses supported-source prefer-local case in finding5. |
+| `publicationMarkers.test.ts` | Applicable finite domain, exception ownership, warning parity, qualified terms and invalid-domain refusal. |
+| `recordSetBound.test.ts` | Legacy collection warning/severity/cost controls; not evidence that current publication authoring supports the advertised layered history forms. |
+| `reductionShape.test.ts` | Mixed current retirement diagnostics and legacy shape/reduction migration controls; findings6–7 address repair advice and wrong-bucket positives. |
+| `representationShape.test.ts` | Applicable structural field/path/cardinality/source attribution checks mixed with legacy representation and exists repair acceptance; filtered success is not full publication admission. |
+| `reservedLibraryName.test.ts` | Applicable reserved-name and hard-severity checks; synthetic AST, no emission execution. |
+| `useSiteType.test.ts` | Mixed useful operand/guard/type and package-owner diagnostics with extensive legacy aliases/sem/collection acceptance; repair advice needs finding6 correction. Publication subset of the representation fixture is distinct from its legacy mammography section. |
+
+
+### Review636
+
+| File | Disposition |
+|---|---|
+| `authoring-kit/tests/authoring-kit.test.ts` | **Applicable behavioral evidence:** selected-answer true/false/missing cases, delegated CRE routing, exact arbitration output arrays, and a project-config membership positive/negative control. **Packaging/internal:** source equality, payload hashes, edge filtering, tier topology, invariant-anchor resolution, prose checks and flag-argument ownership. **Limits:** anchor resolution does not execute the anchored check; hash/prose assertions do not verify semantics. Snippet validation permits unresolved excerpt references. Age strings do not execute temporal behavior. The legacy vacuity example is correctly negative teaching. Findings1,3,5 and6 concern inconsistent or insufficient teaching checks. |
+| `authoring-kit/tests/referenceArtifactsEmit.test.ts` | **Applicable emission/admission evidence:** eight CRL reference artifacts, imported answer terminology, hard-error checks, expected resource presence, broken-reference rejection, and selected-publication admission controls. **Internal:** artifact/stamp coverage and resource-shape checks. **Limits:** declaration admission is not whole-context validation; resource presence is not runtime or round-trip proof. Fix the project-context mismatch in finding2. Its header’s unconditional non-Observation/`exists this` advice is another location for the already accepted631 legacy-guidance correction, not a new finding. |
+| `cli/tests/run-mcp-server.test.mjs` | **Applicable local integration:**64 `check` calls exercise compiled MCP stdio transport, tool discovery, flag-store operations, payload delivery, selected validation/CRE envelopes, emission paths, ID-check exit codes, provenance generation/validation and normalization. **Internal/legacy:** CMS and DME fixtures exercise retained integration paths; they are not current clinical-authoring oracles. **Limits:** this launches the checkout’s compiled entrypoint, not an installed release artifact. Inline `emit_cql` transport success does not establish domain emission success. No `emit_results`, native `$apply`, Q/QR session or renderer acceptance is executed. Findings4 and7 narrow concrete evidence overclaims. |
+
+### Lead reads
+
+- tests/regression/regression-ast.test.ts: Mixed obsolete skipped IMMZ snapshots and current CMS CLI exit checks; no current authoring example or clinical oracle.
+- tests/regression/regression-lexer.test.ts: Lexical snapshot/CLI regressions; lexing a deprecation banner does not establish semantic admission.
+- tests/regression/regression-parser.test.ts: Mixed skipped obsolete snapshots and active CLI exit checks. Structural regression only.
+- tests/regression/regression-transformer.test.ts: Entire deprecated FSH suite skipped; excluded from current kit behavior.
+- tests/emit-layout.test.ts: Applicable output-root/offset and mirror paths, missing path envelope; pure path assertions, environment-dependent no-project row. Explicit lane root still gets full offset.
+- tests/emit-writers.test.ts: Applicable preflight-before-wipe, patient tree scope, path refusal, manifest identity/hash and partial-write accounting. Low-level root is already resolved; no transactional-write promise. Junction control conditionally skipped.
+- tests/obesityTarget.test.ts: Applicable BMI migration refusal and current operand reachability. Mixed legacy history/profile helpers remain internal. No native or clinical evidence.
+- tests/serviceRequestTarget.test.ts: Legacy retrieval-versus-comparison, CRE outcomes and source traces. Native pause rows count recorded debt only. Not a current whole-language example.
+- cli/tests/run-emitter.test.ts: Applicable CLI flags, target errors, emit gate before write and output layout. No transactional filesystem guarantee. Legacy corpora are not current authoring examples.
+- template-match/agePredicate.test.ts: Internal handbuilt age call classification; bounded comparator/unit rejection. No runtime age execution.
+- template-match/tests/pipeline.test.ts: Legacy pipeline parsing, ordering, spans and malformed classification. No current selected-publication positive example.
+- template-match/tests/patternCatalog.test.ts: Catalog namespace/function/result metadata and literal-pattern lower-bound scan. No whole publication admission or native execution.
+- template-match/tests/recencyValueConcept.test.ts: Legacy recency/member-existence classifier. No installed-MCP or current publication capability claim.
+- template-match/tests/resolvePipeline.test.ts: Internal legacy effect/shape/identity matrix and typed refusals. Old generic pipelines are not current authored producers.
+- template-match/tests/membershipPattern.test.ts: Mixed matcher qualification/scope diagnostics and CQL guards; legacy Scalar predicate acceptance not current admission. No native execution.

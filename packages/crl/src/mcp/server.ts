@@ -493,15 +493,15 @@ export function createServer(): McpServer {
         "Returns { success, result?, errors?, unmatched? }: on full success, `result` is the generated CQL text " +
         "targeting the CRLCommon library (src/cql-emitter/catalog/CRLCommon.cql). The emitted CQL library declaration is " +
         "unversioned (npm packaging IS the version system); `include CRLCommon` is also unversioned. " +
-        "Refinement-vs-boolean composition is detected per-operand; stub valuesets (empty URL) become " +
-        "parameter declarations; terminology/concept name collisions are disambiguated with a ' Code' / " +
+        "Parameters come from explicit parameter declarations, not empty-URL terminology. " +
+        "Terminology/concept name collisions are disambiguated with a ' Code' / " +
         "' ValueSet' suffix. " +
         "Issue #79 — when one or more `- definition is …` narrative bodies fail to match a catalog " +
         "pattern, `success` becomes `false`, `unmatched[]` lists each failing narrative ({text, line, column}), " +
         'and `errors[]` mirrors them as `kind: "emit-unmatched-narrative"`. The `result` CQL is still ' +
         "populated so callers can inspect partial output — each unmatched spot contains a compile-failing " +
         "`CRLCommon.UnmatchedNarrative(...)` sentinel that downstream CQL translation will reject. " +
-        "Callers gating on emit fidelity should check `success` (or `unmatched.length === 0`), NOT just " +
+        "Require `success === true`; other emission errors can occur without unmatched narratives. Inspect errors, not just " +
         "the presence of `result`. The output may still need a CQL compiler to validate end-to-end.",
       inputSchema: {
         ...inputSchema,
@@ -520,13 +520,13 @@ export function createServer(): McpServer {
       title: "Emit FHIR Definition Resources from CRL",
       description:
         "Emit cpg-conformant FHIR Definition resources (ValueSet, CodeSystem, Library, ActivityDefinition, PlanDefinition) from a CRL document. " +
-        "A library whose concepts carry local `code is` codes also emits ONE local CodeSystem (url under canonicalBase). When a decision-bearing library is partial-split into a `<lib>` Root + `<lib> Concepts` sibling, that CodeSystem is depends-on'd by the CONCEPTS Library (the codes relocate there) and the Root Library depends-on the Concepts Library; otherwise (single-library emit) it is depends-on'd by that library's own Library resource. One FHIR Library is emitted PER emitted CQL library. " +
+        "Local concept codes and owned answer codes have emitted CodeSystems under canonicalBase. One FHIR Library is emitted per emitted CQL library; dependencies use the actual emission manifest, including source-typed layers when present. " +
         "Closure walks from the file's nearest package.json. Returns a SUMMARY envelope by default to keep tool output small: " +
         "`{ success, resourceCount, resourceManifest:[{resourceType, id, relativePath, sourceKind, sourceName}], errors, unmatched, importDiagnostics, metadataErrors }`. " +
         "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +
-        "Emitted FHIR definitional resources carry `version` (sourced from the npm package.json — CRMI Shareable requires version 1..1) and, at publishable+ capability, a reproducible `date` (resolved from SOURCE_DATE_EPOCH env or package.json `crl.date`, else wall clock). Emitted CQL stays version-less. Default capability is publishable. " +
+        "Policy resource versions come from package.json; shared catalog Libraries retain their own versions. Publishable+ emission requires a reproducible date from SOURCE_DATE_EPOCH or package.json `crl.date`. Without one, missing-publishable-date is an error; wall-clock partial resources are for inspection, not successful publication. Emitted CQL stays version-less. Default capability is publishable. " +
         'A CRL `first:` decision (ordered/first-match) emits the standard `cqf-applicabilityBehavior` "any" extension on a grouping action so a FHIR engine applies the first applicable branch. The menu `any:` qualifier still emits a `crl-logical-switch` extension URL whose StructureDefinition is not yet shipped (its FHIR selection semantics are pending — GitHub #184); strict validators may require an ignore-list for that URL until then. ' +
-        'Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `"CurrentLib"."X"` still resolve. ' +
+        'Prepared closure emission supports qualified selected-publication references and imported answer terminology. Unsupported or unresolved contexts produce diagnostics; inspect the success envelope rather than assuming arbitrary cross-library expressions are supported. ' +
         "Deliberate spec deviation: PlanDefinitions reference publishable-only sub-decisions via action.definitionCanonical (the published cpg-strategydefinition target-profile constraint is wrong; operator is amending the spec).",
       inputSchema: {
         path: z
@@ -571,10 +571,10 @@ export function createServer(): McpServer {
       title: "Emit CRL (two-lane: CQL + FHIR)",
       description:
         "Emit BOTH lanes from one .crl in a single call: the layered CQL closure AND the cpg-conformant FHIR Definition resources that reference it — the SAME two-lane composition as the CLI `crl-emit --target fhir-def` (shared `emitCrlTwoLane`, so the two cannot drift). " +
-        "USE THIS (not `emit_cql`) for layered / both-representation policies: `emit_cql` is the single-library DIRECT lane and rejects both-representation with a duplicate `define`; `emit_crl` lowers it correctly via the decision/case-feature lane. The FHIR `Library.content` URLs point at the sibling `cql/<name>.cql`, so emitting one lane without the other ships broken references — this returns both together. " +
+        "Use this for coordinated project-closure artifacts. `emit_cql` is the single-library direct lane; supported local-plus-Patient publications can emit there, but it does not replace closure dependency and artifact coordination. The FHIR `Library.content` URLs point at the sibling `cql/<name>.cql`, so emitting one lane without the other ships broken references — this returns both together. " +
         "Returns both lane manifests and diagnostics. `success` is true iff BOTH lanes are clean AND no CQL filename collides. Writes BOTH lanes under the project root by default: `src/cql/<outputFilename>` and `src/fhir/<ResourceType>/<id>.json`. Pass `out` to replace that ROOT, retaining the layout. Successful writes return `written: { cql, fhir }` with absolute paths and omit the CQL bodies; `includeResources: true` also returns full FHIR resources. Use an explicit scratch root for inspection because omitting `out` still writes. " +
         "Publishable+ emit needs a publication date — pass `date` (ISO) or set `crl.date` in the artifact package.json. " +
-        "A `defined as` `sem-not` whose operand is not a truth-set (a `coded from` resource list, or a cross-library/`definition is`/cyclic operand whose flavor can't be established) cannot be lowered: `success` becomes `false` with an `emit-unlowerable-negation` error, and the CQL carries a compile-failing `CRLCommon.UnsupportedNegation(...)` sentinel (never a silent unnegated body). Express the negation as a positive-anchored `A sem-and sem-not B`, or move it to the decision layer (`not`).",
+        "A `defined as` `sem-not` whose operand is not a truth-set (a `coded from` resource list, or a cross-library/`definition is`/cyclic operand whose flavor can't be established) cannot be lowered: `success` becomes `false` with an `emit-unlowerable-negation` error, and the CQL carries a compile-failing `CRLCommon.UnsupportedNegation(...)` sentinel (never a silent unnegated body). Selected publications do not admit legacy sem composition. Use supported producers; use decision/criterion `not` only when it preserves the intended Boolean question.",
       inputSchema: {
         path: z
           .string()
@@ -724,11 +724,7 @@ export function createServer(): McpServer {
         "Expected is {leaf,branch} or {leaf,pause:true}; a reached unknown trace node has unknown:true and no satisfied field. " +
         "Compound branch traces preserve explicit true and false, omitting satisfied only for unknown. Validate CRL separately and check native answers. " +
         "Pause attribution identifies reached decision conditions; their compound traces retain operand truth. An activity `result is` passes iff its branch is " +
-        "in the produced recommendation set. A `use decision` target IS evaluated — bare same-library OR " +
-        'qualified cross-library (`"Lib"."Sub"`) / self-qualified: the sub is recursed in place and its ' +
-        "determinations bubble up into the produced set (the bare sub-NAME is not produced) — so the oracle " +
-        "names the delegated disposition. A cross-library sub's bare criteria resolve in ITS library (qualify a " +
-        'CEL fact `defined by "Lib"."C"` to satisfy one); an unresolved/cyclic target is non-producing. ' +
+        "in the produced recommendation set. Same-library `use decision` is evaluated in place and produces its delegated activities, not the sub-decision name. Foreign delegation under publication preparation is refused with publication-unsupported-scope; legacy cross-library successes do not certify that path. " +
         "Raw run schemaVersion is 1 (separate from render_scenario schemaVersion 6). Returns { schemaVersion, success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
         "source, satisfied, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
@@ -738,7 +734,7 @@ export function createServer(): McpServer {
         "`body` (its own boolean sub-tree, on the criterion's FIRST occurrence per case) or `reference:true` (a later " +
         "occurrence — body shown once, keeping the trace linear in distinct criteria); a single-ref `when` keeps `concept`. " +
         "`conceptTruth` is the case's per-concept answer over the whole closure — including OFF-path concepts " +
-        "`first:` never evaluated; an ABSENT (lib,name) is UNKNOWN, never `false`. Record-existence reach-through is supported; " +
+        "`first:` never evaluated; an absent (lib,name) means no authoritative Boolean value in this projection. It can reflect unknown or an unsupported/failed off-path probe; use the reached condition trace to establish pause. Record-existence reach-through is supported; " +
         "other reductions/projections may remain unsupported. Read runtime diagnostics rather than treating a successful parse as execution proof.",
       inputSchema: {
         path: z
@@ -866,7 +862,7 @@ export function createServer(): McpServer {
         "renders only one case. Returns { schemaVersion, success, source, caseCount, passCount, failCount, " +
         "errorCount, scenarios:[{case, decision, status, expected, produced, tree, diagnostics, " +
         "conceptTruth:[{name, libraryName, satisfied}]}], errors }. `conceptTruth` is the case's per-concept " +
-        "answer over the whole closure (incl. OFF-path concepts); an ABSENT (libraryName,name) is UNKNOWN, never `false`. " +
+        "answer projection over the closure (including off-path concepts); an absent row supplies no authoritative Boolean value. It can reflect unknown or failed/unsupported probing, not necessarily a question that needs an answer. " +
         "This is a CRE preview; verify emitted behavior independently with native $apply.",
       inputSchema: {
         path: z
@@ -1959,8 +1955,8 @@ type OutDirResult = { ok: true; outDir: string } | { ok: false; errorText: strin
  *
  * ⚠ THIS IS A BEHAVIOUR CHANGE: omitting `out` used to mean DO NOT WRITE, and `emit_crl` then returned
  * the full CQL bodies inline. It writes now. **Read-only inspection of a LAYERED closure is genuinely
- * removed** — `emit_cql` is the single-library direct lane and rejects both-representation policies
- * (it says so in its own description and points here), and `emit_crl_fhir` returns FHIR only. The
+ * removed** — `emit_cql` provides direct single-library emission, not coordinated closure artifacts,
+ * and `emit_crl_fhir` returns FHIR only. The
  * replacement is to pass a scratch `out`: under the rule above a scratch root receives a
  * layout-identical mirror, so you inspect the real closure rather than a degraded rendering of it.
  *

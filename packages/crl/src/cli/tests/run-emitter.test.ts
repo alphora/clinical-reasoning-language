@@ -120,18 +120,14 @@ describe("CLI dispatch matrix — flag validation", () => {
 });
 
 describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (round-5 [critical] fix)", () => {
-  // The contract verified here: EITHER both <out-dir>/cql/*.cql AND
-  // <out-dir>/fhir/<rt>/*.json write atomically, OR neither does.
-  // cc-screening + cms22 both exercise the failure path because their
-  // concept bodies use placeholder/unmatched narratives that the
-  // CRLCommon catalog rejects — exactly the case where partial
-  // emission would have shipped broken Library.content URLs.
+  // Emission diagnostics are checked before either lane is written. These tests
+  // do not establish transactional writes when a later filesystem operation fails.
 
-  it("cc-screening: CQL lane fails (placeholder narratives) → exit 1, neither <out-dir>/cql NOR <out-dir>/fhir written", () => {
+  it("cc-screening: CQL lane fails (placeholder narratives) → exit 1, neither <out-dir>/src/cql NOR <out-dir>/src/fhir written", () => {
     const { outDir, cleanup } = makeOutDir("cc-fail");
     try {
       // --date so the FHIR lane passes its (publishable) date gate; this test
-      // isolates the CQL-lane failure as the atomic-abort trigger.
+      // isolates the CQL-lane failure as the pre-write refusal.
       const r = runCli([
         "--path",
         CC_SCREENING,
@@ -152,9 +148,9 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
   });
 
   // T13 / #94 made cms22 emit cleanly — the original fail-fast test
-  // premise no longer holds. Repurposed: assert atomic write SUCCESS
+  // premise no longer holds. Repurposed: assert both-lane write SUCCESS
   // (both lanes written together) when both lanes can emit.
-  it("cms22: both lanes succeed → exit 0 or 2 (warnings), BOTH <out-dir>/cql AND <out-dir>/fhir written", () => {
+  it("cms22: both lanes succeed → exit 0 or 2 (warnings), BOTH <out-dir>/src/cql AND <out-dir>/src/fhir written", () => {
     const { outDir, cleanup } = makeOutDir("cms22-success");
     try {
       const r = runCli(["--path", CMS22, "--target", "fhir-def", "--out-dir", outDir]);
@@ -195,18 +191,18 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
 });
 
 describe("CLI dispatch matrix — output layout convention", () => {
-  it("CLI fhir-def branch resolves Library.content URLs against <out-dir>/cql/", () => {
+  it("the documented relative Library URL resolves under <out-dir>/src/cql/", () => {
     // Spot-check the math: closureOrchestrator emits
     // `Library.content[0].url = "../../cql/<name>.cql"`. Relative to
-    // `<out-dir>/fhir/Library/<id>.json` that's `<out-dir>/cql/<name>.cql`.
+    // `<out-dir>/src/fhir/Library/<id>.json` that's `<out-dir>/src/cql/<name>.cql`.
     // This documents the assumption baked into the CLI's two-lane
     // write target.
-    const fhirLibPath = join("any-out-dir", "fhir", "Library", "x.json");
+    const fhirLibPath = join("any-out-dir", "src", "fhir", "Library", "x.json");
     const relUrl = "../../cql/MyLib.cql";
     // Path arithmetic identity: dirname(fhirLibPath) + "/" + relUrl normalizes to
-    // <out-dir>/cql/MyLib.cql
+    // <out-dir>/src/cql/MyLib.cql
     const resolved = normalize(join(dirname(fhirLibPath), relUrl));
-    expect(resolved.replace(/\\/g, "/")).toBe("any-out-dir/cql/MyLib.cql");
+    expect(resolved.replace(/\\/g, "/")).toBe("any-out-dir/src/cql/MyLib.cql");
   });
 });
 

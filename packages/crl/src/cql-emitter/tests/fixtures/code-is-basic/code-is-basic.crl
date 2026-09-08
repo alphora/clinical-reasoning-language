@@ -1,3 +1,5 @@
+// Legacy local-code/layered-lowering fixture. Scalar and exists-this declarations
+// below are not current selected-publication authoring examples.
 # Code-is Basic — slice 3 lowerLocalCodes fixture
 library "Code Is Basic".
 
@@ -40,8 +42,8 @@ concept "Active Crohns Disease":
 
 // TWO SEPARATE BOOLEAN FACTS, so this is boolean `and` — not `sem-and`. The bright line: `sem-*` composes
 // RECORDS across one concept's representations; `and`/`or`/`not` compose BOOLEANS. Composition is strong
-// Kleene, so an unanswered "Adult Patient" makes this null (pause) rather than false (deny) — totality
-// belongs at the branch guard, never per operand.
+// Kleene: unknown and true is unknown; unknown and false is false. This fixture
+// tests retained legacy composition rather than current publication admission.
 //
 // No `type is`: a purely derived composition is EPHEMERAL — it is CQL only and writes no resource, so it has
 // no natural resource to name and gets no case-feature StructureDefinition.

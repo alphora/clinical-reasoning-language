@@ -5,7 +5,8 @@ import { REQUIRED_STRUCTURAL_ELEMENTS, RESOURCE_EMIT_REGISTRY } from "../../emit
 import { boundCodeCqlType, renderRecordConstructor } from "../renderRecordConstructor";
 
 /**
- * #189 P1 step 3 — the CQL text of a generated record constructor.
+ * Legacy generic record-constructor CQL text. Current selected-publication
+ * constructors have their own unknown and validity contracts.
  *
  * ⚠ THESE ARE SHAPE TESTS, NOT PROOF THAT THE CQL WORKS. Every constructor rendered here was also
  * EXECUTED through the CQL engine (design §10): translated, called, and its fields read back. A string
@@ -72,7 +73,7 @@ describe("renderRecordConstructor", () => {
         // (`null cannot be cast to non-null type DateTime`) building `FHIR.dateTime { value: recorded }` — a null
         // timestamp kills the whole evaluation rather than yielding a null candidate. Reachable via §5b (a derived
         // stamp is the newest of its components, and a component may have none). Evaluation time is forbidden as a
-        // fallback, so an un-datable candidate correctly contributes NOTHING.
+        // fallback in this legacy helper, which drops the candidate. This is not the current publication rule.
         "  if value is null or recorded is null then",
         "    null as FHIR.Observation",
         "  else",

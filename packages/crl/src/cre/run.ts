@@ -265,7 +265,7 @@ export interface TraceNode {
  *  OVERALL evaluation (a direct fact OR its `defined as` composition), the SAME value whether the concept was on- or
  *  off-path. Fully qualified: same-name concepts in different libraries are distinct rows. Read-only + additive.
  *
- *  ⚠ ABSENT ⇒ UNKNOWN, and a row is only ever emitted for an ESTABLISHED answer. A concept the engine refuses to
+ *  ⚠ ABSENT ⇒ no authoritative Boolean value, and a row is only ever emitted for an ESTABLISHED answer. A concept the engine refuses to
  *  evaluate, and (since #189 null/pause) an UNANSWERED question, both OMIT their row rather than publish `false`.
  *  Consumers must render a missing row as blank/unknown — never as "not satisfied". */
 export interface ConceptTruthRow {
@@ -288,7 +288,7 @@ export interface CaseRun {
   discardedUnknown?: true;
   /** The case's per-concept truth over the whole closure (#187 Todo 2). Lets the Medical-Validation panes show a
    *  case-derived answer for an OFF-path (preempted) concept that `:first` never evaluated. Empty on an error run.
-   *  CONTRACT: an ABSENT `(lib,name)` (a concept outside this list) is UNKNOWN — render blank, never as `false`. */
+   *  CONTRACT: an ABSENT `(lib,name)` (a concept outside this list) supplies no authoritative Boolean value — render blank, never infer `false` or a required answer. */
   conceptTruth: ConceptTruthRow[];
 }
 
@@ -1242,7 +1242,7 @@ function walkDefinedAs(
  * the real run. Any NEW `runtimeError` writer reachable from `evalConcept` inherits this isolation — keep it that way.
  *
  * The reset also makes the scratch `runtimeError` a per-concept "this off-path answer is NON-AUTHORITATIVE" signal:
- * `collectConceptTruth` reads it to OMIT the row (the `ConceptTruthRow` "absent ⇒ unknown" contract) rather than
+ * `collectConceptTruth` reads it to OMIT the row (the `ConceptTruthRow` "absent ⇒ no authoritative Boolean value" contract) rather than
  * publish a fabricated presence `false` for a concept the engine refuses to evaluate (disc 462 Claude #2 / gpt56 G4).
  */
 function truthOf(id: Id, ctx: Ctx): { eval: ConceptEval; authoritative: boolean } {
@@ -1269,7 +1269,7 @@ function truthOf(id: Id, ctx: Ctx): { eval: ConceptEval; authoritative: boolean 
  * COVERAGE = declared Concepts. This is exactly the set the panes can DISPLAY (their `ConceptShapeIndex` is built from
  * the same `Concept` declarations), so a fact-only name asserted via `defined by` but with NO `Concept` declaration —
  * satisfiable-true but absent from `ctx.concepts` — is intentionally absent here AND never a displayed concept, so the
- * "absent ⇒ unknown" contract cannot mislead a pane. PRECEDENCE: `ctx.concepts` is keyed by `(lib,name)`, and a same-name
+ * "absent ⇒ no authoritative Boolean value" contract cannot mislead a pane. PRECEDENCE: `ctx.concepts` is keyed by `(lib,name)`, and a same-name
  * local+package collision resolves to the local/covered concept (added last in `runCel`) — the shape model resolves the
  * same way, so the row matches what the pane shows.
  *
@@ -1286,14 +1286,14 @@ function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
   for (const [id, entry] of ctx.concepts) {
     const { eval: ev, authoritative } = truthOf(id, ctx);
     // OMIT a non-authoritative concept (a `count`/`most recent` reduction, or a boolean composition over a
-    // criterion operand, that the engine refuses to evaluate) — an ABSENT row is UNKNOWN (render blank), never a fabricated `false`
+    // criterion operand, that the engine refuses to evaluate) — an ABSENT row has no authoritative value (render blank), not necessarily an evaluated unknown
     // (disc 462 Claude #2 / gpt56 G4). Publishing false would tell a pane a `count≥2` determination is
     // authoritatively unmet on a case that may satisfy it.
     if (!authoritative) continue;
     // ⭐ REFACTOR:grounded (#189 null/pause, panel disc 517) — OMIT an UNKNOWN too, for exactly the reason
     // above. `satisfied: sat === true` would publish an unanswered QUESTION to the panes as an authoritative
     // "not satisfied" row — the unanswered≡answered-no conflation this whole change exists to kill,
-    // reintroduced at the surface KE tooling actually reads. The row contract already says ABSENT ⇒ UNKNOWN,
+    // reintroduced at the surface KE tooling actually reads. The row contract already says ABSENT ⇒ no authoritative Boolean value,
     // so a question with no answer belongs in the same bucket as a determination the engine won't evaluate.
     // Reached unknown trace nodes also omit `satisfied` and carry `unknown`; ordered halts additionally
     // carry `blockedUnknown`. Truth rows omit unknowns rather than coerce them.

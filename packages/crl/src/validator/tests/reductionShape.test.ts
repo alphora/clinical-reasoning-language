@@ -56,8 +56,8 @@ const RECORDSET_X =
   `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n`;
 
 describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence WARNINGS", () => {
-  // The whole point of the slice: every finding is validate-only. `isValid` never flips.
-  it("every reduction-shape finding is a WARNING — isValid stays true", () => {
+  // This legacy-input row checks one warning; other rules can emit errors.
+  it("this legacy reduction-shape finding is a warning and keeps isValid true", () => {
     const r = validateFull(`library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n`);
     expect(r.isValid).toBe(true);
     expect(r.warnings.some((e) => e.kind === "reduction-shape")).toBe(true);
@@ -227,33 +227,30 @@ describe("ReductionShapeValidator (#189 IMPL 2a) — reduction/shape coherence W
       expect(errs[0].message).toContain("UNMATCHED NARRATIVE");
     });
 
-    it("is CLEAN for `shape is Record` + `most recent this`", () => {
+    it("the legacy rule accepts `shape is Record` + `most recent this`", () => {
       const src =
         `library "T".\nconcept "C":\n- type is Observation.\n- shape is Record.\n- code is \`c\`.\n` +
         `- definition is most recent this.\n`;
-      expect(redWarnings(src, "record-shape-invariant")).toHaveLength(0);
+      expect(redErrors(src, "record-shape-invariant")).toHaveLength(0);
     });
 
     it("is CLEAN for `shape is Record` + the UN-folded narrative `most recent \"X\"`", () => {
       const src =
         `library "T".\n${RECORDSET_X}` +
         `concept "C":\n- type is Observation.\n- shape is Record.\n- definition is most recent "X".\n`;
-      expect(redWarnings(src, "record-shape-invariant")).toHaveLength(0);
+      expect(redErrors(src, "record-shape-invariant")).toHaveLength(0);
     });
   });
 
   // ---------------------------------------------------------------- no-bare-scalar-code (⚠ corpus-wide)
   describe("no-bare-scalar-code — THE migration prompt (Scalar bare `code is`, no reduction)", () => {
-    it("WARNS a bare boolean `code is`, steering to `exists this` AND warning the reduction bricks emit until the flip (F1)", () => {
+    it("warns on a legacy bare code without prescribing existence or delayed migration", () => {
       const src = `library "T".\nconcept "C":\n- type is Condition.\n- value type is boolean.\n- code is \`c\`.\n`;
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
-      expect(w[0].message).toMatch(/exists this/);
-      // F1 [critical]: the migration prompt must warn that authoring the reduction NOW fails emit
-      // (emit-reduction-not-active — the IMPL-3 sentinel for a `code is` + reduction) until the flip,
-      // else a KE follows it straight into a hard error.
-      expect(w[0].message).toMatch(/emit-reduction-not-active/);
-      expect(w[0].message).toMatch(/until the flip/);
+      expect(w[0].message).toMatch(/Record Observation publication/);
+      expect(w[0].message).toMatch(/preserve the intended question/);
+      expect(w[0].message).not.toMatch(/exists this|most recent this|until the flip/);
     });
 
     // ⭐ #189 null/pause (panel disc 517) — the exemption that matters most, because this rule's ADVICE is
@@ -293,14 +290,14 @@ concept "C":
       expect(redWarnings(src, "no-bare-scalar-code", "C")).toHaveLength(1);
     });
 
-    it("WARNS a bare Quantity `code is`, steering to `most recent this`", () => {
+    it("warns a legacy bare Quantity code with faithful publication guidance", () => {
       const src = `library "T".\nconcept "C":\n- value type is Quantity.\n- code is \`c\`.\n`;
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
-      expect(w[0].message).toMatch(/most recent this/);
+      expect(w[0].message).toMatch(/Record Observation publication/);
     });
 
-    it("conditions the action on repCount: a NON-boolean `code is` + posrep steers to a named RecordSet, not `most recent this` (F6)", () => {
+    it("warns a legacy sourced Quantity without promising a collection migration", () => {
       // repCount 2 (code + posrep): a `most recent this` here would immediately trip reduction-multi-rep,
       // so the action steers to promoting one representation instead of chaining into another warning.
       const src =
@@ -308,10 +305,10 @@ concept "C":
         `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is Quantity.\n`;
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
-      expect(w[0].message).toMatch(/promote a single representation/);
+      expect(w[0].message).toMatch(/Source or collection semantics/);
     });
 
-    it("a BOOLEAN `code is` + posrep steers to `exists this` even multi-rep (union, dedup-immune; gpt56 R3 #2)", () => {
+    it("warns a legacy sourced Boolean without substituting an existence question", () => {
       // design §6: multi-rep `exists this` is the union of each rep's existence — supported and NOT
       // multi-rep-ambiguous, so boolean-presence steers to `exists this` regardless of repCount (must
       // NOT recommend promote-to-RecordSet, which is only for value-reading `most recent`).
@@ -320,8 +317,8 @@ concept "C":
         `- source representation:\n  - type is Observation.\n  - value element is Observation.value.\n  - value type is boolean.\n`;
       const w = redWarnings(src, "no-bare-scalar-code", "C");
       expect(w).toHaveLength(1);
-      expect(w[0].message).toMatch(/exists this/);
-      expect(w[0].message).not.toMatch(/promote a single representation/);
+      expect(w[0].message).toMatch(/preserve the intended question/);
+      expect(w[0].message).not.toMatch(/exists this/);
     });
 
     it("EXEMPTS a `code is` + `defined as` both-rep (a satisfying reduction)", () => {

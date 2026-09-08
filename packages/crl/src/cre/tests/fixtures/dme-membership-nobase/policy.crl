@@ -6,7 +6,7 @@ The project's package.json declares NO `crl.canonicalBase`, so a local concept's
 `{system, code}` set is UNDERIVABLE. An AUTHORED-code local fact then cannot have its
 membership computed; the CRE fails the run LOUD (fabrication-refusal) rather than guess
 — matching the emitter, which also refuses to compose the local CodeSystem url (#271).
-A BARE fact still evaluates (degenerate presence; no system needed).
+Bare and authored-code facts both require resolvable local identity; the owning cases expect errors.
 */
 
 concept "Skull Fracture":

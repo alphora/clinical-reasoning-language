@@ -1,8 +1,8 @@
 # CRL test survey
 
-Baseline2e645034 plus review632 candidate,2026-09-08. **In progress, not comprehensive certification.**
+Baseline1da9f59c plus review637 candidate,2026-09-08. **In progress, not comprehensive certification.**
 
-300 tracked test files. 169 read in full in this round (lead and native reviewers). Reading is not completed claim mapping.
+300 tracked test files. 300 read in full in this round (lead and native reviewers). Full reading is not completed claim mapping.
 
 Normal runner discovery was reconciled with tracked files: batch-java.test.cjs requires an explicit JDK run and is absent from test:native:checks. Conditional native tests and early-return OS cases need per-case execution evidence. A green file or a matching hash does not establish that an assertion ran. No file below is excluded merely because it is unreviewed.
 
@@ -34,8 +34,8 @@ Normal runner discovery was reconciled with tracked files: batch-java.test.cjs r
 | packages/crl/src/ast/tests/representation-structure.test.ts | 5 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/ast/tests/shape-reduction.test.ts | 11 | 0 | read; claim disposition in progress | vitest crl |
 | packages/crl/src/ast/tests/terminology-structure.test.ts | 2 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
-| packages/crl/src/authoring-kit/tests/authoring-kit.test.ts | 51 | 32 | unreviewed | vitest crl |
-| packages/crl/src/authoring-kit/tests/referenceArtifactsEmit.test.ts | 5 | 8 | unreviewed | vitest crl |
+| packages/crl/src/authoring-kit/tests/authoring-kit.test.ts | 51 | 32 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/authoring-kit/tests/referenceArtifactsEmit.test.ts | 5 | 6 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
 | packages/crl/src/cel/emitter/tests/b4-coded-value.test.ts | 6 | 4 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/cel/emitter/tests/bareTypeUncoded.test.ts | 5 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/cel/emitter/tests/classifyConceptRole.test.ts | 7 | 1 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
@@ -58,68 +58,68 @@ Normal runner discovery was reconciled with tracked files: batch-java.test.cjs r
 | packages/crl/src/cel/validator/tests/localMembershipWarning.test.ts | 4 | 1 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/cel/validator/tests/numericValueRules.test.ts | 7 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/cel/validator/tests/validator.test.ts | 49 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
-| packages/crl/src/cli/tests/run-emitter.test.ts | 10 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cli/tests/run-mcp-server.test.mjs | 0 | 0 | unreviewed | test:mcp |
-| packages/crl/src/cql-emitter/tests/ageChainAssertionPoints.test.ts | 3 | 1 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/ageProjectionRetirement.test.ts | 9 | 1 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/bmiRetirement.test.ts | 14 | 7 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/caseFeatureGuards.test.ts | 9 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/compositionErrorKinds.test.ts | 5 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/constructorCelParity.test.ts | 4 | 4 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/criterionCollision.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/criterionLoweringPin.test.ts | 1 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/definedAsExistsLowering.test.ts | 2 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/dme101-030-emit.test.ts | 9 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/emit-golden.test.ts | 2 | 2 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/emitCQL-meta.test.ts | 7 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/emitCQL-parameters.test.ts | 15 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/emitCriterionDefine.test.ts | 11 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/emitsScalarValue.test.ts | 8 | 1 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/foreignCriterionScope.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/functionalVsBinding.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/guardDefineBothLanes.test.ts | 4 | 4 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/heterogeneousSourceEmit.test.ts | 8 | 2 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/layeredEmit.test.ts | 39 | 3 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/leafEligibleConcepts.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/ledgerEnrollment2a.test.ts | 16 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/lowerLocalCodes.test.ts | 44 | 4 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/meta-emit-registry.test.ts | 15 | 6 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/namedAnswerOptionsEmit.test.ts | 2 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/publicationRecord.test.ts | 18 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/pureQuestionEmit.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/recencyRecordMerge.test.ts | 6 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/recencyTieBreak.test.ts | 6 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/recordUnionTerms.test.ts | 4 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/reductionExistsEmit.test.ts | 2 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/renderConstructorCall.test.ts | 13 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/renderPublicationSelection.test.ts | 2 | 5 | read; claim disposition in progress | vitest crl |
-| packages/crl/src/cql-emitter/tests/renderRecordConstructor.test.ts | 9 | 5 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/semnotLowering.test.ts | 13 | 1 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/terminologyIdentifierCollision.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/totalScalarBoolean.test.ts | 22 | 2 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/truthsetProbe.test.ts | 1 | 8 | unreviewed | vitest crl |
-| packages/crl/src/cql-emitter/tests/unmatched-narrative.test.ts | 23 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/branchConditionEval.test.ts | 10 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/caseFactDates.test.ts | 25 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/composition.test.ts | 15 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/conceptTruth.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/criterionEval.test.ts | 32 | 7 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/decisionResolver.test.ts | 5 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/inlineAnswerBareCode.test.ts | 5 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/interfaceOwnValue.test.ts | 13 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/localMembership.test.ts | 14 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/membershipRefusal.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/pauseResult.test.ts | 20 | 5 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/pipelineFamily.test.ts | 12 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/publication.test.ts | 62 | 8 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/publicationAge.test.ts | 2 | 2 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/publicationBMI.test.ts | 1 | 1 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/publicationImports.test.ts | 12 | 0 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/publicationQuantity.test.ts | 1 | 0 | unreviewed | vitest crl |
+| packages/crl/src/cli/tests/run-emitter.test.ts | 10 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cli/tests/run-mcp-server.test.mjs | 0 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | test:mcp |
+| packages/crl/src/cql-emitter/tests/ageChainAssertionPoints.test.ts | 3 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/ageProjectionRetirement.test.ts | 9 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/bmiRetirement.test.ts | 14 | 7 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/caseFeatureGuards.test.ts | 9 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/compositionErrorKinds.test.ts | 5 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/constructorCelParity.test.ts | 4 | 4 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/criterionCollision.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/criterionLoweringPin.test.ts | 1 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/definedAsExistsLowering.test.ts | 2 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/dme101-030-emit.test.ts | 9 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/emit-golden.test.ts | 2 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitCQL-meta.test.ts | 7 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitCQL-parameters.test.ts | 15 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitCriterionDefine.test.ts | 11 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/emitsScalarValue.test.ts | 8 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/foreignCriterionScope.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/functionalVsBinding.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/guardDefineBothLanes.test.ts | 4 | 4 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/heterogeneousSourceEmit.test.ts | 8 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/layeredEmit.test.ts | 39 | 3 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/leafEligibleConcepts.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/ledgerEnrollment2a.test.ts | 16 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/lowerLocalCodes.test.ts | 44 | 4 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/meta-emit-registry.test.ts | 15 | 6 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/namedAnswerOptionsEmit.test.ts | 2 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/publicationRecord.test.ts | 18 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/pureQuestionEmit.test.ts | 8 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/recencyRecordMerge.test.ts | 6 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/recencyTieBreak.test.ts | 6 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/recordUnionTerms.test.ts | 4 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/reductionExistsEmit.test.ts | 2 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/renderConstructorCall.test.ts | 13 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/renderPublicationSelection.test.ts | 2 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/renderRecordConstructor.test.ts | 9 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/semnotLowering.test.ts | 13 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/terminologyIdentifierCollision.test.ts | 8 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/totalScalarBoolean.test.ts | 22 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/truthsetProbe.test.ts | 1 | 8 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cql-emitter/tests/unmatched-narrative.test.ts | 23 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/branchConditionEval.test.ts | 10 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/caseFactDates.test.ts | 25 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/composition.test.ts | 15 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/conceptTruth.test.ts | 8 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/criterionEval.test.ts | 32 | 7 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/decisionResolver.test.ts | 5 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/inlineAnswerBareCode.test.ts | 5 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/interfaceOwnValue.test.ts | 13 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/localMembership.test.ts | 14 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/membershipRefusal.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/pauseResult.test.ts | 20 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/pipelineFamily.test.ts | 12 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/publication.test.ts | 62 | 8 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/publicationAge.test.ts | 2 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/publicationBMI.test.ts | 1 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/publicationImports.test.ts | 12 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/publicationQuantity.test.ts | 1 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
 | packages/crl/src/cre/tests/publicationSource.test.ts | 8 | 2 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
-| packages/crl/src/cre/tests/run.test.ts | 22 | 3 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/unsatisfiedFrontier.test.ts | 34 | 1 | unreviewed | vitest crl |
-| packages/crl/src/cre/tests/viewModel.test.ts | 15 | 1 | unreviewed | vitest crl |
+| packages/crl/src/cre/tests/run.test.ts | 22 | 3 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/unsatisfiedFrontier.test.ts | 34 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/cre/tests/viewModel.test.ts | 15 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
 | packages/crl/src/dispositions/tests/config.test.ts | 27 | 1 | read; claim disposition in progress | vitest crl |
 | packages/crl/src/dispositions/tests/displayName.test.ts | 7 | 0 | read; claim disposition in progress | vitest crl |
 | packages/crl/src/emit/tests/booleanTotality.test.ts | 50 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
@@ -140,41 +140,41 @@ Normal runner discovery was reconciled with tracked files: batch-java.test.cjs r
 | packages/crl/src/emit/tests/publicationTemporal.test.ts | 3 | 1 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/emit/tests/recordConstructor.test.ts | 22 | 7 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/emit/tests/resourceEmitRegistry.test.ts | 45 | 12 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
-| packages/crl/src/fhir-emitter/tests/activity.test.ts | 29 | 1 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/answerOptionsBinding.test.ts | 6 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/blephPresentation.test.ts | 1 | 2 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/caseFeatureCollection.test.ts | 11 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/caseFeatureRecord.test.ts | 11 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/ccScreeningRoundTrip.test.ts | 5 | 5 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/checkIds.test.ts | 15 | 2 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts | 56 | 18 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/codeSystem.test.ts | 7 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/collectCaseFeatures.test.ts | 2 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/corpusProbe.test.ts | 4 | 5 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/cpgActivityProfiles.test.ts | 10 | 4 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/criterionEmit.test.ts | 22 | 7 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/decision.test.ts | 75 | 3 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/emit-fhir-golden.test.ts | 2 | 5 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/example-fhir-golden.test.ts | 3 | 4 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/idFormatter.test.ts | 5 | 1 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/library.test.ts | 13 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/membershipPublication.test.ts | 14 | 3 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/metadata.test.ts | 25 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/namedAnswerClosure.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/partial-split-author-vs-golden.test.ts | 5 | 5 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/partial-split-fhir-golden.test.ts | 18 | 6 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/patient-age.test.ts | 3 | 1 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/presentationEmit.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/presentationReachability.test.ts | 7 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/recommendation.test.ts | 14 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/referenceStub.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/reproDate.test.ts | 20 | 2 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/selectedPublication.test.ts | 5 | 1 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/slug.test.ts | 33 | 1 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/structureDefinition.test.ts | 20 | 4 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/terminologyCodeDisplay.test.ts | 3 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/valueSet.test.ts | 13 | 0 | unreviewed | vitest crl |
-| packages/crl/src/fhir-emitter/tests/writer.test.ts | 5 | 0 | unreviewed | vitest crl |
+| packages/crl/src/fhir-emitter/tests/activity.test.ts | 29 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/answerOptionsBinding.test.ts | 6 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/blephPresentation.test.ts | 1 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/caseFeatureCollection.test.ts | 11 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/caseFeatureRecord.test.ts | 11 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/ccScreeningRoundTrip.test.ts | 5 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/checkIds.test.ts | 15 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts | 56 | 18 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/codeSystem.test.ts | 7 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/collectCaseFeatures.test.ts | 2 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/corpusProbe.test.ts | 4 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/cpgActivityProfiles.test.ts | 10 | 4 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/criterionEmit.test.ts | 22 | 7 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/decision.test.ts | 75 | 3 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/emit-fhir-golden.test.ts | 2 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/example-fhir-golden.test.ts | 3 | 4 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/idFormatter.test.ts | 5 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/library.test.ts | 13 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/membershipPublication.test.ts | 14 | 3 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/metadata.test.ts | 25 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/namedAnswerClosure.test.ts | 8 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/partial-split-author-vs-golden.test.ts | 5 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/partial-split-fhir-golden.test.ts | 18 | 6 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/patient-age.test.ts | 3 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/presentationEmit.test.ts | 8 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/presentationReachability.test.ts | 7 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/recommendation.test.ts | 14 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/referenceStub.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/reproDate.test.ts | 20 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/selectedPublication.test.ts | 5 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/slug.test.ts | 33 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/structureDefinition.test.ts | 20 | 4 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/terminologyCodeDisplay.test.ts | 3 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/valueSet.test.ts | 13 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/fhir-emitter/tests/writer.test.ts | 5 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
 | packages/crl/src/fhir-model/tests/elementPath.test.ts | 4 | 0 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/fhir-model/tests/fhirValueModel.test.ts | 20 | 9 | read; per-file disposition in survey-dispositions.md; detailed claim mapping in progress | vitest crl |
 | packages/crl/src/flags/tests/buildFlagDraft.test.ts | 13 | 0 | read; claim disposition in progress | vitest crl |
@@ -273,48 +273,48 @@ Normal runner discovery was reconciled with tracked files: batch-java.test.cjs r
 | packages/crl/src/results/tests/runProducer.test.ts | 11 | 1 | read; claim disposition in progress | vitest crl |
 | packages/crl/src/results/tests/spawn.test.ts | 15 | 0 | read; claim disposition in progress | vitest crl |
 | packages/crl/src/results/tests/useCases.test.ts | 8 | 2 | read; claim disposition in progress | vitest crl |
-| packages/crl/src/template-match/agePredicate.test.ts | 4 | 0 | unreviewed | vitest crl |
-| packages/crl/src/template-match/tests/membershipPattern.test.ts | 17 | 1 | unreviewed | vitest crl |
-| packages/crl/src/template-match/tests/patternCatalog.test.ts | 11 | 2 | unreviewed | vitest crl |
-| packages/crl/src/template-match/tests/pipeline.test.ts | 9 | 0 | unreviewed | vitest crl |
-| packages/crl/src/template-match/tests/recencyValueConcept.test.ts | 16 | 0 | unreviewed | vitest crl |
-| packages/crl/src/template-match/tests/resolvePipeline.test.ts | 21 | 0 | unreviewed | vitest crl |
-| packages/crl/src/tests/emit-layout.test.ts | 7 | 3 | unreviewed | vitest crl |
-| packages/crl/src/tests/emit-writers.test.ts | 17 | 2 | unreviewed | vitest crl |
-| packages/crl/src/tests/obesityTarget.test.ts | 3 | 5 | unreviewed | vitest crl |
-| packages/crl/src/tests/regression/regression-ast.test.ts | 1 | 0 | unreviewed | vitest crl |
-| packages/crl/src/tests/regression/regression-lexer.test.ts | 1 | 0 | unreviewed | vitest crl |
-| packages/crl/src/tests/regression/regression-parser.test.ts | 1 | 0 | unreviewed | vitest crl |
-| packages/crl/src/tests/regression/regression-transformer.test.ts | 0 | 0 | unreviewed | vitest crl |
-| packages/crl/src/tests/serviceRequestTarget.test.ts | 9 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/agePredicate.test.ts | 14 | 5 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/answerOptions.test.ts | 6 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/conceptSubstance.test.ts | 5 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/criterionSemantics.test.ts | 25 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/cycleDetector.test.ts | 18 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/decisionShape.test.ts | 27 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/definedAsBooleanComposition-t2.test.ts | 13 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/dispositionValidation.test.ts | 12 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/emitCapability.test.ts | 6 | 1 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/metaTag.test.ts | 11 | 0 | read; claim disposition in progress | vitest crl |
-| packages/crl/src/validator/tests/nameUniqueness.test.ts | 6 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/namedAnswerOptions.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/parameter.test.ts | 10 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/pipelineStage.test.ts | 10 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/publication.test.ts | 8 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/publicationMarkers.test.ts | 12 | 1 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/recordSetBound.test.ts | 5 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/reductionShape.test.ts | 47 | 1 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/representationShape.test.ts | 30 | 0 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/reservedLibraryName.test.ts | 3 | 1 | unreviewed | vitest crl |
-| packages/crl/src/validator/tests/useSiteType.test.ts | 77 | 11 | unreviewed | vitest crl |
+| packages/crl/src/template-match/agePredicate.test.ts | 4 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/template-match/tests/membershipPattern.test.ts | 17 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/template-match/tests/patternCatalog.test.ts | 11 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/template-match/tests/pipeline.test.ts | 9 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/template-match/tests/recencyValueConcept.test.ts | 16 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/template-match/tests/resolvePipeline.test.ts | 21 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/emit-layout.test.ts | 7 | 3 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/emit-writers.test.ts | 17 | 2 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/obesityTarget.test.ts | 3 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/regression/regression-ast.test.ts | 1 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/regression/regression-lexer.test.ts | 1 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/regression/regression-parser.test.ts | 1 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/regression/regression-transformer.test.ts | 0 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/tests/serviceRequestTarget.test.ts | 9 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/agePredicate.test.ts | 14 | 5 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/answerOptions.test.ts | 6 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/conceptSubstance.test.ts | 5 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/criterionSemantics.test.ts | 25 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/cycleDetector.test.ts | 18 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/decisionShape.test.ts | 27 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/definedAsBooleanComposition-t2.test.ts | 13 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/dispositionValidation.test.ts | 12 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/emitCapability.test.ts | 6 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/metaTag.test.ts | 11 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/nameUniqueness.test.ts | 6 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/namedAnswerOptions.test.ts | 8 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/parameter.test.ts | 10 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/pipelineStage.test.ts | 10 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/publication.test.ts | 9 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/publicationMarkers.test.ts | 12 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/recordSetBound.test.ts | 5 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/reductionShape.test.ts | 47 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/representationShape.test.ts | 30 | 0 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/reservedLibraryName.test.ts | 3 | 1 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
+| packages/crl/src/validator/tests/useSiteType.test.ts | 77 | 11 | read; mixed per-file disposition in survey-dispositions.md; claim mapping in progress | vitest crl |
 
 ## Additional native entry points
 
 | File | Invocation | Inspection | Inputs / limits |
 |---|---|---|---|
-| packages/crl/scripts/native-acceptance/run.cjs | test:native:bleph | unreviewed | Requires explicit engine jar/output; source/CEL/FHIR and native/CRE case oracles |
+| packages/crl/scripts/native-acceptance/run.cjs | test:native:bleph | read; mapping in progress | Frozen exact cases/input hashes; pinned engine, batch isolation, native+CRE verdicts separately; not executed in audit |
 | packages/crl/scripts/native-acceptance/session.cjs | test:native:bleph-session | read; mapping in progress | Explicit engine jar/output; 4 steps in test/acceptance/bleph/session.json; fresh repository, returned QR + copied bindings; no Q sent |
-| packages/crl/scripts/native-acceptance/bmi-session.cjs | explicit node command | unreviewed | Separate BMI session; not the same transport contract as Bleph |
+| packages/crl/scripts/native-acceptance/bmi-session.cjs | explicit node command | read; historical control | Original4.7 engine, cumulative edited singleton strategy, sends Q plus QR and retained data; not current Bleph QR-only transport and not rerun |
 
 The CLI MCP smoke uses assertions outside named test declarations; a zero declaration count does not exclude it. Extension tests that implement advertised tool availability/settings also require linked evidence, even though this discovery is scoped to packages/crl. Remaining discovery: reconcile all documented maintainer commands and fixture-only harnesses.

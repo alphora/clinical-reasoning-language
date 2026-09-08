@@ -82,7 +82,7 @@ describe("#189 — synthetic guard defines agree across the CQL and FHIR lanes",
     }
   });
 
-  it("the define body is STRONG KLEENE — bare leaves, so an unknown operand makes the guard unknown", () => {
+  it("the legacy define body retains bare leaves without operand Coalesce", () => {
     const { cql } = bothLanes();
     const bodies = [...cql.matchAll(/define "Guard L\d+C\d+":\n\s*(.+)/g)].map((m) => m[1]!);
     expect(bodies.length).toBeGreaterThan(0);

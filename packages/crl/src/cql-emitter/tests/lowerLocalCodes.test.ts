@@ -496,7 +496,7 @@ concept "C":
     expect(desc?.recency).toBeDefined();
   });
 
-  it("#189 Slice B2a — a boolean `most recent this` on a VALUELESS resource (Condition) errors `value-read-valueless` + the `exists this` migration prompt", () => {
+  it("#189 Slice B2a — a boolean `most recent this` on a VALUELESS resource (Condition) errors `value-read-valueless` without prescribing existence", () => {
     const ast = parse(
       lib(`
 concept "C":
@@ -509,7 +509,7 @@ concept "C":
     const { errors } = lowerLocalCodes(ast);
     const e = errors.find((x) => x.kind === "value-read-valueless");
     expect(e).toBeDefined();
-    expect(e!.message).toMatch(/exists this/);
+    expect(e!.message).toMatch(/preserve the intended question/);
   });
 
   it("#189 Slice B2a/B2b — `most recent this` coherence/defer matrix (shape × value-type × resource)", () => {
@@ -537,13 +537,13 @@ concept "C":
     expect(
       kinds("- type is Observation.\n- value type is integer.\n- code is `c`.\n- definition is most recent this."),
     ).toContain("emit-reduction-not-active");
-    // Single non-boolean value type on a VALUELESS resource → the PERMANENT valueless error + exists-this
+    // Single non-boolean value type on a VALUELESS resource → the valueless error + faithful-representation
     // prompt, NOT the Slice-C defer (Claude #1: the deriver's valueless check runs before the non-boolean
     // split, so Condition never gets told to "wait for Slice C" for a form Slice C can't fix).
     const condQ = run("- type is Condition.\n- value type is Quantity.\n- code is `c`.\n- definition is most recent this.");
     expect(condQ.errors.map((e) => e.kind)).toContain("value-read-valueless");
     expect(condQ.errors.map((e) => e.kind)).not.toContain("emit-reduction-not-active");
-    expect(condQ.errors.find((e) => e.kind === "value-read-valueless")!.message).toMatch(/exists this/);
+    expect(condQ.errors.find((e) => e.kind === "value-read-valueless")!.message).toMatch(/preserve the intended question/);
     // Zero value types → incoherent (needs exactly one).
     expect(
       kinds("- type is Observation.\n- code is `c`.\n- definition is most recent this."),
@@ -552,10 +552,10 @@ concept "C":
     // row", which was never true — it always had a row, with `caseFeature: false`. So a boolean `most recent
     // this` on it reported `unsupported-resource`, blaming the resource for what is really a value-read
     // problem. With the flag flipped it reports `value-read-valueless`: Encounter HAS no value element, so a
-    // value-reading reduction is the wrong construct and the diagnostic says to author `exists this`.
+    // value-reading reduction is invalid; the diagnostic must not substitute an existence question.
     const enc = run("- type is Encounter.\n- value type is boolean.\n- code is `c`.\n- definition is most recent this.");
     expect(enc.errors.map((e) => e.kind)).toContain("value-read-valueless");
-    expect(enc.errors.some((e) => /exists this/.test(e.message ?? ""))).toBe(true);
+    expect(enc.errors.some((e) => /preserve the intended question/.test(e.message ?? ""))).toBe(true);
 
     // A genuinely unlisted resource still reports `unsupported-resource`, with NO exists-this prompt —
     // nothing is known about it, so suggesting a reduction would be a guess.

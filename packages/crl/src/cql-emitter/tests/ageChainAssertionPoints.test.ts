@@ -37,7 +37,7 @@ describe("age chain — assertion points", () => {
 
   // ── GAP 2 — the real blocker for an assertable birth date. `age today …` lowers to CQL
   // `AgeInYearsAt(anchor)`, which reads `birthDate` from the PATIENT CONTEXT. There is no overload
-  // taking a birth date operand, so a locally-asserted `Patient Birth Date` concept can never feed the
+  // taking a birth date operand, so this catalog scan does not provide a locally-asserted `Patient Birth Date` input to the
   // age calculation — which is what makes point 2 inexpressible. Pinned on the catalog so the constraint
   // is visible where it actually lives.
   it("age is hard-wired to Patient.birthDate — no overload takes an asserted date", () => {

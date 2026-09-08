@@ -248,7 +248,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — boolean at a refinement / anc
     expect(errs[0].pattern).toBe("WasPerformed");
     expect(errs[0].argPosition).toBe(0);
     expect(errs[0].actual).toBe("boolean");
-    expect(errs[0].message).toMatch(/defined as exists/); // split guidance, not "flip the value type"
+    expect(errs[0].message).toMatch(/supported Boolean publication/); // split guidance, not "flip the value type"
   });
 
   it("ACCEPTS `… performed` over a resource-valued (CodeableConcept) subject", () => {
@@ -515,7 +515,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — boolean operand in a refineme
     const e2 = mismatches(boolOverNonBool, "bare-ref-value-type-mismatch");
     expect(e2).toHaveLength(1);
     expect(e2[0].actual).toBe("CodeableConcept");
-    expect(e2[0].message).toMatch(/defined as exists/); // boolean direction points at exists
+    expect(e2[0].message).toMatch(/supported Boolean publication/); // boolean direction points at exists
 
     // A bare-ref is value-preserving, so FULL value-type equality is required (disc 404 R3 P2): a
     // `Quantity` alias over a `CodeableConcept` target is a mismatch too (else it would pass an
@@ -557,7 +557,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — boolean operand in a refineme
     expect(warns[0].expected).toBe("boolean");
     expect(warns[0].actual).toBe("CodeableConcept");
     expect(warns[0].severity).toBe("warning");
-    expect(warns[0].message).toMatch(/defined as exists/); // steers to the emit-capable form (#265)
+    expect(warns[0].message).toMatch(/supported Boolean publication/); // steers to the emit-capable form (#265)
     expect(validateFull(src).isValid).toBe(true); // a warning never flips isValid
   });
 
@@ -1057,7 +1057,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
     const warns = mismatchWarnings(src, "decision-guard-record-shaped");
     expect(warns).toHaveLength(1);
     expect(warns[0].message).toMatch(/shape is RecordSet/);
-    expect(warns[0].message).toMatch(/defined as exists/);
+    expect(warns[0].message).toMatch(/supported Boolean publication/);
     expect(validateFull(src).isValid).toBe(true);
   });
 
@@ -1089,7 +1089,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
     expect(errs).toHaveLength(1);
     expect(errs[0].actual).toBe("Quantity");
     expect(errs[0].message).toMatch(/shape is RecordSet/);
-    expect(errs[0].message).toMatch(/exists/);
+    expect(errs[0].message).toMatch(/supported Boolean publication/);
     expect(errs[0].message).not.toMatch(/at least/); // record guidance drops the value-comparison hint
   });
 

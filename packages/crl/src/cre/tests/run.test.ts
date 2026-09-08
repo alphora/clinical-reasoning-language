@@ -66,14 +66,8 @@ function assertProducedSubsetOfArms(crlSrc: string, celSrc: string): void {
 }
 
 describe("CRE — runCel", () => {
-  // DEFERRED (disc 496 — "tooling catches up to the oracle"): dme101-030 is now the #189-flip
-  // acceptance oracle and carries the both-representation device + age concepts. The CRE evaluates the
-  // #189 Piece 3 — NOW PASSES. The run previously errored because `Covered Device Requested = exists ("Covered
-  // Device")` evaluated `Covered Device`'s `most recent this` reduction, which the CRE marks a runtimeError. The
-  // Piece-3 existence reach-through (`existsTrace`, v7 §3) reads record EXISTENCE instead: the bare
-  // `Covered Stimulator Ordered` fact is a local degenerate member of `Covered Device` (Piece 2), so
-  // `exists("Covered Device")` is true without touching the value reduction. (Age passes via its LOCAL arm — a bare
-  // degenerate member — as before; the age `value projection` $apply path is separate and unexercised in the CRE.)
+  // Mixed DME regression fixture: current Patient-age publication plus legacy
+  // device/existence declarations. This CRE run does not certify native behavior.
   it("dme101-030: all 3 real cases pass against the fixture (end-to-end)", () => {
     const celPath = join(__dirname, "../../tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = runCel(resolveCelImports(celPath));
@@ -86,7 +80,7 @@ describe("CRE — runCel", () => {
   // populates the both-rep `Covered Device` via its SOURCE arm (the code decides, compartment-global), the boolean
   // interface `exists ("Covered Device")` reads it → covered. A non-member ServiceRequest (wrong code) is closed-
   // world absent → not covered. Membership is the mechanical stub set, IDENTICAL to what the FHIR ValueSet + CQL
-  // retrieve use — so the CRE agrees with `$apply` by construction.
+  // retrieve use. These CRE assertions do not establish native `$apply` agreement.
   it("source membership: the coverage gate is reached via local, remote, or mixed facts; a non-member is not covered", () => {
     const celPath = join(__dirname, "fixtures/dme-source-membership/cases.cel");
     const r = runCel(resolveCelImports(celPath));

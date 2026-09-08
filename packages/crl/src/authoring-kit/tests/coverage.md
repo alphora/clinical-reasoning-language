@@ -1,14 +1,40 @@
 # Kit evidence ledger
 
-## Broad audit in progress — 624–633
+## Broad audit in progress — 624–638
 
-First batches committed as dcf63244 and2e645034. Review632 corrects grammar and
-provenance teaching. The discovery remains300 files; **169 have recorded full
-source reads** (98 lead,71 native reviewer). This does not mean169 complete claim
-mappings. CQL631 and FHIR633 reviews are being integrated separately. [survey-dispositions.md](survey-dispositions.md)
-records mixed applicable/internal/legacy cases; no entire mixed file is excluded.
-Historical execution rows retain the hash tested at that time, separately from
-the current source hash. Reading, passing tests and verified teaching are distinct.
+Grammar/provenance corrections are committed in1da9f59c, following dcf63244 and
+2e645034. All **300 discovered test files have recorded full source reads**, with
+mixed per-file dispositions in [survey-dispositions.md](survey-dispositions.md).
+This completes the discovered-file census, not every claim mapping. Reverse audit638
+is consolidating payload claims, linked active documentation, additional harnesses
+and extension-owned evidence. Reading, passing tests and verified teaching remain
+distinct; installed/native/clinical evidence is not renewed by this source audit.
+
+### CQL, FHIR, CRE and reference corrections — 637
+
+Reviews631/633/635/636 accepted25 findings (0 critical,19 important,6 nit).
+Code review637 found0 critical,0 important,1 nit; both path-description corrections
+were applied. Native GPT-6 Astra/high used crl-emit-v0.1.0; external arm unavailable.
+
+| Claim / consumer | Owning evidence and actual observation | Limit |
+|---|---|---|
+| MCP emission success / parameters | terminologyIdentifierCollision and emitCQL-parameters CQL suites: non-narrative failure and authored parameter declarations | success is required; returned text is inspectable, not certified |
+| MCP FHIR dates / identities / imports | reproDate, closureOrchestrator, membershipPublication, namedAnswerClosure FHIR suites | missing publishable date errors; catalog versions differ; prepared imported bindings resolve. JSON/CQL text, not native |
+| dispositions rationale | activity.test.ts and reviewed activity emitter: own because description or name | no automatic concept-meta rationale propagation |
+| publication-selection:local-source-tie-preference | validator/publication.test.ts explicit Height local+finite Observation source | new control failed before warning-predicate fix; now no errors/warnings. Selector behavior remains owned by publicationSelection tests |
+| value-type repair guidance | lowerLocalCodes, reductionShape and useSiteType owning suites | retain typed refusal without prescribing existence/Scalar migration. Legacy positive shapes remain internal |
+| CRE projection / foreign delegation | cre/publication.test.ts off-path failed publication omitted; foreign delegation refused | no authoritative conceptTruth row does not establish pause. Existing supported local delegation/imported operands remain distinct |
+| decision-composition:arbitration | shared reference CRL/CEL, eight exact CRE output arrays | new X=false,Y=true,severe=false case denies; deleting severe conjunct fails owning test (637-arbitration-mutation). No native run |
+| reference project context | referenceArtifactsEmit: real project validation for every artifact, appropriate PA config including EIU, actual dependency closure | declaration admission/emission distinct from native and clinical fidelity |
+| emitted tree failure / output layout | MCP smoke checks no output root on parse failure; CLI paths include src | path equivalence, not byte identity or transactional writes |
+| legacy collector order | collectCaseFeatures local/foreign same-name branches in both orders | legacy collector regression, not current imported publication semantics |
+| review flags / disposition mode / chaining | existing flag/config/disposition checks and reviewed source | category is not authorization; standalone finality not bypassed by config; shared determination reuse valid, foreign publication delegation limited |
+
+Final latest-per-file validation: **603 passed,0 failed,0 skipped in31 files**.
+TypeScript and complete MCP smoke passed. Per-file reports/tested-source hashes
+are preserved in637-execution.json and the inventory. Source kit1.38 is unreleased.
+Both assembled payloads were reviewed; reverse mapping and explicit remaining gaps
+are prerequisites to comprehensive status and release.
 
 ### Grammar and provenance corrections — 632
 
@@ -184,7 +210,7 @@ operations and publication action-menu guards are not replaced by this kit edit.
 | --- | --- | --- |
 | `concept-form:local-answer-pause` | `PA_DETERMINATION_REFERENCE_CRL/CEL`; kit CRE test asserts all three cases pass | Explicit true approves, false denies, missing predicts pause |
 | `chaining-necessity:local-delegation-pause` | `SOURCE_DELEGATED_DECISION_REFERENCE_CRL/CEL`; five CRE cases plus delegated-Deny trace assertions | Bare same-library delegation preserves its path and unknown-input pause prediction; no foreign-delegation claim |
-| `decision-composition:arbitration` | `DISPOSITION_ARBITRATION_REFERENCE_CRL/CEL`; seven cases with exact outputs for every case | Explicit negatives in both overlap cases, false-dominant conjunction with other inputs absent, and wholly missing input; CRE only |
+| `decision-composition:arbitration` | `DISPOSITION_ARBITRATION_REFERENCE_CRL/CEL`; eight cases with exact outputs for every case | Explicit negatives in both overlap cases, false-dominant conjunction with other inputs absent, and wholly missing input; CRE only |
 | `bmi-publication:kit-finite-source-and-missing` | `cql-emitter/tests/bmiRetirement.test.ts`; extracts actual terms/BMI concepts from `PUBLICATION_REFERENCE_CRL` | CQL/FHIR emission and three CRE outcomes: high BMI approves, a newer lower weight denies, missing height pauses. Existing subsection hash is unchanged; historical native evidence is not a fresh run. |
 
 All source constants are consumed directly by the delivered kit and the owning

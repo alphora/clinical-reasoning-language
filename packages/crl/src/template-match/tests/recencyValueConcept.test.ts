@@ -8,9 +8,8 @@ import {
   isValueReadingBooleanConcept,
 } from "../recencyValueConcept";
 
-// #189 Piece 1 (disc 506 Claude #2) — the shared recency-value shape classifier. Parses against the WORKING-TREE
-// parser (`buildCRL`), NOT the CRL MCP tool (which lags the branch). SHAPE-EXACT: only the exact both-rep
-// recency-value form matches; every off-shape variant returns `not-recency-value` so the existing E1 rejects still fire.
+// Legacy recency-value classifier; these shapes are not current publication admission.
+// This suite uses the source parser and makes no installed-MCP claim.
 
 function conceptNamed(src: string, name: string): Concept {
   const parsed = buildCRL(src);
@@ -26,7 +25,7 @@ function conceptNamed(src: string, name: string): Concept {
 const HEADER = 'library "T".\n\nterminology "Covered Devices":\n- valueset is `http://example.org/vs/covered-devices`.\n\n';
 
 describe("resolveRecencyValueConcept (#189 Piece 1 shared classifier)", () => {
-  it("MATCHES the canonical both-rep recency-value form (Covered Device)", () => {
+  it("MATCHES the legacy both-rep recency-value form (Covered Device)", () => {
     const c = conceptNamed(
       HEADER +
         'concept "Covered Device":\n' +
@@ -144,7 +143,7 @@ describe("isMemberExistenceInterface (#189 Piece 1, disc 507 A/B)", () => {
       name,
     );
 
-  it("ACCEPTS the canonical boolean Observation interface over a recency-value referent", () => {
+  it("ACCEPTS the legacy boolean Observation interface over a recency-value referent", () => {
     expect(isMemberExistenceInterface(cdr(""), isCovered)).toBe(true);
   });
 

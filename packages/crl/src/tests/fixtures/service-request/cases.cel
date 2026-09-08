@@ -1,4 +1,4 @@
-# The acceptance truth table for the canonical ServiceRequest membership target, as CRE cases.
+# CRE cases for the retained legacy ServiceRequest regression fixture.
 //
 // ⭐ THE ROWS THAT MATTER ARE 2 AND 3, AND THEY MUST DIFFER. A request for some other service is a
 // determinate NO — the request was read and it is not covered. No request at all is a question nobody has

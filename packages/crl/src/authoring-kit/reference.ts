@@ -112,8 +112,8 @@ case "missing required answer -> pause":
 /**
  * Worked exemplar B — SOURCE-REQUIRED delegation (kit teaching §2/§5-B). The source NAMES a separate
  * determination ("per the Continuation-of-Therapy protocol") → the policy CHAINS to it with a bare,
- * same-library `use decision`. This is NOT DRY/reuse factoring — chaining is faithful ONLY because the
- * source draws the determination boundary. The chained sub renders its OWN disposition (Approve/Deny
+ * same-library `use decision`. Source delegation is this example's reason for chaining;
+ * genuine shared-determination reuse is another legitimate reason. The chained sub renders its OWN disposition (Approve/Deny
  * meaningful alone). One parent + one delegated sub.
  *
  * Proof note (§4): the bare same-library `use decision` IS evaluated by the CRE — it RECURSES the sub in
@@ -130,9 +130,9 @@ library "Source Delegated Decision Reference".
 /*
 Worked exemplar B: DO chain — because the SOURCE delegates. The policy narrative names a SEPARATE,
 delegated determination ("for a continuation request, apply the Continuation-of-Therapy determination"),
-so the encoding CHAINS to it with a BARE, same-library \`use decision\`. This is the ONLY faithful reason
-to chain: the source draws the determination boundary.
-It is NOT DRY/reuse/readability factoring (that INVENTS a boundary — see the chaining-necessity rule).
+so the encoding CHAINS to it with a BARE, same-library \`use decision\`. This example chains because
+the source draws the determination boundary. Genuine shared-determination reuse is also valid;
+do not fabricate a shared determination from merely similar independent criteria.
 
 The delegated sub renders its OWN disposition (Approve/Deny, each meaningful standalone). The CRE evaluates
 a bare same-library \`use decision\` by RECURSING the sub in place; its determination BUBBLES UP, so the
@@ -424,6 +424,13 @@ case "OVERLAP: both indications, Y-pathway fails (no severe markers) -> approve 
 - fact is "Indication Y Finding".
 - fact is "No Severe Markers".
 - result is "Coverage Determination" is "certify.Approve".
+
+case "Y indicated without severe markers -> Deny":
+- subject is "Sample Patient".
+- fact is "No Indication X".
+- fact is "Indication Y Finding".
+- fact is "No Severe Markers".
+- result is "Coverage Determination" is "not-certify.Deny".
 
 case "within-indication: X present but pathway fails, no Y -> Deny":
 - subject is "Sample Patient".

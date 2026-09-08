@@ -264,7 +264,7 @@ try {
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
     assert.equal(kit.schemaVersion, "1.38"); // named answer ValueSets and presentations
-    assert.equal(kit.contentHash, "ccd59432c0a0e5036fd1f51d1d66973e79f823e3edb15a25c9b7636efe557d40");
+    assert.equal(kit.contentHash, "ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // Supported source/producer publications and legacy inference are distinct in-scope forms.
@@ -281,7 +281,7 @@ try {
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
     assert.equal(kit.schemaVersion, "1.38");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "dafcc2d04b41b59b56a7ba058f73f47259080218972dae38ac8ffe2162858d6f");
+    assert.equal(kit.contentHash, "00151b2005cf86fcbe6c7a49280f22fb2c5f30964e37cccef2fc3769cc52ab78");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 13); // inherited references, including the shared selection CRL/CEL pair
     assert.ok(!refNames.includes("medical-policy-determination.crl"));
@@ -542,7 +542,7 @@ first:
     }
   });
 
-  await check("emit_crl: an explicit project root is byte-identical to omitting out", async () => {
+  await check("emit_crl: an explicit project root has the same output layout as omitting out", async () => {
     // The operator's "or possibly, pass the project root". If these two ever diverge, the offset is
     // being applied a different number of times in the two paths and the uniformity claim is false.
     const { cpSync, rmSync } = await import("node:fs");
@@ -564,7 +564,7 @@ first:
     }
   });
 
-  await check("emit_crl with out on a hard-error .crl → written:null, nothing written, CQL bodies RETAINED", async () => {
+  await check("emit_crl with out on a parse-error .crl → written:null and no output root", async () => {
     const { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } = await import("node:fs");
     const os = await import("node:os");
     const root = mkdtempSync(resolve(os.tmpdir(), "mcp-crl-gatefail-"));
@@ -576,10 +576,7 @@ first:
       const out = JSON.parse((await client.callTool({ name: "emit_crl", arguments: { path: crlPath, out: outDir } })).content[0].text);
       assert.equal(out.success, false, "a parse-failing .crl does not succeed");
       assert.equal(out.written, null, "gate blocked → written:null (the two.cql.success term)");
-      assert.equal(existsSync(resolve(outDir, "cql")), false, "nothing written: no <out>/cql");
-      assert.equal(existsSync(resolve(outDir, "fhir")), false, "nothing written: no <out>/fhir");
-      // On gate-fail the successfully-emitted bodies are NOT withheld (they aren't on disk).
-      assert.ok(out.cql.libraries.every((l) => "cql" in l), "gate-fail retains cql bodies, does not suppress");
+      assert.equal(existsSync(outDir), false, "parse failure creates no output root");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

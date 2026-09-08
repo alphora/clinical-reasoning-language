@@ -1195,13 +1195,11 @@ export function lowerLocalCodes(
         const outcome = deriveEffectiveRepresentations(c, owningMeta);
         if (outcome.status === "error") {
           const e = outcome.error;
-          // Reuse the T3a error taxonomy (one taxonomy — disc 433); the emit branch OWNS the "author
-          // `exists this`" migration prompt on the valueless cell (the deriver's message does not carry
-          // it — Claude #5). `value-read-valueless` = a scalar value read on a resource with no value.
+          // Keep the typed value-carrier refusal without prescribing a different clinical question.
           const message =
             e.kind === "value-read-valueless"
-              ? `Concept "${c.name}": \`most recent this\` reads a value, but ${e.detail} Existence is ` +
-                `forced on a valueless resource — author \`definition is exists this\` instead.`
+              ? `Concept "${c.name}": \`most recent this\` reads a value, but ${e.detail} ` +
+                `Choose a supported representation and producer that preserve the intended question; a missing value carrier does not establish an existence determination.`
               : `Concept "${c.name}": \`most recent this\` — ${e.detail}`;
           errors.push(mkError(e.kind, message, loc));
           continue;

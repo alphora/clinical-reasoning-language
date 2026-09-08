@@ -5,7 +5,7 @@
  * `collectCaseFeatures` keys each condition's recursive `code is` inputs by the
  * NORMALIZED bare name. A genuinely FOREIGN condition (`OtherLib."X"`, still
  * qualified after same-library normalization) collects NOTHING (cross-library
- * case-features are unsupported in v0). Before the F2 fix it was still keyed by
+ * collection here uses the legacy path, not prepared publication bindings). Before the F2 fix it was still keyed by
  * its bare name `getRefName` → an `inputsByCondition` entry of `[]` that
  * CLOBBERED a LOCAL `when "X"` of the same bare name. The fix skips foreign refs
  * entirely so the local condition's collected inputs survive.
@@ -50,7 +50,7 @@ function loweredAndDecisions() {
 }
 
 describe("collectCaseFeatures — foreign-qualified condition does not clobber a same-named local condition (F2)", () => {
-  it("a local `when \"X\"` and a foreign `when OtherLib.\"X\"` → the local X keeps its collected inputs", () => {
+  it.each([false, true])("legacy local inputs survive a foreign same-name condition (foreignFirst=%s)", (foreignFirst) => {
     const { lowered, decisions } = loweredAndDecisions();
     const localDecision = decisions[0]!;
     const localWhen = localDecision.body.statements[0] as WhenBlock;
@@ -69,13 +69,12 @@ describe("collectCaseFeatures — foreign-qualified condition does not clobber a
       ...localWhen,
       condition: { type: "BranchConditionRef", ref: foreignRef, location: localWhen.location },
     };
-    // Put the foreign branch FIRST so a clobber (if the bug regressed) would
-    // overwrite the later local entry — proving the skip, not just last-wins luck.
+    // Both orders matter: local-first catches an empty foreign entry overwriting it.
     const decisionWithForeign: Decision = {
       ...localDecision,
       body: {
         ...localDecision.body,
-        statements: [foreignWhen, localWhen],
+        statements: foreignFirst ? [foreignWhen, localWhen] : [localWhen, foreignWhen],
       },
     };
 

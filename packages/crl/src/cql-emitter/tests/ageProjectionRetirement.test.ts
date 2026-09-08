@@ -21,7 +21,7 @@ describe("age-today publication and retirement", () => {
     expect(r.result).not.toMatch(/recencyAge|lastUpdated|CRLCommon\.AgeAt/);
     expect(r.result).toContain("__CRL_AgeToday_v1_Produce");
   });
-  it.each(["at least 18 years", "at most 18 years", "under 18 years", "younger than 18 years", "at least 6 months", "at most 6 months", "under 1 month", "younger than 1 year"])("preserves comparator and unit %s", phrase => {
+  it.each(["at least 18 years", "at most 18 years", "under 18 years", "younger than 18 years", "at least 6 months", "at most 6 months", "under 1 month", "younger than 1 year"])("admits the supported comparator/unit spelling %s", phrase => {
     const r = emitCQL(source.replace("at least 18 years", phrase), opts); expect(r.success, JSON.stringify(r.errors)).toBe(true);
   });
   it.each(["less than 18 years", "at least 18 days"])("rejects unsupported projection %s", phrase => {

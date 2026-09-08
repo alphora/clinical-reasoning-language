@@ -11,7 +11,10 @@ import {
 } from "../renderConstructorCall";
 
 /**
- * ⭐ #189 — the producer stage's CALL SITE.
+ * Legacy generic constructor call-site text regressions.
+ * Current selected publications use producer-specific validity and unknown preservation;
+ * these old helper expectations are not the current BMI contract. Historical probes below
+ * are historical evidence, not execution by this suite.
  *
  * ⚠ EVERY EXPECTATION HERE WAS EXECUTED against the real CQL engine before it was written down, not designed
  * and then pinned. The probes are `tmp/nullprobe/bmi/` (a Quantity producer + §5b stamps) and
@@ -81,9 +84,8 @@ describe("#189 — rendering a producer stage's constructed candidate", () => {
     //     (FHIR.boolean { value: null }).value is null   ->  true
     //     <the guarded form> is null                     ->  true
     //
-    // So the constructor's `value is null` guard never fired, and a candidate with a null `valueBoolean` and
-    // a REAL stamp was built. It is the NEWEST in the space, so it beats an older established `false` and
-    // turns an owed DENY into a pause.
+    // This legacy helper suppresses a null-valued candidate. Current selected-publication
+    // constructors preserve unknown candidates; this is not a policy denial rule.
     const cql = fhirBooleanFromSystemBoolean('"Obese Computed"');
     expect(cql).toBe(
       'if "Obese Computed" is null then null as FHIR.boolean\n' +
@@ -91,8 +93,8 @@ describe("#189 — rendering a producer stage's constructed candidate", () => {
     );
   });
 
-  describe("§5b — a derived candidate's stamp is the NEWEST of the components that determine its value", () => {
-    it("a FORMULA over several operands takes the MAX of their stamps", () => {
+  describe("legacy derivedStampCql helper — component maximum, not current producer validity", () => {
+    it("the legacy helper renders MAX for multiple component stamps", () => {
       // Executed: Weight @May, Height @Feb -> the candidate is stamped MAY. The operator's reasoning is that
       // a recalculation triggered by a newer input is a NEW claim, made as of that input.
       expect(derivedStampCql(['"W Stamp"', '"H Stamp"'])).toContain('Max({ "W Stamp", "H Stamp" })');
@@ -106,7 +108,7 @@ describe("#189 — rendering a producer stage's constructed candidate", () => {
       // guarded form was executed in the same probe and returns null.
       //
       // Partially-unknown is unknown: any null component ⇒ null stamp ⇒ the constructor's `recorded is null`
-      // guard drops the candidate. The asserted and recorded arms are untouched, so this does not over-pause.
+      // guard drops the candidate. This does not establish correct current publication pause behavior.
       const cql = derivedStampCql(['"W Stamp"', '"H Stamp"']);
       expect(cql).toBe(
         'if "W Stamp" is null or "H Stamp" is null then null as System.DateTime\n' +
@@ -119,8 +121,8 @@ describe("#189 — rendering a producer stage's constructed candidate", () => {
     });
 
     it("⚠ NO components -> a NULL stamp, never `Now()`", () => {
-      // Evaluation time is forbidden: an invented stamp lets a stale calculation outrank a fresh assertion.
-      // The null reaches the constructor's guard, which drops the candidate — which is the honest outcome.
+      // This helper has no authored validity source and does not invent a fallback timestamp.
+      // The null reaches the constructor's guard, which drops the candidate — as this legacy helper specifies.
       expect(derivedStampCql([])).toBe("null as System.DateTime");
       expect(derivedStampCql([])).not.toContain("Now()");
     });

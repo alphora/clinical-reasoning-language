@@ -1,3 +1,5 @@
+// Mixed matcher/internal legacy predicate tests. Current selected-publication
+// admission and assertable qualifications are covered by publication owner tests.
 import * as path from "node:path";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -328,7 +330,7 @@ describe("#189 gap 3 — a membership predicate is NOT directly assertable", () 
   // second source of truth for something definitionally derived, and the recency merge would arbitrate
   // between an ANSWER and its own COMPUTATION as though they were peer observations of the same thing. The
   // answerable thing is the INPUT — the subject carries `code is` + `value from`, so the user is asked WHICH
-  // SERVICE was requested, which is both more informative and the only question a person can answer.
+  // SERVICE was requested, for this retained legacy fixture; it is not a restriction on current coded qualifications.
   const build = (predLines: string[]) =>
     buildCRL(
       [
@@ -359,7 +361,7 @@ describe("#189 gap 3 — a membership predicate is NOT directly assertable", () 
       ].join("\n"),
     );
 
-  it("⭐ the EPHEMERAL shape is clean — it is the only legal one", () => {
+  it("the legacy ephemeral predicate avoids membership-predicate-not-assertable", () => {
     const built = build([
       "- shape is Scalar.",
       "- type is Observation.",

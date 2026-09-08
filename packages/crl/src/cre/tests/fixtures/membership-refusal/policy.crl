@@ -1,4 +1,4 @@
-# The concept-level membership predicate — the CRE cannot evaluate it YET, and must say so.
+# Legacy membership regression: supported cases evaluate; refusal cases retain explicit diagnostics.
 library "MembershipRefusal".
 
 terminology "Requestable Services":

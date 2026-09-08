@@ -106,10 +106,9 @@ describe("resolveEmitOutput — the produces table", () => {
     }
   });
 
-  it("applies the offset EXACTLY ONCE — an explicit lane dir is not re-suffixed", () => {
-    // ⚠ The obvious wrong implementation appends the offset to whatever it is handed. Then a caller who
-    // followed the OLD docs (`--out-dir src`, `--out-dir tests/data/fhir`) silently gets `src/src/cql`
-    // and `tests/data/fhir/tests/data/fhir/patient`. Both write; neither is read.
+  it("treats an explicit lane directory as the root and appends the full configured offset", () => {
+    // The argument is always a root. An old lane-directory argument therefore
+    // receives the offset again; callers must migrate those old arguments.
     const { root, crlPath, celPath } = project();
     try {
       const crl = resolveEmitOutput("crl", crlPath, join(root, "src"));

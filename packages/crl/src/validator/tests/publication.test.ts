@@ -45,7 +45,7 @@ describe("selected Boolean publication authoring", () => {
       conceptName: "Answer",
       location: concept.shapeReduction!.location,
     });
-    expect(result.warnings[0].message).toContain("currently has no effect for this local-only selected Record publication");
+    expect(result.warnings[0].message).toContain("currently has no effect for this local-only publication selected Record");
     expect(result.warnings[0].message).toContain("Two local candidates at the same maximal time still cause an ambiguous-selection error");
     expect(result.warnings[0].message).toContain("no automatic chronological or insertion-order precedence");
     expect(result.warnings[0].message).toContain("an answer does not automatically win");
@@ -55,6 +55,27 @@ describe("selected Boolean publication authoring", () => {
   it("does not warn about a local preference when the admitted selector has no preference", () => {
     const result = new Validator().validate(parseInput(`library "P".\n${publication}`));
     expect(result.isValid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  // @kit publication-selection:local-source-tie-preference
+  it("does not call an admitted local/source preference ineffective", () => {
+    const result = new Validator().validate(parseInput(`library "P".
+terminology "Height Source":
+- system is \`urn:measurements\`.
+- code is \`height\`.
+concept "Height":
+- shape is Record.
+- type is Observation.
+- value type is Quantity.
+- code is \`height\`.
+- shape reduction is most recent, on equal time prefer local.
+- source representation:
+  - type is Observation.
+  - coded from "Height Source".
+presentation for "Height":
+- question text is "What is the measured height?".`));
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
   });

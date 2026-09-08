@@ -1,5 +1,6 @@
 // ===========================================================================
-// ⭐ THE CANONICAL TARGET for the ServiceRequest membership chain (#189).
+// Legacy ServiceRequest regression input; not a current authoring example.
+// Current selected publications replace the Scalar and old reduction forms below.
 //
 // The acceptance criterion (operator, 2026-08-30):
 //
@@ -90,11 +91,7 @@ concept "Requested Service":
 
 // THE DETERMINATION — computed, never asserted. Three states: the requested
 // service is covered / is not covered / has not been established at all.
-// ⚠ NO `type is`, DELIBERATELY. This concept is an EPHEMERAL derivation: it publishes a computed boolean,
-// emits no resource, and gets no case-feature StructureDefinition. Declaring `type is Observation` here
-// would advertise a representation it does not have — and this file is the CANONICAL exemplar, so an author
-// copying it would carry that mistake into their own artifact. (It DID declare one until #189 item 5; the
-// charter and kit teach the no-`type is` form, and the exemplar has to agree with them.)
+// Legacy ephemeral predicate input, retained for its owning tests.
 concept "Requested Service Is Covered":
 - shape is Scalar.
 - value type is boolean.

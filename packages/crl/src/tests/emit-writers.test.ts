@@ -198,7 +198,7 @@ describe("writeEmitResult (CEL) — absolute manifest + containment", () => {
 
   // ⚠ A stale manifest beside a wiped tree would certify files that no longer exist — the same
   // "manufactured confidence" failure this whole change exists to remove, one level in.
-  it("a failed write leaves NO manifest, rather than the previous run's", () => {
+  it("a preflight-rejected write preserves the previous valid manifest and data", () => {
     writeEmitResult(makeResult("patient/c1/observation", "obs-1"), dir);
     expect(existsSync(join(dir, CEL_DATA_MANIFEST))).toBe(true);
     expect(() => writeEmitResult(makeResult("../../escape", "x"), dir)).toThrow();

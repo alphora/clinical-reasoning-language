@@ -1,3 +1,5 @@
+// Legacy pipeline parsing/classification; these retained inputs are not current
+// selected-publication authoring examples.
 // REFACTOR:grounded (#320, plan595): generic pipeline structure uses a supported threshold, not retired BMI.
 import { describe, expect, it } from "vitest";
 
@@ -38,7 +40,7 @@ function stagesOf(definition: string) {
   return split.stages;
 }
 
-const GOAL = 'definition is "A" at least 30 \'kg/m2\', then most recent this.';
+const LEGACY_PIPELINE = 'definition is "A" at least 30 \'kg/m2\', then most recent this.';
 
 describe("splitPipeline", () => {
   it("reports `not-a-pipeline` for an ordinary single-stage narrative", () => {
@@ -48,7 +50,7 @@ describe("splitPipeline", () => {
   });
 
   it("⭐ splits the goal's own two-stage pipeline, in authored order", () => {
-    const stages = stagesOf(GOAL);
+    const stages = stagesOf(LEGACY_PIPELINE);
     expect(stages.length).toBe(2);
     expect(stages.map((s) => s.index)).toEqual([0, 1]);
     // Stage 2 is the bare reduction words — the comma delimiter is stripped, so a stage never sees it.
@@ -60,14 +62,14 @@ describe("splitPipeline", () => {
   });
 
   it("order is LOAD-BEARING — reading order is evaluation order", () => {
-    const stages = stagesOf(GOAL);
+    const stages = stagesOf(LEGACY_PIPELINE);
     // Stage 0 is the producer, stage 1 the reduction — never sorted, never normalized.
     expect(stages[0].elements.length).toBeGreaterThan(stages[1].elements.length);
     expect(stages[0].index).toBe(0);
   });
 
   it("bare `then` delimits too — the comma reads correctly but is not load-bearing", () => {
-    const withComma = stagesOf(GOAL);
+    const withComma = stagesOf(LEGACY_PIPELINE);
     const without = stagesOf('definition is "A" at least 30 \'kg/m2\' then most recent this.');
     expect(without.length).toBe(withComma.length);
     expect(without[1].elements.map((e) => (e as { value?: unknown }).value)).toEqual(
@@ -97,7 +99,7 @@ describe("splitPipeline", () => {
   it("⭐ each stage carries its OWN span, so a per-stage diagnostic can point AT the stage", () => {
     // ⚠ Load-bearing for every stage diagnostic. `matchNarrative` used to pass `clause.location` to every
     // stage, so "stage 2 of 3 matched nothing" squiggled all three and left the author to guess which.
-    const stages = stagesOf(GOAL);
+    const stages = stagesOf(LEGACY_PIPELINE);
     const [producer, reduction] = stages;
     // The stages are disjoint and ordered: the producer ends at or before the reduction begins.
     expect(producer.location.start.column).toBeLessThan(reduction.location.start.column);

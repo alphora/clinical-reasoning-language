@@ -11,16 +11,15 @@ describe("#189 — a bare inline-option code resolves its system from the concep
   });
 
   it("⭐ the explicit `<system>|<code>` form still works — the adversarial rows need it", () => {
-    // A wrong-system / external code is how a test states a determinate NON-MEMBER on purpose. Losing this
-    // would remove the only way to author the `false` row honestly.
+    // Explicit system/code tokens permit adversarial inputs; parsing does not
+    // determine whether later answer interpretation returns false or an error.
     const r = parseCodedValueToken("http://www.ama-assn.org/go/cpt|37722", SET);
     expect(r).toEqual({ parts: { system: "http://www.ama-assn.org/go/cpt", code: "37722" } });
   });
 
   it("⚠ an UNOFFERED bare code is an ERROR, and that does not contradict offered-not-admissible", () => {
-    // "Offered, not admissible" governs a DATUM already in the record, which may legitimately carry a code
-    // nobody offered and is then a determinate non-member. A BARE token is different: there is nothing to
-    // resolve its system against except the declared options, so an unoffered one has NO system at all.
+    // A bare token needs a unique offered system. An unoffered explicit token can
+    // be parsed, but a selected publication can still reject its interpretation.
     const r = parseCodedValueToken("never-declared", SET);
     expect("error" in r).toBe(true);
     // The message must name the escape hatch, or an author reads this as "unoffered values are illegal".

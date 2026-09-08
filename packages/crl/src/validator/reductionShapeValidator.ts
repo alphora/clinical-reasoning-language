@@ -12,7 +12,7 @@ import {
 } from "../ast/types";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { bmiRetirementReason } from "../template-match/bmiPublication";
-import { isLocalBooleanPublication, publicationAdmissionReason, readPublicationMembership } from "../emit/publicationProgram";
+import { isLocalBooleanPublication, publicationAdmissionReason } from "../emit/publicationProgram";
 
 import type { SourceContext } from "../imports/scopes";
 
@@ -21,24 +21,11 @@ import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { matchNarrative } from "../template-match/matcher";
 import { patternReturnShape } from "../template-match/patternCatalog";
 
-// #189 grammar+validation slice — the reduction/shape COHERENCE layer. IMPL 1 shipped the
-// PERMISSIVE grammar+AST (the `- shape is …` clause, the `Reduction` discriminated union, the
-// dedicated `count … at least N` production). This validator makes the INCOHERENT combinations a
-// TEACHING WARNING: it validates ONE VERSION AHEAD of the emit flip (design §9 step 1), so every
-// finding here is an intrinsic `severity: "warning"` — `isValid` stays true. Emit is unchanged
-// until the flip; a reduction still fails LOUD at emit (`reductionNotEmittable` / the
-// `emit-reduction-not-active` sentinel), and a `shape is` marker is not yet consulted by emit.
+// Mixed current-publication validation and retained legacy shape checks.
+// Current publication admission runs first. Legacy fixtures do not define current authoring.
+// Rules have their declared error/warning severity; the descriptions below are historical.
 //
-// The load-bearing model (docs/CRL-NORTH-STAR.md): a concept is self-describing. Its declared
-// `shape` decides whether a reduction is owed — Scalar ⇒ publishes ONE reduced value (a reduction
-// is owed); Record ⇒ ONE selected record; RecordSet ⇒ the set of records. A reduction reduces a
-// RECORD SET down to a scalar (`exists`/`count` ⇒ boolean) or a record (`most recent`). That set is
-// `this` — the space as of the PREVIOUS pipeline stage (at stage 0: the concept's own local `code is`
-// records ∪ each `source representation`'s CANDIDATES, never its raw external resources — charter §3) —
-// and/or a NAMED `shape is RecordSet` concept; a reduction
-// over a named set reduces `this` ∪ that set, so a coded concept's own assertions compete.
-//
-// Rules (all WARNINGS; see .vibe-tools/discussions/415 + the ReductionShapeRule doc in validator.ts):
+// Rules (historical taxonomy; see .vibe-tools/discussions/415 + the ReductionShapeRule doc in validator.ts):
 //   recordset-operand-required        — a named `exists`/`count`/`most recent` operand X that is not
 //                                       `shape is RecordSet` (structural reduction AND narrative `most recent "X"`)
 //   reduction-result-nonboolean       — an exists/count reduction on a Scalar concept typed non-boolean
@@ -176,11 +163,11 @@ export class ReductionShapeValidator {
         this.warn("publication-unsupported-form", concept.name, `Concept "${concept.name}": ${reason}`,
           concept.shapeReduction.location, attribution, errors, "error");
       } else if (concept.shapeReduction.equalTime === "preferLocal" &&
-          (readPublicationMembership(concept) === undefined || concept.code === undefined)) {
-        // REFACTOR:grounded (#320, review 561 E2): admission currently supplies only local
-        // candidates. The authored preference remains valid but cannot break local/local ties.
+          (concept.code === undefined || (concept.definition === undefined && concept.representations.length === 0))) {
+        // An admitted definition or source can contribute nonlocal candidates. A local
+        // preference is ineffective only without a local arm or with a local arm alone.
         this.warn("publication-local-tie-preference-no-op", concept.name,
-          `Concept "${concept.name}": \`on equal time prefer local\` currently has no effect for this ${concept.code === undefined ? "inferred-only" : "local-only"} selected Record publication. Two local candidates at the same maximal time still cause an ambiguous-selection error. Equal-time candidates receive no automatic chronological or insertion-order precedence, and an answer does not automatically win.`,
+          `Concept "${concept.name}": \`on equal time prefer local\` currently has no effect for this ${concept.code === undefined ? "publication without local candidates" : "local-only publication"} selected Record. Two local candidates at the same maximal time still cause an ambiguous-selection error. Equal-time candidates receive no automatic chronological or insertion-order precedence, and an answer does not automatically win.`,
           concept.shapeReduction.location, attribution, errors);
       }
       return;
@@ -419,9 +406,9 @@ export class ReductionShapeValidator {
           concept.name,
           def === undefined
             ? `Concept "${concept.name}" declares \`- shape is Record.\` but has no definition, so nothing ` +
-              `says WHICH record it publishes. \`shape is Record\` is a contract; author into it — a ` +
-              `selection (\`- definition is most recent this.\`), a threshold, or a calculation. Or ` +
-              `change the shape (\`Scalar\` to publish a reduced value, \`RecordSet\` to publish the set).`
+              `says which record it publishes. For current selected answers, use an explicit supported ` +
+              `Record Observation publication and shape reduction. Preserve the intended producer; ` +
+              `source or collection requirements may need a capability not yet supported.`
             : def.type === "DefinitionIsDefinition" && !isMatchedCatalogPattern(def)
               ? `Concept "${concept.name}" declares \`- shape is Record.\`, but its definition is ` +
                 `UNMATCHED NARRATIVE — it resolves to no catalog pattern, so it cannot be shown to yield a ` +
@@ -496,30 +483,13 @@ export class ReductionShapeValidator {
       !hasValueProjectionRep &&
       !isPureQuestionConcept(concept)
     ) {
-      // The suggested reduction is conditioned on value type FIRST, then representation count. A boolean
-      // presence determination is `exists this` — valid over MULTIPLE representations too (design §6: the
-      // union of each rep's existence, dedup-immune), so repCount is irrelevant there (panel R3 gpt56 #2).
-      // A value-reading `most recent this` is the multi-rep-ambiguous one: with a `code is` + posrep(s)
-      // (repCount > 1) it would span every rep and trip `reduction-multi-rep`, so steer to promoting a
-      // single representation to a named RecordSet instead (F6).
-      const action =
-        vt === "boolean" || vt === undefined
-          ? "add \`- definition is exists this.\` (a boolean presence determination — valid over " +
-            "multiple representations too)"
-          : repCount > 1
-            ? `promote a single representation to a named \`- shape is RecordSet.\` concept and reduce ` +
-              `THAT (a \`most recent this\` here would span ${repCount} representations — see ` +
-              `reduction-multi-rep)`
-            : `add \`- definition is most recent this.\` (to publish the most recent record's \`${vt}\` value)`;
       this.warn(
         "no-bare-scalar-code",
         concept.name,
-        `Concept "${concept.name}" is Scalar with a local \`code is\` but no reduction. A Scalar ` +
-          `concept publishes a single reduced value; a bare \`code is\` publishes the raw local code ` +
-          `as a boolean existence. State the reduction explicitly: ${action}. NOTE: authoring the ` +
-          `reduction NOW will FAIL emit (\`emit-reduction-not-active\` — a \`code is\` + reduction ` +
-          `is not yet emittable) until the flip version; make the change when the flip lands, or behind ` +
-          `it. (Validate-only migration prompt — this concept's current emit is unchanged in N.)`,
+        `Concept "${concept.name}" uses a legacy Scalar local-code form. For a selected answer, ` +
+          `author an explicit Record Observation publication with a supported value type and shape reduction. ` +
+          `Choose a representation and producer that preserve the intended question; record presence is not ` +
+          `a Boolean answer. Source or collection semantics may require a capability not yet supported.`,
         loc,
         attribution,
         errors,

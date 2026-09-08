@@ -48,7 +48,7 @@ export const DISPOSITION_CATEGORIES: readonly DispositionCategory[] = [
     finality: "non-final",
     meaning:
       "Pended (PAS reviewActionCode A4) — an async/workflow state; the review is NOT final. Disallowed as a " +
-      "standalone determination leaf; legitimate only where non-final leaves are allowed (embedded mode, or explicitly configured).",
+      "standalone determination leaf; legitimate only where non-final leaves are allowed (embedded mode); configuration membership does not override standalone finality.",
   },
 ];
 

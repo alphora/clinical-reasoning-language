@@ -3,40 +3,20 @@
 library "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
-Prior-authorization coverage model for ultrasonic osteogenesis stimulators.
-`first:` makes the branches ordered (first match wins): coverage is gated first
-(a non-covered request is Unmet), then the exclusions, then the age gate, then the
-indication; and `otherwise` is the catch-all (deny). See docs/decision-shapes.md.
-
-The clinical determinations are LOCAL-CODE OBSERVATIONS: each is a reviewer-asserted
-analytical inference (system of insight, not system of record), so its FHIR datum is
-an Observation carrying the local domain code. Existence of the coded Observation IS
-the determination (`definition is exists this`, closed-world).
-
-The requested device and the patient age are BOTH-representation determinations
-(North Star §3 — the value/interface convention): a VALUE concept holds the datum
-(remote arm DEFAULTS it from supplied data, local arm SETS/OVERRIDES it, recency
-merges the two), and a BOOLEAN INTERFACE concept over that value is what the decision
-reads. The remote channel emits the supplied side (a `Patient.birthDate`, a
-`ServiceRequest` coded from the covered-device value set); the same CRL emits CQL that
-reads them — so emitted FHIR and emitted CQL agree, proven end-to-end by $apply.
-
-This fixture is the CORRECT model of record; it validates clean AND emits clean (CQL +
-FHIR) as of the #189 Piece 1 flip (disc 502–507). The both-rep device value concept
-"Covered Device" (`code is` + `most recent this` recency + a coded `source
-representation`) now lowers to a 3-output split (local records + source retrieve +
-recency merge), and the boolean interface "Covered Device Requested" emits the
-member-existence fold — proven end-to-end in cqf-fhir $apply (a matching covered-device
-→ covered/left; a non-covered code → Unmet/right). REMAINING emit-catch-up: the
-"Covered Devices" value-set is a made-up test terminology we own (real stub emission +
-the SOURCE ServiceRequest data round-trip are Piece 2/3, needing the CEL writer).
+Mixed migration regression fixture, not a current authoring model.
+The Patient-age declaration has migrated. Remaining existence-based local answers,
+device merging and Scalar interfaces exercise retained legacy machinery. In particular,
+the presence of a coded Observation cannot stand in for its Boolean answer value.
+Historical $apply results do not make these remaining declarations current guidance.
+Use the Bleph acceptance fixture and supported selected-publication examples for
+current authoring; preserve this fixture only for its owning regression assertions.
 */
 
 // ============ Supplied determinations — value concept + boolean interface (both-rep convention) ============
 
-// The covered-device value set (North Star §3). The real payer binding is intensional; for this
+// Legacy covered-device ValueSet. For this
 // round-trip fixture we control the terminology with made-up codes we own, so it is a small explicit
-// set the $apply engine can expand. (VS content/emission is emit-catch-up — see the header.)
+// set; this reference remains a synthetic terminology fixture.
 terminology "Covered Devices":
 - valueset is `http://example.org/hcsc/dme101-030/ValueSet/covered-devices`.
 

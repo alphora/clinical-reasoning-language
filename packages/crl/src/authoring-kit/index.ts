@@ -481,7 +481,7 @@ const RULES: KitRule[] = [
     edge: "cpg",
     category: "concept-model",
     rule: "Declare value type explicitly on selected Observation publications: boolean for a finding used as a guard, Quantity for a measurement, CodeableConcept for a coded answer. The Case Feature expression returns the selected record; supported guards read its Boolean value. Do not relabel coded or numeric data as boolean to satisfy a guard: derive a separate qualification or threshold publication. Missing answers remain unknown; record presence does not establish a true answer. Selected publications are rejected in legacy aliases, sem composition, collection-existence reductions and per-action menu guards (publication-unsupported-context). Use supported publication producers and branch/criterion guards. Validation checks do not replace emitted CQL and native execution.",
-    why: "The published value type is what makes a concept's result legible AND checkable at every use site; DECLARING it (rather than inferring a return type — patterns have none) is what lets the producers disagree LOUDLY at validate time instead of silently at apply time (the #231 lane bug the redesign closes). The guard⇒boolean check is the specific rule that catches the A.10b masking — a coded-resource determination mis-typed `CodeableConcept` but consumed as a guard. Separating normative doctrine from shipped enforcement keeps the kit honest: it teaches the model to author to without claiming coverage the validator does not yet have.",
+    why: "The published value type is what makes a concept's result legible AND checkable at every use site; Declaring it explicitly and checking it against the supported producer output contract catches disagreements at validation rather than at apply time (the #231 lane bug the redesign closes). The guard⇒boolean check is the specific rule that catches the A.10b masking — a coded-resource determination mis-typed `CodeableConcept` but consumed as a guard. Separating normative doctrine from shipped enforcement keeps the kit honest: it teaches the model to author to without claiming coverage the validator does not yet have.",
     ref: "src/emit/publicationProgram.ts; src/validator/useSiteTypeValidator.ts; named-answer-options",
     clauses: [
   {
@@ -649,7 +649,7 @@ const RULES: KitRule[] = [
     id: "chaining-necessity",
     edge: "cpg",
     category: "decision-shape",
-    rule: 'The chaining overlay (§2) — a `use decision` (bare same-library `use decision "Sub"`, or a QUALIFIED cross-library chain, #172) is the right primitive for TWO overlapping reasons: (a) the SOURCE delegates a SEPARATE determination BY NAME ("covered if the member meets the Eligibility Policy," "per the Step-Therapy Protocol"); and/or (b) REUSE of a GENUINELY SHARED determination — one determination that multiple policies or pathways genuinely reference, factored into a shared decision/library and chained. The SUR mandate-determination is exactly (b): one shared determination chained cross-library, which IS reuse. Reuse is a FIRST-CLASS reason to chain, not merely tolerated taste. One policy\'s own internal AND/OR/NOT logic still stays in ONE tree, however complex — the tree already expresses boolean composition, so "I have boolean logic" is not a chaining signal (see decision-composition). THE LINE IS NOT reuse-vs-no-reuse; it is GENUINELY-SHARED vs FABRICATED-SHARED: factor + reuse + chain a determination that is genuinely ONE shared thing; do NOT fabricate a shared sub-decision across INDEPENDENT policies whose criteria merely look alike — those are two sources that may diverge, so duplicate them inline (factoring lookalikes invents a false coupling that changes one when you change the other). (See source-delegated-decision-reference and disposition-arbitration-reference.)',
+    rule: 'The chaining overlay (§2) — a `use decision` (bare same-library `use decision "Sub"`, or a QUALIFIED cross-library chain, #172) is the right primitive for TWO overlapping reasons: (a) the SOURCE delegates a SEPARATE determination BY NAME ("covered if the member meets the Eligibility Policy," "per the Step-Therapy Protocol"); and/or (b) REUSE of a GENUINELY SHARED determination — one determination that multiple policies or pathways genuinely reference, factored into a shared decision/library and chained. The SUR mandate-determination is exactly (b): one shared determination chained cross-library, which IS reuse. Reuse is a FIRST-CLASS reason to chain, not merely tolerated taste. One policy\'s own internal AND/OR/NOT logic still stays in ONE tree, however complex — the tree already expresses boolean composition, so "I have boolean logic" is not a chaining signal (see decision-composition). THE LINE IS NOT reuse-vs-no-reuse; it is GENUINELY-SHARED vs FABRICATED-SHARED: factor + reuse + chain a determination that is genuinely ONE shared thing; do NOT fabricate a shared sub-decision across INDEPENDENT policies whose criteria merely look alike — those are two sources that may diverge, so duplicate them inline (factoring lookalikes invents a false coupling that changes one when you change the other). Current CRE publication preparation refuses foreign delegated decisions with publication-unsupported-scope; legacy cross-library success does not certify this path. Same-library delegation and imported publication operands are separate supported cases. Report that capability gap when the source requires foreign delegation. (See source-delegated-decision-reference and disposition-arbitration-reference.)',
     why: "Two failure modes, opposite directions. (1) FABRICATING a determination boundary the structure does not genuinely share — casting one policy's internal pathways as separate sub-determinations, or coupling two independent lookalike policies — INVENTS structure the sources do not support and can change the disposition/provenance surface. (2) DUPLICATING a genuinely-shared determination instead of reusing it (a misapplied no-DRY instinct) loses the single source of truth the share represents (e.g. SUR's mandate determination). The boundary is a fact about what is genuinely shared — not an authoring convenience in either direction.",
     ref: "§2; source-delegated-decision-reference; disposition-arbitration-reference; #172",
     clauses: [
@@ -702,7 +702,7 @@ const RULES: KitRule[] = [
     id: "criterion",
     edge: "cpg",
     category: "decision-shape",
-    rule: "A criterion names a reusable and/or/not branch condition: criterion \"Name\": - when ( <condition> ). Parenthesize its declaration body. It lowers once to a named Boolean CQL define, preserving its expression and unknown values. Reference it unqualified or self-qualified in branch conditions; publication-reachable guards preserve the whole applicability expression with dependency input[]. A criterion is library-local, unassertable and not a concept: CEL cannot define a fact by it. Foreign criterion references, cycles and concept-only uses are errors. Cross-library reuse must reflect a genuine shared determination via use decision, or a genuine shared concept; otherwise report the missing structural capability.",
+    rule: "A criterion names a reusable and/or/not branch condition: criterion \"Name\": - when ( <condition> ). Parenthesize its declaration body. It lowers once to a named Boolean CQL define, preserving its expression and unknown values. Reference it unqualified or self-qualified in branch conditions; publication-reachable guards preserve the whole applicability expression with dependency input[]. A criterion is library-local, unassertable and not a concept: CEL cannot define a fact by it. Foreign criterion references, cycles and concept-only uses are errors. Cross-library reuse must reflect a genuine shared determination via use decision, or a genuine shared concept; otherwise report the missing structural capability. CRE currently refuses foreign decision delegation under publication preparation; do not claim that a legacy cross-library run verifies that path.",
     why: "A named criterion preserves source criteria and their dependencies while providing readable reuse. It does not invent an assertable clinical fact or a determination boundary.",
     ref: "docs/decision-shapes.md; validator rules criterion-cycle / criterion-misuse; #224",
     clauses: [
@@ -727,7 +727,7 @@ const RULES: KitRule[] = [
     id: "dispositions",
     edge: "cpg",
     category: "dispositions",
-    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (service-order activity); a disposition that is COMMUNICATED rather than ordered uses `request CPGCommunicationRequest`. The emitter derives the request type from the act — do not over-specify it.",
+    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. The triggering condition explains branch selection. Concept `meta is` text is not automatically propagated as a disposition rationale. An activity's own `because` supplies its ActivityDefinition description; configured reason codes are separate. DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (service-order activity); a disposition that is COMMUNICATED rather than ordered uses `request CPGCommunicationRequest`. The emitter derives the request type from the act — do not over-specify it.",
     why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not tied to any one disposition vocabulary; keep the core minimal. The disposition's request type follows what the ACT is — an ORDER vs a COMMUNICATION — which the emitter derives; inventing approve/deny/pend verbs bakes one domain's taxonomy into the language.",
     ref: "crl-not-a-pa-language",
     clauses: [
@@ -736,7 +736,7 @@ const RULES: KitRule[] = [
         force: "default",
       },
       {
-        text: "Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept (the emitter surfaces it from the concept's `meta is`).",
+        text: "Do not rely on concept metadata becoming emitted rationale. ActivityDefinition description uses the activity's own `because`, otherwise its name.",
         force: "default",
       },
     ],
@@ -957,8 +957,8 @@ const RULES: KitRule[] = [
       },
       {
         text:
-          "Do NOT author `@validation-concern` — a HUMAN authors it in Medical Validation (category validation: a " +
-          "CRL-vs-CUSTOMER-INTENT concern). You MUST PRESERVE any that exist: never delete a human's `@validation-concern` " +
+          "A `@validation-concern` records evidence of a " +
+          "CRL-vs-customer-intent concern, distinct from extraction fidelity. Category is not author permission: use session authorization and evidence. Preserve existing `@validation-concern` " +
           "store record on re-extraction (the flag store is deliberately OUTSIDE `.crl` so an AI `.crl` rewrite can't " +
           "touch it).",
         force: "default",
@@ -1443,7 +1443,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "Exemplar B — SOURCE-REQUIRED delegation (§2/§5-B): the source NAMES a separate determination, so the policy chains to it with a BARE same-library `use decision`. NOT DRY/reuse factoring — chaining is faithful only because the source draws the boundary. The bare same-library delegation IS evaluated (recursed; the sub determination bubbles up), so the oracle names the DELEGATED disposition, not the sub-decision name. One parent + one delegated sub.",
+      "Exemplar B — SOURCE-REQUIRED delegation (§2/§5-B): the source NAMES a separate determination, so the policy chains to it with a BARE same-library `use decision`. Source delegation is this example's reason; genuine shared-determination reuse is also legitimate. The bare same-library delegation IS evaluated (recursed; the sub determination bubbles up), so the oracle names the DELEGATED disposition, not the sub-decision name. One parent + one delegated sub.",
     verification: ["cre-run", "fhir-emit"],
     source: SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
   },

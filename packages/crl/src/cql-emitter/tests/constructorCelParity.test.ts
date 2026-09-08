@@ -15,7 +15,8 @@ import {
 import { renderRecordConstructor } from "../renderRecordConstructor";
 
 /**
- * #189 P1 build step 5 — ⭐ THE D6 PARITY INVARIANT, EXECUTED ACROSS BOTH LANES.
+ * #189 P1 build step 5 — ⭐ Legacy CEL resource emission versus CQL constructor text.
+ * This suite does not execute CQL or establish native output parity.
  *
  * The design's strongest claim is that a CONSTRUCTED record (the CQL lane, at evaluation time) and a
  * CEL-WRITTEN record (the instance lane, test data) for the SAME concept agree — because both derive their

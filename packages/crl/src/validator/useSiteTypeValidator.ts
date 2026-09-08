@@ -1093,19 +1093,13 @@ function operandMismatchTail(
         `that is an existence question, not a membership one.`
       );
     case "refinement":
-      // The redesign's shape split: a concept consumed at BOTH a refinement/anchor position AND a
-      // boolean guard has NO single valid declaration (disc 403 [imp] #5). Point at the split
-      // (`defined as exists`) rather than telling the author to flip the value type — flipping it to
-      // non-boolean would only move the error to the guard site (the ping-pong the design forbids).
-      // NOTE: `defined as exists` now lowers to CQL on the standard emit lane (#265); it is the
-      // correct MODEL fix here. (Its operand shape is not yet validated — a boolean operand is a
-      // silent always-true; tracked in #269.)
+      // Keep the resource/answer distinction without prescribing existence as a repair.
       return (
         `A refinement / anchor position filters or anchors over event INSTANCES, but a DERIVED ` +
         `\`${vt}\` (computed by \`defined as\` / \`definition is\`) has no instances of its own — ` +
         `refine the underlying resource concept its value is built from instead. If "${operandName}" ` +
         `is specifically needed as a \`boolean\` elsewhere (e.g. a decision guard), keep the resource ` +
-        `concept here and derive a separate \`defined as exists ( … )\` boolean for the guard.`
+        `concept here and use a supported Boolean publication whose producer preserves the intended question.`
       );
   }
 }
@@ -1166,8 +1160,8 @@ function booleanCompositionResult(
       `Concept "${conceptName}": a \`defined as ( … and / or / not … )\` boolean composition always produces a ` +
       `scalar \`boolean\`, but the concept declares ` +
       (nonScalar
-        ? `\`${actual}\` (a record shape). Declare \`shape is Scalar\` + \`value type is boolean\`. To combine ` +
-          `record concepts, promote each to a boolean first with \`defined as exists ( … )\`.`
+        ? `\`${actual}\` (a record shape). Current selected publications use branch/criterion composition ` +
+          `over supported Boolean publications; preserve the intended question instead of coercing records to truth.`
         : `\`value type is ${actual}\`. Change the value type to \`boolean\` — a boolean composition cannot ` +
           `publish a \`${actual}\`.`),
     location: loc(location),
@@ -1191,8 +1185,7 @@ function booleanCompositionOperandNonBoolean(
 ): UseSiteTypeMismatchError {
   const fix = operandIsRecord
     ? `The concept-layer \`and\`/\`or\`/\`not\` is strict — it does not implicitly existentialize a record ` +
-      `operand. Promote "${operandName}" to a boolean first: declare a separate \`value type is boolean\` ` +
-      `concept whose body is \`defined as exists ( "${operandName}" )\`, and compose that.`
+      `operand. Use a supported Boolean publication whose producer preserves the intended question.`
     : `A \`${actualResult}\` has no truth value to combine — reduce it to a boolean fact (a \`definition is ` +
       `${operandName} at least <threshold>\` concept, say) or reference a concept declared \`value type is boolean\`.`;
   return {
@@ -1262,9 +1255,8 @@ function compositionResultMismatch(
   const fix =
     parentResult === "boolean"
       ? `A \`boolean\` composition combines truths, but "${leafName}" publishes a \`${leafResult}\` — ` +
-        `today the emitter implicitly existentializes it, a bridge #189 retires. Make it explicit: derive ` +
-        `a boolean determination with \`defined as exists ( "${leafName}" )\` and compose THAT, so every ` +
-        `leaf of this composition is already a \`boolean\`.`
+        `use a supported Boolean publication whose producer preserves the intended question. ` +
+        `Record presence does not establish an answer value.`
       : `Every leaf of a value-preserving \`${parentResult}\` composition must publish the SAME ` +
         `\`${parentResult}\`, but "${leafName}" publishes a \`${leafResult}\`. Align "${leafName}"'s ` +
         `shape / value type with the composition, or reference a \`${parentResult}\`-publishing concept.`;
@@ -1301,9 +1293,8 @@ function bareRefAliasMismatch(
   let fix: string;
   if (conceptResult === "boolean") {
     fix =
-      `To publish a \`boolean\` here, use \`defined as exists ( "${targetName}" )\` (existence of ` +
-      `"${targetName}"), not a bare alias — a bare \`defined as\` copies "${targetName}"'s value unchanged, ` +
-      `so it can't be a truth.`;
+      `A bare alias copies "${targetName}" unchanged. To obtain a Boolean answer, use a supported ` +
+      `Boolean publication whose producer preserves the intended question; existence is not an automatic repair.`;
   } else if (targetResult === "boolean") {
     fix =
       `A boolean truth can't be read as a \`${conceptResult}\` value — reference a \`${conceptResult}\`-` +
@@ -1367,14 +1358,11 @@ function guardMismatch(
   // "value comparison like `… at least …`" fix does not apply — steer it to an `exists` presence
   // reduction. A Scalar non-boolean (e.g. a `Quantity` observation value) keeps the value-comparison
   // guidance.
-  const fix =
-    shape === "Scalar"
-      ? `A guard has no implicit truthiness — reference a boolean determination (e.g. a ` +
-        `\`defined as exists\` concept, or a value comparison like \`… at least …\`), not the raw ` +
-        `\`${actual}\` value.`
-      : `"${operandName}" is \`shape is ${shape}\` — it publishes records, not a truth. A guard needs a ` +
-        `\`boolean\`: derive a presence determination with \`defined as exists ( "${operandName}" )\` and ` +
-        `guard on THAT.`;
+  const fix = shape === "Scalar"
+    ? `A guard has no implicit truthiness. Use a supported Boolean publication with a faithful value comparison ` +
+      `(for example an admitted at least threshold), not the raw \`${actual}\` value.`
+    : `"${operandName}" is \`shape is ${shape}\`. Use a supported Boolean publication whose producer ` +
+      `preserves the intended question; record presence is not an answer value. Collection semantics may be unsupported.`;
   return {
     kind: "use-site-type-mismatch",
     rule: "decision-guard-nonboolean",
@@ -1410,11 +1398,9 @@ function guardRecordShapedWarning(
     message:
       `Decision/criterion "${ownerName}": a guard consumes a \`boolean\`, and its operand "${operandName}" ` +
       `declares \`value type is boolean\` — but it is \`shape is ${shape}\`, so it publishes a SET of ` +
-      `records, not a truth, and this guard will hard-error at the #189 flip. Reduce it: derive a ` +
-      `determination from it (e.g. \`defined as exists ( "${operandName}" )\`, or a threshold) and guard ` +
-      `on THAT. (A \`shape is Record\` boolean operand is FINE — it publishes one record and the guard ` +
-      `reads its value; only a set needs reducing.) (Validate-only migration warning — the current emit ` +
-      `is unchanged in this version.)`,
+      `records, not a truth. Use a supported Boolean publication whose producer preserves the intended question; ` +
+      `collection semantics may require a capability not yet supported. A selected Record boolean guard reads ` +
+      `the selected answer value; it does not infer truth from record presence.`,
     location: loc(location),
     severity: "warning",
     ...base(attribution),
