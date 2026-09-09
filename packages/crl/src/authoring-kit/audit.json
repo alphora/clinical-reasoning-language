@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "345af5782c61188b11de87b788aecf0276421f1a",
-  "auditedSchemaVersion": "1.38",
-  "auditedContentHash": "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d",
-  "scope": "Full 1.38 prior-auth payload (including common guidance); 301 CRL test-file census and recorded evidence limits. New unified content awaits its maintenance review.",
+  "auditedRevision": "451be38f1fc33723cfe44eec12c1add689c5c52b",
+  "auditedSchemaVersion": "2.0",
+  "auditedContentHash": "e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2",
+  "scope": "Unified kit schema 2.0: all 32 rules, 15 examples, 13 artifacts and retrieval/export; incremental maintenance from 345af5782c61188b11de87b788aecf0276421f1a. Existing 301-file survey retained with explicit limitations; changed guidance/test/tooling scope reviewed in the evidence ledger. No new native-engine or clinical-fidelity certification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

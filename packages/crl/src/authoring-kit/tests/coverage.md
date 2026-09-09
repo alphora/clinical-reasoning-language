@@ -3,8 +3,11 @@
 ## Maintenance — unified retrieval and audited baseline (642/643)
 
 Baseline: `345af5782c61188b11de87b788aecf0276421f1a` (CRL 5.0.0,
-kit 1.38). Target: the reviewed content commit referenced by `../audit.json`
-after this round completes; until then its historical 1.38 stamp remains in place.
+kit 1.38). Reviewed content target: `451be38f1fc33723cfe44eec12c1add689c5c52b` (C1).
+Schema: `2.0`; content hash: `e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2`.
+The subsequent metadata-only commit (C2, identified by Git history) stamps that existing target.
+Observed Git checks: target resolves as a commit; baseline is its ancestor; the clean C1 checkout built this exact pinned hash.
+C2 changes only audit.json and this ledger. Final file/compiled-MCP equality receipts accompany the generated kit; no installed upgrade is implied.
 
 Baseline provenance: `git diff 1231273e 345af578 -- packages/crl/src/authoring-kit`
 is empty. Thus the 639-audited kit content is byte-identical at the released
