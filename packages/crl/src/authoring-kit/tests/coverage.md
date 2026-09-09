@@ -4,7 +4,7 @@
 
 Baseline: `18799337ec6b91e91a4b1577c0e31a7f1b575714`.
 Implementation base: `6d3e06831ee3e75a666a08651cc9832e22f080da`.
-Target: pending reviewed content commit. Schema `2.1`; content hash
+Target: `5e105580a3390bedcbf7874ddb37e9f5f7d6279d` (reviewed content commit). Schema `2.1`; content hash
 `28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336`. This is a bounded correction
 of the 16 rules with no clauses, not a new full semantic audit of existing clauses.
 The baseline is an ancestor of the implementation base. All intervening changes
