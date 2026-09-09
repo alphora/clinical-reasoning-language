@@ -45,7 +45,19 @@ For a complete export:
 {"view":"full"}
 ```
 
-Every view reports `view`, `complete`, `schemaVersion` and `fullContentHash`.
+For the complete readable Markdown document, call:
+
+```json
+{"view":"full","format":"markdown"}
+```
+
+The MCP returns raw Markdown text, identical to the release's `authoring-kit.md`,
+including canonical content identity and audit metadata. The KE can read it directly
+or save the returned text locally; the tool does not write files.
+Markdown requires `view:"full"`. Like JSON, development retrieval exposes stale audit metadata; release/file export still requires a matching audit stamp. Omitted format or
+`format:"json"` keeps JSON output for every view. The overview advertises both exports.
+
+Every JSON view reports `view`, `complete`, `schemaVersion` and `fullContentHash`.
 Only `full` is complete and carries `contentHash`. The hash identifies canonical
 content and navigation, not the bytes of a search/overview response. The content
 source lives in `packages/crl/src/authoring-kit/`; navigation is derived from it.

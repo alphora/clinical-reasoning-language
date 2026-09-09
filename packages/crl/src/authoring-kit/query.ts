@@ -1,5 +1,6 @@
 // REFACTOR:grounded (review642): focused delivery preserves prerequisites and evidence limits.
 import { getAuthoringKit } from "./index";
+import { renderAuthoringKitMarkdown } from "./export";
 import { kitEntryContent } from "./navigation";
 import type { AuthoringKit, KitIndexEntry, KitQuery } from "./types";
 
@@ -11,9 +12,13 @@ function parseQuery(input: unknown): KitQuery {
   if (input === undefined) return {};
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error(MIGRATION);
   const q = input as Record<string, unknown>;
-  if (Object.keys(q).some(k => !["view", "id", "query"].includes(k))) throw new Error(MIGRATION);
+  if (Object.keys(q).some(k => !["view", "id", "query", "format"].includes(k))) throw new Error(MIGRATION);
   const view = q.view === undefined ? "overview" : q.view;
   if (!["overview", "search", "entry", "full"].includes(view as string)) throw new Error(MIGRATION);
+  if (q.format !== undefined && q.format !== "json" && q.format !== "markdown")
+    throw new Error('format must be "json" or "markdown".');
+  if (q.format === "markdown" && view !== "full")
+    throw new Error('Markdown requires view: "full". Use {view:"full",format:"markdown"}.');
   if (view === "search") {
     if (typeof q.query !== "string" || !q.query.trim() || q.id !== undefined) throw new Error("search requires a nonempty query and no id. " + MIGRATION);
   } else if (view === "entry") {
@@ -41,7 +46,11 @@ export function queryAuthoringKit(input?: unknown) {
   const args = parseQuery(input), kit = getAuthoringKit(), view = args.view ?? "overview";
   const identity = { view, complete: view === "full", schemaVersion: kit.schemaVersion,
     fullContentHash: kit.contentHash, audit: kit.audit };
-  if (view === "full") return { ...kit, ...identity };
+  if (view === "full") {
+    if (args.format === "markdown") return { ...identity, contentHash: kit.contentHash,
+      format: "markdown" as const, markdown: renderAuthoringKitMarkdown(kit) };
+    return { ...kit, ...identity };
+  }
   const introduction = {
     ...kit.introduction,
     summary: kit.summary,
@@ -49,7 +58,8 @@ export function queryAuthoringKit(input?: unknown) {
     governingPrinciple: kit.forceModel.governingPrinciple,
     verificationLegend: kit.verificationLegend,
   };
-  if (view === "overview") return { ...identity, introduction, index: kit.navigation };
+  if (view === "overview") return { ...identity, introduction, index: kit.navigation,
+    exports: { json: { view: "full", format: "json" }, markdown: { view: "full", format: "markdown" } } };
   if (view === "entry") {
     const entries = prerequisites(kit, args.id!);
     return { ...identity, introduction, requestedId: args.id!,

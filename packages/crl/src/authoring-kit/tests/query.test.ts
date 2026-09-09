@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { getAuthoringKit } from "../index";
+import * as kitSource from "../index";
+import { assertAuditedKit, renderAuthoringKitMarkdown } from "../export";
 import { queryAuthoringKit } from "../query";
 import { buildKitIndex, kitEntryContent } from "../navigation";
 
@@ -8,6 +10,42 @@ const kit = getAuthoringKit();
 const query = (input?: unknown): any => queryAuthoringKit(input);
 
 describe("one authoring kit: discovery and complete guidance", () => {
+  // @kit verify-loop:kit-markdown
+  it("advertises and returns the same complete Markdown as the audited file export", () => {
+    const args = query().exports.markdown;
+    expect(args).toEqual({ view: "full", format: "markdown" });
+    const result = query(args);
+    expect(result).toMatchObject({ view: "full", complete: true, format: "markdown",
+      contentHash: kit.contentHash, fullContentHash: kit.contentHash, audit: kit.audit });
+    expect(result.markdown).toBe(renderAuthoringKitMarkdown(kit));
+    expect(result.markdown).toMatch(/^# CRL authoring kit\n/);
+  });
+
+  it.each([{}, { view: "full" }, { view: "search", query: "dropdown" }, { view: "entry", id: "rule:named-answer-options" }])(
+    "explicit JSON preserves the default response for %j", args => {
+      expect(query({ ...args, format: "json" })).toEqual(query(args));
+    });
+
+  it.each([{ format: "markdown" }, { view: "overview", format: "markdown" },
+    { view: "search", query: "dropdown", format: "markdown" },
+    { view: "entry", id: "rule:named-answer-options", format: "markdown" },
+    { view: "full", format: "html" }, { view: "full", format: null }])(
+    "rejects unsupported format/view combinations %j", args => {
+      expect(() => query(args)).toThrow(/format|Markdown requires/);
+    });
+
+  it("retains visible stale audit metadata in both Markdown and JSON retrieval", () => {
+    const stale = { ...kit, audit: { ...kit.audit, contentMatchesAudit: false } };
+    const spy = vi.spyOn(kitSource, "getAuthoringKit").mockReturnValue(stale);
+    try {
+      expect(query({ view: "full" }).audit.contentMatchesAudit).toBe(false);
+      const markdown = query({ view: "full", format: "markdown" }).markdown;
+      expect(markdown).toBe(renderAuthoringKitMarkdown(stale));
+      expect(markdown).toMatch(/Content Matches Audit\n\nfalse/);
+      expect(() => assertAuditedKit(stale)).toThrow(/completed audit/);
+    } finally { spy.mockRestore(); }
+  });
+
   it("defaults to a bounded introduction and untruncated, complete index", () => {
     const overview = query();
     expect(overview).toMatchObject({ view: "overview", complete: false, fullContentHash: kit.contentHash });

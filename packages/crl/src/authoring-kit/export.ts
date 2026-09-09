@@ -44,7 +44,13 @@ export function exportAuthoringKit(kit: AuthoringKit): { json: string; markdown:
   assertAuditedKit(kit);
   return {
     json: JSON.stringify(kit, null, 2) + "\n",
-    markdown: "# CRL authoring kit\n\nGenerated from the canonical kit. The JSON companion preserves its machine-readable structure. " +
-      "The audit identifies reviewed content; it does not certify later implementation changes or clinical fidelity.\n\n" + render(kit, 2),
+    markdown: renderAuthoringKitMarkdown(kit),
   };
+}
+
+/** Read-only retrieval preserves honest audit metadata, including stale stamps.
+ * File delivery must use exportAuthoringKit, which enforces the audit gate. */
+export function renderAuthoringKitMarkdown(kit: AuthoringKit): string {
+  return "# CRL authoring kit\n\nGenerated from the canonical kit. The JSON companion preserves its machine-readable structure. " +
+    "The audit identifies reviewed content; it does not certify later implementation changes or clinical fidelity.\n\n" + render(kit, 2);
 }

@@ -884,12 +884,14 @@ export function createServer(): McpServer {
       title: "CRL authoring kit",
       description: "One kit for all CRL authoring. Start with overview (default): introduction and complete index. " +
         "Use search with query to find task/syntax aliases, entry with a stable id for complete guidance and prerequisites, " +
-        "or full for the complete export. Each response identifies view, completeness and fullContentHash. " +
-        "Only full includes the canonical contentHash. Read applicability and verification limits. " +
+        "or full for the complete export. JSON is the default; its responses identify view, completeness and fullContentHash. " +
+        "Only full includes the canonical contentHash. For the complete Markdown document, use {view:\"full\",format:\"markdown\"}; " +
+        "it returns raw Markdown text with canonical contentHash and audit metadata, identical to the downloadable .md. Read applicability and verification limits. " +
         "stage/useCase kit selectors have been removed; authorization guidance is included without a selector. " +
         "emit_results retains its separate runtime useCase setting.",
       inputSchema: z.object({
         view: z.enum(["overview", "search", "entry", "full"]).optional(),
+        format: z.enum(["json", "markdown"]).optional(),
         query: z.string().optional(),
         id: z.string().optional(),
       }).passthrough(),
@@ -1692,7 +1694,7 @@ function runAuthoringKit(args: unknown): {
 } {
   try {
     const kit = queryAuthoringKit(args);
-    return { content: [{ type: "text", text: JSON.stringify(kit, null, 2) }] };
+    return { content: [{ type: "text", text: "markdown" in kit ? kit.markdown : JSON.stringify(kit, null, 2) }] };
   } catch (e) {
     return { content: [{ type: "text", text: (e as Error).message }], isError: true };
   }

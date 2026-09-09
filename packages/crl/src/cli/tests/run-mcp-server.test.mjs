@@ -7,6 +7,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
+import { getAuthoringKit } from "../../../dist/authoring-kit/index.js";
+import { renderAuthoringKitMarkdown } from "../../../dist/authoring-kit/export.js";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync } from "node:fs";
@@ -255,6 +257,18 @@ try {
     const artifact = entry.entries.find(e => e.id === "artifact:named-answer-reference.crl").content;
     assert.ok(artifact.requires.crl.canonicalBase);
     assert.ok(entry.entries.some(e => e.id === "artifact:named-answer-terms.crl"));
+  });
+
+// @kit verify-loop:kit-markdown
+  await check("authoring_kit delivers raw audited Markdown through MCP", async () => {
+    const overview = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
+    assert.deepEqual(overview.exports.markdown, { view: "full", format: "markdown" });
+    const result = await client.callTool({ name: "authoring_kit", arguments: overview.exports.markdown });
+    assert.ok(!result.isError);
+    assert.equal(result.content[0].text, renderAuthoringKitMarkdown(getAuthoringKit()));
+    for (const args of [{ format: "markdown" }, { view: "full", format: "html" }]) {
+      assert.equal((await client.callTool({ name: "authoring_kit", arguments: args })).isError, true);
+    }
   });
 
   await check("authoring_kit full exports all 13 artifacts and determination guidance", async () => {

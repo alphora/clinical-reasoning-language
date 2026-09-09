@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getAuthoringKit } from "../index";
-import { assertAuditedKit, exportAuthoringKit } from "../export";
+import { assertAuditedKit, exportAuthoringKit, renderAuthoringKitMarkdown } from "../export";
 
 const kit = getAuthoringKit();
 // Fixture represents the post-review metadata operation; never writes the real stamp.
@@ -18,6 +18,7 @@ describe("authoring kit export delivery", () => {
 
   it("exports the entire canonical structure and preserves every tested source verbatim", () => {
     const output = exportAuthoringKit(reviewed);
+    expect(output.markdown).toBe(renderAuthoringKitMarkdown(reviewed));
     expect(JSON.parse(output.json)).toEqual(reviewed);
     for (const artifact of reviewed.referenceArtifacts) expect(output.markdown).toContain(artifact.source);
     for (const example of reviewed.examples) expect(output.markdown).toContain(example.snippet);

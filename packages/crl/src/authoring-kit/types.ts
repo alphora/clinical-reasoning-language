@@ -224,7 +224,7 @@ export interface AuthoringKit {
   referenceArtifacts: ReferenceArtifact[];
   /**
    * The in-payload legend for `ReferenceArtifact.verification` — one entry per tier a shipped artifact uses. It is
-   * HASHED payload (not a TS docstring) because the remote-MCP KE consumer receives JSON only; without it
+   * HASHED payload (not a TS docstring) because the remote-MCP KE consumer receives the exported kit; without it
    * `verification: "validate-only"` is an opaque string. Distinguishes the PROOF axis (is it runtime-proven?) from
    * the AUTHORING-SCOPE axis (`boundary`/`conceptLayerModel` scope) — the two are orthogonal.
    */
@@ -305,6 +305,8 @@ export interface KitIndexEntry {
 
 export interface KitQuery {
   view?: "overview" | "search" | "entry" | "full";
+  /** Markdown exports the complete kit with its audit metadata; JSON supports every view. */
+  format?: "json" | "markdown";
   query?: string;
   id?: string;
 }

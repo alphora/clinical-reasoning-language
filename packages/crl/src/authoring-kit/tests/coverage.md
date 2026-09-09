@@ -1,5 +1,50 @@
 # Kit evidence ledger
 
+## Maintenance — Markdown MCP delivery (655/656)
+
+Baseline: `451be38f1fc33723cfe44eec12c1add689c5c52b`.
+This is the maintenance baseline (last audited revision). The implementation
+review diff starts at released `6ef4357a80f99a0e91a4ddb1639faad791889bef`;
+the intervening maintenance delta consists of the release/docs/stamp rows below.
+Target: pending reviewed implementation commit. Kit schema `2.0` and canonical
+content hash `e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2`
+remain unchanged: this adds transport access to the existing Markdown export.
+All changed paths since the baseline were reviewed, including the intervening
+5.1.0 release corrections. No compiler, emitter, CRE, driver or clinical example
+changed in that interval.
+
+| Changed paths / owning assertions | Disposition |
+| --- | --- |
+| Root/core/extension package.json and package-lock.json | Not author-facing semantics: lockstep release versions only; dependency graph unchanged. |
+| audit.json and this ledger | Metadata-only prior stamp reviewed; new audit will bind the tested transport change to an existing commit. |
+| Core/extension README and TOOLING.md since baseline | Existing guidance sufficient: installation, versioned links, tool counts and retirement/migration wording corrected. New Markdown call documented with raw-text format, full-only scope, no file-write promise and audit requirement. |
+| docs/authoring-kit.md | Delivery guidance updated; JSON response identity distinguished from canonical Markdown metadata. The full document is available without checking out or building CRL. |
+| query.ts, types.ts and export.ts | Kit updated at delivery layer: optional explicit JSON preserves existing views; Markdown requires full and reuses the canonical renderer. The file-export audit gate stays intact; development reads expose honest stale metadata. Overview provides executable export arguments. No new language claim or canonical content change. |
+| query.test.ts | `@kit verify-loop:kit-markdown`: actual overview arguments retrieve text byte-equal to the existing Markdown renderer. Four JSON rows preserve overview/full/search/entry responses. Six invalid format/view rows fail. Stale-audit control preserves visible mismatch in both Markdown and JSON; the existing file-export tests still reject stale stamps. These are transport/evidence safeguards, not a second semantic suite. |
+| mcp/server.ts, core CLI and extension MCP tests | `@kit verify-loop:kit-markdown`: real stdio calls follow overview arguments and assert raw text equals the canonical exporter; malformed format/full combinations return tool errors. Both entry points exercise the same production handler. Description/schema advertise format. |
+
+Tag delta: three owning `verify-loop:kit-markdown` tags added; no tags removed.
+The public query result adds a Markdown variant; explicit JSON deliberately does
+not echo format so its existing response remains unchanged. The renderer has two
+production callers: gated file export and ungated read-only query. It is not a
+top-level npm export. The owning export test asserts renderer/export byte equality;
+the query stale-flag control also asserts the file-delivery gate rejects it.
+The claim belongs to the existing verify-loop delivery guidance and this explicit
+transport documentation; all existing examples and semantic assertions remain
+unchanged. Existing native-execution and clinical-fidelity limits are retained.
+Plan655 and code656 ran native Astra/high and external Opus5 (high plan, low code).
+Native code review:0 critical/0 important/0 nit. External code review:1 critical/
+4 important/5 nit; lead accepted2, refined4, rejected4 with checked reasons.
+The exact invalid-format MCP call passed; the reviewer had conflated candidate
+and root files for version claims. The concrete export-equality and stale-gate
+assertions were added and rerun. No unrun external convergence is claimed.
+Verification:135 kit checks across4 files, core4814 passed/32 existing skips,
+extension1184 passed/3 expected failures, both typechecks and full real core MCP
+smoke passed. The extension suite includes the bundled raw-Markdown MCP check.
+Measured before the metadata stamp:JSON190461 bytes, Markdown179106 bytes.
+Final stamped file/MCP byte equality is a release gate; full is deliberately the
+complete document, while search/entry remain the focused retrieval choices.
+
 ## Maintenance — unified retrieval and audited baseline (642/643)
 
 Baseline: `345af5782c61188b11de87b788aecf0276421f1a` (CRL 5.0.0,
