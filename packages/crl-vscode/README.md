@@ -2,15 +2,15 @@
 
 A VS Code extension for the Clinical Reasoning Language (CRL). It does four things:
 
-1. **Highlights `.crl` files** — CRL keywords, strings, comments. Updated for v0.7 grammar (covers `defined as`, `definition is`, `sem-and`, `sem-or`, `sem-not`).
+1. **Highlights `.crl` files** — CRL keywords, strings, and comments.
 2. **Catalog-driven authoring help** — narrative-pattern, type, valuetype, and concept-reference completion + hover for `.crl` files:
-   - Inside `- definition is ` bodies, narrative-pattern snippets from the 45-entry catalog (`<X> during <Y>`, `<X> performed`, `<X> justified by <Y>`, `has <X>`, etc.).
+   - Inside `- definition is ` bodies, snippets from the bundled pattern catalog. Consult the current authoring kit for each pattern's applicability and required context.
    - After `- type is `, the list of FHIR resource types CRL recognizes (`Observation`, `Encounter`, `Condition`, …).
    - After `- value type is `, the list of FHIR value types (`boolean`, `CodeableConcept`, `Quantity`, `dateTime`, …).
    - Inside any quoted name position (e.g. `defined as "…"`, `definition is "…"`), the names of every `concept` / `terminology` declared in the file.
    - Hover any of the above to see what it is and where it's declared.
 3. **Live error checking** — the bundled CRL validator runs on every change (debounced 250 ms) and reports parser, AST-build, and semantic findings as VS Code diagnostics (squiggles). Runs in **soft mode** so unresolved references appear as warnings during authoring.
-4. **Gives your Claude Code agent CRL tools** — Claude can parse and **validate** CRL for you. The MCP server now exposes `validate_crl` with an optional `soft` flag in addition to `tokenize_crl` and `build_crl_ast`.
+4. **Gives your agent CRL tools** — the bundled MCP server provides the authoring kit, validation, CRL/CEL emission, and supporting review tools. Claude Code setup is described below; other MCP clients can connect to the server using the [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v6.0.0/packages/crl/TOOLING.md).
 
 It configures everything automatically — there are no settings to paste by hand.
 
@@ -35,7 +35,11 @@ When you open a workspace that contains `.crl` files, the extension configures t
 - **`CLAUDE.md`** (this workspace) — a short managed block telling Claude when and how to use the CRL tools. Your own `CLAUDE.md` content is left untouched.
 - **Highlighting settings** (your user settings) — associates `*.crl` with the CRL grammar and adds the CRL token colors, preserving your existing customizations.
 
-### The tools Claude gets
+### Authoring-kit discovery and tools
+
+Start with `authoring_kit({})` for the overview and complete index. Kit schema 2.0 provides one unfiltered reference with explicit applicability. Search with `authoring_kit({view:"search",query:"dropdown with a none answer"})`; retrieve complete guidance and prerequisites with `authoring_kit({view:"entry",id:"rule:named-answer-options"})`. Use `view:"full"` for the complete export. The former kit `stage` and `useCase` arguments are removed in 6.0.0.
+
+The server registers 19 tools by default and 20 when `emit_results` is enabled. The [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v6.0.0/packages/crl/TOOLING.md) lists the tool surface, including `emit_crl`, `emit_cel`, and `emit_results`. Some lower-level tools are:
 - **`tokenize_crl`** — lex CRL source into tokens.
 - **`build_crl_ast`** — parse CRL source and build its AST. No semantic checks.
 - **`validate_crl`** — lex + parse + build + run all semantic validators (name uniqueness, reference resolution, cycle detection, action uniqueness). Optional `soft: true` demotes reference-target-exists findings to warnings. Returns `{ success, errors[], warnings[] }`.
@@ -45,7 +49,7 @@ Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult`-sha
 
 ### Authoring help in the editor
 
-- **Narrative pattern completion** — inside any `- definition is ` line, snippet for each of the 45 catalog patterns (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `src/cql-emitter/catalog/inference-pattern-catalog.md`; new patterns are picked up by the next `npm run compile`.
+- **Narrative pattern completion** — inside any `- definition is ` line, snippet for each supported catalog pattern (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `src/cql-emitter/catalog/inference-pattern-catalog.md`; new patterns are picked up by the next `npm run compile`.
 - **Type / valuetype completion** — fires after `- type is ` and `- value type is ` with the enum allowed by the CRL grammar.
 - **Concept-reference completion** — inside any quoted name position, the names of every `concept` / `terminology` declared in the file (with their type / valuetype / body preview in the hover).
 - **Hover** over a narrative phrase, a type/valuetype token, or a concept reference for the catalog entry or declaration info.
@@ -66,7 +70,7 @@ your keyboard layout if different.
 | **Ctrl+Click** on `include "Lib"` | Open the included library's file. |
 | **Shift+F12** on a declaration or any ref site | Open the References view listing every site that uses that name across the project. |
 | **Ctrl+T** | Workspace Symbols — fuzzy-search every concept / terminology / decision / activity across every CRL project in the workspace. |
-| **F2** on a declaration or ref name | Rename the declaration and every reference to it (atomic multi-file edit). Per-(library, kind) collision check matches validator semantics. Library rename is rejected in v2.1.0. |
+| **F2** on a declaration or ref name | Rename the declaration and every reference to it (atomic multi-file edit). Per-(library, kind) collision check matches validator semantics. Library rename is not supported. |
 
 #### Outline / overview
 
@@ -152,6 +156,6 @@ npm run package          # produces crl-language-support-<version>.vsix
 
 **Heads-up (Windows):** if VS Code is open with the CRL extension active, its bundled MCP server holds `dist/` files open and `npm run package` will fail with `EPERM`. Close VS Code (or disable the CRL extension) before building the VSIX.
 
-Publishing to the Marketplace uses `vsce` (`vsce login <publisher>`, then `vsce publish`).
+This release distributes the verified VSIX as a GitHub release asset. Marketplace publication is not part of this release workflow.
 
-For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see [`README.md` § Cutting a release](../README.md#cutting-a-release-build-both-artifacts--upload-to-github) in the repo root.
+For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see the [core README § Cutting a release](https://github.com/alphora/clinical-reasoning-language/blob/v6.0.0/packages/crl/README.md#cutting-a-release-build-both-artifacts--upload-to-github).

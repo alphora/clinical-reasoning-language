@@ -64,7 +64,7 @@ A single CLI binary (`crl-emit`) dispatches all three emit paths by the input fi
 
 ## Installation
 
-The package is publicly available from npm: `npm install @smile-digital-health/crl@5.0.0`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL5 requires content migration; consult its release notes before updating an existing4.x project.
+The package is publicly available from npm: `npm install @smile-digital-health/crl@6.0.0`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL6 changes the authoring-kit npm and MCP APIs; the CRL/CEL language is unchanged from 5.0.0. Consult the [6.0.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v6.0.0) when updating kit calls. Older content may also need the earlier CRL5 language migration.
 
 ### Option A — VS Code extension (vsix) — for interactive authoring + MCP
 
@@ -75,7 +75,7 @@ Lowest-friction path if you want the language server, validation, and the MCP to
    ```bash
    code --install-extension crl-language-support-X.Y.Z.vsix --force
    ```
-3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up the19 default tools on its next start, or20 when `emit_results` is enabled.
+3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up the 19 default tools on its next start, or 20 when `emit_results` is enabled.
 
 ### Option B — npm tarball (`.tgz`) — for host apps + downstream code
 
@@ -212,7 +212,7 @@ The [authoring kit guide](../../docs/authoring-kit.md) describes `authoring_kit`
 one kit, overview/search/entry/full retrieval, prerequisite context and audit identity.
 The removed kit selectors do not change `emit_results` runtime configuration.
 
-The bundled MCP server registers **19 tools by default**, plus `emit_results` when enabled (`CRL_ENABLE_RESULTS=1`, or VS Code User setting `crl.enableResults`). The live enabled surface has20 tools. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining seven (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`, `check_fhir_ids`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
+The bundled MCP server registers **19 tools by default**, plus `emit_results` when enabled (`CRL_ENABLE_RESULTS=1`, or VS Code User setting `crl.enableResults`). The live enabled surface has 20 tools. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); `authoring_kit` is described in the linked guide. The remaining six (`emit_crl`, `run_decision`, `render_scenario`, `create_flag`, `set_flag_status`, `check_fhir_ids`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
 
 | Tool | Input | Returns | Use when |
 |---|---|---|---|
@@ -345,11 +345,11 @@ This is the same pattern the bundled `crl-language-support` extension uses inter
    ```json
    {
      "dependencies": {
-       "@smile-digital-health/crl": "^5.0.0"
+       "@smile-digital-health/crl": "^6.0.0"
      }
    }
    ```
-   (For an offline installation, use `file:./vendor/smile-digital-health-crl-5.0.0.tgz` after downloading that release asset.)
+   (For an offline installation, use `file:./vendor/smile-digital-health-crl-6.0.0.tgz` after downloading that release asset.)
 
 2. **Bundle the dep into your extension** with esbuild / webpack / your bundler of choice. VS Code extensions ship as a single `dist/extension.js`; the CRL code gets inlined just like any other dep.
 
