@@ -1,5 +1,59 @@
 # Kit evidence ledger
 
+## Maintenance — unified retrieval and audited baseline (642/643)
+
+Baseline: `345af5782c61188b11de87b788aecf0276421f1a` (CRL 5.0.0,
+kit 1.38). Target: the reviewed content commit referenced by `../audit.json`
+after this round completes; until then its historical 1.38 stamp remains in place.
+
+Baseline provenance: `git diff 1231273e 345af578 -- packages/crl/src/authoring-kit`
+is empty. Thus the 639-audited kit content is byte-identical at the released
+baseline. The historical unreleased sentence below describes the state when
+639 was written; release640/641 subsequently shipped those exact two payloads.
+The new unified payload is reviewed as a transformation of their complete union,
+not asserted to be the same bytes. Its source schema is 2.0.
+
+Current operator intent: one kit, no CPG/PA/use-case selector; navigable reference
+material supporting a comprehensive and correct computable representation of
+L1 narrative and/or L2 semi-structured source. Format is revisable. Named rules,
+examples and artifacts remain canonical; all former PA guidance stays available
+with intent-based applicability, even before configuration exists.
+
+| Changed scope | Disposition and evidence |
+|---|---|
+| authoring-kit/index.ts, types.ts, navigation.ts, query.ts | Kit updated: one full payload; generated complete index; stable IDs and authored aliases; overview/search/entry/full. Query tests observe plain-language and retired-spelling discovery, counterexample labeling, exact prerequisite closure, invariant anchor resolution, no-match/error behavior and complete-vs-focused identity. No claim that search replaces reading the referenced entries. |
+| requirements.ts; referenceArtifactsEmit.test.ts | Kit updated: companion/import IDs and project configuration travel with each artifact. Existing validation/FHIR emission gate now uses precisely that served context, including named terminology and disposition vocabulary. The determination examples now use standalone mode with their authored Approve/Deny final leaves, aligning the configuration with the teaching instead of embedded mode. Thirteen artifacts remain; CRE and FHIR proof limits remain separate. |
+| authoring-kit.test.ts | Existing guidance sufficient for unchanged semantic behavior: preserved actual-input equality, CRE cases, source-shape admission, force/verification/coverage and retired-form checks. Removed only selector/filter/old per-use-case hash assertions; replaced by unified identity/discovery tests. Historical pin history remains in Git. No owning behavioral claim was removed. |
+| query.test.ts | New author-facing discovery assertions: `@kit verify-loop:kit-discovery` maps plain-language and retired spellings to current guidance. Other declarations check internal delivery integrity, malformed requests, complete index and audit boundaries; these need no separate CRL language claim. |
+| src/index.ts, mcp/server.ts, core CLI and extension MCP tests | Kit updated: public retrieval API; old selectors produce migration errors; real core/bundled MCP tests exercise overview/search/entry/full, 13 artifacts and actual validation. emit_results.useCase is unchanged runtime behavior. |
+| audit.json | New metadata-only audit identity, excluded from content hash. Content equality does not prove repository audit currency; future implementation-only changes still require review. |
+| export.ts, export.test.ts, scripts/export-authoring-kit.mjs | Delivery integrity: explicit JSON/Markdown export refuses stale schema/hash stamps and modified content. Both files derive from the same canonical object; actual tested sources and proof limits are retained. These assertions add no CRL semantic claims. |
+| concept-form evidence/quantification explanation | Kit updated: makes the existing charter §2/§3 completeness boundary explicit; its unimplemented spelling stays a #320 limitation. Existing cre/tests/publication.test.ts selected-datum membership tests observe known member/nonmember, missing/unknown operands, and unsupported non-Boolean guards. These tests do not establish broad collection completeness or clinical fidelity. |
+| publication.test.ts (unchanged owning assertions; two added tags) | Kit updated: `concept-form:selected-datum-membership` tags known yes/no parameter rows; `concept-form:missing-evidence` tags absent/present-unknown rows. Rerun these existing assertions; no new parallel semantic suite. Completeness design limitation is a manually reviewed operator/charter requirement, not a claimed implementation feature. |
+| packages/crl/package.json and package-lock.json | Test tooling only: declare already-resolved markdown-it14.2.0 directly for rendered export regression; no runtime dependency or compiler behavior changes. |
+| dispositions request-kind wording; cpgActivityProfiles.test.ts | Kit updated: replace misleading inference wording with mapping from the authored request profile to FHIR kind. Existing table test covers CPGServiceRequest/ServiceRequest and CPGCommunicationRequest/CommunicationRequest (plus other existing rows); added `dispositions:authored-request-kind` tag without changing assertions. |
+| crl-release skill | Release verification updated: successful audited file export plus canonical equality/audit-match through both installed MCP entry points. Development retrieval remains available with explicit stale audit metadata; no release performed here. |
+| canonical kit skill and Codex entry point | Kit maintenance updated: baseline/target Git delta, old/new tags and assertions, renamed/deleted/shared inputs, untagged cases and implementation/config changes without test deltas. The coverage ledger remains authoritative. No duplicate behavior suite or automatic audit advancement. |
+| docs/authoring-kit.md and TOOLING.md | Kit updated: delivery/migration contract and L1/L2 purpose. Manual review against operator intent and Boxwala terminology; not an executable clinical-fidelity claim. |
+
+No compiler, CQL/FHIR emitter, CRE or engine implementation changed. No new
+clinical or native-execution claims. Existing scoped gaps remain explicit in the
+kit. Review642 accepted/refined retrieval and audit safeguards. Code reviews643,
+646 and647 have complete prompts, responses and dispositions in the workspace's
+discussion records. Native647:0 critical/0 important/0 nit. External647:0 critical,
+4 important,4 nit, explicitly no blocking fault; lead accepted3/refined4/rejected1,
+verified the concrete corrections and recorded the review iteration bound.
+No unrun final panel convergence is claimed.
+
+Final source verification: **234 passed across6 files** (kit, existing publication
+and request-kind owners), **31 bundled MCP checks passed**, complete core MCP smoke
+passed, full core/extension builds and both typechecks passed. Skill frontmatter
+validation passed. Three new owning @kit tags label existing assertions without
+changing their behavior. The stale-audit export was observed to fail before any
+output was created; rendered placeholder loss has a known-bad control and passing
+correction. Metadata stamping and final export/MCP equality are the next step;
+new source is not released or installed merely by updating this ledger.
+
 ## Initial broader audit — 624–639
 
 Source review and the grouped reverse mapping are complete, with explicit evidence limits. All300 originally discovered test files were read, including parameterized rows/helpers;639 adds a producer cleanup suite (301 total). See [reverse-claim-map.md](reverse-claim-map.md) for every substantive payload claim group and [survey-dispositions.md](survey-dispositions.md) for applicable, internal and legacy cases. The machine inventory records source hashes and execution separately.

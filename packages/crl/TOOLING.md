@@ -208,6 +208,10 @@ esac
 
 ## MCP reference
 
+The [authoring kit guide](../../docs/authoring-kit.md) describes `authoring_kit`:
+one kit, overview/search/entry/full retrieval, prerequisite context and audit identity.
+The removed kit selectors do not change `emit_results` runtime configuration.
+
 The bundled MCP server registers **19 tools by default**, plus `emit_results` when enabled (`CRL_ENABLE_RESULTS=1`, or VS Code User setting `crl.enableResults`). The live enabled surface has20 tools. The **7 CRL-authoring tools** are detailed in the table below; the **5 provenance tools** in [Provenance tools](#provenance-tools); the remaining seven (`emit_crl`, `run_decision`, `render_scenario`, `authoring_kit`, `create_flag`, `set_flag_status`, `check_fhir_ids`) are registered but not yet detailed in this reference (a known documentation gap). Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
 
 | Tool | Input | Returns | Use when |

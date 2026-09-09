@@ -1,0 +1,7 @@
+{
+  "auditedRevision": "345af5782c61188b11de87b788aecf0276421f1a",
+  "auditedSchemaVersion": "1.38",
+  "auditedContentHash": "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d",
+  "scope": "Full 1.38 prior-auth payload (including common guidance); 301 CRL test-file census and recorded evidence limits. New unified content awaits its maintenance review.",
+  "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
+}

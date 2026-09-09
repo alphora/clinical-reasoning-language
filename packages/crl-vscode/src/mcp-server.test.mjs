@@ -124,69 +124,52 @@ check("canonicalize_source: a real .docx → writes .txt + .anchormeta.json + re
   assert.equal(meta.textHash, out.textHash, "sidecar textHash == summary textHash");
 });
 
-check("authoring_kit (default = cpg base) → PA-free payload + embedded reference validates clean", async () => {
+check("authoring_kit defaults to a complete index, not a filtered payload", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: {} });
-    assert.ok(!r.isError, "should not be a tool error");
+    assert.ok(!r.isError);
     const kit = JSON.parse(r.content[0].text);
-    assert.equal(kit.stage, "local-decision-support");
-    assert.equal(kit.useCase, "cpg"); // omitted useCase → the neutral base, NOT PA (#191, fail-loud)
-    assert.deepEqual(kit.chain, ["cpg"]);
-    assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
-    // The bundled server ships the PA-free, audited reference set.
-    assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
-      "named-answer-reference.cel",
-      "named-answer-reference.crl",
-      "named-answer-terms.crl",
-      "patient-age-both-rep-reference.crl",
-      "publication-reference.crl",
-      "selection-reference.cel",
-      "selection-reference.crl",
-    ]);
-    // No PA content leaked into the base bundle.
-    assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
-    const crl = kit.referenceArtifacts.find((a) => a.name === "selection-reference.crl").source;
+    assert.equal(kit.view, "overview");
+    assert.equal(kit.complete, false);
+    assert.equal(kit.contentHash, undefined);
+    assert.match(kit.fullContentHash, /^[0-9a-f]{64}$/);
+    assert.ok(kit.index.some(e => e.id === "rule:pa-disposition-set"));
+    assert.ok(kit.introduction.verificationLegend.length > 0);
+    const search = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "search", query: "dropdown with a none answer" } })).content[0].text);
+    assert.equal(search.results[0].id, "rule:named-answer-options");
+    const entry = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "entry", id: search.results[0].id } })).content[0].text);
+    assert.equal(entry.fullContentHash, kit.fullContentHash);
+    const artifact = entry.entries.find(e => e.id === "artifact:named-answer-reference.crl").content;
+    assert.ok(artifact.requires.crl.canonicalBase);
+    assert.ok(entry.entries.some(e => e.id === "artifact:named-answer-terms.crl"));
+  });
+
+check("authoring_kit full exports all 13 artifacts and determination guidance", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { view: "full" } });
+    assert.ok(!r.isError);
+    const kit = JSON.parse(r.content[0].text);
+    assert.equal(kit.view, "full");
+    assert.equal(kit.complete, true);
+    assert.equal(kit.schemaVersion, "2.0");
+    assert.equal(kit.contentHash, "e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2");
+    assert.equal(kit.fullContentHash, kit.contentHash);
+    assert.equal(kit.referenceArtifacts.length, 13);
+    assert.equal(kit.dispositionModel.categories.length, 3);
+    assert.equal(kit.useCase, undefined);
+    const crl = kit.referenceArtifacts.find(a => a.name === "selection-reference.crl").source;
     const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
-    assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
+    assert.equal(v.success, true);
   });
 
-check("authoring_kit useCase:'prior-auth' → the full inherited 13-artifact set + dispositionModel", async () => {
-    const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
-    assert.ok(!r.isError, "should not be a tool error");
-    const kit = JSON.parse(r.content[0].text);
-    assert.equal(kit.useCase, "prior-auth");
-    assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    // Durable guard that the bundled server carries the full PA kit — the 13-artifact set (config-driven; the shared
-    // medical-policy-determination.crl was removed — determinations are now local `<category>.<key>` activities).
-    assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
-      "disposition-arbitration-reference.cel",
-      "disposition-arbitration-reference.crl",
-      "named-answer-reference.cel",
-      "named-answer-reference.crl",
-      "named-answer-terms.crl",
-      "pa-determination-reference.cel",
-      "pa-determination-reference.crl",
-      "patient-age-both-rep-reference.crl",
-      "publication-reference.crl",
-      "selection-reference.cel",
-      "selection-reference.crl",
-      "source-delegated-decision-reference.cel",
-      "source-delegated-decision-reference.crl",
-    ]);
-    assert.ok(!kit.referenceArtifacts.some((a) => a.name === "medical-policy-determination.crl"));
-    assert.ok(!kit.facets, "advisory facets are retired");
-    assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
-  });
-
-check("authoring_kit unknown stage → isError listing valid stages", async () => {
+check("authoring_kit removed stage selector → migration error", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
     assert.equal(r.isError, true);
-    assert.match(r.content[0].text, /local-decision-support/);
+    assert.match(r.content[0].text, /one kit/);
   });
 
-check("authoring_kit unknown useCase → isError listing valid useCases", async () => {
+check("authoring_kit removed useCase selector → migration error", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "measure" } });
     assert.equal(r.isError, true);
-    assert.match(r.content[0].text, /Unknown authoring useCase|cpg|prior-auth/);
+    assert.match(r.content[0].text, /authorization guidance/);
   });
 
 // #189 — UN-MARKED. dme101-030's both-rep age concept was un-evaluable by the CRE (the age `value projection`

@@ -1,6 +1,6 @@
 ---
 name: crl-kit-update
-description: "Update or audit the CRL authoring kit using reviewed claims backed by tagged implementation tests and their actual examples. Use for kit changes, stale or conflicting KE guidance, and surveying CRL tests for missing teaching."
+description: "Maintain the CRL authoring kit from its last audited Git revision, reviewing changed tests and behavior against tagged claims and shared examples. Use for kit updates, stale or conflicting KE guidance, and coverage audits."
 ---
 
 Read and follow the [canonical crl-kit-update protocol](../../../.claude/skills/crl-kit-update/SKILL.md)

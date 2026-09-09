@@ -99,6 +99,14 @@ unexecuted — exactly how 4.114.0’s missing driver stayed invisible through a
 
 ## 3. Gate B — the artifacts (THE ONE THAT CATCHES REAL DEFECTS)
 
+- [ ] After the core build, run `node packages/crl/scripts/export-authoring-kit.mjs <release-output>/authoring-kit`
+      from the repository root. It must succeed with the current reviewed schema/hash and audit stamp.
+      Resolve the stamp's Git revision and review all later implementation changes using `crl-kit-update`.
+      Development MCP retrieval can expose `contentMatchesAudit:false`; that is not release acceptance.
+      In Gate C, query `authoring_kit` with `view:"full"` through BOTH installed MCP entry points:
+      require `audit.contentMatchesAudit === true` and equality with this export's canonical content,
+      schema, content hash and audited revision. Do not certify a release using an unstamped kit.
+
 Build both published artifacts and **look inside them as archives**:
 
 ```bash

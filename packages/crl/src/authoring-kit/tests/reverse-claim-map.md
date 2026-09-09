@@ -1,5 +1,13 @@
 # Reverse kit claim map
 
+Maintenance642/643: one unified payload replaces the former CPG/PA selection;
+the initial grouped semantic mappings below still apply. `typeAllowlist.recommended`
+replaces `stageRecommended`. New `verify-loop:kit-discovery` evidence lives in
+`query.test.ts`: plain-language and retired syntax queries find current guidance;
+entry delivery includes prerequisites and proof limits. Existing reference emit
+tests now use the artifact's served `requires` configuration and import closure.
+The authoritative revision/status and change dispositions remain in coverage.md.
+
 Initial survey:300 discovered CRL test files, plus the new producer cleanup suite (301), native entry points and linked extension evidence.
 
 Reviewed baseline: b2ff4762 plus639 corrections. This map consolidates native638's complete grouped payload survey, assessed by the lead. Corrections from639 are incorporated below. Line numbers locate the reviewed before-state; stable @kit tags and declaration titles survive later movement. Execution status is recorded per file in test-inventory.json; **V is an assertion mapping, not a claim that every test ran in this audit**.

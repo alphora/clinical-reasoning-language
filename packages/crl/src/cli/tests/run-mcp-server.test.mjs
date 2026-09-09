@@ -238,59 +238,44 @@ try {
     assert.match(out.flag.gist, /line one\nline two/);
   });
 
-  await check("authoring_kit (default = cpg base) → PA-free local-decision-support payload", async () => {
+  await check("authoring_kit defaults to a complete index, not a filtered payload", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: {} });
-    assert.ok(!r.isError, "should not be a tool error");
+    assert.ok(!r.isError);
     const kit = JSON.parse(r.content[0].text);
-    assert.equal(kit.stage, "local-decision-support");
-    assert.equal(kit.useCase, "cpg"); // omitted useCase → the neutral base, NOT PA (#191)
-    assert.deepEqual(kit.chain, ["cpg"]);
-    assert.equal(typeof kit.schemaVersion, "string");
-    assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
-    assert.ok(Array.isArray(kit.rules) && kit.rules.length > 0);
-    assert.ok(Array.isArray(kit.typeAllowlist.conceptTypes) && kit.typeAllowlist.conceptTypes.includes("Condition"));
-    // The un-fused cpg base carries only the PA-FREE artifacts (pure-CDS decision + patient-age).
-    const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.deepEqual(refNames, [
-      "named-answer-reference.cel",
-      "named-answer-reference.crl",
-      "named-answer-terms.crl",
-      "patient-age-both-rep-reference.crl",
-      "publication-reference.crl",
-      "selection-reference.cel",
-      "selection-reference.crl",
-    ]);
-    assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
-    assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
-    // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.38"); // named answer ValueSets and presentations
-    assert.equal(kit.contentHash, "ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9");
-    assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
-    assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
-    // Supported source/producer publications and legacy inference are distinct in-scope forms.
-    const scopeOf = (frag) => kit.conceptLayerModel.find((e) => e.form.includes(frag))?.scope;
-    assert.equal(scopeOf("defined as"), undefined);
-    assert.equal(scopeOf("definition is"), "in");
+    assert.equal(kit.view, "overview");
+    assert.equal(kit.complete, false);
+    assert.equal(kit.contentHash, undefined);
+    assert.match(kit.fullContentHash, /^[0-9a-f]{64}$/);
+    assert.ok(kit.index.some(e => e.id === "rule:pa-disposition-set"));
+    assert.ok(kit.introduction.verificationLegend.length > 0);
+    const search = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "search", query: "dropdown with a none answer" } })).content[0].text);
+    assert.equal(search.results[0].id, "rule:named-answer-options");
+    const entry = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "entry", id: search.results[0].id } })).content[0].text);
+    assert.equal(entry.fullContentHash, kit.fullContentHash);
+    const artifact = entry.entries.find(e => e.id === "artifact:named-answer-reference.crl").content;
+    assert.ok(artifact.requires.crl.canonicalBase);
+    assert.ok(entry.entries.some(e => e.id === "artifact:named-answer-terms.crl"));
   });
 
-  await check("authoring_kit useCase:'prior-auth' → the full inherited PA kit + pinned hash", async () => {
-    const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
-    assert.ok(!r.isError, "should not be a tool error");
+  await check("authoring_kit full exports all 13 artifacts and determination guidance", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { view: "full" } });
+    assert.ok(!r.isError);
     const kit = JSON.parse(r.content[0].text);
-    assert.equal(kit.useCase, "prior-auth");
-    assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.38");
-    // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d");
-    const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.equal(refNames.length, 13); // inherited references, including the shared selection CRL/CEL pair
-    assert.ok(!refNames.includes("medical-policy-determination.crl"));
-    assert.ok(!kit.facets, "advisory facets are retired");
-    assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
+    assert.equal(kit.view, "full");
+    assert.equal(kit.complete, true);
+    assert.equal(kit.schemaVersion, "2.0");
+    assert.equal(kit.contentHash, "e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2");
+    assert.equal(kit.fullContentHash, kit.contentHash);
+    assert.equal(kit.referenceArtifacts.length, 13);
+    assert.equal(kit.dispositionModel.categories.length, 3);
+    assert.equal(kit.useCase, undefined);
+    const crl = kit.referenceArtifacts.find(a => a.name === "selection-reference.crl").source;
+    const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
+    assert.equal(v.success, true);
   });
 
   await check("authoring_kit embedded patient-age-both-rep-reference.crl validates clean via validate_crl", async () => {
-    const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
+    const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "full" } })).content[0].text);
     const crl = kit.referenceArtifacts.find((a) => a.name === "patient-age-both-rep-reference.crl").source;
     const r = await client.callTool({ name: "validate_crl", arguments: { code: crl } });
     const out = JSON.parse(r.content[0].text);
@@ -298,7 +283,7 @@ try {
   });
 
   await check("emit_cql via inline code → runs without a tool error (the kit's patient-age-both-rep-reference.crl)", async () => {
-    const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
+    const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "full" } })).content[0].text);
     const crl = kit.referenceArtifacts.find((a) => a.name === "patient-age-both-rep-reference.crl").source;
     const r = await client.callTool({ name: "emit_cql", arguments: { code: crl } });
     assert.ok(!r.isError, `emit_cql should not be a tool error; got ${r.content?.[0]?.text?.slice(0, 200)}`);
@@ -315,10 +300,10 @@ try {
     assert.equal(r.isError, true);
   });
 
-  await check("authoring_kit with unknown stage → isError listing valid stages", async () => {
+  await check("authoring_kit with removed stage selector → migration error", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
     assert.equal(r.isError, true);
-    assert.match(r.content[0].text, /local-decision-support/);
+    assert.match(r.content[0].text, /one kit/);
   });
 
   await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {

@@ -19,47 +19,23 @@ import { parseInput } from "../../ast/tests/parseInput";
  * non-Observation source questions do not have a universal existence rewrite.
  */
 
-const kit = getAuthoringKit("local-decision-support", "prior-auth");
+const kit = getAuthoringKit();
 const crlArtifacts = kit.referenceArtifacts.filter((a) => a.language === "crl");
 
-const PROJECT = {
-  "package.json": JSON.stringify({
-    name: "kit-emit-probe",
-    version: "1.0.0",
-    private: true,
-    crl: {
-      canonicalBase: "http://example.org/kit-emit-probe",
-      status: "draft",
-      experimental: true,
-      date: "2026-01-01T00:00:00.000Z",
-      dispositions: {
-        version: 1,
-        mode: "embedded",
-        options: {
-          certify: { Approve: { label: "Certified" } },
-          "not-certify": { Deny: { label: "Not certified" }, EIU: { label: "Experimental/investigational/unproven" } },
-        },
-      },
-    },
-  }),
-};
-
 const materializeArtifact = (name: string, source: string) => {
+  const artifact = kit.referenceArtifacts.find(a => a.name === name)!;
   const dir = mkdtempSync(join(tmpdir(), "crl-kit-emit-"));
-  for (const [f, body] of Object.entries(PROJECT)) {
-    const config = JSON.parse(body);
-    if (name.startsWith("named-answer-")) {
-      config.crl.canonicalBase = ANSWER_EXAMPLE_BASE;
-    }
-    if (!["pa-determination-reference.crl", "source-delegated-decision-reference.crl", "disposition-arbitration-reference.crl"].includes(name)) delete config.crl.dispositions;
-    writeFileSync(join(dir, f), JSON.stringify(config));
-  }
-  // Materialize only this example and its actual dependency closure.
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "kit-emit-probe", version: "1.0.0", private: true, crl: artifact.requires.crl }));
   writeFileSync(join(dir, name), source);
-  if (name === "named-answer-reference.crl") {
-    const terms = crlArtifacts.find(a => a.name === "named-answer-terms.crl")!;
-    writeFileSync(join(dir, terms.name), terms.source);
-  }
+  const visited = new Set([name]);
+  const include = (id: string) => {
+    const dependency = kit.referenceArtifacts.find(a => `artifact:${a.name}` === id)!;
+    if (visited.has(dependency.name)) return;
+    visited.add(dependency.name);
+    writeFileSync(join(dir, dependency.name), dependency.source);
+    dependency.requires.artifacts.forEach(include);
+  };
+  artifact.requires.artifacts.forEach(include);
   return join(dir, name);
 };
 const emitArtifact = (name: string, source: string) => {
@@ -134,15 +110,13 @@ describe("every kit reference artifact does what its stamp claims", () => {
     .flatMap(c => { const reason = publicationAdmissionReason(c); return reason ? [c.name + ": " + reason] : []; });
 
   it("every positive delivered concept uses the admitted publication contract", () => {
-    for (const useCase of ["cpg", "prior-auth"] as const) {
-      const payload = getAuthoringKit(undefined, useCase);
-      const sources = [
-        ...payload.referenceArtifacts.filter(a => a.language === "crl").map(a => ({ name: a.name, source: a.source })),
-        ...payload.examples.filter(e => e.language === "crl" && e.valid).map(e => ({ name: e.title, source: e.snippet })),
-      ];
-      expect(sources.length).toBeGreaterThan(5);
-      for (const example of sources) expect(unsupportedConcepts(example.source), example.name).toEqual([]);
-    }
+    const payload = getAuthoringKit();
+    const sources = [
+      ...payload.referenceArtifacts.filter(a => a.language === "crl").map(a => ({ name: a.name, source: a.source })),
+      ...payload.examples.filter(e => e.language === "crl" && e.valid).map(e => ({ name: e.title, source: e.snippet })),
+    ];
+    expect(sources.length).toBeGreaterThan(5);
+    for (const example of sources) expect(unsupportedConcepts(example.source), example.name).toEqual([]);
   });
 
   it("the admission gate catches implicit Scalar, explicit Scalar and inactive Record markers", () => {

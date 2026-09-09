@@ -1,126 +1,189 @@
 ---
 name: crl-kit-update
-description: "Update or audit the CRL authoring kit using reviewed claims backed by tagged implementation tests and their actual examples. Use for kit changes, stale or conflicting KE guidance, and surveying CRL tests for missing teaching."
+description: "Maintain the CRL authoring kit from its last audited Git revision, reviewing changed tests and behavior against tagged claims and shared examples. Use for kit updates, stale or conflicting KE guidance, and coverage audits."
 ---
 
-# CRL kit update
+# CRL kit maintenance
 
-Keep the delivered kit coherent and grounded in executable examples. Existing
-implementation tests supply the evidence; do not build a second suite that
-reimplements the same behavior for the kit.
+Maintain one discoverable kit from reviewed implementation evidence. Reuse the
+owning tests and their actual examples; do not create a second behavior suite.
+This skill does not authorize publishing, committing, or contacting a KE.
 
-## Establish intent before promoting evidence
+The goal is a comprehensive, correct computable representation of source material
+at L1 (narrative), L2 (semi-structured recommendations), or both. Do not require a
+pre-existing L2 intermediate. L2 organizes clinical scenarios, decisions and actions
+for communication between domain experts and KEs. See
+[Boxwala et al. (2011)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3241169/).
+Optimize retrieval and teaching for that goal. The current
+JSON delivery and TypeScript content layout are revisable implementation choices,
+not authority. A different final or intermediate format is welcome when it improves
+KE comprehension or completeness while preserving evidence and one source of truth.
 
-Apply `crl-north-star` and `stale-requirements` through this project's shared skill
-entry points. Current operator intent governs. Existing CRL, tests, golden files
-and the kit can all encode an incorrect design. A passing test establishes what
-was measured, not what the language ought to mean.
+## Establish intent
 
-For each proposed claim, compare intended semantics with the exact assertions.
-Correct or remove misleading tests and fix implementation as warranted. Do not
-preserve a wrong test to keep a kit claim green, promote a known defect into a
-recommended pattern, or broaden a claim beyond its evidence. Record unresolved
-behavior as a limitation with an owner/issue, not as successful teaching.
+Apply `crl-north-star` and `stale-requirements`. Operator intent governs. A passing
+test measures an implementation; it does not establish the intended language.
+Correct or remove wrong tests and fix behavior as needed before promoting it
+into teaching. Record unresolved behavior as a limitation with an owner/issue.
 
-## Inventory once, then maintain it
+## Start from the last completed audit
 
-Use `packages/crl/src/authoring-kit/tests/coverage.md` as the working coverage
-ledger alongside the existing kit tests. Record the audited revision and scope.
-If it does not yet exist, create it. Never treat an empty or partial ledger as a
-complete audit.
+Read `packages/crl/src/authoring-kit/audit.json` and the authoritative coverage
+ledger `packages/crl/src/authoring-kit/tests/coverage.md`. The other inventory,
+reverse-map and survey files linked there are supporting evidence, not independent
+audit status. Metadata points to the ledger; it does not duplicate claim records.
 
-For the initial survey:
+The stamp contains `auditedRevision`, `auditedSchemaVersion`,
+`auditedContentHash`, `scope`, and `evidence`. These are distinct from the CRL
+release version and the current kit content identity. `contentMatchesAudit`
+means only that kit content matches the audited content. An implementation-only
+change can invalidate evidence while leaving kit bytes unchanged.
 
-1. Inventory every substantive claim in both assembled `cpg` and `prior-auth`
-   payloads: summary, model, rules and clauses, boundaries, examples, reference
-   artifacts, verification instructions, judge guidance and disposition model.
-   Include MCP descriptions and linked active docs that repeat those claims.
-2. Map each claim to existing behavioral tests before adding any test. Where a
-   real behavior has no test, add coverage in its owning implementation suite.
-   Process/source-fidelity guidance may require human review rather than an
-   executable test; label that evidence honestly.
-3. Survey every CRL test, including parameterized rows, for applicable teaching.
-   Consolidate equivalent cases into one claim; record reasoned exclusions for
-   internal mechanics, redundant cases and regression tests for known defects.
-   File-level exclusions are sufficient only when the entire file has that
-   character. Give unreviewed areas explicit status; do not hide them as excluded.
+Resolve the saved SHA and the intended target commit without checking out either:
 
-After the survey, inspect changed/new/deleted tests and their claim consumers on
-each update. New cases need a claim or a reasoned exclusion. Changes to semantics,
-assertions or input invalidate the affected mapping and example until reviewed.
-This maintenance does not require rerunning unrelated behavior tests.
+```text
+git rev-parse --verify <baseline>^{commit}
+git rev-parse --verify <target>^{commit}
+git merge-base --is-ancestor <baseline> <target>
+git diff --name-status --find-renames <baseline> <target>
+git diff --find-renames <baseline> <target> -- <relevant paths>
+git status --short
+git diff
+git diff --cached
+```
+
+Use full resolved SHAs in the ledger. Quote shell arguments appropriately. For
+machine parsing use `--name-status -z` rather than splitting paths on whitespace.
+Do not silently replace a missing, shallow or non-ancestor baseline with HEAD.
+Recover the recorded revision if available, or explicitly perform a new full
+survey and explain why the prior baseline could not be used.
+
+Review **all changed paths** first. Then inspect changed tests, parameterized
+rows, fixtures, shared inputs, snapshots and helper/configuration dependencies.
+Read both old and new paths for renames, and old content for deletions. Also
+inspect implementation, compiler, runtime, dependencies and configuration changes
+that have no corresponding test change. These can invalidate existing claims.
+Uncommitted and untracked relevant work is pending scope, never an audited SHA.
+
+For tag discovery use `git grep -n "@kit" <revision> -- <test paths>` at both
+revisions. Inspect the assertion/input diff, not just the tag diff: unchanged tags
+can support changed behavior. Join affected tags to their claims in coverage.md
+and its reverse map. Report added/removed tags, claims losing an owning assertion,
+unknown tags, and new/changed untagged test cases needing a disposition. Do not
+repeat the entire old census when a reliable baseline and complete delta exist.
+
+## Disposition every relevant change
+
+Add one maintenance section to coverage.md with baseline, target, changed-file
+inventory and evidence. Each affected claim or test case needs one of:
+
+- **Kit updated:** intended behavior changed or teaching was absent/wrong; identify
+  the canonical kit entry and exact owning assertions/examples.
+- **Existing guidance sufficient:** show which claim still covers the changed
+  assertion/input and why no wording/example change is needed.
+- **Not author-facing:** give a reason (internal mechanics, redundant test,
+  metadata-only stamp); do not exclude a whole file containing relevant cases.
+- **Unresolved gap:** identify the missing evidence or behavior, its owner/issue
+  and the explicit kit limitation. Never count unreviewed work as excluded.
+
+For each claim retain intended semantics and their basis, exact test file/name,
+asserted observation, meaningful parameterized rows, fixture/constant and required
+project configuration, example identity, evidence tier and limits. Tags alone,
+test names and suite pass counts are not evidence of the claim.
+
+If an unresolved gap prevents the declared scope from being complete, keep the
+prior stamp. An explicitly bounded limitation can be audited as a limitation;
+it cannot be promoted to a verified behavior. Record the distinction.
+
+## Bootstrap only when needed
+
+Without a trustworthy baseline, inventory every substantive claim in the complete
+kit: introduction, models, rules/clauses, limits, examples, reference artifacts,
+verification guidance, judge rubric and disposition model. Include active MCP
+descriptions/docs that repeat claims. Map to existing tests before adding any.
+Survey every CRL test declaration and parameterized row for relevant teaching.
+Give each a claim, a reasoned exclusion or explicit unreviewed/gap status. Process
+and narrative-fidelity rules may need manual review; label that evidence honestly.
 
 ## Tag tests and reuse their inputs
 
-Put a stable claim tag immediately above each relevant test declaration:
+Place a stable tag immediately above each relevant owning test declaration:
 
 ```ts
 // @kit named-answer-options:qualification
-it("<existing behavioral test name>", () => { /* existing test */ });
+it("<behavioral test>", () => { /* existing assertions */ });
 ```
 
-The prefix is an existing kit rule ID where possible; the suffix identifies a
-distinct claim. A test may carry several tags, and several tests may support one
-claim. A tag on a parameterized test covers its rows; describe meaningful limits
-in the ledger. Tags are searchable links, not evidence that an audit ran.
+Prefer an existing rule ID as prefix; suffix identifies the claim. Multiple tests
+may support a claim and one test may support several. A parameterized declaration
+tag covers its rows; record boundaries. Update/remove tags when their claims change.
 
-For each claim record:
+Reuse actual CRL/CEL from the owning test as teaching. Prefer a shared pure
+fixture/string consumed by both; never import a test runner into production.
+If copying is necessary, generate or compare bytes against the tested input.
+Label excerpts and preserve required context. Artifacts declare companion/import
+IDs and tested `package.json` CRL configuration in `requires`; the emission gate
+must materialize that same context, not an easier private setup.
 
-- Intended behavior and its basis in an operator decision or reviewed design.
-- Kit locations and applicability: common core or a scoped use case.
-- Exact test file/name(s), actual input fixture/constant and required config.
-- Evidence level and its limits; test command, result and audited revision.
-- The actual asserted observation supporting the bounded claim, including the
-  relevant parameterized rows. A test name or a green suite alone is insufficient.
-- Example source and how its identity with tested input is maintained.
-- Status: verified, manual review, gap, or excluded with reason.
+Emitter assertions do not prove CQL execution. CRE does not prove native `$apply`
+pausing or medical correctness. Preserve the existing independent proof tiers.
 
-Reuse the actual CRL/CEL input from the behavioral test as the delivered example.
-Prefer a shared fixture/string consumed by both the implementation test and kit
-assembly. Keep production packaging independent of test runners: import a pure
-fixture module, never a test file. If embedding requires copying, generate or
-compare the embedded bytes from that source in a packaging check. Any excerpt
-must identify its tested source and context; validate an excerpt claimed to be
-standalone. Do not silently simplify away the condition the example demonstrates.
+## Maintain retrieval as part of the content
 
-A unit assertion on emitted FHIR does not prove CQL execution. CRE does not prove
-native `$apply`, pause behavior, or medical correctness. Preserve these boundaries
-in the ledger and the kit's existing verification tiers.
+There is one kit, with no CPG/PA/measure stage or use-case selector. Applicability
+states the authoring intent and assumptions (including before required configuration
+exists); it never filters content out. `emit_results.useCase` is a separate runtime
+setting. Shared language semantics do not vary by application.
 
-## Teach one coherent language
+Keep canonical guidance in `packages/crl/src/authoring-kit/`. The index derives
+from those sections, rules, examples and artifacts. Maintain stable IDs, task/topic
+labels, plain-language and syntax aliases, and prerequisite links. New guidance
+must be reachable. Retired terms should lead to replacements, with counterexamples
+clearly marked. Do not preserve retired positive teaching for compatibility.
 
-Keep common language semantics in the shared core. Use small specializations for
-application guidance, such as PA workflow; name their assumptions so the KE can
-decide applicability. A specialization cannot redefine common semantics. Do not
-put customer-specific requirements into the universal payload.
+Review overview, search, entry and full together: full is the canonical export;
+search gives discovery summaries; entry supplies complete guidance/prerequisites
+with force definitions, resolvable invariant anchors and proof limits. A short
+response must not imply the agent has read the full kit. `fullContentHash` names
+the full content in every view; `contentHash` appears only in the full export.
 
-Compare the complete assembled payloads, not just edited rule strings. A rule,
-example, summary, boundary, judge instruction or MCP description that contradicts
-another is a defect. Correct every active copy, including tests pinning obsolete
-teaching. A retired positive example is not preserved for compatibility. Check implicit defaults as well as explicit syntax: an omitted shape can keep a retired representation alive. For current selected-publication examples, require the full declaration admission contract, including its reduction; a Record marker alone is insufficient. Keep compiler regression inputs separate from recommended kit teaching.
+Sweep for contradictions across rules, examples, summaries, boundaries, judge
+instructions and MCP descriptions. Check implicit defaults as well as explicit
+syntax; omitted fields can preserve retired models. Keep regression counterexamples
+separate from recommended authoring. Scope and proof are independent dimensions.
 
-Cover invalid forms and meaningful boundaries alongside successful examples.
-Keep the delivered kit readable: one concise claim can summarize many tests;
-the detailed mapping and exclusions stay in the repository ledger.
+## Verify, review, then advance the stamp
 
-## Verify and deliver
+Follow AGENTS.md for plan/code review and readable responses/dispositions. Supply
+before-state, intended semantics, changed examples, mappings and gaps. Challenge
+tests that encode wrong intent as well as contradictory claims.
 
-Follow `AGENTS.md` for plan/code reviews and readable review records. Give the
-panel the before-state, intended semantics, changed examples, evidence mappings
-and unresolved gaps. Ask it to challenge tests that encode wrong intent as well
-as conflicting claims. The author owns dispositions and verification.
+Run affected owning tests, kit/reference gates, build and actual MCP retrieval
+checks. Verify search examples, prerequisite closure, content identity and
+source/packaged delivery. No unrelated runtime rerun is required for a kit-only
+change. For new stale-text guards, verify a known-bad sample fails.
 
-Run affected implementation tests, existing kit/reference tests and packaging
-checks. Metadata/ref/example-identity checks are appropriate; they must not
-duplicate behavior implementation. Test a new stale-text guard against a known
-bad sample to show it detects its claimed failure.
+For changed kit content advance `schemaVersion` once, describe the change, inspect
+the full payload diff and repin its hash. Hash canonical content and navigation,
+excluding audit metadata. A build must never advance an audit stamp automatically.
 
-For a changed payload, advance `schemaVersion` once, update version history, read
-both assembled payload diffs and repin both content hashes. Build and query the
-actual MCP `authoring_kit` for each use case. A source change does not update an
-installed kit. Release only within session authorization, using `crl-release`.
+After review/checks complete, commit the reviewed content and ledger within session
+authorization. Then stamp its **existing full commit SHA**, schema and content hash
+in a separate metadata-only commit. This avoids a self-referential commit hash.
+In that same metadata commit, finalize this maintenance section in coverage.md
+with the literal target SHA, schema and content hash. A historical section must
+not point only to the mutable current audit.json; later audits must not change
+the identity of an earlier review interval.
+The next delta will include that stamp commit; disposition it as metadata-only
+after inspecting it. Do not blanket-ignore files or future changes by commit name.
+Verify the stamp names the reviewed content and that `contentMatchesAudit` is true.
+Run the explicit delivery gate `node scripts/export-authoring-kit.mjs <output-directory>`
+from the built core package. It refuses stale or mismatched content before writing
+the generated JSON and Markdown. Inspect the actual files and confirm their identity
+matches the full MCP response. Resolve the stamped commit in Git and verify its
+recorded content before delivery; the export's content check cannot certify unseen
+implementation changes or replace this maintenance review.
 
-Report separately: skill created/updated; claims corrected and verified; census
-coverage and remaining gaps; source kit identity; installed/released identity.
-Do not claim a comprehensive kit until every applicable test has a disposition
-and every substantive kit claim has reviewed evidence or an explicit limitation.
+A source update does not change an installed kit. Report skill/kit changes,
+baseline/target and scope/gaps, validation/review, and source versus released kit
+identities separately. Release only within authorization using `crl-release`.

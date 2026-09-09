@@ -75,6 +75,7 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
     }
   });
 
+  // @kit dispositions:authored-request-kind
   it("kind values match the IG-verified table", () => {
     const expected: Record<string, string> = {
       CPGServiceRequest: "ServiceRequest",

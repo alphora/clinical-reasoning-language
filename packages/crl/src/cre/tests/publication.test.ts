@@ -640,6 +640,7 @@ describe("CRE selected-datum membership production", () => {
     expect(run.produced).toEqual([]);
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context");
   });
+  // @kit concept-form:selected-datum-membership
   it.each([["yes", true], ["no", false]] as const)("computes %s from the selected operand", (code, value) => {
     const {run, emission} = evaluate(procedureFact("Selected", `\`${code}\``), ["Selected"], DECISION, "", value ? "Approve" : "Deny", "", {policy:membershipPolicy});
     expect(emission.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
@@ -648,6 +649,7 @@ describe("CRE selected-datum membership production", () => {
     expect(run.trace[0].facts).toEqual(["Selected"]);
   });
 
+  // @kit concept-form:missing-evidence
   it.each([false, true])("missing/unknown operand pauses without false (present=%s)", (present) => {
     const {run} = evaluate(present ? procedureFact("Unknown") : "", present ? ["Unknown"] : [], DECISION, "", "Deny", "", {policy:membershipPolicy});
     expect(run.status,run.diagnostics.join("\n")).toBe("fail");

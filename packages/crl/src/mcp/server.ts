@@ -13,7 +13,7 @@ import { z } from "zod";
 // Provenance must name the version that actually ran.
 const CRL_PACKAGE_VERSION: string = (require("../../package.json") as { version: string }).version;
 
-import { getAuthoringKit, DEFAULT_STAGE, DEFAULT_USE_CASE } from "../authoring-kit";
+import { queryAuthoringKit } from "../authoring-kit/query";
 import { CEL_DATA_MANIFEST, emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
@@ -881,49 +881,20 @@ export function createServer(): McpServer {
   server.registerTool(
     "authoring_kit",
     {
-      title: "CRL authoring kit (stage + useCase sliced)",
-      description:
-        "Return the self-contained authoring knowledge a Knowledge-Engineering agent needs to encode one " +
-        "CRL artifact for a given stage and USE CASE: a `forceModel` (how hard each rule binds — the " +
-        "validator-enforced / invariant / default FORCE levels, read first), the concept-layer model, " +
-        "authoring rules (decision shapes incl. the composition ladder + chaining necessity, guards, " +
-        "dispositions, CEL cases, the verify loop) — each with a machine-readable `clauses` force breakdown " +
-        "and an `edge` tag, the grammar type allowlists (full + a stage-recommended subset), validated " +
-        "reference artifacts embedded inline, do/don't examples, a `judgeLens` rubric with TWO families " +
-        "(waivers — how to adjudicate the FINAL-mode provenance waivers validate_provenance surfaces; and " +
-        "composition — the decision-composition / chaining source-fidelity checks invented-determination-" +
-        "boundary / hollowed-criteria / dropped-or-added-criterion that have no mechanical home), and a " +
-        "feedback URL. The verify loop separates CRE case proofs, FHIR emission, and engine execution. " +
-        "Supported local/source representations check code membership. A local concept without a derivable code set fails loudly; " +
-        "some non-local forms use name-based presence, so a green CRE run does not prove every code was checked. " +
-        "The introductory examples cover local questions, shallow inference, and Patient age source " +
-        "projections; broader language forms have separate implementation limits recorded in the kit. " +
-        'USE CASE (#191 lattice): "cpg" (default) is the neutral base framework (≈ full CRL); "prior-auth" ' +
-        "adds the PA / medical-policy narrowings — the CONFIG-DRIVEN determination model (`configure-dispositions` " +
-        "+ `disposition-mode` rules + the `dispositionModel` field: a determination is a plain local activity named " +
-        "`<category>.<key>` [certify/not-certify/pended PAS review-actions] drawn from the deployment's " +
-        "`crl.dispositions` config), the pa-disposition-set rule (communicated-not-ordered / configured-membership / " +
-        "mutual-exclusivity / finality-by-mode), the PA determination exemplars, and the PA boundary items. PA content is present ONLY with " +
-        '`useCase:"prior-auth"` — an omitted `useCase` returns the base cpg kit (NOT PA). Each useCase has its ' +
-        "own distinct, stable `contentHash`. Returns the kit JSON incl. `schemaVersion`, the resolved " +
-        "`useCase` + edge `chain`, and the derived `contentHash`. Unknown stage or useCase → tool error " +
-        "listing valid values.",
-      inputSchema: {
-        stage: z
-          .string()
-          .optional()
-          .describe(
-            'Authoring stage. Default "local-decision-support". Unknown → error listing valid stages.',
-          ),
-        useCase: z
-          .string()
-          .optional()
-          .describe(
-            'Specialization use case (#191). Default "cpg" (base framework). "prior-auth" adds the PA/medical-policy narrowings. Unknown → error listing valid useCases.',
-          ),
-      },
+      title: "CRL authoring kit",
+      description: "One kit for all CRL authoring. Start with overview (default): introduction and complete index. " +
+        "Use search with query to find task/syntax aliases, entry with a stable id for complete guidance and prerequisites, " +
+        "or full for the complete export. Each response identifies view, completeness and fullContentHash. " +
+        "Only full includes the canonical contentHash. Read applicability and verification limits. " +
+        "stage/useCase kit selectors have been removed; authorization guidance is included without a selector. " +
+        "emit_results retains its separate runtime useCase setting.",
+      inputSchema: z.object({
+        view: z.enum(["overview", "search", "entry", "full"]).optional(),
+        query: z.string().optional(),
+        id: z.string().optional(),
+      }).passthrough(),
     },
-    (args) => runAuthoringKit(args as { stage?: string; useCase?: string }),
+    (args) => runAuthoringKit(args),
   );
 
   server.registerTool(
@@ -1715,12 +1686,12 @@ function runValidateProvenance(
   }
 }
 
-function runAuthoringKit(args: { stage?: string; useCase?: string }): {
+function runAuthoringKit(args: unknown): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
   try {
-    const kit = getAuthoringKit(args.stage ?? DEFAULT_STAGE, args.useCase ?? DEFAULT_USE_CASE);
+    const kit = queryAuthoringKit(args);
     return { content: [{ type: "text", text: JSON.stringify(kit, null, 2) }] };
   } catch (e) {
     return { content: [{ type: "text", text: (e as Error).message }], isError: true };

@@ -10,45 +10,13 @@
  * (index.ts). `contentHash` changes whenever any content byte changes (the drift identity).
  */
 
-/** Authoring slices. v1 ships exactly one; the param exists for forward-compat. */
-export type AuthoringStage = "local-decision-support";
-
-/**
- * A specialization EDGE — the tag on a unit of kit content (#191 lattice). `cpg` is the base framework
- * (≈ full CRL, the FHIR CPG IG); `prior-auth` is the PA/medical-policy narrowing that inherits down from it.
- * Enforcement inherits down the chain: a `prior-auth` kit carries all `cpg` content plus the `prior-auth`
- * narrowings. Measure is a RESERVED sibling edge (documented, not shipped) — do NOT read the two-value union
- * as the closed set of future edges.
- */
-export type AuthoringEdge = "cpg" | "prior-auth";
-
-/**
- * A selectable USE CASE — resolves (by NAME, never by index) to an ordered chain of edges. `cpg` → `["cpg"]`;
- * `prior-auth` → `["cpg", "prior-auth"]`. Consumers traverse the chain by name so inserting a reserved edge
- * later is a non-breaking length change.
- */
-export type AuthoringUseCase = "cpg" | "prior-auth";
-
-/**
- * An ADVISORY, above-edge coverage FACET (#191). A named dimension the PA edge surfaces but whose taxonomy
- * LEVEL is not yet frozen (pending the second domain edge). Explicitly a distinct channel from `rules`/`clauses`:
- * it carries NO resolvable `test` anchor and NO force — a consumer must NOT anchor selection or inheritance to it.
- */
-export interface KitFacet {
-  id: string;
-  name: string;
-  /** Reserved — the facet's home level is TBD until the second edge forces it. */
-  status: "home-TBD";
-  note: string;
-}
-
-/** One concept-body form and whether it is in scope for the stage. */
+/** One concept-body form and whether it is in scope in these introductory examples. */
 export interface ConceptLayerEntry {
   /** The CRL surface form, e.g. "- code is `code`.". */
   form: string;
   /** What it means / which source it queries / which layer it is. */
   meaning: string;
-  /** Whether this form is in scope ("in") or deferred ("out") for the stage. */
+  /** Whether this form is in scope ("in") or deferred ("out") in these introductory examples. */
   scope: "in" | "out";
 }
 
@@ -92,12 +60,8 @@ export interface KitRule {
     | "minimalism"
     | "cel"
     | "process";
-  /**
-   * The specialization edge this rule belongs to (#191). EXPLICIT on every rule — a `prior-auth` rule is
-   * assembled only into a chain that includes `prior-auth`; a `cpg` rule is in every chain. No implicit default
-   * (an omitted edge would let a PA rule silently ship in the neutral base).
-   */
-  edge: AuthoringEdge;
+  /** When this guidance applies; no content is filtered out. */
+  applicability: string;
   rule: string;
   why?: string;
   /** Doc path and/or validator rule-name this derives from (not a paraphrase to trust blindly). */
@@ -119,6 +83,7 @@ export interface ForceModel {
 /** A small teaching snippet. `valid` distinguishes a do-case from an intentional don't-case. `text` = a non-CRL/CEL
  *  illustration (e.g. an MCP tool call) — the example harness only CRL-validates `crl` snippets, so `text` is descriptive. */
 export interface KitExample {
+  id: string;
   title: string;
   language: "crl" | "cel" | "text";
   snippet: string;
@@ -150,17 +115,14 @@ export type VerificationTier = "cre-run" | "fhir-emit" | "engine-run" | "validat
 export interface ReferenceArtifact {
   name: string;
   language: "crl" | "cel";
-  /**
-   * The specialization edge this artifact belongs to (#191), CLOSURE-CORRECT: an artifact's edge is ≥ the edge
-   * of every artifact it references (an exemplar that recommends into the shared `Medical Policy Determination`
-   * library rides `prior-auth` with that library, so a `cpg` kit never ships a determination ref it cannot resolve).
-   */
-  edge: AuthoringEdge;
+  /** When this guidance applies; no content is filtered out. */
+  applicability: string;
   /** The nonempty set of independent proof methods for this artifact (see the payload `verificationLegend` for full semantics). */
   verification: [VerificationTier, ...VerificationTier[]];
   purpose: string;
   /** The complete artifact text. */
   source: string;
+  requires: ArtifactRequirements;
 }
 
 /** One entry of the payload verification legend — the in-payload meaning of a `VerificationTier` (TS docstrings don't ship over MCP). */
@@ -172,12 +134,12 @@ export interface VerificationLegendEntry {
   doesNotProve: string;
 }
 
-/** The grammar-legal type vocabularies plus a non-binding stage-recommended subset. */
+/** The grammar-legal type vocabularies plus a non-binding recommended subset. */
 export interface TypeAllowlist {
   conceptTypes: string[];
   conceptValueTypes: string[];
   activityTypes: string[];
-  stageRecommended: { conceptTypes: string[]; activityTypes: string[] };
+  recommended: { conceptTypes: string[]; activityTypes: string[] };
   note: string;
 }
 
@@ -194,11 +156,8 @@ export interface VerifyLoop {
    * Pairs with the `judgeLens.composition:<check>` anchor for source-fidelity invariants; together they make
    * EVERY invariant clause's `test` resolve to a real check (the anti-fake-green guarantee).
    *
-   * Each requirement carries an `edge` (#191): a `prior-auth` requirement is assembled only into a chain that
-   * includes `prior-auth`, so it is present exactly when the `prior-auth` clause that anchors it is — the
-   * per-useCase resolve check never dangles.
    */
-  methodologyRequirements: { id: string; edge: AuthoringEdge; text: string }[];
+  methodologyRequirements: { id: string; applicability: string; text: string }[];
 }
 
 /**
@@ -251,15 +210,11 @@ export interface JudgeLens {
 }
 
 export interface AuthoringKit {
+  introduction: { goal: string; reading: string; navigation: string; auditMeaning: string };
   /** Kit version; advances on any content release (the KE seats re-sync off it), hashed into contentHash. */
   schemaVersion: string;
-  /** sha256 of the rest of the payload — the unforgeable drift identity (distinct + stable per useCase). */
+  /** sha256 of canonical content including navigation, excluding this field and audit metadata. */
   contentHash: string;
-  stage: AuthoringStage;
-  /** The resolved use case this payload was assembled for (#191). Omitted `useCase` resolves to `cpg` (the base). */
-  useCase: AuthoringUseCase;
-  /** The resolved edge chain, name-order (`cpg` → `["cpg"]`; `prior-auth` → `["cpg", "prior-auth"]`). */
-  chain: AuthoringEdge[];
   summary: string;
   /** How an agent must apply the rules — the FORCE levels (§0). Read first. */
   forceModel: ForceModel;
@@ -286,21 +241,16 @@ export interface AuthoringKit {
   /** What this kit does NOT cover (descriptive boundary, not a roadmap of named future stages). */
   boundary: string[];
   /**
-   * ADVISORY above-edge coverage facets (#191) — present only when the chain includes `prior-auth`. A distinct
-   * channel from `rules`: no `test`, no force. Reserved dimensions whose taxonomy level is not frozen until the
-   * second domain edge — do NOT anchor selection or inheritance to them. (Retired for the configurable-PA-leaves
-   * work — the once-abstract facets became concrete rules; the field remains for a future genuine facet.)
-   */
-  facets?: KitFacet[];
-  /**
-   * The PA determination MODEL (feature: configurable PA leaves) — present only on the `prior-auth` chain,
+   * The PA determination MODEL (feature: configurable PA leaves) — for authorization/coverage determinations,
    * customer-agnostic. Tells the KE the framework category vocabulary (certify/not-certify/pended = PAS
    * review-actions) + the `crl.dispositions` config SHAPE the deployment fills. NOT a deployment's option labels.
    */
-  dispositionModel?: DispositionModel;
+  dispositionModel: DispositionModel;
+  navigation: KitIndexEntry[];
+  audit: KitAudit & { contentMatchesAudit: boolean };
 }
 
-/** The PA determination model surfaced on the prior-auth kit edge — framework categories + the config contract. */
+/** The PA determination model for authorization/coverage determinations — framework categories + the config contract. */
 export interface DispositionModel {
   /** The determination-leaf naming convention (a plain local activity). */
   activityNamePattern: string;
@@ -321,4 +271,40 @@ export interface DispositionModel {
     closedSet: string;
     optionCode: string;
   };
+}
+
+/** Repository audit identity; equality of content does not establish repository audit currency. */
+export interface KitAudit {
+  auditedRevision: string;
+  auditedSchemaVersion: string;
+  auditedContentHash: string;
+  scope: string;
+  evidence: string;
+}
+
+export interface ArtifactRequirements {
+  artifacts: string[];
+  /** The tested crl object in package.json. Synthetic values are example context. */
+  crl: Record<string, unknown>;
+}
+
+export type KitTopic = "orientation" | "concepts" | "answers" | "questions" | "decisions" |
+  "dispositions" | "terminology" | "libraries" | "testing" | "review" | "limitations";
+
+export interface KitIndexEntry {
+  id: string;
+  title: string;
+  topics: KitTopic[];
+  applicability: string;
+  status: "current" | "counterexample" | "limitation";
+  aliases: string[];
+  requires: string[];
+  /** Collection navigation, not duplicate content/prerequisites. Retrieve members individually. */
+  members?: string[];
+}
+
+export interface KitQuery {
+  view?: "overview" | "search" | "entry" | "full";
+  query?: string;
+  id?: string;
 }

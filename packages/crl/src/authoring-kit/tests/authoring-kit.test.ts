@@ -1,4 +1,4 @@
-// REFACTOR:grounded (#320, plan595): both BMI kit payloads are versioned and verified through MCP.
+// REFACTOR:grounded (#320, plan595): kit content is versioned and verified through MCP.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,7 +26,7 @@ import {
   SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "../reference";
-import { getAuthoringKit, STAGES, USE_CASE_NAMES } from "../index";
+import { getAuthoringKit } from "../index";
 import { answerExampleSource, ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_CEL, ANSWER_EXAMPLE_TERMS } from "../answerExample";
 import { flagFieldRulesOf } from "../../flags/flagVocab"; // #212 step 4b: flag field rules live in the vocab now
 
@@ -42,15 +42,13 @@ function crlErrors(src: string) {
 
 describe("authoring-kit — reference artifacts", () => {
   it("serves the exact named-answer inputs used by the implementation test", () => {
-    for (const useCase of USE_CASE_NAMES) {
-      const artifacts = new Map(getAuthoringKit(undefined, useCase).referenceArtifacts.map((a) => [a.name, a.source]));
-      expect(artifacts.get("named-answer-reference.crl")).toBe(answerExampleSource());
-      expect(artifacts.get("named-answer-reference.cel")).toBe(ANSWER_EXAMPLE_CEL);
-      expect(artifacts.get("named-answer-terms.crl")).toBe(`library "Shared".\n${ANSWER_EXAMPLE_TERMS}`);
-    }
+    const artifacts = new Map(getAuthoringKit().referenceArtifacts.map((a) => [a.name, a.source]));
+    expect(artifacts.get("named-answer-reference.crl")).toBe(answerExampleSource());
+    expect(artifacts.get("named-answer-reference.cel")).toBe(ANSWER_EXAMPLE_CEL);
+    expect(artifacts.get("named-answer-terms.crl")).toBe(`library "Shared".\n${ANSWER_EXAMPLE_TERMS}`);
   });
 
-  it("rejects the known stale PA instruction and teaches the named form on both chains", () => {
+  it("rejects the known stale PA instruction and teaches the named form on the unified kit", () => {
     const obsoleteInstruction = /\b(?:use|author|prefer|write)\b[^.\n]*\binline\s+`value from:`/i;
     const prose = (value: unknown): string[] => typeof value === "string" ? [value]
       : value && typeof value === "object" ? Object.values(value).flatMap(prose) : [];
@@ -59,29 +57,27 @@ describe("authoring-kit — reference artifacts", () => {
     expect(hasObsoleteInstruction({ clauses: [{ text: bad }] })).toBe(true);
     expect(hasObsoleteInstruction({ summary: bad })).toBe(true);
     expect(hasObsoleteInstruction({ text: "The removed inline `value from:` form is rejected." })).toBe(false);
-    for (const useCase of USE_CASE_NAMES) {
-      const kit = getAuthoringKit(undefined, useCase);
-      expect(kit.rules.some((r) => r.id === "named-answer-options")).toBe(true);
-      const model = kit.conceptLayerModel.find((m) => m.form.startsWith("- shape is"));
-      expect(model?.scope).toBe("in");
-      expect(hasObsoleteInstruction(kit)).toBe(false);
-      for (const mutation of [
-        { ...kit, summary: bad },
-        { ...kit, rules: [...kit.rules, { clauses: [{ text: bad }] }] },
-        { ...kit, boundary: [{ text: bad }] },
-        { ...kit, referenceArtifacts: [{ purpose: bad }] },
-      ]) expect(hasObsoleteInstruction(mutation)).toBe(true);
-      const guard = kit.rules.find((r) => r.id === "guards")!;
-      expect(guard.rule).toContain("publication-unsupported-context");
-      const shared = kit.judgeLens.composition.find((c) => c.check === "invented-determination-boundary")!;
-      expect(shared.guidance).toContain("source-delegation OR a genuinely shared determination");
-      expect(shared.guidance).toContain("independent policies");
-      if (useCase === "prior-auth") {
-        const pa = kit.rules.find((r) => r.id === "pa-answers-not-records")!;
-        expect(pa.rule).toContain('value from is "Named Terminology"');
-        expect(pa.ref).toContain("named-answer-options");
-        expect(pa.ref).not.toContain("inline-answer-options");
-      }
+    const kit = getAuthoringKit();
+    expect(kit.rules.some((r) => r.id === "named-answer-options")).toBe(true);
+    const model = kit.conceptLayerModel.find((m) => m.form.startsWith("- shape is"));
+    expect(model?.scope).toBe("in");
+    expect(hasObsoleteInstruction(kit)).toBe(false);
+    for (const mutation of [
+      { ...kit, summary: bad },
+      { ...kit, rules: [...kit.rules, { clauses: [{ text: bad }] }] },
+      { ...kit, boundary: [{ text: bad }] },
+      { ...kit, referenceArtifacts: [{ purpose: bad }] },
+    ]) expect(hasObsoleteInstruction(mutation)).toBe(true);
+    const guard = kit.rules.find((r) => r.id === "guards")!;
+    expect(guard.rule).toContain("publication-unsupported-context");
+    const shared = kit.judgeLens.composition.find((c) => c.check === "invented-determination-boundary")!;
+    expect(shared.guidance).toContain("source-delegation OR a genuinely shared determination");
+    expect(shared.guidance).toContain("independent policies");
+    {
+      const pa = kit.rules.find((r) => r.id === "pa-answers-not-records")!;
+      expect(pa.rule).toContain('value from is "Named Terminology"');
+      expect(pa.ref).toContain("named-answer-options");
+      expect(pa.ref).not.toContain("inline-answer-options");
     }
   });
 
@@ -291,36 +287,18 @@ describe("authoring-kit — reference artifacts", () => {
 });
 
 describe("authoring-kit — getAuthoringKit", () => {
-  it("returns the local-decision-support kit by default", () => {
+  it("returns one complete kit", () => {
     const kit = getAuthoringKit();
-    expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.38");
+    expect(kit).not.toHaveProperty("useCase");
+    expect(kit).not.toHaveProperty("stage");
+    expect(kit).not.toHaveProperty("chain");
+    expect(kit.schemaVersion).toBe("2.0");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
-  it("an OMITTED useCase resolves to the neutral cpg base (fail-loud, NOT silent-PA)", () => {
-    const kit = getAuthoringKit();
-    expect(kit.useCase).toBe("cpg");
-    expect(kit.chain).toEqual(["cpg"]); // name-resolved chain
-  });
 
-  it("useCase:'prior-auth' resolves the inherited chain [cpg, prior-auth] (name-order)", () => {
-    const kit = getAuthoringKit(undefined, "prior-auth");
-    expect(kit.useCase).toBe("prior-auth");
-    expect(kit.chain).toEqual(["cpg", "prior-auth"]);
-  });
 
-  it("throws on an unknown stage, listing valid stages", () => {
-    expect(() => getAuthoringKit("emit")).toThrow(/Unknown authoring stage/);
-    expect(() => getAuthoringKit("emit")).toThrow(/local-decision-support/);
-  });
 
-  it("throws on an unknown useCase, listing valid useCases", () => {
-    expect(() => getAuthoringKit(undefined, "measure")).toThrow(/Unknown authoring useCase/);
-    expect(() => getAuthoringKit(undefined, "measure")).toThrow(/cpg.*prior-auth|prior-auth/);
-    // Measure is RESERVED by docs, deliberately not a shipped chain — so the throw stays honest.
-    expect([...USE_CASE_NAMES]).toEqual(["cpg", "prior-auth"]);
-  });
 
   it("serves the FULL grammar type vocabularies (source of truth, no drift)", () => {
     const kit = getAuthoringKit();
@@ -329,40 +307,22 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit.typeAllowlist.activityTypes).toEqual([...activityTypes]);
   });
 
-  it("stageRecommended types are all members of the full grammar lists", () => {
+  it("recommended types are all members of the full grammar lists", () => {
     const kit = getAuthoringKit();
     // The grammar also contains legacy and source-only resource types. They must
     // not be promoted into current selected-concept teaching by this field.
-    expect(kit.typeAllowlist.stageRecommended.conceptTypes).toEqual(["Observation"]);
-    for (const t of kit.typeAllowlist.stageRecommended.conceptTypes) {
+    expect(kit.typeAllowlist.recommended.conceptTypes).toEqual(["Observation"]);
+    for (const t of kit.typeAllowlist.recommended.conceptTypes) {
       expect(conceptTypes).toContain(t);
     }
-    for (const t of kit.typeAllowlist.stageRecommended.activityTypes) {
+    for (const t of kit.typeAllowlist.recommended.activityTypes) {
       expect(activityTypes).toContain(t);
     }
   });
 
-  it("the cpg base embeds the PA-free artifacts (named answers + patient age + publications); NO PA artifacts", () => {
-    const kit = getAuthoringKit(undefined, "cpg");
-    const names = kit.referenceArtifacts.map((a) => a.name).sort();
-    expect(names).toEqual([
-      "named-answer-reference.cel",
-      "named-answer-reference.crl",
-      "named-answer-terms.crl",
-      "patient-age-both-rep-reference.crl",
-      "publication-reference.crl",
-      "selection-reference.cel",
-      "selection-reference.crl",
-    ]);
-    // Every cpg artifact is edge-tagged cpg, and (closure) references no PA determination lib.
-    for (const a of kit.referenceArtifacts) {
-      expect(a.edge).toBe("cpg");
-      expect(a.source).not.toMatch(/Medical Policy Determination/);
-    }
-  });
 
-  it("the prior-auth chain embeds the full artifact set (cpg base + the PA edge)", () => {
-    const kit = getAuthoringKit(undefined, "prior-auth");
+  it("the unified kit embeds the complete artifact set", () => {
+    const kit = getAuthoringKit();
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
       "disposition-arbitration-reference.cel",
@@ -399,61 +359,59 @@ describe("authoring-kit — getAuthoringKit", () => {
   });
 
   it("STEP-4 (kit 1.18) — the `verification` taxonomy is honest, in-payload, and tier↔proof-consistent (disc 408)", () => {
-    for (const uc of ["cpg", "prior-auth"] as const) {
-      const kit = getAuthoringKit("local-decision-support", uc);
-      // (a) EVERY artifact declares a nonempty set of recognized tiers.
-      const tiers = new Set(["cre-run", "fhir-emit", "engine-run", "validate-only"]);
-      for (const a of kit.referenceArtifacts) {
-        expect(a.verification.length).toBeGreaterThan(0);
-        expect(new Set(a.verification).size).toBe(a.verification.length);
-        expect(
-          a.verification.every((tier) => tiers.has(tier)),
-          a.name,
-        ).toBe(true);
-      }
-      // (b) The legend is IN the (hashed) payload — a TS docstring never reaches the MCP consumer. It is EXACTLY
-      //     the set of tiers the shipped artifacts use — no duplicate entries (uniqueness), no dangling entry for
-      //     an unused tier (coverage both ways = set equality) — each with a non-empty `means` + `doesNotProve`.
-      const legendTierList = kit.verificationLegend.map((l) => l.tier);
-      const legendTiers = new Set(legendTierList);
-      const usedTiers = new Set(kit.referenceArtifacts.flatMap((a) => a.verification));
-      expect(legendTierList.length, `duplicate legend entries in ${uc}`).toBe(legendTiers.size);
-      expect([...legendTiers].sort(), `legend tiers != tiers artifacts use in ${uc}`).toEqual(
-        [...usedTiers].sort(),
-      );
-      for (const l of kit.verificationLegend) {
-        expect(l.means.length).toBeGreaterThan(0);
-        expect(l.doesNotProve.length).toBeGreaterThan(0);
-      }
-      // (c) TIER↔PROOF structural consistency (the field must not be an unverified claim):
-      //     - every `cre-run` `.crl` has a `.cel` companion (same basename) that is ALSO `cre-run` (the pair the
-      //       kit harness actually runs); every `cre-run` `.cel` has its `.crl`.
-      //     - `engine-run` / `validate-only` artifacts have NO `.cel` companion (not CRE-run).
-      const byName = new Map(kit.referenceArtifacts.map((a) => [a.name, a]));
-      const base = (n: string) => n.replace(/\.(crl|cel)$/, "");
-      for (const a of kit.referenceArtifacts) {
-        const cel = byName.get(`${base(a.name)}.cel`);
-        const crl = byName.get(`${base(a.name)}.crl`);
-        if (a.verification.includes("cre-run")) {
-          if (a.name.endsWith(".crl")) {
-            expect(cel, `cre-run ${a.name} must have a .cel companion in ${uc}`).toBeDefined();
-            expect(cel!.verification).toContain("cre-run");
-          } else {
-            expect(crl, `cre-run ${a.name} must have a .crl companion in ${uc}`).toBeDefined();
-          }
-        } else {
-          // engine-run / validate-only are NOT proven via a CEL pair — assert no companion CEL exists.
-          expect(
-            cel,
-            `${a.name} has no cre-run proof and must NOT have a .cel companion in ${uc}`,
-          ).toBeUndefined();
-        }
-      }
-      // The selected producer example is emitted, with no unexecuted runtime stamp.
-      const repr = byName.get("publication-reference.crl")!;
-      expect(repr.verification).toEqual(["fhir-emit"]);
-      expect(repr.edge).toBe("cpg");
+    const kitScope = "unified";
+    const kit = getAuthoringKit();
+    // (a) EVERY artifact declares a nonempty set of recognized tiers.
+    const tiers = new Set(["cre-run", "fhir-emit", "engine-run", "validate-only"]);
+    for (const a of kit.referenceArtifacts) {
+      expect(a.verification.length).toBeGreaterThan(0);
+      expect(new Set(a.verification).size).toBe(a.verification.length);
+      expect(
+        a.verification.every((tier) => tiers.has(tier)),
+        a.name,
+      ).toBe(true);
     }
+    // (b) The legend is IN the (hashed) payload — a TS docstring never reaches the MCP consumer. It is EXACTLY
+    //     the set of tiers the shipped artifacts use — no duplicate entries (uniqueness), no dangling entry for
+    //     an unused tier (coverage both ways = set equality) — each with a non-empty `means` + `doesNotProve`.
+    const legendTierList = kit.verificationLegend.map((l) => l.tier);
+    const legendTiers = new Set(legendTierList);
+    const usedTiers = new Set(kit.referenceArtifacts.flatMap((a) => a.verification));
+    expect(legendTierList.length, `duplicate legend entries in ${kitScope}`).toBe(legendTiers.size);
+    expect([...legendTiers].sort(), `legend tiers != tiers artifacts use in ${kitScope}`).toEqual(
+      [...usedTiers].sort(),
+    );
+    for (const l of kit.verificationLegend) {
+      expect(l.means.length).toBeGreaterThan(0);
+      expect(l.doesNotProve.length).toBeGreaterThan(0);
+    }
+    // (c) TIER↔PROOF structural consistency (the field must not be an unverified claim):
+    //     - every `cre-run` `.crl` has a `.cel` companion (same basename) that is ALSO `cre-run` (the pair the
+    //       kit harness actually runs); every `cre-run` `.cel` has its `.crl`.
+    //     - `engine-run` / `validate-only` artifacts have NO `.cel` companion (not CRE-run).
+    const byName = new Map(kit.referenceArtifacts.map((a) => [a.name, a]));
+    const base = (n: string) => n.replace(/\.(crl|cel)$/, "");
+    for (const a of kit.referenceArtifacts) {
+      const cel = byName.get(`${base(a.name)}.cel`);
+      const crl = byName.get(`${base(a.name)}.crl`);
+      if (a.verification.includes("cre-run")) {
+        if (a.name.endsWith(".crl")) {
+          expect(cel, `cre-run ${a.name} must have a .cel companion in ${kitScope}`).toBeDefined();
+          expect(cel!.verification).toContain("cre-run");
+        } else {
+          expect(crl, `cre-run ${a.name} must have a .crl companion in ${kitScope}`).toBeDefined();
+        }
+      } else {
+        // engine-run / validate-only are NOT proven via a CEL pair — assert no companion CEL exists.
+        expect(
+          cel,
+          `${a.name} has no cre-run proof and must NOT have a .cel companion in ${kitScope}`,
+        ).toBeUndefined();
+      }
+    }
+    // The selected producer example is emitted, with no unexecuted runtime stamp.
+    const repr = byName.get("publication-reference.crl")!;
+    expect(repr.verification).toEqual(["fhir-emit"]);
   });
 
   it("STEP-4 — the `cre-run` tier is SELF-VERIFYING: EVERY cre-run pair is materialized and run through the CRE (disc 408 impl round)", () => {
@@ -461,7 +419,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     // test only checks pair TOPOLOGY — a future cre-run pair with both files present but no run test would pass it
     // while the legend silently lies. This closes that gap the way `validate-only` is closed by crlErrors: it
     // DERIVES the run set from the payload, so a cre-run label with an unrunnable/absent CEL FAILS here.
-    const kit = getAuthoringKit("local-decision-support", "prior-auth"); // the complete inherited chain
+    const kit = getAuthoringKit(); // the complete kit
     const byName = new Map(kit.referenceArtifacts.map((a) => [a.name, a]));
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
@@ -501,29 +459,6 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("artifact edges are CLOSURE-CORRECT: no cpg artifact references ANY prior-auth artifact's library by qualified ref", () => {
-    // Post-migration the PA determination exemplars are self-contained (local `<category>.<key>` activities) — no
-    // shared library. Generalize the closure guard anyway: derive the LIBRARY name declared by every prior-auth
-    // artifact, then assert no cpg artifact quotes any of them — so a FUTURE prior-auth library referenced from a
-    // cpg artifact fails here too.
-    const kit = getAuthoringKit(undefined, "prior-auth");
-    const libNameOf = (src: string): string | undefined =>
-      /(?:^|\n)\s*library\s+"([^"]+)"/.exec(src)?.[1];
-    const priorAuthLibs = new Set(
-      kit.referenceArtifacts
-        .filter((a) => a.edge === "prior-auth")
-        .map((a) => libNameOf(a.source))
-        .filter((n): n is string => !!n),
-    );
-    expect(priorAuthLibs.has("PA Determination Reference")).toBe(true); // the derivation actually found libs
-    const cpgArtifacts = kit.referenceArtifacts.filter((a) => a.edge === "cpg");
-    for (const a of cpgArtifacts) {
-      for (const lib of priorAuthLibs) {
-        // A cpg artifact must not QUOTE a prior-auth library name (a qualified `"Lib"."Activity"` ref would dangle).
-        expect(a.source).not.toContain(`"${lib}"`);
-      }
-    }
-  });
 
   it("conceptLayerModel admits supported selected-publication shapes, producers and sources", () => {
     const kit = getAuthoringKit();
@@ -561,35 +496,31 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit.forceModel.governingPrinciple).toMatch(/faithful/i);
   });
 
-  it("every invariant clause's `test` RESOLVES within its OWN assembled useCase kit — no dangling anchors (§0 — no fake-green)", () => {
-    // Run PER useCase: a prior-auth clause anchors a prior-auth methodologyRequirement, so the check must be
-    // done against the SAME assembled kit — else the edge-filtered anchor would dangle (the very orphan the
-    // un-fuse's clause[2] relocation avoids).
+  it("every invariant clause's `test` RESOLVES in the unified kit — no dangling anchors (§0 — no fake-green)", () => {
     let totalInvariantClauses = 0;
-    for (const useCase of USE_CASE_NAMES) {
-      const kit = getAuthoringKit(undefined, useCase);
-      const compositionChecks = new Set(kit.judgeLens.composition.map((c) => c.check));
-      const methodologyIds = new Set(kit.verifyLoop.methodologyRequirements.map((m) => m.id));
-      for (const rule of kit.rules) {
-        for (const clause of rule.clauses ?? []) {
-          expect(["validator-enforced", "invariant", "default"]).toContain(clause.force);
-          if (clause.force === "invariant") {
-            totalInvariantClauses++;
-            const ref = clause.test ?? "";
-            const comp = /^judgeLens\.composition:(.+)$/.exec(ref);
-            const meth = /^verifyLoop:(.+)$/.exec(ref);
-            if (comp) expect(compositionChecks.has(comp[1])).toBe(true);
-            else if (meth) {
-              if (!methodologyIds.has(meth[1])) {
-                throw new Error(
-                  `invariant clause in rule "${rule.id}" (useCase "${useCase}") anchors "${ref}" but no methodologyRequirement resolves it in that assembled kit`,
-                );
-              }
-            } else {
+    const kitScope = "unified";
+    const kit = getAuthoringKit();
+    const compositionChecks = new Set(kit.judgeLens.composition.map((c) => c.check));
+    const methodologyIds = new Set(kit.verifyLoop.methodologyRequirements.map((m) => m.id));
+    for (const rule of kit.rules) {
+      for (const clause of rule.clauses ?? []) {
+        expect(["validator-enforced", "invariant", "default"]).toContain(clause.force);
+        if (clause.force === "invariant") {
+          totalInvariantClauses++;
+          const ref = clause.test ?? "";
+          const comp = /^judgeLens\.composition:(.+)$/.exec(ref);
+          const meth = /^verifyLoop:(.+)$/.exec(ref);
+          if (comp) expect(compositionChecks.has(comp[1])).toBe(true);
+          else if (meth) {
+            if (!methodologyIds.has(meth[1])) {
               throw new Error(
-                `invariant clause in rule "${rule.id}" has an unresolvable test anchor: "${ref}"`,
+                `invariant clause in rule "${rule.id}" (kitScope "${kitScope}") anchors "${ref}" but no methodologyRequirement resolves it in that assembled kit`,
               );
             }
+          } else {
+            throw new Error(
+              `invariant clause in rule "${rule.id}" has an unresolvable test anchor: "${ref}"`,
+            );
           }
         }
       }
@@ -597,34 +528,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(totalInvariantClauses).toBeGreaterThan(0); // the package is supposed to carry invariant clauses
   });
 
-  it("the cpg base is PA-FREE: no PA rule, no PA methodology, no PA boundary, no PA prose tokens", () => {
-    const cpg = getAuthoringKit(undefined, "cpg");
-    // No PA rule.
-    expect(cpg.rules.find((r) => r.id === "pa-disposition-set")).toBeUndefined();
-    expect(cpg.rules.every((r) => r.edge === "cpg")).toBe(true);
-    // No PA methodology requirement.
-    const methIds = cpg.verifyLoop.methodologyRequirements.map((m) => m.id);
-    expect(methIds).not.toContain("communicated-not-ordered");
-    expect(methIds).not.toContain("shared-lib-membership");
-    expect(methIds).not.toContain("no-pend");
-    expect(methIds).not.toContain("mutual-exclusivity-spans-closure");
-    // No PA boundary items.
-    expect(cpg.boundary.join("\n")).not.toMatch(/Pended|HCR01/);
-    // No facets on the base.
-    expect(cpg.facets).toBeUndefined();
-    // No unambiguous PA prose tokens anywhere in the serialized cpg payload (contentHash is derived — drop it).
-    // NB: the generic word "prior-auth" legitimately appears in "CRL is general (…CDS, prior-auth, quality…)"
-    // framing prose, so it is NOT a PA-content marker — the shared-lib name + X12/HCR01 codes are.
-    const { contentHash: _h, ...payload } = cpg;
-    expect(JSON.stringify(payload)).not.toMatch(
-      /Medical Policy Determination|Pended|HCR01|X12|communicated-not-ordered|shared-lib-membership|no-pend/,
-    );
-  });
 
   it("the `dispositions` rule is UN-FUSED — CPG-base only, NO PA `communicated-not-ordered` invariant", () => {
-    const disp = getAuthoringKit(undefined, "cpg").rules.find((r) => r.id === "dispositions")!;
+    const disp = getAuthoringKit().rules.find((r) => r.id === "dispositions")!;
     expect(disp).toBeDefined();
-    expect(disp.edge).toBe("cpg");
     // The base survives: plain activity / no invented verbs / disposition-type-follows-act.
     expect(disp.rule).toMatch(/plain `activity`/);
     expect(disp.rule).toMatch(/no approve\/deny\/pend verbs|do not invent/i);
@@ -638,7 +545,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   });
 
   it("pa-disposition-set carries the config-driven invariants — communicated-not-ordered + configured-membership + finality-by-mode, each a DISTINCT check", () => {
-    const paRule = getAuthoringKit(undefined, "prior-auth").rules.find(
+    const paRule = getAuthoringKit().rules.find(
       (r) => r.id === "pa-disposition-set",
     )!;
     const anchors = (paRule.clauses ?? [])
@@ -658,12 +565,8 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(new Set(anchors).size).toBe(anchors.length); // all distinct
   });
 
-  it("the 3 advisory facets are RETIRED (became concrete rules); the prior-auth dispositionModel replaces them", () => {
-    expect(getAuthoringKit(undefined, "cpg").facets).toBeUndefined();
-    expect(getAuthoringKit(undefined, "prior-auth").facets).toBeUndefined();
-    // The prior-auth edge now surfaces the framework category model + config contract (customer-agnostic).
-    expect(getAuthoringKit(undefined, "cpg").dispositionModel).toBeUndefined();
-    const dm = getAuthoringKit(undefined, "prior-auth").dispositionModel!;
+  it("determination guidance includes the configurable category model", () => {
+    const dm = getAuthoringKit().dispositionModel!;
     expect(dm.categories.map((c) => c.name).sort()).toEqual(["certify", "not-certify", "pended"]);
     expect(dm.categories.find((c) => c.name === "pended")!.finality).toBe("non-final");
     expect(dm.localActivityRequired).toBe(true);
@@ -706,190 +609,8 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(invented).toBeDefined();
   });
 
-  it("omitted useCase and explicit cpg return the byte-identical payload + the same contentHash", () => {
-    const omitted = getAuthoringKit();
-    const explicitCpg = getAuthoringKit(undefined, "cpg");
-    const { contentHash: h1, ...p1 } = omitted;
-    const { contentHash: h2, ...p2 } = explicitCpg;
-    expect(p1).toEqual(p2);
-    expect(h1).toBe(h2); // the default-note is out-of-band (MCP description), never a hashed payload delta
-  });
 
-  it("each useCase has its OWN distinct, stable contentHash", () => {
-    const cpg = getAuthoringKit(undefined, "cpg");
-    const priorAuth = getAuthoringKit(undefined, "prior-auth");
-    expect(cpg.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(priorAuth.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(cpg.contentHash).not.toBe(priorAuth.contentHash); // different content → different identity
-    // Deterministic per useCase.
-    expect(getAuthoringKit(undefined, "cpg").contentHash).toBe(cpg.contentHash);
-    expect(getAuthoringKit(undefined, "prior-auth").contentHash).toBe(priorAuth.contentHash);
-  });
 
-  it("contentHash is a stable, deterministic sha256 over the payload (pinned per useCase)", () => {
-    const cpg = getAuthoringKit(undefined, "cpg");
-    const priorAuth = getAuthoringKit(undefined, "prior-auth");
-    expect(cpg.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    // Pinned snapshots — any payload byte change must update these deliberately (KE seats pin them; re-sync on a bump).
-    // Re-pinned for the KE decision-composition teaching package (§0–§4, schemaVersion 1.1→1.2): added the
-    // `forceModel` (§0 force levels), per-rule `clauses` force breakdowns, the `chaining-necessity` rule, the
-    // §1 ladder + §3 asymmetry into `decision-composition`, the delegated-closure mutual-exclusivity into
-    // `pa-disposition-set`, the `judgeLens.composition` family (§2/§3 source-fidelity checks), the qualified
-    // `use decision` boundary entry (#172), the §4 proof-methodology in verifyLoop, Deny EIU in the shared
-    // determination lib, and two new exemplars (B source-delegated, C disposition-arbitration).
-    // Re-pinned again (#172 COMPLETE): qualified / cross-library `use decision` now EVALUATES end-to-end (run_decision
-    // + validate_cel + provenance + cockpit), so the "NOT yet evaluated" BOUNDARY entry was removed and the proof-status
-    // example updated. KE skills pin this hash — re-sync on the bump.
-    // Re-pinned (clusterBy kit-proofing, per KE request): the verifyLoop note now names the PROVENANCE/PROMOTION
-    // generate mode — generate_provenance clusterBy:"disposition-path" (correspondence-correct by construction) for
-    // promotion vs the default "decision" concept-attribution view. The kit was silent on a generate mode before.
-    // Re-pinned (chaining-necessity reuse fix): `use decision` now serves source-delegation OR genuine REUSE (the SUR
-    // cross-library shared determination IS reuse) — the line is genuinely-shared vs fabricated-shared, not reuse-vs-not.
-    // Reworded the chaining-necessity rule/why/clauses + decision-composition rung 3 to match. KE skills pin this hash — re-sync.
-    // Re-pinned (interface-concept-naming rule, #180): added the `interface-concept-naming` concept-model rule — name a
-    // decision's `when` (interface) concepts askably (the FHIR emit forms the case-feature input prompt as `<name>?`); the
-    // case-feature StructureDefinition + PlanDefinition action.input emit is TOP-LAYER directly-asserted only (recursive
-    // inferred-condition inputs deferred, #180). KE skills pin this hash — re-sync.
-    // Re-pinned (schemaVersion 1.2→1.3, patient-age both-rep carve-out): added the CONCEPT_LAYER_MODEL both-rep entry,
-    // the `patient-age-both-rep` rule + its verifyLoop methodology anchor, the concept-form/boundary carve-out wording,
-    // the recency-execution `doesNotProve` note, and the `patient-age-both-rep-reference.crl` exemplar.
-    // Re-pinned (schemaVersion 1.3→1.4, the `useCase` specialization axis, #191): the payload gained `useCase`+`chain`;
-    // every rule/artifact/methodologyRequirement gained an `edge`; the PA/CPG-fused `dispositions` was un-fused (PA prose
-    // out, clause[2] `communicated-not-ordered` RELOCATED to pa-disposition-set); PA boundary items + PA artifacts moved
-    // to the prior-auth edge; advisory `facets` added on prior-auth. TWO hashes now — cpg (the default) and prior-auth.
-    // KE seats pin these — re-sync on the bump.
-    // Re-pinned (schemaVersion 1.4→1.5, configurable-PA-leaves T3a): pa-disposition-set rewritten config-driven,
-    // configure-dispositions + disposition-mode rules added, verifyLoop shared-lib-membership→configured-membership +
-    // no-pend→finality-by-mode, facets retired, prior-auth `dispositionModel` field added. schemaVersion is hashed on
-    // BOTH payloads so both pins move. KE seats re-sync on the bump.
-    // Todo 4 (same schemaVersion 1.5, prior-auth hash re-pinned): the emit half now CODES the A1/A3 outcome on the
-    // determination ActivityDefinition (`reasonCode` + `payload`/`note`), so the "coded-HCR01 outcome is a later
-    // stage" boundary is RETIRED and the config `narrative` field dropped from the shape doc. Prior-auth content
-    // changed → cpg hash holds, prior-auth hash moves.
-    // KE #203 Todo 6 (schemaVersion 1.5→1.6): the `review-flags` rule (cpg/process) + 3 examples were added; BOTH
-    // hashes move (schemaVersion is in the hashed base AND the cpg-edge rule/examples inherit into the prior-auth
-    // chain). KE seats re-sync both pins on the bump.
-    // KE #203 Piece 1 (schemaVersion 1.6→1.7): the `review-flags` rule gained a phase-boundary + preservation clause
-    // for the new `category:validation` `@validation-concern`. BOTH hashes move (schemaVersion is hashed + the cpg-edge
-    // rule inherits into prior-auth). KE seats re-sync both pins on the bump (the SINGLE re-pin — full working set).
-    // KE #207 (schemaVersion 1.7→1.8): the `review-flags` rule gained an EMIT clause documenting Todo 5's shipped
-    // status-aware CQL emit (concept→block comment; decision/library→gate-only; resolved→none). BOTH hashes move
-    // (schemaVersion is hashed + the cpg-edge rule inherits into prior-auth). Folds into the SAME single KE re-pin.
-    // KE #205/#203 (schemaVersion 1.8→1.9): the `review-flags` rule gained a WRITE-TOOLS clause (author via create_flag/
-    // set_flag_status). BOTH hashes move.
-    // #212 step 4c (schemaVersion 1.9→1.10): review FLAGS left `.crl` for the `.crl/flags/` store — the `review-flags` rule
-    // is rewritten to the store model (create_flag WRITES the store, no rewritten source; flags don't emit; the 3 flag
-    // examples became `text` tool calls); @gap-filed stays a `.crl` meta tag. BOTH hashes move. KE seats re-sync both pins.
-    // #224 re-pin (content-only, schemaVersion unchanged) — SUPERSEDES the prior #219 entry above (which recorded the
-    // now-retired disposition-consequence doctrine as current). The `hollowed-criteria` invariant is INVERTED to
-    // SEMANTIC-SAMENESS + EMIT-OPACITY: a `defined as`/`sem-*` composite over a policy's DISTINCT criteria is a VIOLATION
-    // regardless of shared consequence (it ships ONE opaque `condition[]` and asserts a sameness distinct criteria lack);
-    // distinct criteria compose in decision STRUCTURE (compound branch guard / `criterion` / sibling `when` branches).
-    // Adds the branch-guards / criterion / guard-or-vs-sibling-or rules + 2 #224 do-examples; re-grounds the
-    // disposition-arbitration reference from `sem-not` inference to `first:`-precedence structure (its CEL truth function
-    // is FROZEN). Swept across decision-composition, concept-form, the judge-lens, boundary, minimalism, cel-cases,
-    // verify-loop, the examples, and BOTH reference artifacts. BOTH hashes move. KE seats re-sync both pins.
-    // #224 iii.1 re-pin (content-only) — the per-action-guard `guards` rule + the branch-guards `text`
-    // flipped their "action guards NOT YET lowered to FHIR" caveat: `unless`/`only when` now LOWER to a
-    // per-item `condition[applicability]` (`unless` → library-qualified null-safe `not Coalesce(...)`).
-    // BOTH hashes move (the `guards` rule is a cpg edge inheriting into prior-auth). KE seats re-sync both pins.
-    // #224 iii.3 re-pin (content-only) — the `branch-guards` + `criterion` rules flipped their "there is
-    // NO branch `not`" claim: branch `not` now lowers to a per-atom `not Coalesce(...)` applicability
-    // `condition[]` (closed-world), the emit-capable path a menu-only `unless` cannot express. BOTH
-    // hashes move (branch-guards is a cpg edge inheriting into prior-auth). KE seats re-sync both pins.
-    // KE #234 (schemaVersion 1.10→1.11): the `decision-composition` invariant was UNFALSIFIABLE (the composite's own
-    // NAME supplied "the one fact"). Adds a UNIT ANCHORING invariant clause (nameable WITHOUT the label; co-occurrence
-    // tell; mechanical corollary), amends the rule `why` + `hollowed-criteria` guidance/4th checkpoint, REPLACES the
-    // `Failed Conservative Therapy` `defined as` EXAMPLE with the guard-`or` `criterion` + adds genuine-rung-1 (viral
-    // suppression) + vacuity-trap examples, re-grounds the `criteria-decision-reference` artifact (FCT `defined as` →
-    // a named `criterion` gated by an or-guard; truth-identical, CEL cases unchanged), and re-words the `concept-form`
-    // rule + conceptLayerModel `defined as` + model prose off the FCT-as-inference gloss. (The co-occurrence tell is
-    // stated as SAME-underlying-occurrence vs SEPARATE-events, NOT "mutually exclusive" — a lab result and a chart note
-    // of one suppression may coexist yet are one fact.) schemaVersion is bumped (the KE's Step-0 re-sync keys off it —
-    // the governing convention). BOTH hashes move (cpg-edge rule/examples/judgeLens inherit into prior-auth; the
-    // prior-auth-edge artifact reinforces the PA move). KE seats re-sync both pins.
-    // KE #234 FOLLOW-UPS (schemaVersion 1.11→1.12): finding 4 (vacuity-trap example declares its 4 operands → fully
-    // validator-clean), finding 2 (the `criteria-decision-reference` artifact regains ONE genuine rung-1 `defined as` —
-    // viral suppression = a lab result OR a chart note of one occurrence — as a third nested `when` node; emits + runs,
-    // 5 CEL cases), finding 1 (a DNF SIZE clause on `decision-composition` flagging #236 load-bearing). Finding 3
-    // resolved: KEEP the schemaVersion-bumps-on-content convention, so this CONTENT change moves schemaVersion. BOTH
-    // hashes move (cpg-edge decision-composition clause + examples inherit into prior-auth; the artifact rides the PA edge).
-    // #215 (schemaVersion 1.12→1.13): the patient-age both-rep rule/clauses + concept-form carve-out mentions +
-    // conceptLayerModel entry + the reference exemplar WIDEN from `at least <N>` to the full comparator set
-    // (`at least`/`at most`/`under`/`younger than`); the exemplar gains an `Under Twenty One` (`under 21`) both-rep
-    // concept + pediatric decision; the value-type-boolean clause is annotated with #241. BOTH hashes move.
-    // #230 (schemaVersion 1.13→1.14): the review-flags rule + examples teach the relocated `medical-validation/flags/` store
-    // + a new migration clause (create_flag/set_flag_status refuse a legacy `.crl/flags/` store). BOTH hashes move.
-    // #257 (schemaVersion 1.15→1.16): the concept-model redesign makes `value type` REQUIRED on every concept
-    // (A.10 — `missing-value-type` is now a validator ERROR); every reference/example concept declares its
-    // `value type` (case-feature determinations are `value type is boolean`). BOTH hashes move.
-    // #257 (schemaVersion 1.16→1.17): the concept-model PROSE — a new `value-type` rule (published-shape doctrine +
-    // ROLE heuristic + the A.10b guard⇒boolean lesson + VALUE-PRESERVING inference to the shipped rule-B checks +
-    // NORMATIVE-vs-SHIPPED + the `defined as exists` LANE MATRIX as capability-status); `concept-form` gains
-    // `value type is` + the composition formula; a leading conceptLayerModel value-type entry; the stale posrep
-    // `form` fixed; the patient-age #241 annotation reconciled with rule-B. Correlated temporal DEFERRED (scope
-    // note only). Design round: disc 407. BOTH hashes move (cpg rule/model inherit into prior-auth).
-    // #257 (schemaVersion 1.17→1.18): SHAPE + CONTENT — the artifact `verification` taxonomy (`cre-run`/
-    // `engine-run`/`validate-only`) + `verificationLegend` payload + the reachable `publication-reference.crl`
-    // (validate-only) + boundary proof-vs-authoring-axis cross-refs. Design round: disc 408. BOTH hashes move.
-    // #257 age slice (schemaVersion 1.18→1.19): T1 MECHANICAL migration of `patient-age-both-rep-reference.crl`
-    // from the retired `definition is age today` carve-out to the Patient age `source representation` +
-    // `value projection` recency form (the migrated exemplar inherits into both useCases; schemaVersion is
-    // hashed). Deeper kit re-teach is T3 (same pre-release work-set). Design + impl rounds: disc 409. BOTH hashes move.
-    // #257 age slice (schemaVersion 1.19→1.20): T3 DEEPER kit re-teach — patient-age reframed as a Patient
-    // `source representation` `value projection` (NOT a `definition is` carve-out); the rule renamed
-    // `patient-age-projection` + reframed to both shapes; CONCEPT_LAYER_MODEL/concept-form/methodology/boundary/
-    // purposes/SUMMARY swept of the retired doctrine (anti-regression payload test added); units widen to
-    // `years|months`; the `representation-reference` exemplar + fixture gain a standalone months age concept.
-    // Design + impl rounds: disc 411. BOTH hashes move.
-    // #257 age slice (schemaVersion 1.20→1.21): T3 impl-panel follow-up (disc 411 impl round) — honesty fixes:
-    // catalog-boundary claim NARROWED (only the age-today family is tool-enforced), `coded from`/`value
-    // projection` are independent slots, the recency `type is Observation` reworded to effective/implicit, and
-    // the `validate-only` legend + representation-reference `purpose` reworded (artifact tier vs construct
-    // status). BOTH hashes move again.
-    // #271 (schemaVersion 1.21→1.22): teach the project-config `crl.canonicalBase` REQUIREMENT (emitted local
-    // CodeSystem url + removed urn fallback) in the verify-loop note. NO payload-shape change. BOTH hashes moved.
-    // #189 IMPL 4 (schemaVersion 1.22→1.23): the `value type` requirement is now SHAPE-CONDITIONAL — the shipped
-    // validation slice added `- shape is Scalar | Record | RecordSet.` (A.10 relaxation: `missing-value-type` errors
-    // only for a Scalar concept; Record/RecordSet take their result type from `type is`). Reworded the global "value
-    // type REQUIRED on EVERY concept / A.10 ERROR" claim (a contradiction against the shipped validator) to
-    // shape-conditional in `value-type` (rule + enforced clause), `concept-form`, and the CONCEPT_LAYER_MODEL value-type
-    // entry; added a MINIMAL `shape is` CONCEPT_LAYER_MODEL entry (scope `out`, validate-only, OUT of Stage-1). The
-    // two-arm panel (disc 415) additionally corrected the kit `value-type` composition teaching to the SHIPPED b1068ca
-    // rule — the `composition-result-type-mismatch` WARNING (→ error at flip) + `decision-guard-record-shaped`, and the
-    // shape-aware `concept = declared shape + …` package-wide model. BOTH hashes move.
-    // #189 full-slice sanity follow-up (schemaVersion 1.23→1.24, disc 415 R4): the `code is` entry names the
-    // `no-bare-scalar-code` validate-only migration prompt + reconciles it with `definition is` OUT-of-stage; the
-    // `value-type` shipped-checks clause narrows `decision-guard-record-shaped` to a TYPED record operand (untyped is
-    // silent in N). Paired validator fix exempts the age-recency `value projection` posrep from the false warning. BOTH hashes move.
-    // #236 criterion-as-reducer flip (schemaVersion 1.24→1.25, disc 422): the criterion framing is inverted — a
-    // `criterion` lowers ONCE to a named boolean CQL define referenced BY IDENTITY (one condition per ref; body once;
-    // IS an arm reducer when its body carries an `or`). The faithfulness discriminator was re-grounded across the
-    // `decision-composition` + `concept-form` invariants and the `hollowed-criteria`/`dropped-or-added-criterion`
-    // judge lenses (action-condition-count → opaque-inference-vs-named-transparent-define); every "each atom visible"
-    // prose surface swept to distinguish inline vs named; `criterion-expansion-overflow`/criterion-atom bound retired.
-    // CONTENT bump, NO payload-shape change. BOTH hashes move.
-    // #189 P2 — `value element is` / `value type` are RETIRED on a source representation. The two `form`
-    // strings taught them, so a KE agent reading the kit would author a construct the compiler no longer
-    // wants. That is a CORRECTNESS fix, not teaching, so it lands with the slice and re-pins at 1.25 with NO
-    // bump — the doctrine re-teach + schemaVersion bump stay BATCHED (`tmp/WORKLIST-kit-deltas.md`).
-    expect(cpg.contentHash).toBe(
-      "ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9",
-    );
-    // #189 null/pause — the priorAuth payload embeds the reference `.cel` artifacts, which gained explicit
-    // `value is true/false` facts (a NEGATIVE must now be STATED; omission means UNKNOWN and PAUSES). That is
-    // a CORRECTNESS change, not teaching — reverting it fails the CRE proofs — so it lands with the slice
-    // while the schemaVersion bump + doctrine re-teach are BATCHED to one final kit pass
-    // (`tmp/WORKLIST-kit-deltas.md`, operator 2026-08-27). Hence a re-pin at 1.25 with NO bump.
-    // ⚠ The cpg hash is UNCHANGED — that payload does not embed the reference artifacts.
-    // ⚠ 1.27 → 1.28: teaches `emit_results` (the kit had never mentioned it) AND gives a version to the
-    // reference-artifact correction that had already moved BOTH hashes under a static 1.27. BOTH re-pin, and the
-    //   changelog entry that explains the re-sync is the `inline-answer-options` rule itself. A KE pinning
-    //   1.25 re-syncs and gets the teaching for the new construct in the same step.
-    expect(priorAuth.contentHash).toBe(
-      "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d",
-    );
-  });
 
   // ⚠⚠ THE GATE THAT MAKES A SILENT HASH MOVE IMPOSSIBLE.
   //
@@ -907,53 +628,21 @@ describe("authoring-kit — getAuthoringKit", () => {
   //   - add a NEW version key (a bump, which is the correct move), or
   //   - edit a HISTORICAL entry, which is visible in review as rewriting the past.
   // There is no longer a way to re-pin that looks like routine test maintenance.
-  const KIT_PINS: Readonly<Record<string, { cpg: string; priorAuth: string }>> = {
-    "1.38": { cpg: "ed833359fba7a0efb09af8ddd291c404b5401424bba03873913c8ceb3141e5c9", priorAuth: "cb36c1692d48a3300e1aa778c10e1f10892a88ea22ac16da074a647e73e78f6d" },
-    "1.37": { cpg: "3fde02056d866c24b3cb61a84608fd70cef89d2996f5dffc3d51867af415e30b", priorAuth: "a5f4309604a0e222a9e3dfcfff101dbed4a2075dcace94f84da0e6798d3789f3" },
-    "1.36": { cpg: "417b27c9557431cde15b1cf2c7f45f646a3598bb02bfdf559ffd7b260becdcfc", priorAuth: "183f26f2a9ff6f2b82087505f3a63e91e6a034ba3013b003bb71aa2a8a6882e9" },
-    "1.35": { cpg: "72cdbf0d7f8db6fa7b3f843d3e82a76f6ca12558c7c560bff2dd3d913fff6c3a", priorAuth: "4d5004b9ff65d7370b83f3b352c7cf5d7662158c0f83cca4a1bb3c460f271423" },
-    "1.33": { cpg: "2aadd7985be1f254d3f326ed67f0c84fd5ac39f98e175279aad2bcb498244718", priorAuth: "681b3cf460b26ca415244e0b65211516bfa401ab4728565a71bf6a4c6bba5fe0" },
-    "1.34": { cpg: "69ed9b2f29f19ee0b6d85535c4646d3ea537f5d2948aeb066b115c694eb5ca6f", priorAuth: "84e3c1682b150ca663df913862188f5859b8eb461721e12a529f1ca50202e038" },
-    "1.31": { cpg: "c0c2bc07da34e315af33fbfae40782396895ae7ff7b074a2951db50b815ee8c0", priorAuth: "fcae7880574b91ffa1fef562cf9878478e3ba36e6a23f49f7d9c1e564ce48342" },
-    "1.32": { cpg: "6296a7e64112f3002056f23ce1daa4e4a24024f33f4b0f5cddd6a7a212cebbb1", priorAuth: "21dbed3880bd6d9981b330306297db4e0f22f163d4118185b96483294068a298" },
-    "1.30": { cpg: "017e2016ddc9672eac37acca4cf9d48fad4a8a1dcf6784790f61a9130dc09603", priorAuth: "0c94484c277b7624ee9accd56a8b610eb49dffaa5b44b0798497f0108d718b85" },
-    "1.29": {
-      cpg: "d2e88ac031928abbed94cfa4fe5b5795fa16226d6050ac58e98e7fded91d974d",
-      priorAuth: "0bc71aad566638e321a1428df0d72137e0ddbb6e1b04d75918bb2772a3905b39",
-    },
-  };
-
-  it("⭐ the contentHash cannot move without a schemaVersion bump (hashes are keyed by version)", () => {
-    const cpg = getAuthoringKit("local-decision-support", "cpg");
-    const priorAuth = getAuthoringKit("local-decision-support", "prior-auth");
-    const pinned = KIT_PINS[cpg.schemaVersion];
-
-    expect(
-      pinned,
-      `schemaVersion ${cpg.schemaVersion} has no pinned hashes. If you changed kit CONTENT, bump ` +
-        `SCHEMA_VERSION and add an entry to KIT_PINS — do not re-pin an existing version.`,
-    ).toBeDefined();
-
-    expect(cpg.contentHash, `cpg payload moved under schemaVersion ${cpg.schemaVersion}`).toBe(
-      pinned.cpg,
-    );
-    expect(
-      priorAuth.contentHash,
-      `prior-auth payload moved under schemaVersion ${priorAuth.schemaVersion}`,
-    ).toBe(pinned.priorAuth);
-    expect(priorAuth.schemaVersion).toBe(cpg.schemaVersion);
+  it("the full content hash stays pinned for its kit version", () => {
+    const kit = getAuthoringKit();
+    expect(kit.schemaVersion).toBe("2.0");
+    expect(kit.contentHash).toBe("e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {
     // A version with no entry is a hash move a consumer cannot diff — the same defect one step later.
     const src = readFileSync(join(__dirname, "..", "index.ts"), "utf8");
-    const version = getAuthoringKit("local-decision-support", "cpg").schemaVersion;
+    const version = getAuthoringKit().schemaVersion;
     expect(src, `no changelog entry mentions "${version}"`).toContain(`→ "${version}"`);
   });
 
   it("SERIALIZED payload teaches the posrep age model with NO residue of the retired `definition is age today` doctrine (#257 T3 sweep guard)", () => {
     // Guards against the T1-era partial state recurring one layer down: a line-list edit is too fragile
-    // for a served artifact, so this asserts the ASSEMBLED payload over BOTH useCases. Patterns target
     // POSITIVE retired doctrine only — retirement/anchored MENTIONS (e.g. "`definition is age today` is
     // now an author-time + emit error") are legitimately present and must pass.
     const forbidden: [RegExp, string][] = [
@@ -977,22 +666,21 @@ describe("authoring-kit — getAuthoringKit", () => {
         "the retired `definition is` exception/carve-out framing",
       ],
     ];
-    for (const useCase of ["cpg", "prior-auth"] as const) {
-      const payload = JSON.stringify(getAuthoringKit(undefined, useCase));
-      for (const [re, label] of forbidden) {
-        expect(
-          re.test(payload),
-          `${useCase}: retired doctrine "${label}" must not appear in the served payload`,
-        ).toBe(false);
-      }
-      // POSITIVE — the posrep model + T2 months ARE taught.
-      expect(payload, useCase).toContain("value projection");
-      expect(payload, useCase).toContain("patient-age-projection"); // the renamed rule id (accurate teaching surface)
-      expect(payload, useCase).toContain("AgeInMonths"); // the months compute fn is taught
-      const age = getAuthoringKit(undefined, useCase).rules.find(r => r.id === "patient-age-projection")!;
-      expect(age.rule).toContain("PROJECTION COVERAGE");
-      expect(age.clauses?.some(c => c.force === "invariant" && /age family only/.test(c.text))).toBe(true);
+    const kitScope = "unified";
+    const payload = JSON.stringify(getAuthoringKit());
+    for (const [re, label] of forbidden) {
+      expect(
+        re.test(payload),
+        `${kitScope}: retired doctrine "${label}" must not appear in the served payload`,
+      ).toBe(false);
     }
+    // POSITIVE — the posrep model + T2 months ARE taught.
+    expect(payload, kitScope).toContain("value projection");
+    expect(payload, kitScope).toContain("patient-age-projection"); // the renamed rule id (accurate teaching surface)
+    expect(payload, kitScope).toContain("AgeInMonths"); // the months compute fn is taught
+    const age = getAuthoringKit().rules.find(r => r.id === "patient-age-projection")!;
+    expect(age.rule).toContain("PROJECTION COVERAGE");
+    expect(age.clauses?.some(c => c.force === "invariant" && /age family only/.test(c.text))).toBe(true);
   });
 
   it("the representation-reference exemplar semantically pins the STANDALONE months age projection (#257 T3 impl-panel — generic prose `.toContain`s don't prove the exemplar survives)", () => {
@@ -1021,69 +709,58 @@ describe("authoring-kit — getAuthoringKit", () => {
     // is worse than the old rule — the review found four such survivors on the first pass. This sweeps the WHOLE
     // serialized payload for the retired POSITIVE claims. Patterns are chosen NEGATION-SAFE: the new prose's
     // retirement quotes (e.g. "'a single-consequence composite is faithful' rule") do NOT match these. Both
-    // useCases, since cpg content inherits into prior-auth.
-    for (const uc of ["cpg", "prior-auth"] as const) {
-      const blob = JSON.stringify(getAuthoringKit("local-decision-support", uc));
-      const retired: RegExp[] = [
-        /EQUALLY faithful/i,
-        /disposition-consequence, not (audit|visibility)/i,
-        /faithful, provable refinement/i,
-        /computed in the inference layer/i,
-        /is FAITHFUL when (those criteria|they|all)/i,
-        // #224 iii.3: no "monotone" / "no `not`" branch-guard doctrine survives (negation is
-        // first-class). Catches the retired "a `when` takes a MONOTONE and/or boolean" claim.
-        /\bmonotone\b/i,
-        /no `?not`? at the branch/i,
-        // #234: the FCT distinct-criteria composite is retired (drug/PT failure are SEPARATE events, DISTINCT
-        // criteria, not one fact). Match the SOURCE FORM, not prose — a revert of the artifact/example reintroduces
-        // this string. ESCAPE-TOLERANT: the sweep runs on JSON.stringify(kit), where a source `"` serializes as `\"`
-        // and a newline as `\n`, so `\\?"` matches the operand's closing quote (escaped or raw) and `(?:\s|\\n)+`
-        // spans the separator whether the composite is single-line or wrapped across lines. Mutation-tested against
-        // both serializations. (The replacement example note is worded to NOT contain this literal; "one criterion,
-        // two representations" is deliberately NOT banned — the viral-suppression example legitimately IS that.)
-        /Failed (Drug|Physical) Therapy\\?"(?:\s|\\n)+sem-or/i,
-      ];
-      for (const re of retired) {
-        expect(blob, `retired doctrine still in ${uc} payload: ${re}`).not.toMatch(re);
-      }
+    const kitScope = "unified";
+    const blob = JSON.stringify(getAuthoringKit());
+    const retired: RegExp[] = [
+      /EQUALLY faithful/i,
+      /disposition-consequence, not (audit|visibility)/i,
+      /faithful, provable refinement/i,
+      /computed in the inference layer/i,
+      /is FAITHFUL when (those criteria|they|all)/i,
+      // #224 iii.3: no "monotone" / "no `not`" branch-guard doctrine survives (negation is
+      // first-class). Catches the retired "a `when` takes a MONOTONE and/or boolean" claim.
+      /\bmonotone\b/i,
+      /no `?not`? at the branch/i,
+      // #234: the FCT distinct-criteria composite is retired (drug/PT failure are SEPARATE events, DISTINCT
+      // criteria, not one fact). Match the SOURCE FORM, not prose — a revert of the artifact/example reintroduces
+      // this string. ESCAPE-TOLERANT: the sweep runs on JSON.stringify(kit), where a source `"` serializes as `\"`
+      // and a newline as `\n`, so `\\?"` matches the operand's closing quote (escaped or raw) and `(?:\s|\\n)+`
+      // spans the separator whether the composite is single-line or wrapped across lines. Mutation-tested against
+      // both serializations. (The replacement example note is worded to NOT contain this literal; "one criterion,
+      // two representations" is deliberately NOT banned — the viral-suppression example legitimately IS that.)
+      /Failed (Drug|Physical) Therapy\\?"(?:\s|\\n)+sem-or/i,
+    ];
+    for (const re of retired) {
+      expect(blob, `retired doctrine still in ${kitScope} payload: ${re}`).not.toMatch(re);
     }
   });
 
   it("keeps source-unit reasoning without recommending legacy sem composition", () => {
- for (const useCase of ["cpg", "prior-auth"] as const) {
-   const kit = getAuthoringKit(undefined, useCase);
-   const rule = kit.rules.find(r => r.id === "decision-composition")!;
-   expect(rule.clauses?.find(c => c.text.startsWith("UNIT ANCHORING"))).toMatchObject({ force: "invariant", test: "judgeLens.composition:hollowed-criteria" });
-   expect(rule.rule).toContain("separate independently occurring facts");
-   expect(kit.conceptLayerModel.some(m => m.form.includes("defined as"))).toBe(false);
- }
+ const kit = getAuthoringKit();
+ const rule = kit.rules.find(r => r.id === "decision-composition")!;
+ expect(rule.clauses?.find(c => c.text.startsWith("UNIT ANCHORING"))).toMatchObject({ force: "invariant", test: "judgeLens.composition:hollowed-criteria" });
+ expect(rule.rule).toContain("separate independently occurring facts");
+ expect(kit.conceptLayerModel.some(m => m.form.includes("defined as"))).toBe(false);
 });
 
   it("teaches value types on admitted publications without Scalar authoring", () => {
- for (const useCase of ["cpg", "prior-auth"] as const) {
-   const kit = getAuthoringKit(undefined, useCase);
-   const rule = kit.rules.find(r => r.id === "value-type")!;
-   expect(rule.rule).toContain("Declare value type explicitly on selected Observation publications");
-   expect(rule.rule).toContain("Do not relabel coded or numeric data as boolean");
-   expect(rule.clauses?.[0].force).toBe("validator-enforced");
-   expect(rule.clauses?.[1].force).toBe("default");
-   expect(kit.boundary.join(" ")).toContain("full compiler retirement is unfinished");
- }
+ const kit = getAuthoringKit();
+ const rule = kit.rules.find(r => r.id === "value-type")!;
+ expect(rule.rule).toContain("Declare value type explicitly on selected Observation publications");
+ expect(rule.rule).toContain("Do not relabel coded or numeric data as boolean");
+ expect(rule.clauses?.[0].force).toBe("validator-enforced");
+ expect(rule.clauses?.[1].force).toBe("default");
+ expect(kit.boundary.join(" ")).toContain("full compiler retirement is unfinished");
 });
 
   it("teaches whole-expression publication guards without a legacy DNF size prescription", () => {
- for (const useCase of ["cpg", "prior-auth"] as const) {
-   const rule = getAuthoringKit(undefined, useCase).rules.find(r => r.id === "decision-composition")!;
-   const emission = rule.clauses!.find(c => c.text.startsWith("Publication-reachable"))!;
-   expect(emission.text).toContain("whole Boolean expression");
-   expect(emission.text).toContain("dependency input[]");
-   expect(rule.clauses!.some(c => c.text.includes("K×"))).toBe(false);
- }
+ const rule = getAuthoringKit().rules.find(r => r.id === "decision-composition")!;
+ const emission = rule.clauses!.find(c => c.text.startsWith("Publication-reachable"))!;
+ expect(emission.text).toContain("whole Boolean expression");
+ expect(emission.text).toContain("dependency input[]");
+ expect(rule.clauses!.some(c => c.text.includes("K×"))).toBe(false);
 });
 
-  it("STAGES contains exactly the one Stage-1 slice", () => {
-    expect([...STAGES]).toEqual(["local-decision-support"]);
-  });
 
   it("judgeLens has one rule per the 4 provenance waiver kinds, each with a weightedBy + ≥1 checkpoint", () => {
     const kit = getAuthoringKit();
@@ -1121,11 +798,10 @@ describe("authoring-kit — getAuthoringKit", () => {
   });
 
   it("the pa-disposition-set rule (#134/#167) is STRUCTURAL + config-driven — membership/mutual-exclusivity/finality, naming no activities", () => {
-    const rule = getAuthoringKit(undefined, "prior-auth").rules.find(
+    const rule = getAuthoringKit().rules.find(
       (r) => r.id === "pa-disposition-set",
     );
     expect(rule).toBeDefined();
-    expect(rule!.edge).toBe("prior-auth");
     // config-driven membership (no shared library) + the never-CPGServiceRequest guard
     expect(rule!.rule).toMatch(/configured|crl\.dispositions/i);
     expect(rule!.rule).not.toMatch(/Medical Policy Determination/); // the shared-lib model is gone
@@ -1140,13 +816,10 @@ describe("authoring-kit — getAuthoringKit", () => {
   });
 
   it("the kit PAYLOAD names no content-repo / customer (customer-agnostic — serves any deployment's content project)", () => {
-    // Sweep the WHOLE serialized payload of BOTH useCases (the PA edge carries the fuller content most at risk of a
     // customer leak), not just rules — the leak this guards (e.g. a verifyLoop/referenceArtifact note) would slip a
     // rules-only check. contentHash is derived, so drop it.
-    for (const useCase of USE_CASE_NAMES) {
-      const { contentHash: _hash, ...payload } = getAuthoringKit(undefined, useCase);
-      expect(JSON.stringify(payload)).not.toMatch(/crl-content|hcsc|iehp|inland empire|bleph/i);
-    }
+    const { contentHash: _hash, audit: _audit, ...payload } = getAuthoringKit();
+    expect(JSON.stringify(payload)).not.toMatch(/crl-content|hcsc|iehp|inland empire|bleph/i);
   });
 });
 
