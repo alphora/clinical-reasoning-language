@@ -6,7 +6,7 @@ Baseline: `451be38f1fc33723cfe44eec12c1add689c5c52b`.
 This is the maintenance baseline (last audited revision). The implementation
 review diff starts at released `6ef4357a80f99a0e91a4ddb1639faad791889bef`;
 the intervening maintenance delta consists of the release/docs/stamp rows below.
-Target: pending reviewed implementation commit. Kit schema `2.0` and canonical
+Target: `18799337ec6b91e91a4b1577c0e31a7f1b575714` (reviewed implementation). The next metadata-only commit stamps this existing revision. Kit schema `2.0` and canonical
 content hash `e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2`
 remain unchanged: this adds transport access to the existing Markdown export.
 All changed paths since the baseline were reviewed, including the intervening

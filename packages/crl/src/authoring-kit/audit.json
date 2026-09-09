@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "451be38f1fc33723cfe44eec12c1add689c5c52b",
+  "auditedRevision": "18799337ec6b91e91a4b1577c0e31a7f1b575714",
   "auditedSchemaVersion": "2.0",
   "auditedContentHash": "e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2",
-  "scope": "Unified kit schema 2.0: all 32 rules, 15 examples, 13 artifacts and retrieval/export; incremental maintenance from 345af5782c61188b11de87b788aecf0276421f1a. Existing 301-file survey retained with explicit limitations; changed guidance/test/tooling scope reviewed in the evidence ledger. No new native-engine or clinical-fidelity certification.",
+  "scope": "Unified kit schema 2.0: canonical content unchanged; Markdown MCP retrieval and JSON compatibility reviewed from 451be38f1fc33723cfe44eec12c1add689c5c52b. Prior 301-file survey and explicit clinical/native evidence limitations retained. Transport owning tests and both real MCP entry points verified; see evidence ledger.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
