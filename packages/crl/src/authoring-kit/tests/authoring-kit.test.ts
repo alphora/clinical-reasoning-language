@@ -30,6 +30,25 @@ import { getAuthoringKit } from "../index";
 import { answerExampleSource, ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_CEL, ANSWER_EXAMPLE_TERMS } from "../answerExample";
 import { flagFieldRulesOf } from "../../flags/flagVocab"; // #212 step 4b: flag field rules live in the vocab now
 
+
+/** Metadata completeness only; resolving an anchor does not execute its obligation. */
+function assertForceCoverage(kit: ReturnType<typeof getAuthoringKit>): void {
+  const anchors = new Set([
+    ...kit.judgeLens.composition.map(c => 'judgeLens.composition:' + c.check),
+    ...kit.verifyLoop.methodologyRequirements.map(m => 'verifyLoop:' + m.id),
+  ]);
+  for (const rule of kit.rules) {
+    if (!Array.isArray(rule.clauses) || rule.clauses.length === 0)
+      throw new Error(rule.id + ': missing force clauses');
+    for (const clause of rule.clauses) {
+      if (!clause.text.trim() || !['validator-enforced', 'invariant', 'default'].includes(clause.force))
+        throw new Error(rule.id + ': invalid force clause');
+      if (clause.force === 'invariant' && !anchors.has(clause.test ?? ''))
+        throw new Error(rule.id + ': unresolved invariant anchor');
+    }
+  }
+}
+
 function crlErrors(src: string) {
   // Validate through the REAL single-file gate — `buildCRL` runs `classifyCriterionRefs`, so a `when`
   // that names a local `criterion` resolves as a criterion-ref (the resolver skips it) instead of a
@@ -292,7 +311,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.0");
+    expect(kit.schemaVersion).toBe("2.1");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -496,36 +515,30 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit.forceModel.governingPrinciple).toMatch(/faithful/i);
   });
 
-  it("every invariant clause's `test` RESOLVES in the unified kit — no dangling anchors (§0 — no fake-green)", () => {
-    let totalInvariantClauses = 0;
-    const kitScope = "unified";
-    const kit = getAuthoringKit();
-    const compositionChecks = new Set(kit.judgeLens.composition.map((c) => c.check));
-    const methodologyIds = new Set(kit.verifyLoop.methodologyRequirements.map((m) => m.id));
-    for (const rule of kit.rules) {
-      for (const clause of rule.clauses ?? []) {
-        expect(["validator-enforced", "invariant", "default"]).toContain(clause.force);
-        if (clause.force === "invariant") {
-          totalInvariantClauses++;
-          const ref = clause.test ?? "";
-          const comp = /^judgeLens\.composition:(.+)$/.exec(ref);
-          const meth = /^verifyLoop:(.+)$/.exec(ref);
-          if (comp) expect(compositionChecks.has(comp[1])).toBe(true);
-          else if (meth) {
-            if (!methodologyIds.has(meth[1])) {
-              throw new Error(
-                `invariant clause in rule "${rule.id}" (kitScope "${kitScope}") anchors "${ref}" but no methodologyRequirement resolves it in that assembled kit`,
-              );
-            }
-          } else {
-            throw new Error(
-              `invariant clause in rule "${rule.id}" has an unresolvable test anchor: "${ref}"`,
-            );
-          }
-        }
-      }
+  // @kit verify-loop:kit-force-coverage
+  it("every rule has explicit force clauses and every invariant anchor resolves", () => {
+    expect(() => assertForceCoverage(getAuthoringKit())).not.toThrow();
+  });
+
+  // @kit verify-loop:kit-force-coverage
+  it.each(getAuthoringKit().rules.map(rule => rule.id))("rejects missing or empty force clauses on %s", id => {
+    for (const clauses of [undefined, []]) {
+      const kit = getAuthoringKit();
+      const malformed = { ...kit, rules: kit.rules.map(rule => rule.id === id ? { ...rule, clauses } : rule) };
+      expect(() => assertForceCoverage(malformed as ReturnType<typeof getAuthoringKit>)).toThrow(id);
     }
-    expect(totalInvariantClauses).toBeGreaterThan(0); // the package is supposed to carry invariant clauses
+  });
+
+  it.each([
+    { text: "Claim", force: "unspecified" },
+    { text: "Claim", force: "invariant" },
+    { text: "Claim", force: "invariant", test: "verifyLoop:missing" },
+    { text: "Claim", force: "invariant", test: "judgeLens.composition:missing" },
+    { text: "", force: "default" },
+  ])("rejects malformed force metadata %j", clause => {
+    const kit = getAuthoringKit();
+    const rules = kit.rules.map((rule, index) => index === 0 ? { ...rule, clauses: [clause] } : rule);
+    expect(() => assertForceCoverage({ ...kit, rules } as ReturnType<typeof getAuthoringKit>)).toThrow();
   });
 
 
@@ -630,8 +643,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.0");
-    expect(kit.contentHash).toBe("e9870c0042e7cb2e76a66d10b0edc72056786e0a53ccb73dc417544c8753c8b2");
+    expect(kit.schemaVersion).toBe("2.1");
+    expect(kit.contentHash).toBe("28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {

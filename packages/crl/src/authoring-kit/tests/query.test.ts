@@ -196,7 +196,11 @@ describe("one authoring kit: discovery and complete guidance", () => {
       const result = query({ view: "entry", id: `rule:${rule.id}` });
       expect(result.context.forceModel).toEqual(kit.forceModel);
       expect(result.context.verificationLegend).toEqual(kit.verificationLegend);
-      for (const clause of rule.clauses ?? []) {
+      expect(rule.clauses.length, rule.id).toBeGreaterThan(0);
+      const entry = result.entries.find((e: any) => e.id === `rule:${rule.id}`);
+      expect(entry, `missing focused entry for ${rule.id}`).toBeDefined();
+      expect(entry.content.clauses).toEqual(rule.clauses);
+      for (const clause of rule.clauses) {
         if (clause.force !== "invariant") continue;
         const [kind, name] = clause.test!.split(":");
         if (kind === "verifyLoop") expect(result.context.verifyLoop.methodologyRequirements.some((m: any) => m.id === name)).toBe(true);

@@ -340,7 +340,8 @@ export type {
 // interpretation to the selected record. Audit coverage is recorded separately.
 // "1.38" → "2.0": one complete kit with task/topic retrieval, executable prerequisites,
 // explicit applicability and separate repository audit identity. No kit use-case selector.
-const SCHEMA_VERSION = "2.0";
+// "2.0" → "2.1" (SHAPE + CONTENT): every rule has explicit force clauses; no implicit classification.
+const SCHEMA_VERSION = "2.1";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -354,23 +355,27 @@ const SUMMARY =
  */
 const FORCE_MODEL: ForceModel = {
   summary:
-    "A rule whose force VARIES by clause carries explicit `clauses` (a single rule may carry both a default and " +
-    "an invariant clause — do not collapse them); a rule without `clauses` is uniformly its stated force (the " +
-    "validator-enforced grammar/mechanics rules). The force tells the agent how hard to bind. It exists so an " +
+    "Every rule carries nonempty explicit `clauses`; each clause states its force. A rule may mix forces: " +
+    "do not collapse them into a rule-wide default. Read clauses with their rule prose and applicability. " +
+    "Prose still describes language semantics and tool behavior; a force level does not make those facts " +
+    "overridable. Use the explicit clauses to determine force. If prose appears to introduce a different obligation, report the ambiguity instead of guessing its force. " +
+    "Invariant anchors identify manual source or verification obligations; resolving an anchor does not prove " +
+    "the obligation was performed. The force tells the agent how hard to bind. It exists so an " +
     "agent that mechanically enforces an authoring PREFERENCE does not revert a human KE's deliberate, " +
     "faithful refactor. The force is operator-governed content, not agent-editable.",
   levels: [
     {
       level: "validator-enforced",
       meaning:
-        "The grammar/validator rejects it (e.g. qualifier-required, guard-on-single-action). The agent need " +
-        "not police; the tool does.",
+        "The grammar/validator reports the stated condition within its documented scope and preconditions. " +
+        "An error rejects the input; an explicitly described warning leaves it legal. A warning is not a " +
+        "rejection; absence of a diagnostic outside the checked scope is not proof of correctness.",
     },
     {
       level: "invariant",
       meaning:
-        "A FIDELITY-TO-SOURCE constraint (an ADD or a HOLLOW vs the policy narrative). Always enforced, on ANY " +
-        "author's output, human or agent. Every invariant carries a `test` that RESOLVES to a real check — never " +
+        "An obligation that applies regardless of author: either source fidelity (avoid an ADD or HOLLOW " +
+        "against the source) or per-policy verification and artifact integrity. Every invariant carries a `test` that RESOLVES to a real check — never " +
         '"looks wrong," and never a dangling/typo\'d anchor (a `test` pointing at nothing IS the K4 fake-green ' +
         "this guards against; the force-model test asserts every invariant's `test` resolves). The anchor names " +
         "the adjudication MODE: a `judgeLens.composition:<check>` (a §2/§3 source-fidelity judge call with no " +
@@ -583,13 +588,39 @@ const RULES: KitRule[] = [
     rule: "Name a concept as a clinical concept. Put the question's wording in a separate presentation declaration with required question text and optional question description. Presentation has no separate short label. Check generated questionnaires and population through emit_results; a green CRE run does not establish the questionnaire behavior.",
     why: "A prompt should name the determination the reviewer can answer. A computed condition and the records feeding it are different surfaces.",
     ref: "docs/CRL-NORTH-STAR.md §4; #317; #318",
+    clauses: [
+      {
+        "text": "Name concepts for the clinical determinations they represent; put question wording in a presentation rather than turning the concept name into a question.",
+        "force": "default"
+      },
+      {
+        "text": "The concept-presentation rule defines presentation validation: only concepts declaring code is may have a presentation; its question text must be nonempty, description is optional, and label/short fields are rejected. Missing presentation on a coded concept is legal and warns even if unreached; the question fallback is the concept name with no description.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Check generated question text and populated answers against the intended determination. CRE success alone does not verify Questionnaire behavior.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "decision-qualifiers",
     applicability: "All CRL authoring",
     category: "decision-shape",
-    rule: "A multi-branch decision must declare a qualifier: `first:` (ordered, first match wins — requires a trailing `otherwise`), `all:` (every matching branch fires), or `any:` (over actions only — offer alternatives). A `then:` body is closed by `end.`. A single-member block takes no qualifier. Every later branch of `first:`, including `otherwise`, receives null-propagating priority exclusions for prior guards. The author writes no condition on `otherwise`; the emitted action is guarded. Compound priors automatically get named CQL defines. `priority-exclusion-inexpressible` means an unresolved reference: correct its name/library qualification, not its guard shape. Earlier unknown prevents a later disposition; `all:` has no ordered exclusions.",
+    rule: "A multi-branch decision must declare a qualifier: `first:` (ordered, first match wins — top-level requires trailing `otherwise`; nested may omit it), `all:` (every matching branch fires), or `any:` (over actions only — offer alternatives). A `then:` body is closed by `end.`. A single-member block takes no qualifier. Every later branch of `first:`, including `otherwise`, receives null-propagating priority exclusions for prior guards. The author writes no condition on `otherwise`; the emitted action is guarded. Compound priors automatically get named CQL defines. `priority-exclusion-inexpressible` means an unresolved reference: correct its name/library qualification, not its guard shape. Earlier unknown prevents a later disposition; `all:` has no ordered exclusions.",
     ref: "docs/decision-shapes.md; validator rules qualifier-required / otherwise-required / any-over-branches / first-over-actions",
+    clauses: [
+      {
+        "text": "Multi-member blocks require a qualifier: first/all over branches, any/all over actions. A top-level first requires trailing otherwise; nested first may omit it. A singleton takes no qualifier. A then block closes with end. Otherwise is unconditioned, last, restricted to first, and cannot be the only branch.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Verify the authored ordering: first priority exclusions preserve an earlier unknown instead of reaching a later disposition; all has no ordered exclusions. Inspect emitted conditions and executed paths rather than treating successful parsing as proof of precedence. Resolve priority-exclusion-inexpressible by correcting the referenced name/library qualification; do not change guard meaning to hide an unresolved reference.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "decision-composition",
@@ -649,6 +680,17 @@ const RULES: KitRule[] = [
     category: "guards",
     rule: "Per-action only when / unless guards are unsupported for selected publications: validation reports publication-unsupported-context and FHIR emit reports publication-action-guard-unsupported. Use branch conditions when that expresses the source intent. If the source requires a guarded action menu, report the missing publication capability; do not fall back to legacy Scalar answers. CRE legacy unknown coercion is not an intended pause contract.",
     ref: "docs/decision-shapes.md; validator rule guard-on-single-action",
+    clauses: [
+      {
+        "text": "A per-action guard on a single action is always rejected as guard-on-single-action. For an admitted selected publication resolved in the prepared source context, per-action only when/unless guards report publication-unsupported-context. FHIR emission separately reports publication-action-guard-unsupported. This does not certify legacy/unadmitted operands or unresolved package references.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Use branch conditions only when they preserve source intent. If a guarded action menu is required, report the missing capability instead of substituting a legacy Scalar answer or accepting its unknown coercion.",
+        "force": "invariant",
+        "test": "judgeLens.composition:hollowed-criteria"
+      }
+    ],
   },
   {
     id: "branch-guards",
@@ -696,6 +738,18 @@ const RULES: KitRule[] = [
     category: "decision-shape",
     rule: "A combined when (A or B) expresses alternatives within one Boolean condition. Ordered sibling when A / when B branches express precedence, including when data is missing. With selected Boolean A unknown and B true, the combined condition is true but first: sibling branches pause at A. Do not split or merge them merely for presentation or DNF size. Use a compound guard when either alternative can establish the rule without resolving the other; use ordered siblings when the earlier determination must be resolved first or branches route differently. Under all:, two satisfied sibling branches can each fire, while one combined OR branch fires its body once. Preserve authored clinical intent and test missing-data cases as well as fully known inputs.",
     ref: "docs/decision-shapes.md §3; #224",
+    clauses: [
+      {
+        "text": "Preserve source alternatives and precedence: a combined OR and ordered sibling branches are not interchangeable, especially with missing inputs. Do not split or merge merely for presentation or expression size.",
+        "force": "invariant",
+        "test": "judgeLens.composition:hollowed-criteria"
+      },
+      {
+        "text": "Verify relevant unknown and known cases: unknown A with true B satisfies combined OR, but first sibling branches pause at A; under all, satisfied siblings may each fire while one combined OR branch fires once.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "dispositions",
@@ -780,9 +834,29 @@ const RULES: KitRule[] = [
     id: "configure-dispositions",
     applicability: "Authoring authorization or coverage determinations, including before project configuration exists",
     category: "dispositions",
-    rule: "A medical-policy deployment MUST configure its disposition vocabulary in the content project's `package.json` under `crl.dispositions`: a `mode` (`standalone` | `embedded`) and `options` mapping each PAS category (`certify` / `not-certify` / `pended`) to keyed reasons/flavors — `{ label, code? }`. The activity name a policy recommends is `\"<category>.<key>\"` (e.g. `recommend activity \"not-certify.EIU\"`), authored as a plain local `activity` block (`request CPGCommunicationRequest`); the `code` on an option is a PAS review-decision-reason code in full-PAS (Approve/Deny) intent, or the larger system's own code in embedded (Met/Unmet) intent. Once configured `options` resolves to a nonempty vocabulary it is the CLOSED valid set: the validator rejects any recommended activity not in it, any determination not `CPGCommunicationRequest`, and (per `disposition-mode`) a non-final leaf under `standalone`. `options: {}` yields an `empty-vocabulary` warning and leaves these checks inactive; resolve configuration diagnostics before relying on enforcement. Default vocabulary (if unconfigured): `certify.Approve` / `not-certify.Deny`.",
+    rule: "Configure a medical-policy deployment's disposition vocabulary in the content project's `package.json` under `crl.dispositions`: a `mode` (`standalone` | `embedded`) and `options` mapping each PAS category (`certify` / `not-certify` / `pended`) to keyed reasons/flavors — `{ label, code? }`. The activity name a policy recommends is `\"<category>.<key>\"` (e.g. `recommend activity \"not-certify.EIU\"`), authored as a plain local `activity` block (`request CPGCommunicationRequest`); the `code` on an option is a PAS review-decision-reason code in full-PAS (Approve/Deny) intent, or the larger system's own code in embedded (Met/Unmet) intent. Once configured `options` resolves to a nonempty vocabulary it is the CLOSED valid set: the validator rejects any recommended activity not in it, any determination not `CPGCommunicationRequest`, and (per `disposition-mode`) a non-final leaf under `standalone`. `options: {}` yields an `empty-vocabulary` warning and leaves these checks inactive; resolve configuration diagnostics before relying on enforcement. Default vocabulary (if unconfigured): `certify.Approve` / `not-certify.Deny`.",
     why: "The determination vocabulary is per-deployment (one payer per content project) — Approve/Deny for a standalone full-PA deployment, Met/Unmet for one that is part of a larger adjudication. Making it CONFIG (not hard-coded in the language or the kit) is what lets a deployment relabel or add a flavor without re-authoring policies, and keeps the universal kit customer-agnostic. This rule is GUIDANCE — the validator does NOT error on a MISSING config (an unconfigured project keeps today's behavior); it is the nudge to configure so the closed-set + request-type + finality checks turn on.",
     ref: "crl.dispositions; #134",
+    clauses: [
+      {
+        "text": "Configure the deployment disposition vocabulary and standalone/embedded mode in package.json crl.dispositions. Missing configuration is not rejected; unconfigured defaults are certify.Approve and not-certify.Deny. Resolve empty-vocabulary warnings before relying on config-gated checks.",
+        "force": "default"
+      },
+      {
+        "text": "A configured, nonempty resolved vocabulary gates disposition-not-configured, disposition-request-type and standalone disposition-non-final-leaf diagnostics. Missing configuration or an empty resolved vocabulary does not enable those checks.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Check every recommended determination against the deployment vocabulary, including when configuration does not enable automatic validation.",
+        "force": "invariant",
+        "test": "verifyLoop:configured-membership"
+      },
+      {
+        "text": "A coverage determination communicates its conclusion through CPGCommunicationRequest, rather than ordering a service.",
+        "force": "invariant",
+        "test": "verifyLoop:communicated-not-ordered"
+      }
+    ],
   },
   {
     id: "disposition-mode",
@@ -791,6 +865,18 @@ const RULES: KitRule[] = [
     rule: "`crl.dispositions.mode` is first-class and gates FINALITY only. `standalone` — our decision IS the whole coverage adjudication; every determination leaf must be FINAL (certify / not-certify). `embedded` — our decision is a SUB-determination feeding a larger cross-company adjudication; a non-final `pended` (PAS A4) leaf is legitimate (a refer-up / need-info contribution). In BOTH modes our decision still issues EXACTLY ONE determination on completion; a needed-unknown pause emits none (mutual-exclusivity is not relaxed by mode — do NOT read `embedded` as permission to emit two determinations across a parent + sub).",
     why: "The customer described two operating modes: Smile as the whole PA (Approve/Deny final) vs Smile as part of a larger system (Met/Unmet contributions that the larger tree finalizes). Only finality differs — a contribution may be non-final; it is still one contribution per run. Making mode explicit lets the same policy CRL run either way per deployment, and lets the validator enforce standalone-finality without guessing.",
     ref: "crl.dispositions.mode",
+    clauses: [
+      {
+        "text": "Standalone determinations must be final; embedded determinations may contribute a non-final pended result. Mode governs finality, not whether multiple conclusions are allowed.",
+        "force": "invariant",
+        "test": "verifyLoop:finality-by-mode"
+      },
+      {
+        "text": "Across the complete executed closure, a completed coverage determination produces exactly one conclusion; a needed-unknown pause produces none. Check delegated and sibling emission paths in both modes.",
+        "force": "invariant",
+        "test": "verifyLoop:mutual-exclusivity-spans-closure"
+      }
+    ],
   },
   {
     id: "minimalism",
@@ -798,6 +884,17 @@ const RULES: KitRule[] = [
     category: "minimalism",
     rule: "Declare the MINIMAL set that captures the clinical intent and let the emitter do the heavy lifting. Do not over-specify properties the emitter can derive. Minimalism is over EMITTER-DERIVABLE detail, NOT over FIDELITY: a branch guard that keeps each distinct criterion VISIBLE (an inline atom in the applicability expression and dependency `input[]`, or a named criterion as one identifier `condition[]` resolving to a transparent define with its atoms in `input[]`) is NOT 'over-specified' relative to a `defined as` composite that hides them in one opaque boolean — semantic fidelity (same-fact vs distinct-criteria; see decision-composition) governs over node-count.",
     ref: "docs/CRL-NORTH-STAR.md §4.0",
+    clauses: [
+      {
+        "text": "Omit emitter-derivable detail where doing so preserves the authored meaning; prefer the minimal faithful declaration.",
+        "force": "default"
+      },
+      {
+        "text": "Retain each distinct source criterion as an auditable decision operand. A smaller opaque Boolean composite is not a faithful substitute merely because it has fewer nodes.",
+        "force": "invariant",
+        "test": "judgeLens.composition:hollowed-criteria"
+      }
+    ],
   },
   {
     id: "library-scoping",
@@ -806,6 +903,21 @@ const RULES: KitRule[] = [
     rule: 'A document may start with one # header, followed by its required library "Name". declaration and optional library metadata, then includes before statements. Library and include declarations do not accept version clauses. Use logical CRL library and declaration names, not generated CQL filenames. Validate multifile content with validate_crl(path); inline code has no sibling context. The nearest package.json defines the project, and nested packages are separate projects. A qualified local sibling reference such as "Shared"."Choices" resolves without include, as in named-answer-reference.crl and named-answer-terms.crl. Installed packages must expose CRL files through package.json crl.libraries and be discoverable under the project\'s top-level node_modules (including scoped packages); nested dependency installations are not scanned. Each referencing CRL library must explicitly include a package library by its declared CRL name. Being installed, discovered or transitively included by another library does not grant reference visibility.',
     why: 'Discovery, reference visibility and physical CQL routing are distinct. Explicit include resolves an installed package before a same-named local library; without that include, a local qualified reference resolves locally. Avoid ambiguous ownership names. Packages cannot fall back to consumer-local libraries. Include aliases are unsupported: use declared names. Fix missing imports, cycles and emitted-name collision diagnostics in the source/package configuration, not generated CQL. Criteria are library-local; a concept and criterion cannot share a name within one library, and including another library does not make its criteria exportable.',
     ref: "imports/tests/preparePublicationContext.test.ts; imports/tests/registry.test.ts; imports/tests/criterionMultifile.test.ts; docs/decision-shapes.md",
+    clauses: [
+      {
+        "text": "CRL requires a library declaration before statements and places includes before statements. Library/include version clauses and include aliases are unsupported. Project-path validation checks import visibility: a referenced installed package library needs an explicit include in the referencing library; discovery or transitive inclusion alone does not grant visibility. Inline validation has no sibling project context. Criteria are library-local; same-library concept/criterion name collisions are rejected.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Use logical CRL names, validate multifile content by path, and avoid ambiguous ownership names. Installed packages should expose crl.libraries through discoverable top-level node_modules; nested package roots are separate projects.",
+        "force": "default"
+      },
+      {
+        "text": "Verify emitted references resolve to the intended local or package owner. Inspect import/cycle/identity diagnostics; repair source or configuration rather than generated CQL. Package code must not acquire unintended consumer-local dependencies.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "cel-cases",
@@ -831,6 +943,17 @@ const RULES: KitRule[] = [
     category: "cel",
     rule: "Use distinct fact names for distinct resources in a case. Referencing the same emitting fact twice with different dates or intents does not create new resource identities and can invalidate the case. Different names can also collide after identity normalization. Patient references do not create extra Patients; an ambient Encounter participates in identity checks. Reusing a fact in separate cases is supported. Inspect diagnostics and the returned case/resource manifest; do not assume every referenced fact emitted a resource or that a warning skipped the whole case.",
     ref: "cel/validator/tests/identityDiagnostics.test.ts; emit_cel",
+    clauses: [
+      {
+        "text": "Collisions in actual emitted resource paths, within a case or with a previously emitted case in the same run, report id-collision as an error and prevent the colliding case from emitting. Different fact names can collide after normalization; repeated Patient references are exempt, and the ambient Encounter participates. Reusing a fact across separate cases is legal when their emitted paths remain distinct.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Check identity diagnostics and the complete case/resource manifest, including normalization collisions, Patient references and ambient Encounter participation. Confirm that the intended resources actually emitted; do not infer resource presence or whole-case rejection from a warning.",
+        "force": "invariant",
+        "test": "verifyLoop:artifact-integrity"
+      }
+    ],
   },
   {
     id: "cel-quantity",
@@ -838,6 +961,17 @@ const RULES: KitRule[] = [
     category: "cel",
     rule: "For a concept-linked Quantity answer, use a unit-bearing CEL literal, for example value is 90 'kg'. A bare number or whitespace-only unit is rejected. Unit presence validation does not certify UCUM spelling or dimensional compatibility; the producer and native execution must support the intended units. A numeric literal is not a CodeableConcept answer. Do not infer support for integer or other publication types from legacy numeric-validator tests.",
     ref: "cel/validator/tests/numericValueRules.test.ts; quantity-declaration; quantity-answer",
+    clauses: [
+      {
+        "text": "For a numeric/Quantity literal whose qualified defined by reference resolves to a concept with exactly one declared value type, Quantity requires a unit-bearing literal: bare numbers and whitespace-only units are rejected. A numeric literal targeting CodeableConcept is a value-type mismatch. This numeric check does not cover bare FHIR-type facts or unresolved/multiple-value-type targets; absence of a diagnostic there does not certify the value. Legacy integer/decimal targets have separate unitless rules, not proof of new publication support.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Verify units are supported by the intended producer and native execution. Unit-presence validation alone does not establish UCUM or dimensional correctness; legacy numeric tests do not establish other publication-type support.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "emit-output-root",
@@ -845,6 +979,17 @@ const RULES: KitRule[] = [
     category: "process",
     rule: "ONE OUTPUT ROOT for the writing emit tools. MCP `emit_cql` returns CQL inline and never writes. Normally omit MCP `out` / `outRoot`, CLI `--out-dir` (`--out` for crl-emit-results): the nearest package.json defines the project root. `emit_crl` (target fhir-def) writes `<root>/src/cql/` and `<root>/src/fhir/<ResourceType>/<id>.json`; target cql writes `<root>/src/cql/`. `emit_cel` writes `<root>/tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json`; `emit_results` writes under `<root>/tests/results/fhir/patient/<compartmentId>/`. An explicit output argument replaces ROOT, retaining that entire layout. Never pass a leaf such as src or tests/data/fhir as the root: src would become src/src/cql. Omission WRITES for emit_crl and emit_cel; use an explicit scratch root for inspection. A scratch tree mirrors the project layout. For both-representation content use closure emit_crl, not the single-library emit_cql tool. Consume returned paths and manifests; tools own placement. `emit_cel` replaces its patient data tree and `emit_results` prunes its generated outputs; `emit_crl` does not prune stale files, so a renamed definition can leave an obsolete CQL/FHIR file. Inspect the definition tree before publishing it.",
     ref: "packages/crl/TOOLING.md — the ROOT",
+    clauses: [
+      {
+        "text": "Normally omit output-root arguments to use the nearest project package.json. Use an explicit scratch root for inspection and closure emit_crl for both-representation content; consume returned paths instead of constructing output paths.",
+        "force": "default"
+      },
+      {
+        "text": "Verify that the selected root and complete returned paths are intended before publishing. Select a root above the documented generated layout, not a leaf that duplicates src or tests/data/fhir below itself. Account for CEL/results replacement and pruning, and inspect CRL definition trees for stale files after renames.",
+        "force": "invariant",
+        "test": "verifyLoop:artifact-integrity"
+      }
+    ],
   },
   {
     id: "written-equals-executed",
@@ -852,6 +997,18 @@ const RULES: KitRule[] = [
     category: "process",
     rule: "CRL owes you written == executed. It optimizes clarity, not fewer keystrokes. The emitter translates CRL into CQL/FHIR; it does not invent a CRL expression the author could and should have written. Report a mismatch when a determination behaves differently from its source, even if the tool reports success. Target-language plumbing that CRL cannot express, such as the FHIR structural floor, belongs to emit. It must not manufacture a determination value. An unanswered pure question pauses because nothing supplies its value; that behavior follows from its declaration and must agree in the CRE. Explicitness is useful where the form exists; do not replace a faithful model merely to obtain a green run.",
     ref: "docs/CRL-NORTH-STAR.md §0 and §4.0",
+    clauses: [
+      {
+        "text": "The computable representation must preserve source criteria and outcomes. Do not introduce or remove a determination merely to obtain a green run; report written/executed mismatches.",
+        "force": "invariant",
+        "test": "judgeLens.composition:dropped-or-added-criterion"
+      },
+      {
+        "text": "Verify emitted behavior against authored intent, including unanswered questions. Compiler-owned structural plumbing must not manufacture determination values; CRE alone does not prove native agreement.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "terminology-forms",
@@ -859,13 +1016,48 @@ const RULES: KitRule[] = [
     category: "concept-model",
     rule: "A terminology has three forms. Pure `valueset is` is a reference: when its final path segment is a FHIR id (1-64 letters, digits, dot or hyphen), the emitted placeholder uses that declared canonical, and deployment supplies the real membership there. CURRENT LIMIT: a canonical without that id-legal tail, including a URN OID, falls back to a policy slug canonical. This does not satisfy the fixed-canonical deployment model; inspect emitted identity and report the mismatch rather than assuming the swap works. `system is` plus `code is` entries instantiates membership. Mixed `valueset is` plus codes emits ONE policy-owned ValueSet identity and includes the authored external canonical by reference alongside its explicit codes; CQL references that same policy-owned identity. Do not assume a named reference contains a usable dropdown: instantiate the offered codes or deploy the real terminology. `value from is` binds offered answer values, never source retrieves. With value domain is answer options and in qualifying, that offered finite set also supplies the interpreted domain and concept-local exceptions; representation-local `coded from` selects which source records participate. They may name the same terminology when those roles genuinely coincide. A terminology code may carry optional `display is`; each finite answer ValueSet member requires its display. Displays are authored, never inferred. Example instantiated terminology:\n\n```crl\nterminology \"Example Choices\":\n- system is `http://example.org/CodeSystem/choices`.\n- code is `a` display is `Choice A`.\n- code is `b` display is `Choice B`.\n```\n\nA coded question without `value from is` still warns `answer-options-missing`. #313 remains open: this release adds displays but does not fix the titled codeless-reference defect.",
     ref: "docs/CRL-NORTH-STAR.md; #313; #316",
+    clauses: [
+      {
+        "text": "Choose reference, instantiated or mixed terminology to express the intended membership. Use value from is for offered answer values and representation-local coded from for source retrieval; share a terminology only when those roles coincide.",
+        "force": "default"
+      },
+      {
+        "text": "Finite answer ValueSet members require authored displays at the answer use site. A missing value from is on a coded question warns rather than failing.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Inspect emitted ValueSet/CodeSystem identities and actual membership, including mixed/reference forms. Deploy real membership for an opaque reference before relying on it. Report the documented non-id-tail canonical fallback instead of assuming its identity or dropdown is correct.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "verify-loop",
     applicability: "All CRL authoring",
     category: "process",
-    rule: "Verify with the MCP tools in order: validate_crl(path) clean → validate_cel(path) clean → run_decision(path) with every case's `result is` passing. validate_cel and run_decision need FILES under a project root (a package.json) — they do not accept inline code. For a COMPOUND-GUARD branch, cite the run_decision `conditionTrace` (the per-operand truth-table) as the audit surface, and confirm the DROP-ONE battery (see cel-cases) — a satisfying case alone does not prove each conjunct is load-bearing.",
+    rule: "Verify with the MCP tools in order: validate_crl(path) clean → validate_cel(path) clean → run_decision(path) with every case's `result is` passing. validate_cel and run_decision need FILES under a project root (a package.json) — they do not accept inline code. For a COMPOUND-GUARD branch, cite the run_decision `conditionTrace` (the per-operand truth-table) as the audit surface, and demonstrate that each conjunct is load-bearing; the DROP-ONE battery (see cel-cases) is recommended, and equivalent proof is acceptable. A satisfying case alone is insufficient.",
     ref: "verifyLoop",
+    clauses: [
+      {
+        "text": "Validate CRL and CEL, compare supported CRE predictions with independent native activity/pause expectations, and record unsupported or unexecuted cases as unverified. Establish that each distinct criterion is consequential and relevant unknown behavior is correct; equivalent proof methods are acceptable.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      },
+      {
+        "text": "Prefer file-based CRL validation to supply project context. For compound guards, the conditionTrace and a drop-one battery are a recommended way to demonstrate that each conjunct matters.",
+        "force": "default"
+      },
+      {
+        "text": "The validate_cel and run_decision MCP tools require a file path under a project root and reject inline code. This restriction does not apply to validate_crl, which also accepts inline CRL.",
+        "force": "validator-enforced"
+      },
+      {
+        "text": "Check the executed path as well as the disposition; a matching activity name alone can hide a wrong fall-through or delegation route.",
+        "force": "invariant",
+        "test": "verifyLoop:assert-path"
+      }
+    ],
   },
   {
     id: "emitted-trees-are-ours",
@@ -873,6 +1065,13 @@ const RULES: KitRule[] = [
     category: "process",
     rule: "Emitted trees are producer-owned. `emit_cel` wipes `<root>/tests/data/fhir/patient/` and repopulates it; one suite owns that project tree, with no sibling-suite protection. `emit_results` prunes unclaimed Questionnaire/QuestionnaireResponse files in its results tree by default (`prune: false` retains them). Keep authored files elsewhere. Symlinks and removal failures are reported. Each tool writes a manifest with case → compartmentDir → paths and hashes. Re-hashing listed files proves integrity, not completeness: compare the complete path set too. A renamed case otherwise leaves plausible stale data which a downstream mirror copies and certifies. Use each tool's manifest and returned paths.",
     ref: "verifyLoop",
+    clauses: [
+      {
+        "text": "Keep authored files outside producer-owned data/results trees. Compare the complete expected path/resource set with returned manifests as well as file hashes; inspect pruning, retention, symlink and removal diagnostics. Integrity of listed files alone does not prove completeness or absence of stale output.",
+        "force": "invariant",
+        "test": "verifyLoop:artifact-integrity"
+      }
+    ],
   },
   {
     id: "produce-results",
@@ -880,6 +1079,17 @@ const RULES: KitRule[] = [
     category: "process",
     rule: "Questionnaires are generated by `$apply`, never emitted from CRL: no Questionnaire appears in the CRL definition emit. After validation and CRE checks, call `emit_results(celPath, crlPath, useCase)` (useCase selects result-driver behavior, not kit content); it owns result placement, so never place `$apply` output yourself. Enable `crl.enableResults` in VS Code User settings and restart the MCP client. An absent setting preserves an existing opt-in; explicit false removes it. A JRE 17+ and the CRL-maintained complete CLI engine " + ENGINE_JAR_SOURCE.buildId + " are required. The tool gives the download command when missing, discovers <home>/" + ENGINE_JAR_SOURCE.cacheRelativePath + ", and verifies the pinned hash; normal use needs no manual hashing, extraction, or classpath. The original Maven jar is not the corrected default. `jarPath` and `jarSha256` are overrides. Read every case state: generated / no-questionnaire / populate-degraded / failed / timeout / not-run. An absent file alone is not evidence that the policy asked nothing. generated means a Questionnaire was returned, not that the intended activity or pause was verified; compare those outcomes against each case oracle. Written MV pairs have stable per-case identities and omit QuestionnaireResponse.authored to avoid run-time churn. They are MV review artifacts; do not resubmit these normalized files unchanged as interactive responses. The results tree is producer-owned; use returned paths/manifests and keep hand-authored Q/QR elsewhere.",
     ref: "verifyLoop",
+    clauses: [
+      {
+        "text": "Use emit_results after validation and CRE checks, enabling it through crl.enableResults in VS Code User settings and restarting the MCP client, and using the maintained verified engine. Consume returned paths and manifests; use explicit jar overrides only for a deliberate alternate engine.",
+        "force": "default"
+      },
+      {
+        "text": "Inspect every results case state and compare actual activity/path and answer states with independent expectations. Generated means a Questionnaire was returned, not that the expected conclusion or pause was proved. Failed extraction, degradation, timeout or missing output is not evidence of a clinical pause. Keep result files under producer control: use returned paths/manifests rather than manually placing $apply output or hand-authored Q/QR in its generated tree. MV-normalized Q/QR files omit interactive metadata and must not be resubmitted unchanged as session responses.",
+        "force": "invariant",
+        "test": "verifyLoop:native-outcome-verification"
+      }
+    ],
   },
   {
     id: "review-flags",
@@ -1161,6 +1371,17 @@ const VERIFY_LOOP_BASE: Omit<VerifyLoop, "note" | "methodologyRequirements"> = {
 
 /** Methodology requirements retain explicit applicability; all invariant anchors resolve in this one kit. */
 const METHODOLOGY_REQUIREMENTS: VerifyLoop["methodologyRequirements"] = [
+  {
+    "id": "native-outcome-verification",
+    "applicability": "All CRL authoring",
+    "text": "Manual verification obligation: validate and emit the intended artifact closure, then compare native $apply activity identities, paths and relevant question/answer states with independently specified case expectations. Verify source/terminology ownership, membership, units and input prerequisites relevant to the case. Check known and missing-input cases and evidence that distinct criteria remain consequential; drop-one is one acceptable method, not a mandatory battery. A pause requires an identified unanswered question and no activity, with setup/extraction/evaluation errors excluded. When execution or a required capability is unavailable, record the affected cases as unverified with the blocking gap and owner/issue; this permits continued authoring but does not discharge runtime acceptance. CRE and successful emission are separate evidence tiers; neither proves native behavior or clinical fidelity."
+  },
+  {
+    "id": "artifact-integrity",
+    "applicability": "All CRL authoring",
+    "text": "Manual artifact check: keep authored files outside producer-owned trees; inspect tool diagnostics, returned paths and manifests. Compare the complete intended case/resource/path set as well as listed file hashes. Check for identity collisions, omitted resources, stale definitions and pruning/removal failures. Confirm that alternate output roots retain the documented layout. Hash equality alone proves neither completeness nor runtime or clinical correctness."
+  },
+
   {
     id: "assert-path",
     applicability: "All CRL authoring",
@@ -1475,7 +1696,7 @@ export function getAuthoringKit(): AuthoringKit {
   const content = {
     introduction: {
       goal: "Help the KE create a comprehensive and correct computable representation of source material at L1 (narrative), L2 (semi-structured recommendations), or both, using CRL and emitted CQL/FHIR. L2 organizes clinical scenarios, decisions and actions; it is not a required pre-existing intermediate step. Preserve criteria, alternatives, exceptions and outcomes, and validate source coverage separately from execution. Knowledge levels: Boxwala et al. (2011), https://pmc.ncbi.nlm.nih.gov/articles/PMC3241169/. Kit format is a means to this goal, not a language requirement.",
-      reading: "Read applicability before applying guidance. The index is complete and unfiltered. Search results are discovery summaries, not complete instructions; retrieve their entry IDs. Entry includes prerequisites. Rule ref fields are human-readable source notes (documents, issues, validator names), not retrieval IDs; use index IDs and requires for tool navigation. Read counterexamples as warnings, never positive templates. Introductory coverage and verification evidence are separate axes.",
+      reading: "Read applicability before applying guidance. The index is complete and unfiltered. Search results are discovery summaries, not complete instructions; retrieve their entry IDs and read the force clauses before acting. Entry includes prerequisites. Rule ref fields are human-readable source notes (documents, issues, validator names), not retrieval IDs; use index IDs and requires for tool navigation. Read counterexamples as warnings, never positive templates. Introductory coverage and verification evidence are separate axes.",
       navigation: 'authoring_kit({view:"entry",id:"rule:named-answer-options"}); authoring_kit({view:"full"}) exports everything.',
       auditMeaning: "contentMatchesAudit compares content only. auditedRevision is the last reviewed source revision, not the build revision or proof that subsequent implementation changes were audited. Development retrieval remains available with contentMatchesAudit:false; release acceptance requires matching audited content.",
     },

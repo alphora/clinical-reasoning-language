@@ -25,9 +25,10 @@ export interface ConceptLayerEntry {
  * mechanically enforces an authoring *preference* will revert a human KE's deliberate, faithful
  * refactor, destroying intent. Force tells the agent how hard to bind, at CLAUSE granularity.
  *
- *  - `validator-enforced` — the grammar/validator rejects it; the agent need not police, the tool does.
- *  - `invariant` — a FIDELITY-TO-SOURCE constraint (an ADD or a HOLLOW vs the policy narrative), always
- *    enforced on ANY author's output, human or agent. Every invariant carries a `test` that RESOLVES to a real
+ *  - `validator-enforced` — the grammar/validator diagnoses the stated condition within its checked scope;
+ *    errors reject, explicitly described warnings remain legal.
+ *  - `invariant` — an obligation independent of author: source fidelity (avoid ADD/HOLLOW), or per-policy
+ *    verification and artifact integrity. Every invariant carries a `test` that RESOLVES to a real
  *    check — a `judgeLens.composition:<check>` source-fidelity lens or a `verifyLoop:<id>` methodology
  *    requirement; a dangling anchor IS the K4 fake-green it forbids (the force-model test enforces resolution).
  *  - `default` — blank-slate generative guidance; a FAITHFUL override STANDS (the judge gate checks
@@ -67,7 +68,7 @@ export interface KitRule {
   /** Doc path and/or validator rule-name this derives from (not a paraphrase to trust blindly). */
   ref?: string;
   /** The machine-readable force breakdown of `rule` — its default / invariant / validator-enforced clauses (§0). */
-  clauses?: KitRuleClause[];
+  clauses: [KitRuleClause, ...KitRuleClause[]];
 }
 
 /**

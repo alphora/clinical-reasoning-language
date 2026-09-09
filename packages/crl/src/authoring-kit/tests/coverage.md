@@ -1,5 +1,84 @@
 # Kit evidence ledger
 
+## Maintenance — explicit rule force (665/666)
+
+Baseline: `18799337ec6b91e91a4b1577c0e31a7f1b575714`.
+Implementation base: `6d3e06831ee3e75a666a08651cc9832e22f080da`.
+Target: pending reviewed content commit. Schema `2.1`; content hash
+`28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336`. This is a bounded correction
+of the 16 rules with no clauses, not a new full semantic audit of existing clauses.
+The baseline is an ancestor of the implementation base. All intervening changes
+were inspected: root/core/extension package versions and lockfile versions only,
+plus the prior audit stamp and ledger target. No dependency, implementation or
+test behavior changed in that interval; existing tag sets are unchanged.
+
+Intent: consumers must not invent force for missing metadata. Every rule now has
+nonempty explicit clauses using the existing three forces. Grammar/validator
+rejections, authoring defaults and manual fidelity/verification obligations remain
+distinct. The new `native-outcome-verification` and `artifact-integrity` anchors
+are manual obligations, not claims that resolving an anchor executes a test.
+Drop-one remains a default method; equivalent evidence is allowed. The qualifier
+summary now includes the already-supported nested-first otherwise exception.
+
+| Corrected rule | Owning evidence inspected; bounded observation | Force disposition |
+| --- | --- | --- |
+| interface-concept-naming | `emit/tests/presentation.test.ts`: required/nonempty text, rejected label/short, missing-presentation warning, preserved identity and Bleph migration. `fhir-emitter/tests/presentationEmit.test.ts`: input text/description and identity. Existing presentation examples reused. | Naming default; authored syntax rejection; manual native question/population check. |
+| decision-qualifiers | `validator/tests/decisionShape.test.ts`: qualifier-required, singleton, first/all/any, top-level otherwise-required and nested omission controls. `fhir-emitter/tests/membershipPublication.test.ts`: whole prior expression/null-preserving exclusion. | Syntax rejection; manual runtime precedence obligation. Structural emission alone does not prove pause. |
+| guards | `validator/tests/decisionShape.test.ts`: unconditional single-action guard rejection. `cre/tests/publication.test.ts`: publication-boundary and unsupported contexts. `fhir-emitter/tests/selectedPublication.test.ts`: selected-publication action-guard emitter refusal. | Rejected action-guard context; manual faithful replacement/capability-gap decision. |
+| guard-or-vs-sibling-or | Same CRE suite: unknown A/true B combined OR versus ordered siblings; failed-operand controls. Existing cases retained. | Source-fidelity and manual unknown/fan-out verification, not universal automatic enforcement. |
+| configure-dispositions | `dispositions/tests/config.test.ts`: replacement and empty vocabulary. `validator/tests/dispositionValidation.test.ts`: configured membership/type, missing/empty config controls. | Configuration default; explicit config-gated diagnostics; manual membership/request-type obligations remain. |
+| disposition-mode | Same validator suite: standalone pended refusal versus identical embedded acceptance. | Existing finality and closure-wide exclusivity invariants; validator is not claimed to prove every runtime path. |
+| minimalism | Charter and `judgeLens.composition:hollowed-criteria`; existing transparent criterion/expression emission mapping. | Derivable-detail default; source-criterion fidelity remains manual. No automatic clinical-sameness classifier. |
+| library-scoping | `ast/tests/library-and-include-structure.test.ts`: declaration syntax. `imports/tests/{registry,preparePublicationContext,criterionMultifile}.test.ts`: discovery, package visibility, local/package priority, aliases and criterion locality. | Syntax/visibility rejection; workflow defaults; manual emitted ownership check. No new package-native certification. |
+| cel-identity | `cel/validator/tests/identityDiagnostics.test.ts`: repeated reference, Patient exemption, ambient Encounter, normalized collision, distinct resources and cross-case reuse. | Explicit collision error; manual full resource/diagnostic check. Warning does not imply whole-case rejection. |
+| cel-quantity | `cel/validator/tests/numericValueRules.test.ts`: shared Quantity literal, missing/blank unit and CodeableConcept number diagnostics. Legacy integer controls are not current authoring examples. | Bounded literal rejection; manual producer/unit/native verification. |
+| emit-output-root | `tests/emit-layout.test.ts`: default and alternate root layout. `tests/emit-writers.test.ts`: written manifest and stale CEL removal. | Default tool/root choice; manual complete artifact/path verification. |
+| written-equals-executed | Charter and source judge, existing kit reference-emission and CRE cases. | Fidelity plus independent native verification obligation. These tests do not certify clinical meaning or all native behavior. |
+| terminology-forms | `fhir-emitter/tests/valueSet.test.ts`: pure, instantiated, mixed identity/membership. `terminologyCodeDisplay.test.ts`: authored display presence. `validator/tests/namedAnswerOptions.test.ts`: finite-domain display rejection. | Role choice default; finite-answer display rejection; manual identity/membership verification including recorded canonical limitation. |
+| verify-loop | Existing kit reference cases/emission and trace mappings; native acceptance remains independently version-bound. | Verification and path obligations; conditionTrace/drop-one as recommended methods with equivalent proof permitted. |
+| emitted-trees-are-ours | `tests/emit-writers.test.ts`: preflight, stale removal, disk hashes. `results/tests/produceCleanup.test.ts`: prune, retain and removal failure. | Manual full-set/integrity obligation; no claim hashes certify completeness. |
+| produce-results | `results/tests/runProducer.test.ts`: generated is not an outcome oracle, case states. `persistedPair.test.ts`: MV identity/authored normalization. Existing extension opt-in mapping retained. | Setup default; manual actual outcome/error check. No new installed-engine or rendered-client claim. |
+
+Changed files: `index.ts` adds the16 clause sets and two concrete methodology
+anchors, corrects implicit-force/otherwise/drop-one/configuration wording, and
+bumps the kit content version. `types.ts` makes clauses a nonempty tuple.
+`authoring-kit.test.ts` replaces skip-on-absence with completeness/anchor checks;
+the `verify-loop:kit-force-coverage` tests mutate every rule to absent/empty clauses
+and reject invalid force, text and anchors. These are metadata integrity tests,
+not a duplicate language suite. `query.test.ts` checks the exact clauses and
+resolved obligations in every focused entry. Existing full export tests compare
+every JSON/Markdown leaf, including all new clauses. No CRL/CEL example changed.
+This ledger and reverse-map wording carry the bounded audit scope.
+
+The delivered extension README now names schema 2.1. The initial test survey and
+test-inventory.json retain their historical revision, source hashes and run counts;
+the survey now explicitly points to this ledger for later changes. They are not a
+current-checkout census. The audit metadata commit must use the literal phrase
+`schema 2.1` in its scope as well as the matching schema, hash and content revision.
+
+Reviews 665/666: plan findings were dispositioned before implementation. Native
+code review found 0 critical/important/nit. External code review found 2 critical,
+6 important and 4 nit; 7 accepted, 2 refined, 3 rejected with reasons recorded in
+666-dispositions.md. Concrete corrections cover guard rejection, presentation
+scope, mandatory tool context, output placement and emitted-path identity. Shared
+manual anchors remain methods, not assertions of automatic semantic coverage.
+Native follow-up on the applied corrections converged with 0/0/0. No unrun
+external follow-up convergence is claimed. Full final diff: review 666.
+
+Both real MCP smoke suites (`src/cli/tests/run-mcp-server.test.mjs` and
+`packages/crl-vscode/src/mcp-server.test.mjs`) pin the updated schema and hash.
+Verification: 172 kit tests pass; 365 owning tests pass with one existing skip;
+32 extension MCP tests pass; core MCP smoke passes. The extension build generated
+fresh core output and passed core/extension typechecks. The final core MCP run was
+sequential after that build: an earlier parallel attempt collided with the build
+clearing dist and failed before exercising the server. No new native clinical
+acceptance or installed-release verification is claimed by this metadata change.
+
+Relevant test changes are these metadata/delivery assertions only. Existing
+owning cases and shared examples remain unchanged; no semantic tags lost their
+assertions. Added tags: `verify-loop:kit-force-coverage`; no removed tags. Source
+fidelity and method obligations remain manual even after the metadata tests pass.
+
 ## Maintenance — Markdown MCP delivery (655/656)
 
 Baseline: `451be38f1fc33723cfe44eec12c1add689c5c52b`.

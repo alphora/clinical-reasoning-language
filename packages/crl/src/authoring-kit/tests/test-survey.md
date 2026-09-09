@@ -2,6 +2,10 @@
 
 Baseline b2ff4762 plus review639,2026-09-08. Initial source survey complete; execution and clinical certification are separate.
 
+This table preserves that initial survey's source counts. Subsequent changed-test
+reviews and execution results are recorded by revision in `coverage.md`; do not
+treat these historical declaration counts as a census of the current checkout.
+
 300 originally discovered test files plus the new producer cleanup suite:301 read in full (lead and native reviewers). Every file has a disposition; equivalent claims are consolidated in reverse-claim-map.md, with manual and runtime limits explicit.
 
 Normal runner discovery was reconciled with tracked files: batch-java.test.cjs requires an explicit JDK run and is absent from test:native:checks. Conditional native tests and early-return OS cases need per-case execution evidence. A green file or a matching hash does not establish that an assertion ran. No file below is excluded merely because it is unreviewed.

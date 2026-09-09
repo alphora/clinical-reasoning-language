@@ -37,7 +37,7 @@ When you open a workspace that contains `.crl` files, the extension configures t
 
 ### Authoring-kit discovery and tools
 
-Start with `authoring_kit({})` for the overview and complete index. Kit schema 2.0 provides one unfiltered reference with explicit applicability. Search with `authoring_kit({view:"search",query:"dropdown with a none answer"})`; retrieve complete guidance and prerequisites with `authoring_kit({view:"entry",id:"rule:named-answer-options"})`. Use `view:"full"` for the complete JSON export, or `authoring_kit({view:"full",format:"markdown"})` for raw Markdown identical to the downloadable `authoring-kit.md`. Markdown includes the same audit metadata as JSON. The former kit `stage` and `useCase` arguments are removed in 5.1.0.
+Start with `authoring_kit({})` for the overview and complete index. Kit schema 2.1 provides one unfiltered reference with explicit applicability. Search with `authoring_kit({view:"search",query:"dropdown with a none answer"})`; retrieve complete guidance and prerequisites with `authoring_kit({view:"entry",id:"rule:named-answer-options"})`. Use `view:"full"` for the complete JSON export, or `authoring_kit({view:"full",format:"markdown"})` for raw Markdown identical to the downloadable `authoring-kit.md`. Markdown includes the same audit metadata as JSON. The former kit `stage` and `useCase` arguments are removed in 5.1.0.
 
 The server registers 19 tools by default and 20 when `emit_results` is enabled. The [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/TOOLING.md) lists the tool surface, including `emit_crl`, `emit_cel`, and `emit_results`. Some lower-level tools are:
 - **`tokenize_crl`** — lex CRL source into tokens.
