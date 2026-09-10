@@ -4,7 +4,7 @@
 
 Baseline: `5e105580a3390bedcbf7874ddb37e9f5f7d6279d`.
 Implementation base: `d79f4c676b2c9ec0f70012ed8017a5982b20eb92`.
-Target: pending reviewed content commit. Kit schema 2.1 and consumer content are unchanged.
+Target: `34d591eeab7fae22485546add54efe41106d756d` (reviewed content commit). Kit schema `2.1` and consumer content hash `28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336` are unchanged.
 The intervening commit changes only the prior audit stamp and ledger target.
 
 The operator directs the Elements naming throughout this project, including

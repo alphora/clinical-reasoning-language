@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "5e105580a3390bedcbf7874ddb37e9f5f7d6279d",
-  "auditedSchemaVersion": "2.1",
-  "auditedContentHash": "28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336",
-  "scope": "Unified kit schema 2.1: bounded correction of 16 missing rule classifications, reviewed from 18799337ec6b91e91a4b1577c0e31a7f1b575714. All 32 rules have explicit nonempty clauses; metadata checks do not certify semantic correctness. Owning tests, kit gates and both real MCP entry points verified. Prior survey and clinical/native evidence limitations retained; see evidence ledger.",
-  "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
+    "auditedRevision":  "34d591eeab7fae22485546add54efe41106d756d",
+    "auditedSchemaVersion":  "2.1",
+    "auditedContentHash":  "28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336",
+    "scope":  "Kit schema 2.1 naming-only maintenance from 5e105580a3390bedcbf7874ddb37e9f5f7d6279d through 34d591eeab7fae22485546add54efe41106d756d. All project retrieval-layer identities and authored split fixtures use Elements. Consumer kit content and tags are unchanged; affected evidence records were refreshed. Verified: 4,855 core tests (32 skipped), core MCP, 32 extension MCP tests, 116 Bleph native cases, four returned-QR rounds, 11 bounded BMI cases, and exact emission parity. Prior semantic and native limitations remain; see the evidence ledger.",
+    "evidence":  "packages/crl/src/authoring-kit/tests/coverage.md"
 }
