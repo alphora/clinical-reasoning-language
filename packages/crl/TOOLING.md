@@ -64,7 +64,7 @@ A single CLI binary (`crl-emit`) dispatches all three emit paths by the input fi
 
 ## Installation
 
-The package is publicly available from npm: `npm install @smile-digital-health/crl@5.1.1`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL5.1 changes the authoring-kit npm and MCP APIs; the CRL/CEL language is unchanged from 5.0.0. Consult the [5.1.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.1.0) when updating kit calls. Older content may also need the earlier CRL5 language migration.
+The package is publicly available from npm: `npm install @smile-digital-health/crl@5.2.0`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL 5.2 changes generated retrieval-library identities to `LocalElements`/`ExternalElements`. Regenerate CQL and FHIR together and replace the previous generated-file inventory, preserving independently authored files; the emitter does not automatically prune obsolete artifacts. Use an exact dependency version when upgrades require coordinated replacement, and consult the [5.2.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.2.0). CRL/CEL syntax is unchanged by 5.2. Upgrading from 5.0.0 also requires the authoring-kit API changes in the [5.1.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.1.0). Older content may need the earlier CRL5 language migration.
 
 ### Option A — VS Code extension (vsix) — for interactive authoring + MCP
 
@@ -352,7 +352,7 @@ This is the same pattern the bundled `crl-language-support` extension uses inter
      }
    }
    ```
-   (For an offline installation, use `file:./vendor/smile-digital-health-crl-5.1.1.tgz` after downloading that release asset.)
+   (For an offline installation, use `file:./vendor/smile-digital-health-crl-5.2.0.tgz` after downloading that release asset.)
 
 2. **Bundle the dep into your extension** with esbuild / webpack / your bundler of choice. VS Code extensions ship as a single `dist/extension.js`; the CRL code gets inlined just like any other dep.
 

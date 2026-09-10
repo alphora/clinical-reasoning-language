@@ -10,7 +10,7 @@ A VS Code extension for the Clinical Reasoning Language (CRL). It does four thin
    - Inside any quoted name position (e.g. `defined as "…"`, `definition is "…"`), the names of every `concept` / `terminology` declared in the file.
    - Hover any of the above to see what it is and where it's declared.
 3. **Live error checking** — the bundled CRL validator runs on every change (debounced 250 ms) and reports parser, AST-build, and semantic findings as VS Code diagnostics (squiggles). Runs in **soft mode** so unresolved references appear as warnings during authoring.
-4. **Gives your agent CRL tools** — the bundled MCP server provides the authoring kit, validation, CRL/CEL emission, and supporting review tools. Claude Code setup is described below; other MCP clients can connect to the server using the [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/TOOLING.md).
+4. **Gives your agent CRL tools** — the bundled MCP server provides the authoring kit, validation, CRL/CEL emission, and supporting review tools. Claude Code setup is described below; other MCP clients can connect to the server using the [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/TOOLING.md).
 
 It configures everything automatically — there are no settings to paste by hand.
 
@@ -39,7 +39,7 @@ When you open a workspace that contains `.crl` files, the extension configures t
 
 Start with `authoring_kit({})` for the overview and complete index. Kit schema 2.1 provides one unfiltered reference with explicit applicability. Search with `authoring_kit({view:"search",query:"dropdown with a none answer"})`; retrieve complete guidance and prerequisites with `authoring_kit({view:"entry",id:"rule:named-answer-options"})`. Use `view:"full"` for the complete JSON export, or `authoring_kit({view:"full",format:"markdown"})` for raw Markdown identical to the downloadable `authoring-kit.md`. Markdown includes the same audit metadata as JSON. The former kit `stage` and `useCase` arguments are removed in 5.1.0.
 
-The server registers 19 tools by default and 20 when `emit_results` is enabled. The [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/TOOLING.md) lists the tool surface, including `emit_crl`, `emit_cel`, and `emit_results`. Some lower-level tools are:
+The server registers 19 tools by default and 20 when `emit_results` is enabled. The [tooling reference](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/TOOLING.md) lists the tool surface, including `emit_crl`, `emit_cel`, and `emit_results`. Some lower-level tools are:
 - **`tokenize_crl`** — lex CRL source into tokens.
 - **`build_crl_ast`** — parse CRL source and build its AST. No semantic checks.
 - **`validate_crl`** — lex + parse + build + run all semantic validators (name uniqueness, reference resolution, cycle detection, action uniqueness). Optional `soft: true` demotes reference-target-exists findings to warnings. Returns `{ success, errors[], warnings[] }`.
@@ -158,4 +158,4 @@ npm run package          # produces crl-language-support-<version>.vsix
 
 This release distributes the verified VSIX as a GitHub release asset. Marketplace publication is not part of this release workflow.
 
-For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see the [core README § Cutting a release](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/README.md#cutting-a-release-build-both-artifacts--upload-to-github).
+For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see the [core README § Cutting a release](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/README.md#cutting-a-release-build-both-artifacts--upload-to-github).

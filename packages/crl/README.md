@@ -6,36 +6,38 @@ Clinical Reasoning Language (CRL) provides a structured way to model clinical de
 
 ## Overview
 
-See the [User Guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices. For the **CLI and MCP tool reference** (emit, validate, the MCP tools — for both CRL and CEL), see [TOOLING.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/TOOLING.md).
+See the [User Guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices. For the **CLI and MCP tool reference** (emit, validate, the MCP tools — for both CRL and CEL), see [TOOLING.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/TOOLING.md).
 
 CRL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CRL documents.
 
 For the authoring reference over MCP, call `authoring_kit({})` to discover guidance,
 or `authoring_kit({view:"full",format:"markdown"})` for the complete audited Markdown.
 The response is the same document as the release's `authoring-kit.md`; the agent can
-read or save it. JSON remains the default. See the [kit guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/docs/authoring-kit.md).
+read or save it. JSON remains the default. See the [kit guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/docs/authoring-kit.md).
 
 ## Metadata annotations
 
-CRL concepts can carry typed metadata via an `@tag` convention on `meta` lines (e.g. `@description`, `@ke-feedback`, `@kg-concept`) — for descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance. See the [metadata model](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/spec/metadata-model.md) and the canonical [tag registry](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/spec/metadata-registry.json). *(Draft: the convention parses today; Validator enforcement is forthcoming.)*
+CRL concepts can carry typed metadata via an `@tag` convention on `meta` lines (e.g. `@description`, `@ke-feedback`, `@kg-concept`) — for descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance. See the [metadata model](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/spec/metadata-model.md) and the canonical [tag registry](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/spec/metadata-registry.json). *(Draft: the convention parses today; Validator enforcement is forthcoming.)*
 
 ## Installation
 
 The package is publicly available from npm; installation does not require an npm account or token.
 
 ```bash
-npm install @smile-digital-health/crl@5.1.1
+npm install @smile-digital-health/crl@5.2.0
 ```
 
-For a dependency that accepts compatible CRL5 updates:
+Pin the version so generated-artifact migrations are adopted deliberately:
 
 ```json
 "dependencies": {
-  "@smile-digital-health/crl": "^5.1.0"
+  "@smile-digital-health/crl": "5.2.0"
 }
 ```
 
-CRL5.1 changes the public authoring-kit npm and MCP APIs. When upgrading from 5.0.0, update kit calls as described in the [5.1.0 release notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.1.0); the CRL/CEL language and emitted CQL/FHIR are unchanged from 5.0.0. A `^5` dependency permits 5.1.0. Content from before the CRL5 language transition may also need language migration using the current authoring kit.
+CRL 5.2 renames generated retrieval libraries from `LocalPrimitives`/`ExternalPrimitives` to `LocalElements`/`ExternalElements`, including CQL includes and FHIR Library identities. Regenerate CQL and FHIR together and replace the previous generated-file inventory, preserving independently authored files. Re-emission does not automatically delete obsolete artifacts. See the [5.2.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.2.0). A `^5` or `^5.1.0` dependency can acquire this update automatically; use an exact version pin when upgrades require coordinated artifact replacement.
+
+CRL/CEL syntax is unchanged by 5.2. When upgrading from 5.0.0, also update the authoring-kit npm/MCP calls described in the [5.1.0 release notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.1.0). Content from before the CRL5 language transition may need language migration using the current authoring kit.
 
 ### For Package Maintainers
 
@@ -165,7 +167,7 @@ The FSH-to-CRL transformer converts FHIR Shorthand (FSH) files into Clinical Rea
 - **Deduplication and Suffixing**: Terminology blocks are unique by identifier and body. If a duplicate identifier is encountered with a different body, a numeric suffix (e.g., `_2`) is added to the identifier. If both identifier and body are the same, the block is not duplicated.
 - **Extraction Logic**: For `medicationCodeableConcept`, the transformer uses `system`, `code`, and `identifier` from the FSH object. For `dynamicValue.expression.expression` (where `path = "code.coding"`), the transformer uses `system` and `code` from the CQL code expression string and `identifier` from the corresponding description.
 
-For more details, see the [User Guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/USER_GUIDE.md) and the technical mapping documentation.
+For more details, see the [User Guide](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/USER_GUIDE.md) and the technical mapping documentation.
 
 ## CLI Tool Usage
 
@@ -193,7 +195,7 @@ crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
 
 Output lands at `<project-root>/src/fhir/<ResourceType>/<id>.json`. CQL emit (the existing `--target cql` / default behavior) lands at `<project-root>/src/cql/<library-name>.cql`. Library content references the CQL file via the relative path `../../cql/<library-name>.cql`.
 
-For semantic rules, layout details, deliberate spec deviations, and the MCP `emit_crl` tool, see [`USER_GUIDE.md` §"Emitting FHIR Definition resources"](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl/USER_GUIDE.md#emitting-fhir-definition-resources).
+For semantic rules, layout details, deliberate spec deviations, and the MCP `emit_crl` tool, see [`USER_GUIDE.md` §"Emitting FHIR Definition resources"](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl/USER_GUIDE.md#emitting-fhir-definition-resources).
 
 ## API Usage & Reference
 
@@ -495,7 +497,7 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 >
 > The authoritative release checklist and instructions are maintained in a single location:
 > 
-> **[.github/PULL_REQUEST_TEMPLATE/release.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/.github/PULL_REQUEST_TEMPLATE/release.md)**
+> **[.github/PULL_REQUEST_TEMPLATE/release.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/.github/PULL_REQUEST_TEMPLATE/release.md)**
 >
 > Always follow the steps in this file when preparing a new release. This ensures consistency and reduces maintenance overhead. If you need to update the release process, update the PR template only.
 
@@ -509,7 +511,7 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 - **Generated Files:** Auto-generated files (e.g., ANTLR outputs, grammar-driven types) are ignored by git and should never be edited manually. Always use the provided scripts to regenerate them.
 - **Documentation:** Keep all documentation referencing the release checklist up-to-date by linking to the PR template.
 
-For more details, see the [release PR template](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
+For more details, see the [release PR template](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
 
 ### Error Handling Strategy
 
@@ -552,7 +554,7 @@ We provide a Visual Studio Code extension for CRL files:
 - Comment support
 - Language basics for a better editing experience
 
-For installation instructions and full details, see [crl-vscode/README.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.1.1/packages/crl-vscode/README.md)
+For installation instructions and full details, see [crl-vscode/README.md](https://github.com/alphora/clinical-reasoning-language/blob/v5.2.0/packages/crl-vscode/README.md)
 
 ## License
 
