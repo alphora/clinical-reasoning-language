@@ -5,8 +5,8 @@ using FHIR version '4.0.1'
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
-include SemnotAge232FixtureLocalPrimitives
-include SemnotAge232FixtureExternalPrimitives
+include SemnotAge232FixtureLocalElements
+include SemnotAge232FixtureExternalElements
 
 context Patient
 
@@ -293,7 +293,7 @@ define function "__CRL_AgeToday_v1_Eligible"(candidates List<Tuple { key System.
     evaluationDay, offsetHours, conceptId)
 
 define "__CRL_PublicationEnvelope_v1_Age 21 Or Older":
-  "__CRL_PublicationSelection_v1_Select"("__CRL_AgeToday_v1_Eligible"(Flatten({ ((SemnotAge232FixtureLocalPrimitives."Age 21 Or Older Records") O return all "__CRL_PublicationSelection_v1_LocalBooleanCandidate"(O, 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older/local', 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older')), (((SemnotAge232FixtureExternalPrimitives."Age 21 Or Older Source 1") S return all "__CRL_AgeToday_v1_Produce"(S, 'crl:source:v1:%5B%22http%3A%2F%2Fexample.org%2Fcrl%2Fsemnot-age-232%22%2C%22semnot-age-232-fixture%22%2C%22Semnot%20Age%20232%22%2C%22semnot-age-232-fixture%22%2C%221.0.0%22%2C%22Age%2021%20Or%20Older%22%2C%5B%22source%22%2C0%5D%5D', 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older', FHIR.CodeableConcept { text: FHIR.string { value: 'Age 21 Or Older' }, coding: { FHIR.Coding { system: FHIR.uri { value: 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local' }, code: FHIR.code { value: 'age-21-or-older' } } } }, 'http://example.org/crl/semnot-age-232/StructureDefinition/semnot-age-232-fixture-age-21-or-older', 'Patient/' + Patient.id.value, 'AtLeast', 'years', 21.0, Today())) C where C is not null) }), Today(), timezoneoffset from Now(), 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older'), 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older', 'error')
+  "__CRL_PublicationSelection_v1_Select"("__CRL_AgeToday_v1_Eligible"(Flatten({ ((SemnotAge232FixtureLocalElements."Age 21 Or Older Records") O return all "__CRL_PublicationSelection_v1_LocalBooleanCandidate"(O, 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older/local', 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older')), (((SemnotAge232FixtureExternalElements."Age 21 Or Older Source 1") S return all "__CRL_AgeToday_v1_Produce"(S, 'crl:source:v1:%5B%22http%3A%2F%2Fexample.org%2Fcrl%2Fsemnot-age-232%22%2C%22semnot-age-232-fixture%22%2C%22Semnot%20Age%20232%22%2C%22semnot-age-232-fixture%22%2C%221.0.0%22%2C%22Age%2021%20Or%20Older%22%2C%5B%22source%22%2C0%5D%5D', 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older', FHIR.CodeableConcept { text: FHIR.string { value: 'Age 21 Or Older' }, coding: { FHIR.Coding { system: FHIR.uri { value: 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local' }, code: FHIR.code { value: 'age-21-or-older' } } } }, 'http://example.org/crl/semnot-age-232/StructureDefinition/semnot-age-232-fixture-age-21-or-older', 'Patient/' + Patient.id.value, 'AtLeast', 'years', 21.0, Today())) C where C is not null) }), Today(), timezoneoffset from Now(), 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older'), 'http://example.org/crl/semnot-age-232/CodeSystem/semnot-age-232-fixture-local#age-21-or-older', 'error')
 
 define "Age 21 Or Older":
   "__CRL_PublicationSelection_v1_Record"("__CRL_PublicationEnvelope_v1_Age 21 Or Older")

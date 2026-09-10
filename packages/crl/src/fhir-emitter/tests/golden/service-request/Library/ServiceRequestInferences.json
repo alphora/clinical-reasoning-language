@@ -50,11 +50,11 @@
     },
     {
       "type": "depends-on",
-      "resource": "http://example.org/endoluminal-ablation/Library/ServiceRequestLocalPrimitives"
+      "resource": "http://example.org/endoluminal-ablation/Library/ServiceRequestLocalElements"
     },
     {
       "type": "depends-on",
-      "resource": "http://example.org/endoluminal-ablation/Library/ServiceRequestExternalPrimitives"
+      "resource": "http://example.org/endoluminal-ablation/Library/ServiceRequestExternalElements"
     }
   ],
   "content": [

@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "TwostepLocalPrimitives",
+  "id": "ServiceRequestExternalElements",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives",
-  "version": "0.0.0",
-  "name": "TwostepLocalPrimitives",
-  "title": "TwostepLocalPrimitives",
+  "url": "http://example.org/endoluminal-ablation/Library/ServiceRequestExternalElements",
+  "version": "1.0.0",
+  "name": "ServiceRequestExternalElements",
+  "title": "ServiceRequestExternalElements",
   "status": "draft",
   "experimental": true,
-  "date": "2026-01-01T00:00:00.000Z",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "TwostepLocalPrimitives",
+  "description": "THE canonical target for the ServiceRequest membership chain (#189) — `matches this` is a DATUM read, so a wrong-code request is a determinate false and no request at all pauses",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/twostep/Library/TwostepLocalConcepts"
+      "resource": "http://example.org/endoluminal-ablation/Library/ServiceRequestExternalConcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/TwostepLocalPrimitives.cql"
+      "url": "../../cql/ServiceRequestExternalElements.cql"
     }
   ]
 }

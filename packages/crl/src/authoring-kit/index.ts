@@ -196,7 +196,7 @@ export type {
 //   bare-ref / posrep checks, not the design-doc's looser sentence; NORMATIVE-vs-SHIPPED so use-site typing is
 //   not over-claimed — #266; the `defined as exists` LANE MATRIX as CAPABILITY-STATUS, NOT a usable Stage-1 form
 //   — run_decision status:errors on it, #270). `concept-form` gains `value type is` + the composition
-//   `concept = value type + (n primitives and/or ≤1 derived)` (framed via the existing scope tags so Stage-1's
+//   `concept = value type + (n source contributions and/or ≤1 derived)` (framed via the existing scope tags so Stage-1's
 //   producer boundary is unchanged); a leading `value type` conceptLayerModel entry; the stale posrep `form` fixed
 //   to the fully-explicit self-describing shape; the patient-age `#241` annotation reconciled with rule-B.
 //   Correlated resource-level temporal refinement is DEFERRED (boundary-OUT; a scope note only, no syntax). Design

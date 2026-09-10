@@ -1614,17 +1614,9 @@
     },
     {
       "path": "packages/crl/src/ast/tests/definedAsBooleanComposition-t1.test.ts",
-      "sha256": "c9c9fc5bde15656a71f0aab6287e430a07f6212fbb8c9286ff6b19505e405e03",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": {
-        "report": "tmp/632-corrected-vitest.json",
-        "status": "passed",
-        "passed": 44,
-        "failed": 0,
-        "pending": 0,
-        "sourceSha256": "c9c9fc5bde15656a71f0aab6287e430a07f6212fbb8c9286ff6b19505e405e03",
-        "limits": "Latest affected-file Vitest run in review632 isolation. No native or installed-artifact execution."
-      },
+      "sha256": "7ae664ed5027b2b0932c89690f155e7299275a50d7774eb71752b2e32c7f7b33",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
@@ -1804,8 +1796,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review630",
-      "inspectedSourceSha256": "113e3c1ee4f0cefe9000a40225de216721cd5c53a4c960bd6e1d4445e8458807"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "7ae664ed5027b2b0932c89690f155e7299275a50d7774eb71752b2e32c7f7b33"
     },
     {
       "path": "packages/crl/src/ast/tests/guardDefines.test.ts",
@@ -4615,60 +4607,60 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/caseFeatureGuards.test.ts",
-      "sha256": "1243c9cfbc4de36bbb2998e528abaaf1c92aff0df7c9017b6de10a8462f2b5ee",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "a33e1a61520d7e98db0ce961d7eeee57f4708f0c4954f21639af5c21c5a4d3e5",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 51,
+          "line": 52,
           "title": "a both-rep concept emitted via a DIRECT (non-truth-set) path hard-errors",
           "call": "it"
         },
         {
-          "line": 67,
+          "line": 68,
           "title": "the SAME both-rep concept through the case-feature split lane succeeds (no false error)",
           "call": "it"
         },
         {
-          "line": 82,
-          "title": "a truth-set `defined as` over a ExternalPrimitives (`coded from`) operand is unsupported",
+          "line": 83,
+          "title": "a truth-set `defined as` over a ExternalElements (`coded from`) operand is unsupported",
           "call": "it"
         },
         {
-          "line": 123,
+          "line": 124,
           "title": "an unknown bare ref under case-feature mode is NOT silently qualified to the Inferences lib",
           "call": "it"
         },
         {
-          "line": 151,
+          "line": 152,
           "title": "a VALID same-library Inferences sibling bare ref stays BARE (a library cannot qualify its own define)",
           "call": "it"
         },
         {
-          "line": 197,
+          "line": 198,
           "title": "`concept D: defined as exists (\"R\")` where R is a reduction hard-errors with `emit-reduction-in-composition`",
           "call": "it"
         },
         {
-          "line": 222,
+          "line": 223,
           "title": "`defined as exists (\"X\")` over a genuine RecordSet (a `code is` records concept) still EMITS — the guard is reduction-specific",
           "call": "it"
         },
         {
-          "line": 243,
+          "line": 244,
           "title": "#270 (disc 461 code review G2) — a `shape is RecordSet` concept with a `defined as exists` body is a COHERENCE error (a record shape cannot publish an existence boolean)",
           "call": "it"
         },
         {
-          "line": 265,
+          "line": 266,
           "title": "#270 (disc 461 code review G3/Claude-7) — `defined as exists` over another total scalar boolean (an exists concept) is loud-refused (singleton-promotion inversion)",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "1243c9cfbc4de36bbb2998e528abaaf1c92aff0df7c9017b6de10a8462f2b5ee"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "a33e1a61520d7e98db0ce961d7eeee57f4708f0c4954f21639af5c21c5a4d3e5"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/compositionErrorKinds.test.ts",
@@ -4815,60 +4807,60 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/dme101-030-emit.test.ts",
-      "sha256": "625de3fc9c013001da39817e42009715a62737e3e612f854120f3e15b1417c8e",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "7e196fc48dec53012a327cea1d5eec9e9391db80d75bc061c85391ed37999e9b",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 32,
+          "line": 33,
           "title": "emits successfully (no deferral / mixed-code errors)",
           "call": "it"
         },
         {
-          "line": 37,
-          "title": "Covered Device — LocalPrimitives records retrieve (same-name)",
+          "line": 38,
+          "title": "Covered Device — LocalElements records retrieve (same-name)",
           "call": "it"
         },
         {
-          "line": 43,
-          "title": "Covered Device Source — ExternalPrimitives source retrieve",
+          "line": 44,
+          "title": "Covered Device Source — ExternalElements source retrieve",
           "call": "it"
         },
         {
-          "line": 49,
+          "line": 50,
           "title": "Covered Device — Inferences recency-value merge (two-tier recency lattice, no Coalesce)",
           "call": "it"
         },
         {
-          "line": 66,
-          "title": "Inferences includes BOTH Local and External Primitives",
+          "line": 67,
+          "title": "Inferences includes BOTH Local and External Elements",
           "call": "it"
         },
         {
-          "line": 72,
+          "line": 73,
           "title": "Covered Device Requested — three-leg member-existence fold (own NEWEST-read, not any-true)",
           "call": "it"
         },
         {
-          "line": 84,
+          "line": 85,
           "title": "Interface re-exports the fold BARE (not `.satisfied()` on a bare boolean)",
           "call": "it"
         },
         {
-          "line": 90,
+          "line": 91,
           "title": "whole-boundary totality proof is CLEAN (obligation↔discharge reconciles for the new forms)",
           "call": "it"
         },
         {
-          "line": 101,
+          "line": 102,
           "title": "FHIR lane emits cleanly (no dangling cpg-featureExpression — Claude #10)",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "625de3fc9c013001da39817e42009715a62737e3e612f854120f3e15b1417c8e"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "7e196fc48dec53012a327cea1d5eec9e9391db80d75bc061c85391ed37999e9b"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/emit-golden.test.ts",
@@ -5249,61 +5241,61 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/heterogeneousSourceEmit.test.ts",
-      "sha256": "8382e78f271c861ac51bd726b0c8dfae844447db8af6c21699dc69895e64be71",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "2be5117f38b0619d07cc7215e53f94e3b692344563b6cc14fc02c7672e20beb5",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 2,
       "tests": [
         {
-          "line": 39,
+          "line": 40,
           "title": "⭐ builds ONE candidate per source record, filtered on the DATUM being present",
           "call": "it"
         },
         {
-          "line": 46,
+          "line": 47,
           "title": "⭐ the candidate carries the CONCEPT's local code and case-feature profile, not the source's",
           "call": "it"
         },
         {
-          "line": 54,
+          "line": 55,
           "title": "⭐ reads the MODEL-RESOLVED canonical carrier as the candidate's VALUE",
           "call": "it"
         },
         {
-          "line": 65,
+          "line": 66,
           "title": "⭐⭐ the arm is PARENTHESISED, so a following union term cannot be swallowed by the return",
           "call": "it"
         },
         {
-          "line": 73,
+          "line": 74,
           "title": "⭐⭐ the existence interface carries the SAME datum filter as the candidate space",
           "call": "it"
         },
         {
-          "line": 83,
+          "line": 84,
           "title": "⭐ stamps the candidate from the SOURCE record, so recency stays the source's own date",
           "call": "it"
         },
         {
-          "line": 87,
+          "line": 88,
           "title": "⭐⭐ DEFINES every constructor it CALLS — a dangling call fails to TRANSLATE",
           "call": "it"
         },
         {
-          "line": 103,
+          "line": 104,
           "title": "⭐⭐ `Encounter.type` refuses at lowering instead of emitting an untranslatable cast",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "8382e78f271c861ac51bd726b0c8dfae844447db8af6c21699dc69895e64be71"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "2be5117f38b0619d07cc7215e53f94e3b692344563b6cc14fc02c7672e20beb5"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/layeredEmit.test.ts",
-      "sha256": "4c3e99d75e17eb6e67fdf24cefc4ad4f3be4dae61ec9f14629a94457bc1f743e",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "49c619c23de2340a687431763f3a1af2b09c898e7c2de4a6211e2392b360031c",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 3,
       "tests": [
@@ -5444,7 +5436,7 @@
         },
         {
           "line": 760,
-          "title": "layered `count \"X\" at least N` → `Count(<S>-LocalPrimitives.\"X Records\") >= N` (cross-layer-qualified)",
+          "title": "layered `count \"X\" at least N` → `Count(<S>-LocalElements.\"X Records\") >= N` (cross-layer-qualified)",
           "call": "it"
         },
         {
@@ -5503,8 +5495,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "4c3e99d75e17eb6e67fdf24cefc4ad4f3be4dae61ec9f14629a94457bc1f743e"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "49c619c23de2340a687431763f3a1af2b09c898e7c2de4a6211e2392b360031c"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/leafEligibleConcepts.test.ts",
@@ -5543,109 +5535,101 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/ledgerEnrollment2a.test.ts",
-      "sha256": "31c299cefa5c4204665ad6a120139fbcad5fa1d49a019bb6da1a446b15e27807",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "55e0eb25e7a84f8d7f0df28a313c5f2a6d8a9bf9c4fa80b471d39d0a45d298e9",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 131,
+          "line": 132,
           "title": "none-lane: every emitted define header ↔ exactly one ledger entry (no uncovered, no orphan)",
           "call": "it"
         },
         {
-          "line": 138,
+          "line": 139,
           "title": "layered/interface lane: completeness green across the split's layer libraries",
           "call": "it"
         },
         {
-          "line": 149,
+          "line": 150,
           "title": "positive control: a none-lane reduction (`exists`) proves total; the records twin is skipped",
           "call": "it"
         },
         {
-          "line": 162,
+          "line": 163,
           "title": "2b.1: a boolean catalog comparator is TOTALIZED (`Coalesce(<cmp>, false)`) → discharges requires-boundary, proves",
           "call": "it"
         },
         {
-          "line": 178,
+          "line": 179,
           "title": "2b.1: a boolean INSTANCE-pattern (`most recent \"X\"`) discharges NULLABLE (not a false `total`) — value-vs-presence (§4 gap 3, → 2b.3)",
           "call": "it"
         },
         {
-          "line": 201,
+          "line": 202,
           "title": "bucket 3: a bare-scalar `code is` boolean enrolls `rejected` and the proof hard-fails it",
           "call": "it"
         },
         {
-          "line": 210,
+          "line": 211,
           "title": "the Interface `.satisfied()` façade is TOTAL (exists), NOT a failure; its bare-scalar leaves fail (rejected)",
           "call": "it"
         },
         {
-          "line": 228,
+          "line": 229,
           "title": "legacy lane (`caseFeature` off): `defined as exists` is intrinsic-total; a refinement composition is NON-Boolean (no false-pass)",
           "call": "it"
         },
         {
-          "line": 266,
+          "line": 267,
           "title": "fail-closed: a contradictory `shape is RecordSet` + boolean + comparator is FLAGGED, not silently dropped",
           "call": "it"
         },
         {
-          "line": 309,
+          "line": 310,
           "title": "categorizes the real-form baseline: comparators TOTALIZED (2b.1), none-lane cascade proves, façades TOTAL, rejects present",
           "call": "it"
         },
         {
-          "line": 345,
+          "line": 346,
           "title": "total-boolean façade: a reduction-sourced decision guard re-exports BARE (facade-delegated) and proves via the reduction (cross-layer operand resolution)",
           "call": "it"
         },
         {
-          "line": 366,
+          "line": 367,
           "title": "#189 2b.2 — a FLIPPED bare-ref alias to a reduction enrolls `total`/composite-delegated (Inferences) + facade-delegated, and PROVES",
           "call": "it"
         },
         {
-          "line": 396,
-          "title": "LocalPrimitives `.asTruths().satisfied()` façade (a direct `code is` decision guard) enrolls facade-satisfied",
+          "line": 397,
+          "title": "LocalElements `.asTruths().satisfied()` façade (a direct `code is` decision guard) enrolls facade-satisfied",
           "call": "it"
         },
         {
-          "line": 416,
+          "line": 417,
           "title": "a `criterion` enrolls as a SANCTIONED THREE-STATE guard, not a total axiom",
           "call": "it"
         },
         {
-          "line": 446,
+          "line": 447,
           "title": "the subject boundary is the POLICY library (CQLEmitter output); fixed catalog libraries are excluded",
           "call": "it"
         },
         {
-          "line": 460,
+          "line": 461,
           "title": "tallies `rejected` (bare-scalar) apart from `unclassified` build debt (both-rep), independent of emit",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "31c299cefa5c4204665ad6a120139fbcad5fa1d49a019bb6da1a446b15e27807"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "55e0eb25e7a84f8d7f0df28a313c5f2a6d8a9bf9c4fa80b471d39d0a45d298e9"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/lowerLocalCodes.test.ts",
-      "sha256": "021736731c7010d7323520ee53aa74ddfc7e5d7737eab0360c31f382e987be50",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": {
-        "report": "tmp/637-vitest.json",
-        "status": "passed",
-        "passed": 44,
-        "failed": 0,
-        "pending": 0,
-        "sourceSha256": "021736731c7010d7323520ee53aa74ddfc7e5d7737eab0360c31f382e987be50",
-        "limits": "Vitest in isolation; no native execution. Final source-only tags/titles and baseline line-ending restoration are separate from these tested bytes."
-      },
+      "sha256": "937287258a72a28ebc2116a7d573de0149e1e51a08491b5b9b52472b78cf7318",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 4,
       "tests": [
@@ -5870,8 +5854,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "b741713640b528ec2b5dcda61e435b81b36fdb33a3f17b49339bb3d200abcae4"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "937287258a72a28ebc2116a7d573de0149e1e51a08491b5b9b52472b78cf7318"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/meta-emit-registry.test.ts",
@@ -6094,97 +6078,97 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/pureQuestionEmit.test.ts",
-      "sha256": "4248523da6cf7a813c945d506eddc7d194ab8d3aa89b89b8ddcabc8e58169540",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "a11d5cd861f153086c092b919aac8707724c0ae0333c2986d9892b8846882929",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 32,
+          "line": 33,
           "title": "a PURE QUESTION reads `answeredValue()` (true / false / null), never the truth-set collapse",
           "call": "it"
         },
         {
-          "line": 44,
+          "line": 45,
           "title": "the facade re-exports the question BARE — a `.satisfied()` there would re-manufacture the false",
           "call": "it"
         },
         {
-          "line": 74,
+          "line": 75,
           "title": "emits the twin + the three-state read, each define exactly ONCE",
           "call": "it"
         },
         {
-          "line": 92,
+          "line": 93,
           "title": "declares the `answeredValue()` fluent's library — the direct path has the case-feature lane OFF",
           "call": "it"
         },
         {
-          "line": 99,
+          "line": 100,
           "title": "composes two questions in the BOOLEAN lane — bare leaves, so an unanswered operand stays unknown",
           "call": "it"
         },
         {
-          "line": 122,
+          "line": 123,
           "title": "REFUSES when the synthesized `\"<X> Records\"` name is already taken, rather than colliding silently",
           "call": "it"
         },
         {
-          "line": 140,
+          "line": 141,
           "title": "`exists this` is a DERIVATION, not a question — absence stays closed-world false",
           "call": "it"
         },
         {
-          "line": 146,
+          "line": 147,
           "title": "the pure question's records retrieve is unchanged in SHAPE — it moves to the `Records` twin",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "4248523da6cf7a813c945d506eddc7d194ab8d3aa89b89b8ddcabc8e58169540"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "a11d5cd861f153086c092b919aac8707724c0ae0333c2986d9892b8846882929"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/recencyRecordMerge.test.ts",
-      "sha256": "6d6c95397b59cb91549f628a3fc1c50373de9d3353cf5f817902940d886919e2",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "0f114d42f4066fa00fd7d5316b6eb38fe6f1c8c7d74ad01e23ef86fff88144d8",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 46,
+          "line": 47,
           "title": "lowers at all — it used to be refused `emit-reduction-not-active`",
           "call": "it"
         },
         {
-          "line": 66,
+          "line": 67,
           "title": "⭐ emits the two arms UNIONED into one collection, with the stage selecting over it",
           "call": "it"
         },
         {
-          "line": 81,
+          "line": 82,
           "title": "⭐⭐ the concept's OWN define carries the boundary transform — check, then replace",
           "call": "it"
         },
         {
-          "line": 97,
+          "line": 98,
           "title": "publishes each arm as its own retrieve — local by CODE, source by VALUE SET",
           "call": "it"
         },
         {
-          "line": 103,
+          "line": 104,
           "title": "⚠ emits NO `undefined` — the value-merge path would have interpolated one",
           "call": "it"
         },
         {
-          "line": 113,
+          "line": 114,
           "title": "⚠ does NOT read a value — a Record publishes the record, and the guard reads the value later",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "6d6c95397b59cb91549f628a3fc1c50373de9d3353cf5f817902940d886919e2"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "0f114d42f4066fa00fd7d5316b6eb38fe6f1c8c7d74ad01e23ef86fff88144d8"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/recencyTieBreak.test.ts",
@@ -6230,35 +6214,35 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/recordUnionTerms.test.ts",
-      "sha256": "313db94e3788dab67983e83d5ae565564c3a5cb6c617084dafeceb9069c2e8d9",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "1a184bb4492d21c487919c4fea31fea61cabf91d94bf9cb10616525a2c1fd080",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 56,
+          "line": 57,
           "title": "⭐ the twin LISTS its space, in order, with the layer of each term",
           "call": "it"
         },
         {
-          "line": 64,
+          "line": 65,
           "title": "⚠ the LAYER is part of the term, because it decides the include qualifier",
           "call": "it"
         },
         {
-          "line": 73,
+          "line": 74,
           "title": "the local term names the concept itself — the LP retrieve twin shares the author's name",
           "call": "it"
         },
         {
-          "line": 79,
+          "line": 80,
           "title": "⚠ the marker and the terms are set in LOCK-STEP",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "313db94e3788dab67983e83d5ae565564c3a5cb6c617084dafeceb9069c2e8d9"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "1a184bb4492d21c487919c4fea31fea61cabf91d94bf9cb10616525a2c1fd080"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/reductionExistsEmit.test.ts",
@@ -6456,9 +6440,9 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/semnotLowering.test.ts",
-      "sha256": "48feceb9da2feec9e6e311df106c90891a472126e1fe1d579f90c2c4c2e7941f",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "416ec7e7d0220cb1beaf2905f7e4da95db784cf0d4c651fadc149c61e6221a9a",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 1,
       "tests": [
@@ -6528,8 +6512,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "48feceb9da2feec9e6e311df106c90891a472126e1fe1d579f90c2c4c2e7941f"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "416ec7e7d0220cb1beaf2905f7e4da95db784cf0d4c651fadc149c61e6221a9a"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/terminologyIdentifierCollision.test.ts",
@@ -6593,9 +6577,9 @@
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/totalScalarBoolean.test.ts",
-      "sha256": "861d91a65172f25127089902352a4fda406997d5fdcfe40006b2df9f61fb2565",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "4254436045fec7abd620a003652c8388685b45aa95ff25b3eb64dac363d45036",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 2,
       "tests": [
@@ -6626,7 +6610,7 @@
         },
         {
           "line": 134,
-          "title": "an alias to a plain `code is` boolean (a LocalPrimitives retrieve, NOT a reduction) is NOT total",
+          "title": "an alias to a plain `code is` boolean (a LocalElements retrieve, NOT a reduction) is NOT total",
           "call": "it"
         },
         {
@@ -6710,8 +6694,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review631",
-      "inspectedSourceSha256": "861d91a65172f25127089902352a4fda406997d5fdcfe40006b2df9f61fb2565"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "4254436045fec7abd620a003652c8388685b45aa95ff25b3eb64dac363d45036"
     },
     {
       "path": "packages/crl/src/cql-emitter/tests/truthsetProbe.test.ts",
@@ -9339,237 +9323,237 @@
     },
     {
       "path": "packages/crl/src/emit/tests/closeIndex.test.ts",
-      "sha256": "5ad230c9cdaa80a526b188d852c026001639b50c07c00967edf17897795a6d1c",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "cced84ce69606e512893e3614fdd09dbcc0c01357d89118583004b4e535c3a55",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 2,
       "tests": [
         {
-          "line": 56,
+          "line": 57,
           "title": "keys by {libraryIdentity, defineName}, resolving same-named impl twin and public entry to DISTINCT entries",
           "call": "it"
         },
         {
-          "line": 84,
+          "line": 85,
           "title": "routes {source, name} to the UNIQUE public entry — the impl twin and façade are NOT candidates (Inferences-wins)",
           "call": "it"
         },
         {
-          "line": 96,
+          "line": 97,
           "title": "returns MISSING for an unknown reference and AMBIGUOUS only when ≥2 PUBLIC entries remain after the winner rule",
           "call": "it"
         },
         {
-          "line": 127,
+          "line": 128,
           "title": "(a) a RENDERED qualified façade operand resolves directly to the enrolled identity",
           "call": "it"
         },
         {
-          "line": 131,
+          "line": 132,
           "title": "(a) a bare ref into its OWN emitted library resolves directly",
           "call": "it"
         },
         {
-          "line": 135,
+          "line": 136,
           "title": "(b) a bare ref maps fromLibrary→source, then routes to the public identity",
           "call": "it"
         },
         {
-          "line": 145,
+          "line": 146,
           "title": "(c) a raw qualified ref routes via the injected scope resolver",
           "call": "it"
         },
         {
-          "line": 150,
+          "line": 151,
           "title": "FAIL-CLOSED: an unroutable operand returns a sentinel identity (never enrolled) — no throw",
           "call": "it"
         },
         {
-          "line": 156,
+          "line": 157,
           "title": "an UNRESOLVED composite operand yields a ProofFailure that NAMES the miss (fail-closed at proof time)",
           "call": "it"
         },
         {
-          "line": 177,
+          "line": 178,
           "title": "cms22-split: ledgerEntries surface on policy libs (absent on catalog); completeness is green over policy libs",
           "call": "it"
         },
         {
-          "line": 198,
+          "line": 199,
           "title": "CLOSURE inventory pin: a façade composite resolves CROSS-LAYER to its Inferences determination (proven)",
           "call": "it"
         },
         {
-          "line": 210,
+          "line": 211,
           "title": "CLOSURE inventory pin: the two bare `code is` forms report DIFFERENTLY — a question owes a three-state read, a non-Observation boolean is rejected",
           "call": "it"
         },
         {
-          "line": 238,
+          "line": 239,
           "title": "decision-when-reduction: the role→visibility mapping fires from real layered emit; routing applies the winner rule",
           "call": "it"
         },
         {
-          "line": 272,
+          "line": 273,
           "title": "a real `count … at least N` reduction enrolls dischargedBy `count-bare`, total Scalar<boolean>",
           "call": "it"
         }
       ],
-      "inspectionBy": "lead, review632",
-      "inspectedSourceSha256": "5ad230c9cdaa80a526b188d852c026001639b50c07c00967edf17897795a6d1c"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "cced84ce69606e512893e3614fdd09dbcc0c01357d89118583004b4e535c3a55"
     },
     {
       "path": "packages/crl/src/emit/tests/declaredResultIndex.test.ts",
-      "sha256": "908bd5aa421800f920b8dc8d25e4938641cc0144c496e6524094ffe746b80ced",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "0a820abd1bc5a37d11eb14d10b5d021048ab93c1a1838c664cd38733506c47ec",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 59,
+          "line": 60,
           "title": "a boolean Scalar concept indexes as Scalar<boolean>",
           "call": "it"
         },
         {
-          "line": 64,
+          "line": 65,
           "title": "a RecordSet concept indexes as RecordSet<resource>",
           "call": "it"
         },
         {
-          "line": 69,
+          "line": 70,
           "title": "an INDETERMINATE scalar (0 or >1 value types) → `indeterminate` (distinct from miss)",
           "call": "it"
         },
         {
-          "line": 77,
+          "line": 78,
           "title": "a miss (unknown source or name) → `miss` (distinct from indeterminate)",
           "call": "it"
         },
         {
-          "line": 83,
+          "line": 84,
           "title": "keys do NOT collide across spaced identity/name boundaries (JSON key, not a delimiter)",
           "call": "it"
         },
         {
-          "line": 98,
+          "line": 99,
           "title": "a `source-impl` twin is EXCLUDED; the same-name `public-determination` wins",
           "call": "it"
         },
         {
-          "line": 105,
+          "line": 106,
           "title": "order-independent: `public-determination` first, `source-impl` second — still the determination",
           "call": "it"
         },
         {
-          "line": 112,
+          "line": 113,
           "title": "an Interface re-export façade (flag) is NOT a candidate",
           "call": "it"
         },
         {
-          "line": 118,
+          "line": 119,
           "title": "an `interface-facade` ROLE (no flag) is NOT a candidate",
           "call": "it"
         },
         {
-          "line": 124,
+          "line": 125,
           "title": "a `records-impl` twin alone (no public twin) is NOT a candidate",
           "call": "it"
         },
         {
-          "line": 130,
+          "line": 131,
           "title": "two DISTINCT public candidates for one {source,name} → `ambiguous` (fail-safe, not a wrong pick)",
           "call": "it"
         },
         {
-          "line": 138,
+          "line": 139,
           "title": "an untagged authored foreign concept IS public (indexed)",
           "call": "it"
         },
         {
-          "line": 154,
+          "line": 155,
           "title": "a QUALIFIED ref resolves its library token via the referrer's SCOPE, OVER a shadowing direct hit",
           "call": "it"
         },
         {
-          "line": 166,
+          "line": 167,
           "title": "scope miss WITH a resolver armed → `miss` (does NOT fall through to a raw token hit)",
           "call": "it"
         },
         {
-          "line": 173,
+          "line": 174,
           "title": "no resolver (default) → the qualified token is treated AS a source identity (direct hit)",
           "call": "it"
         },
         {
-          "line": 181,
+          "line": 182,
           "title": "a self-qualified ref (libraryName === fromIdentity) resolves via the token-as-source default",
           "call": "it"
         },
         {
-          "line": 189,
+          "line": 190,
           "title": "a BARE ref resolves in the referrer's OWN source library",
           "call": "it"
         },
         {
-          "line": 195,
+          "line": 196,
           "title": "an unknown qualified token (no scope, no direct source) → `miss`",
           "call": "it"
         },
         {
-          "line": 202,
+          "line": 203,
           "title": "a total scalar boolean (an `exists` reduction) → `{ total: true }`",
           "call": "it"
         },
         {
-          "line": 207,
+          "line": 208,
           "title": "a NON-total but coherent concept (a RecordSet) → `{ total: false }` (a hit, verdict false — NOT indeterminate)",
           "call": "it"
         },
         {
-          "line": 212,
+          "line": 213,
           "title": "a same-lib boolean COMPOSITION over same-lib total booleans → `{ total: true }`",
           "call": "it"
         },
         {
-          "line": 233,
+          "line": 234,
           "title": "CHAINED cross-lib: a boolean composition with its OWN qualified operand projects NON-total (Option-(a) conservative-loud, NOT a silent wrong verdict)",
           "call": "it"
         },
         {
-          "line": 253,
+          "line": 254,
           "title": "preserves DISTINCT non-total causes: indeterminate / ambiguous / miss (NOT flattened to `total:false`)",
           "call": "it"
         },
         {
-          "line": 278,
+          "line": 279,
           "title": "a BARE ref recurses SAME-LAYER (returns a `concept` resolution, identical to the legacy arm)",
           "call": "it"
         },
         {
-          "line": 283,
+          "line": 284,
           "title": "a genuinely-FOREIGN qualified ref → the index totality verdict (total)",
           "call": "it"
         },
         {
-          "line": 288,
+          "line": 289,
           "title": "a foreign qualified ref to a NON-total foreign concept → `{ total: false }`",
           "call": "it"
         },
         {
-          "line": 293,
+          "line": 294,
           "title": "a scope MISS with a resolver armed → `{ total: false }` (loud downstream, never a raw-token hit)",
           "call": "it"
         },
         {
-          "line": 298,
+          "line": 299,
           "title": "a RENDERED-LAYER token (classified positively) → a SAME-SOURCE index lookup, NOT a foreign resolution",
           "call": "it"
         }
       ],
-      "inspectionBy": "lead, review632",
-      "inspectedSourceSha256": "908bd5aa421800f920b8dc8d25e4938641cc0144c496e6524094ffe746b80ced"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "0a820abd1bc5a37d11eb14d10b5d021048ab93c1a1838c664cd38733506c47ec"
     },
     {
       "path": "packages/crl/src/emit/tests/effectiveRepresentation.test.ts",
@@ -9838,9 +9822,9 @@
     },
     {
       "path": "packages/crl/src/emit/tests/producerCandidate.test.ts",
-      "sha256": "1a6659d5869f250bbc0c8a5756cac20404c8310940ec89c252e507a72696f86d",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "f494e8769174010e94714de4135e3f2777bc7e3bd256b407fac5b0fe29fe5b39",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
@@ -9894,13 +9878,15 @@
           "title": "⚠ fail-closed on a resource with no carrier for the declared type — no guess, no `value[x]`",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "f494e8769174010e94714de4135e3f2777bc7e3bd256b407fac5b0fe29fe5b39"
     },
     {
       "path": "packages/crl/src/emit/tests/publicationAge.test.ts",
-      "sha256": "3f8da09b4fd0820d61d3c8fc23d87b5479419f234300a5ac60a8ca87e7e703c2",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "8bd5eaaf422ccdce5bfff58d884a724913477e903bd862a8fe16d264da6a3bac",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 3,
       "tests": [
@@ -9922,18 +9908,12 @@
         {
           "line": 67,
           "title": "crosses the birthday without a Patient update and dates the calculation today",
-          "call": "it",
-          "kitClaims": [
-            "patient-age-projection:daily-calculation"
-          ]
+          "call": "it"
         },
         {
           "line": 72,
           "title": "missing/partial DOB %s does not manufacture a negative",
-          "call": "it.each([undefined, \"2008\", \"2008-09\"])",
-          "kitClaims": [
-            "patient-age-projection:missing-partial-dob"
-          ]
+          "call": "it.each([undefined, \"2008\", \"2008-09\"])"
         },
         {
           "line": 73,
@@ -9943,18 +9923,12 @@
         {
           "line": 75,
           "title": "selects the intended determination (%s)",
-          "call": "it.each([ [\"2008-09-07\", [local(false, \"2026-09-06\")], true], [\"2008-09-07\", [local(false)], false], [\"2008-09-07\", [local(undefined)], undefined], [undefined, ",
-          "kitClaims": [
-            "patient-age-projection:assertion-calculation-selection"
-          ]
+          "call": "it.each([ [\"2008-09-07\", [local(false, \"2026-09-06\")], true], [\"2008-09-07\", [local(false)], false], [\"2008-09-07\", [local(undefined)], undefined], [undefined, "
         },
         {
           "line": 88,
           "title": "expires yesterday's cached calculation",
-          "call": "it",
-          "kitClaims": [
-            "patient-age-projection:cached-calculation-expiry"
-          ]
+          "call": "it"
         },
         {
           "line": 89,
@@ -9984,10 +9958,7 @@
         {
           "line": 109,
           "title": "requires observable method rather than guessing from the local arm",
-          "call": "it",
-          "kitClaims": [
-            "patient-age-projection:observable-method"
-          ]
+          "call": "it"
         },
         {
           "line": 113,
@@ -9999,7 +9970,9 @@
           "title": "uses invocation offset to determine same-day eligibility",
           "call": "it"
         }
-      ]
+      ],
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "8bd5eaaf422ccdce5bfff58d884a724913477e903bd862a8fe16d264da6a3bac"
     },
     {
       "path": "packages/crl/src/emit/tests/publicationBMI.test.ts",
@@ -10578,9 +10551,9 @@
     },
     {
       "path": "packages/crl/src/emit/tests/publicationSource.test.ts",
-      "sha256": "61bfc846019592c353f4d363e36a159825dd0df42ac4aa8663ed314426b2aa92",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "8729d7149356d2f9cd4df5c7186ec657a8bc9e3269c88b4c597ca10067963a6e",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 1,
       "tests": [
@@ -10592,18 +10565,12 @@
         {
           "line": 46,
           "title": "matches either finite code by exact system/code, not display or resource presence",
-          "call": "it",
-          "kitClaims": [
-            "source-representation:finite-code-match"
-          ]
+          "call": "it"
         },
         {
           "line": 53,
           "title": "newer local %s displaces the positive source without OR",
-          "call": "it.each([false, undefined])",
-          "kitClaims": [
-            "source-representation:local-source-selection"
-          ]
+          "call": "it.each([false, undefined])"
         },
         {
           "line": 61,
@@ -10686,8 +10653,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "lead, review632",
-      "inspectedSourceSha256": "1a8ae4dcd3af95de5be4021f9ea8b8e518305fad9b5b5da9185b313c466bd553"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "8729d7149356d2f9cd4df5c7186ec657a8bc9e3269c88b4c597ca10067963a6e"
     },
     {
       "path": "packages/crl/src/emit/tests/publicationTemporal.test.ts",
@@ -11382,17 +11349,9 @@
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/caseFeatureRecord.test.ts",
-      "sha256": "de5aa443c3c9281064bdb9a6760f7dc8d7890e5787d6607640f1d669ce1f17e7",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": {
-        "report": "tmp/632-corrected-vitest.json",
-        "status": "passed",
-        "passed": 11,
-        "failed": 0,
-        "pending": 0,
-        "sourceSha256": "de5aa443c3c9281064bdb9a6760f7dc8d7890e5787d6607640f1d669ce1f17e7",
-        "limits": "Latest affected-file Vitest run in review632 isolation. No native or installed-artifact execution."
-      },
+      "sha256": "d645ce091faadd89811df72daaa8084e67c2f1c57af52aeecba0f86f4fe38228",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
@@ -11452,8 +11411,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "de5aa443c3c9281064bdb9a6760f7dc8d7890e5787d6607640f1d669ce1f17e7"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "d645ce091faadd89811df72daaa8084e67c2f1c57af52aeecba0f86f4fe38228"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/ccScreeningRoundTrip.test.ts",
@@ -11581,17 +11540,9 @@
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts",
-      "sha256": "f62ca322f84a83a3b4445fadcf7d3c86c1e8dea04b5b11348c2c3b00cb09d3f8",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": {
-        "report": "tmp/639-vitest.json",
-        "status": "passed",
-        "passed": 58,
-        "failed": 0,
-        "pending": 0,
-        "sourceSha256": "f62ca322f84a83a3b4445fadcf7d3c86c1e8dea04b5b11348c2c3b00cb09d3f8",
-        "limits": "Isolated Vitest; no native/installed execution. Subsequent comment-only tags do not change assertions."
-      },
+      "sha256": "9504ed816674f671ebdf67c6fa566cc901353ac2af4a5a2197918c623ac6c779",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 18,
       "tests": [
@@ -11652,7 +11603,7 @@
         },
         {
           "line": 226,
-          "title": "#189 Slice-C flip — case (b) a decision + `code is` + reduction library EMITS successfully (the reduction classifies Inferences → the library splits, so the case-feature lane has its LocalPrimitives target)",
+          "title": "#189 Slice-C flip — case (b) a decision + `code is` + reduction library EMITS successfully (the reduction classifies Inferences → the library splits, so the case-feature lane has its LocalElements target)",
           "call": "it"
         },
         {
@@ -11697,7 +11648,7 @@
         },
         {
           "line": 631,
-          "title": "F4 — two eligible LocalPrimitives-boolean concepts → BOTH case-feature SDs emitted AND each when-action carries its input.profile (silent-omission guard)",
+          "title": "F4 — two eligible LocalElements-boolean concepts → BOTH case-feature SDs emitted AND each when-action carries its input.profile (silent-omission guard)",
           "call": "it"
         },
         {
@@ -11876,8 +11827,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "f62ca322f84a83a3b4445fadcf7d3c86c1e8dea04b5b11348c2c3b00cb09d3f8"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "9504ed816674f671ebdf67c6fa566cc901353ac2af4a5a2197918c623ac6c779"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/codeSystem.test.ts",
@@ -12174,390 +12125,390 @@
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/decision.test.ts",
-      "sha256": "1acc9e036ddc74ee6bfc92e0e7eff527d65634bc01fcbe1c58797ebeccf3a080",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "cefad333536a85dc967e23c243fc569aa3591ad1979f15d30eddfea5f6ccea4e",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 3,
       "tests": [
         {
-          "line": 164,
+          "line": 165,
           "title": "emits Strategy profile + workflow-definition type when isRoot=true",
           "call": "it"
         },
         {
-          "line": 186,
+          "line": 187,
           "title": "emits `version` from package.json (CRMI shareable floor)",
           "call": "it"
         },
         {
-          "line": 195,
+          "line": 196,
           "title": "emits 3 knowledgeCapability extensions (NOT executable)",
           "call": "it"
         },
         {
-          "line": 208,
+          "line": 209,
           "title": "Strategy property test (round-3 F6): action key set ⊆ allowed set; forbidden 7 absent at all depths",
           "call": "it"
         },
         {
-          "line": 247,
+          "line": 248,
           "title": "emits additive CRMI plandefinition profiles (no CPG strategy profile) + eca-rule type",
           "call": "it"
         },
         {
-          "line": 264,
+          "line": 265,
           "title": "WhenBlock condition becomes action.condition with text/cql-identifier",
           "call": "it"
         },
         {
-          "line": 277,
+          "line": 278,
           "title": "recommend activity X → definitionCanonical = Recommendation URL",
           "call": "it"
         },
         {
-          "line": 287,
+          "line": 288,
           "title": "use decision Y → definitionCanonical = sub-decision PlanDef URL",
           "call": "it"
         },
         {
-          "line": 297,
+          "line": 298,
           "title": "nested when/then → nested action.action[]",
           "call": "it"
         },
         {
-          "line": 316,
+          "line": 317,
           "title": "any: qualifier keeps the crl-logical-switch stand-in (deferred to #184)",
           "call": "it"
         },
         {
-          "line": 336,
+          "line": 337,
           "title": "all: or no qualifier → no crl-logical-switch extension",
           "call": "it"
         },
         {
-          "line": 390,
+          "line": 391,
           "title": "`only when C` → positive text/cql-identifier (bare, byte-identical to a when atom)",
           "call": "it"
         },
         {
-          "line": 398,
+          "line": 399,
           "title": "`unless C` (multi-word) → negated `not Coalesce(\"<Lib>\".\"<name>\", false)`",
           "call": "it"
         },
         {
-          "line": 418,
+          "line": 419,
           "title": "BRANCH guards propagate null; ACTION guards do NOT — the same concept, two carriers",
           "call": "it"
         },
         {
-          "line": 439,
+          "line": 440,
           "title": "an UNGUARDED menu action emits no condition[] (byte-unchanged from pre-iii.1)",
           "call": "it"
         },
         {
-          "line": 446,
+          "line": 447,
           "title": "resolves BOTH an unresolved guard AND an unresolved leaf; suppresses the item; guard diag at guard.location",
           "call": "it"
         },
         {
-          "line": 465,
+          "line": 466,
           "title": "adds the guard concept as action.input[] (case-feature parity with a when atom)",
           "call": "it"
         },
         {
-          "line": 480,
+          "line": 481,
           "title": "self-qualified `unless MyLib.\"C\"` inside MyLib normalizes to bare C (condition parity, F5)",
           "call": "it"
         },
         {
-          "line": 490,
+          "line": 491,
           "title": "`only when C` also contributes action.input[] (shared case-feature path)",
           "call": "it"
         },
         {
-          "line": 503,
+          "line": 504,
           "title": "a guarded `use decision` member lowers its guard + resolves the sub-decision leaf",
           "call": "it"
         },
         {
-          "line": 514,
+          "line": 515,
           "title": "rule 1: unresolved concept suppresses entire WhenBlock + unresolved-concept UnmatchedReference",
           "call": "it"
         },
         {
-          "line": 524,
+          "line": 525,
           "title": "rule 2: unresolved activity ref suppresses the WhenBlock + unresolved-activity",
           "call": "it"
         },
         {
-          "line": 533,
+          "line": 534,
           "title": "rule 3: mixed children (some emit, some suppress) → emit parent with survivors, NO cascade diagnostic",
           "call": "it"
         },
         {
-          "line": 559,
+          "line": 560,
           "title": "rule 4 + 7 (round-6): all-the-way-up cascade fires decision-cascade-suppressed ONLY (no separate cascade warning per level)",
           "call": "it"
         },
         {
-          "line": 581,
+          "line": 582,
           "title": "rule 4 + 7 (round-6): mixed top-level (cascade + survive) emits ONE cascade warning at the cascade root",
           "call": "it"
         },
         {
-          "line": 606,
+          "line": 607,
           "title": "rule 7 (round-6 Claude): deeply-nested all-suppress emits ZERO mid-tree cascade warnings (decision-cascade-suppressed subsumes)",
           "call": "it"
         },
         {
-          "line": 633,
+          "line": 634,
           "title": "rule 6: all top-level actions cascade-suppressed → decision-cascade-suppressed + skip resource",
           "call": "it"
         },
         {
-          "line": 642,
+          "line": 643,
           "title": "rule 5: top-level mixed → resource emits with surviving actions only",
           "call": "it"
         },
         {
-          "line": 665,
+          "line": 666,
           "title": "classifies root vs sub via dependency graph",
           "call": "it"
         },
         {
-          "line": 686,
+          "line": 687,
           "title": "Strategy → Sub-decision reference uses planDefinitionCanonicalUrl (byte-equality)",
           "call": "it"
         },
         {
-          "line": 697,
+          "line": 698,
           "title": "Recommend activity in decision → definitionCanonical = recommendationDefinitionCanonicalUrl",
           "call": "it"
         },
         {
-          "line": 707,
+          "line": 708,
           "title": "library[0] byte-equals libraryCanonicalUrl",
           "call": "it"
         },
         {
-          "line": 716,
+          "line": 717,
           "title": "cycle: A → B → A → circular-decision-reference + skip both",
           "call": "it"
         },
         {
-          "line": 726,
+          "line": 727,
           "title": "empty-strategy-entrypoint fires ONLY when acyclic + no root + decisions exist",
           "call": "it"
         },
         {
-          "line": 738,
+          "line": 739,
           "title": "intra-Decision slug collision: two decisions slugify identically → slug-collision + skip both",
           "call": "it"
         },
         {
-          "line": 748,
+          "line": 749,
           "title": "same-library qualified ref `\"Lib\".\"C\"` is treated as local (matches validator)",
           "call": "it"
         },
         {
-          "line": 758,
+          "line": 759,
           "title": "true cross-library qualified ref → unresolved-decision (Todo 4 will resolve)",
           "call": "it"
         },
         {
-          "line": 768,
+          "line": 769,
           "title": "round-6 C1 regression: foreign-qualified `use decision` does NOT create a phantom local cycle even when name collides",
           "call": "it"
         },
         {
-          "line": 782,
+          "line": 783,
           "title": "round-6 C1 regression: foreign-qualified `use decision` does NOT misclassify local same-name decision as sub-decision",
           "call": "it"
         },
         {
-          "line": 799,
+          "line": 800,
           "title": "libraryName contract: when slug ≠ name (`\"My Library\"` vs `my-library`), qualified ref still resolves locally",
           "call": "it"
         },
         {
-          "line": 811,
+          "line": 812,
           "title": "first: top-level wraps branches in a cqf-applicabilityBehavior switch group; otherwise is conditionless + LAST",
           "call": "it"
         },
         {
-          "line": 850,
+          "line": 851,
           "title": "unresolved leaf under otherwise suppresses that branch but keeps surviving siblings",
           "call": "it"
         },
         {
-          "line": 868,
+          "line": 869,
           "title": "first: nested block carries the cqf-applicabilityBehavior extension (branch-switch)",
           "call": "it"
         },
         {
-          "line": 888,
+          "line": 889,
           "title": "all: nested block carries NO extension (emit-neutral)",
           "call": "it"
         },
         {
-          "line": 942,
-          "title": "a `when` LocalPrimitives-boolean concept gets one action.input with the right profile and a missing-wording warning",
+          "line": 943,
+          "title": "a `when` LocalElements-boolean concept gets one action.input with the right profile and a missing-wording warning",
           "call": "it"
         },
         {
-          "line": 951,
+          "line": 952,
           "title": "#189 2d: the resolver's NATURAL `resourceType` becomes `action.input.type` (no Observation fallback)",
           "call": "it"
         },
         {
-          "line": 971,
-          "title": "a `when` condition the resolver returns null for (ExternalPrimitives/Inferences — no case-feature SD) gets NO input",
+          "line": 972,
+          "title": "a `when` condition the resolver returns null for (ExternalElements/Inferences — no case-feature SD) gets NO input",
           "call": "it"
         },
         {
-          "line": 980,
+          "line": 981,
           "title": "a QUALIFIED (cross-library) `when` ref is skipped — never queries the resolver → no input",
           "call": "it"
         },
         {
-          "line": 993,
+          "line": 994,
           "title": "the default resolver (omitted arg) attaches NO input — keeps cms / per-library callers unchanged",
           "call": "it"
         },
         {
-          "line": 1002,
-          "title": "a NESTED `when` on an eligible LocalPrimitives-boolean concept gets its OWN action.input (no aggregation, any depth)",
+          "line": 1003,
+          "title": "a NESTED `when` on an eligible LocalElements-boolean concept gets its OWN action.input (no aggregation, any depth)",
           "call": "it"
         },
         {
-          "line": 1024,
+          "line": 1025,
           "title": "a nested `when` the resolver returns null for gets NO input (its OWN condition is not case-feature-eligible)",
           "call": "it"
         },
         {
-          "line": 1043,
+          "line": 1044,
           "title": "a SAME-library qualified `when` ref (self-qualified) gets its input — consistent with its condition (F2)",
           "call": "it"
         },
         {
-          "line": 1111,
+          "line": 1112,
           "title": "`A and not B` → ONE arm, positive `A` (cql-identifier) + NULL-PROPAGATING `not <ref>` (cql-expression)",
           "call": "it"
         },
         {
-          "line": 1134,
+          "line": 1135,
           "title": "a single `when not B` → one action, one negated condition, title `not B` (routes through DNF)",
           "call": "it"
         },
         {
-          "line": 1149,
+          "line": 1150,
           "title": "De Morgan: `not (A and B)` → TWO arms of ONE negated literal each (spliced under first:)",
           "call": "it"
         },
         {
-          "line": 1165,
+          "line": 1166,
           "title": "De Morgan: `not (A or B)` → ONE arm of TWO negated literals (¬A ∧ ¬B)",
           "call": "it"
         },
         {
-          "line": 1184,
+          "line": 1185,
           "title": "De Morgan under flat/no-qualifier: `not (A and B)` → ONE `any` wrapper over the two ¬ arms",
           "call": "it"
         },
         {
-          "line": 1194,
+          "line": 1195,
           "title": "a negated atom's concept STILL contributes action.input[] (parity with iii.1 `unless`)",
           "call": "it"
         },
         {
-          "line": 1203,
+          "line": 1204,
           "title": "an unresolved NEGATED atom suppresses the whole guard (parity with positive)",
           "call": "it"
         },
         {
-          "line": 1220,
+          "line": 1221,
           "title": "`and` guard → ONE action carrying N ANDed applicability conditions",
           "call": "it"
         },
         {
-          "line": 1245,
+          "line": 1246,
           "title": "`or` guard under `first:` → arms SPLICED as ordered siblings (no wrapper, otherwise not starved)",
           "call": "it"
         },
         {
-          "line": 1261,
+          "line": 1262,
           "title": "`or` guard under flat/no-qualifier → ONE `cqf-applicabilityBehavior any` wrapper over the arms",
           "call": "it"
         },
         {
-          "line": 1272,
+          "line": 1273,
           "title": "`(A or B) and C` → DNF arms [A,C] then [B,C] (exact order)",
           "call": "it"
         },
         {
-          "line": 1287,
+          "line": 1288,
           "title": "compound `or` inside a NESTED `first:` block splices under the parent when-action",
           "call": "it"
         },
         {
-          "line": 1300,
+          "line": 1301,
           "title": "per-arm `input` = arm-aware union over the arm's atoms, deduped by canonical (first-seen)",
           "call": "it"
         },
         {
-          "line": 1320,
+          "line": 1321,
           "title": "a faithful multi-category model (4×5 = 20 arms) EMITS — the cap is NOT an authoring gate (#224 KE)",
           "call": "it"
         },
         {
-          "line": 1333,
+          "line": 1334,
           "title": "resource envelope: a pathological `and`-of-`or`s (>256 arms) → hard overflow, NO CQL, no OOM",
           "call": "it"
         },
         {
-          "line": 1356,
+          "line": 1357,
           "title": "an unresolved atom suppresses the WHOLE compound `when`; every bad atom is reported",
           "call": "it"
         },
         {
-          "line": 1372,
+          "line": 1373,
           "title": "shared body emitted ONCE — an unresolved leaf under a 2-arm `or` reports ONE diagnostic, not per-arm",
           "call": "it"
         },
         {
-          "line": 1394,
+          "line": 1395,
           "title": "duplicate atom `A and A` → two applicability conditions, ONE deduped input",
           "call": "it"
         },
         {
-          "line": 1403,
+          "line": 1404,
           "title": "same-library qualified atom `A and Lib.\"B\"` (in library Lib) is normalized + included",
           "call": "it"
         },
         {
-          "line": 1421,
+          "line": 1422,
           "title": "genuinely-foreign atom `A and Other.\"B\"` (unresolved cross-lib) suppresses the whole guard",
           "call": "it"
         },
         {
-          "line": 1441,
+          "line": 1442,
           "title": "two foreign atoms with the SAME name in DIFFERENT libraries → distinct diagnostics (atomKey)",
           "call": "it"
         },
         {
-          "line": 1455,
+          "line": 1456,
           "title": "a 17-wide `or` EMITS 17 spliced arms — the old 16 gate no longer bites (#224 KE)",
           "call": "it"
         },
         {
-          "line": 1468,
+          "line": 1469,
           "title": "`or` under an explicit `all:` qualifier → the `any` wrapper (named disc-286 contract case)",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "1acc9e036ddc74ee6bfc92e0e7eff527d65634bc01fcbe1c58797ebeccf3a080"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "cefad333536a85dc967e23c243fc569aa3591ad1979f15d30eddfea5f6ccea4e"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/emit-fhir-golden.test.ts",
@@ -12583,30 +12534,30 @@
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/example-fhir-golden.test.ts",
-      "sha256": "e7eed806a16420a52e1a566099f9bcb941f56d8091401f85da8c582e1553f231",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "c8583de896a0915cadec9fb77f9f9394348cbde924d8c8ac659d4318e401817a",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 4,
       "tests": [
         {
-          "line": 80,
+          "line": 81,
           "title": "emits with no errors",
           "call": "it"
         },
         {
-          "line": 104,
+          "line": 105,
           "title": "decision PlanDefinition input[] matches (inference order)",
           "call": "it"
         },
         {
-          "line": 119,
+          "line": 120,
           "title": "first: coverage PlanDefinition wraps branches in a cqf-applicabilityBehavior switch group",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "e7eed806a16420a52e1a566099f9bcb941f56d8091401f85da8c582e1553f231"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "c8583de896a0915cadec9fb77f9f9394348cbde924d8c8ac659d4318e401817a"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/idFormatter.test.ts",
@@ -13021,142 +12972,142 @@
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/partial-split-author-vs-golden.test.ts",
-      "sha256": "d0c384ff52e6ed256fcb239d167a39dc74f1929a638113179dd0751e0fb8b717",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "e45ca5c40c35e0aa4d573ca5b9b877274b74ce3dc938792b50f5af1ad7e5fa97",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 5,
       "tests": [
         {
-          "line": 75,
+          "line": 76,
           "title": "emits with no errors and no unmatched",
           "call": "it"
         },
         {
-          "line": 81,
+          "line": 82,
           "title": "the relocated terminology routes by SOURCE FAMILY: local CodeSystem → LocalConcepts, author ValueSet → ExternalConcepts",
           "call": "it"
         },
         {
-          "line": 129,
+          "line": 130,
           "title": "emits exactly one author ValueSet for the relocated terminology",
           "call": "it"
         },
         {
-          "line": 140,
+          "line": 141,
           "title": "regenerates the code-is-decision-vs golden",
           "call": "it"
         },
         {
-          "line": 159,
+          "line": 160,
           "title": "golden file set matches the emitted set",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "d0c384ff52e6ed256fcb239d167a39dc74f1929a638113179dd0751e0fb8b717"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "e45ca5c40c35e0aa4d573ca5b9b877274b74ce3dc938792b50f5af1ad7e5fa97"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/partial-split-fhir-golden.test.ts",
-      "sha256": "22320e6d35ef4e37cde555a60fd9a3c6c0163a153a6fdc4d32d15785cd154068",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "77ad752e007e03477db105b8b63328f1c1f17b10144206d8364c7ec44f3ef3e7",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 6,
       "tests": [
         {
-          "line": 68,
+          "line": 69,
           "title": "emits with no errors and no unmatched",
           "call": "it"
         },
         {
-          "line": 74,
+          "line": 75,
           "title": "R1 byte-equality: the FHIR CodeSystem.url == the CQL `codesystem '<url>'` literal, both POLICY-ID slugged",
           "call": "it"
         },
         {
-          "line": 92,
-          "title": "emits the R2 source-typed split Libraries (LocalConcepts + LocalPrimitives + Inferences + Interface) with the layered dep routing",
+          "line": 93,
+          "title": "emits the R2 source-typed split Libraries (LocalConcepts + LocalElements + Inferences + Interface) with the layered dep routing",
           "call": "it"
         },
         {
-          "line": 186,
+          "line": 187,
           "title": "the PlanDefinition + ActivityDefinition library[] resolve to the Interface Library canonical",
           "call": "it"
         },
         {
-          "line": 203,
+          "line": 204,
           "title": "regenerates the code-is-decision golden",
           "call": "it"
         },
         {
-          "line": 222,
+          "line": 223,
           "title": "golden file set matches the emitted set",
           "call": "it"
         },
         {
-          "line": 248,
+          "line": 249,
           "title": "Library pointing at a CQL file the manifest never paired with it → library-content-url-unresolved",
           "call": "it"
         },
         {
-          "line": 257,
+          "line": 258,
           "title": "Library content url = its OWN manifest-paired filename → no error",
           "call": "it"
         },
         {
-          "line": 268,
+          "line": 269,
           "title": "cross-wired: Library pointing at ANOTHER source's emitted CQL file → error (per-identity, not global)",
           "call": "it"
         },
         {
-          "line": 283,
+          "line": 284,
           "title": "wrong directory but matching basename → error (sibling-layout prefix required)",
           "call": "it"
         },
         {
-          "line": 292,
+          "line": 293,
           "title": "empty manifest → invariant is a no-op (graph-only path)",
           "call": "it"
         },
         {
-          "line": 316,
+          "line": 317,
           "title": "a manifest/closure mismatch (a source with NO manifest entry, but other sources present) surfaces the error through the full closure",
           "call": "it"
         },
         {
-          "line": 349,
+          "line": 350,
           "title": "the unmodified manifest passes the closure with no content-url error",
           "call": "it"
         },
         {
-          "line": 381,
+          "line": 382,
           "title": "a decision-bearing source with a multi-entry manifest but NO role:\"interface\"/\"root\" entry → decision-root-library-missing + decisions skipped (not thrown)",
           "call": "it"
         },
         {
-          "line": 406,
+          "line": 407,
           "title": "a single-entry manifest whose lone entry is NOT the name-keeping Root → single-entry malformed-manifest guard fires",
           "call": "it"
         },
         {
-          "line": 436,
+          "line": 437,
           "title": "a decision-bearing code-is source passed with NO manifest → decision-root-library-missing (case-feature lane can't silently skip)",
           "call": "it"
         },
         {
-          "line": 458,
+          "line": 459,
           "title": "a `emit-local-codesystem-urn-collision` (clean import graph, empty manifest) is folded into the FHIR result",
           "call": "it"
         },
         {
-          "line": 484,
+          "line": 485,
           "title": "a hand-authored MULTI-SYSTEM functional terminology now emits successfully (codesystem-url-conflict obsolete)",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "22320e6d35ef4e37cde555a60fd9a3c6c0163a153a6fdc4d32d15785cd154068"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "77ad752e007e03477db105b8b63328f1c1f17b10144206d8364c7ec44f3ef3e7"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/patient-age.test.ts",
@@ -13743,115 +13694,115 @@
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/structureDefinition.test.ts",
-      "sha256": "85b96b584ca1b481176511384fac1786fea7f8b66fb7e25520e2c3ebe78770ce",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "093f741b3ba999df2b1f89536282fdc63d48b2e58672d3d71c2d695cbd3bde3d",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 4,
       "tests": [
         {
-          "line": 63,
-          "title": "a LocalPrimitives boolean decision concept → exactly one StructureDefinition (id/url/system/code)",
+          "line": 64,
+          "title": "a LocalElements boolean decision concept → exactly one StructureDefinition (id/url/system/code)",
           "call": "it"
         },
         {
-          "line": 89,
+          "line": 90,
           "title": "an INFERRED decision condition (`defined as`) → its recursive `code is` leaf gets a StructureDefinition",
           "call": "it"
         },
         {
-          "line": 103,
+          "line": 104,
           "title": "a NON-boolean value-read `code is` decision concept FAILS LOUD (Slice-C deferred) — never a forced boolean SD",
           "call": "it"
         },
         {
-          "line": 121,
+          "line": 122,
           "title": "two overlength divergent `code is` leaves → distinct hashed SD ids/urls that byte-equal their recursive action.input profiles (truncation-collision regression)",
           "call": "it"
         },
         {
-          "line": 164,
+          "line": 165,
           "title": "emits the expected id/url/system/code/reference for a boolean concept",
           "call": "it"
         },
         {
-          "line": 199,
+          "line": 200,
           "title": "an empty featureExpression-library suffix throws (a root-pointing reference must never be emitted silently)",
           "call": "it"
         },
         {
-          "line": 218,
+          "line": 219,
           "title": "an empty code raises emit-casefeature-missing-code and emits no resource",
           "call": "it"
         },
         {
-          "line": 236,
+          "line": 237,
           "title": "an undefined code raises emit-casefeature-missing-code and emits no resource",
           "call": "it"
         },
         {
-          "line": 266,
+          "line": 267,
           "title": "two long concepts differing only PAST the 64-char cap get DISTINCT ids + survive Inv 1",
           "call": "it"
         },
         {
-          "line": 286,
+          "line": 287,
           "title": "the same concept name emits a stable id across calls (pure, order-independent)",
           "call": "it"
         },
         {
-          "line": 299,
+          "line": 300,
           "title": "two concepts that lossy-normalize to the same id → closure-resource-collision, both dropped (backstop)",
           "call": "it"
         },
         {
-          "line": 327,
+          "line": 328,
           "title": "a featureExpression reference to a non-emitted Library → unresolved-feature-expression-reference",
           "call": "it"
         },
         {
-          "line": 333,
+          "line": 334,
           "title": "a featureExpression reference to an emitted Library → no error",
           "call": "it"
         },
         {
-          "line": 352,
+          "line": 353,
           "title": "a VALUELESS Condition (`exists this`) → Condition, code pattern, subject + recordedDate, NO value[x]",
           "call": "it"
         },
         {
-          "line": 376,
+          "line": 377,
           "title": "a VALUELESS Observation (`exists this`) → Observation, code pattern, subject + effective[x], NO value[x]",
           "call": "it"
         },
         {
-          "line": 390,
+          "line": 391,
           "title": "a VALUE-READING Observation (`most recent this`, boolean) → adds Observation.value[x] boolean",
           "call": "it"
         },
         {
-          "line": 411,
+          "line": 412,
           "title": "a `default` structural element carries its pattern so $extract materialises it",
           "call": "it"
         },
         {
-          "line": 421,
+          "line": 422,
           "title": "a repeating `default` structural element is SLICED, not blanket-patterned",
           "call": "it"
         },
         {
-          "line": 436,
+          "line": 437,
           "title": "a `wired` structural element is not duplicated by the floor",
           "call": "it"
         },
         {
-          "line": 443,
+          "line": 444,
           "title": "subject + recency carry the sdc-questionnaire-definitionExtractValue extension wired to %resource",
           "call": "it"
         }
       ],
-      "inspectionBy": "native CRL emit reviewer, review633",
-      "inspectedSourceSha256": "85b96b584ca1b481176511384fac1786fea7f8b66fb7e25520e2c3ebe78770ce"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "093f741b3ba999df2b1f89536282fdc63d48b2e58672d3d71c2d695cbd3bde3d"
     },
     {
       "path": "packages/crl/src/fhir-emitter/tests/terminologyCodeDisplay.test.ts",
@@ -14826,49 +14777,50 @@
     },
     {
       "path": "packages/crl/src/imports/tests/criterionEmitEndToEnd.test.ts",
-      "sha256": "2110df721edb6624ad25b99f13b1401f39d09f9eb8246b841d453ab3952c9a22",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "ec44d3d85ea9176618b5af9e8e427ff9005d270e1f90826de16ef4f16f2de4ba",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 1,
       "tests": [
         {
-          "line": 88,
+          "line": 89,
           "title": "emits a named define + re-exports the criterion-only concept on the INTERFACE library",
           "call": "it"
         },
         {
-          "line": 103,
+          "line": 104,
           "title": "a MIXED guard `( Inline and Eligible )` re-exports BOTH the inline concept AND the criterion-body concept",
           "call": "it"
         },
         {
-          "line": 135,
+          "line": 136,
           "title": "a deep doubling-chain criterion emits LINEARLY (one define per criterion), not an overflow",
           "call": "it"
         },
         {
-          "line": 178,
+          "line": 179,
           "title": "re-exports the guard-only concept on the INTERFACE (self-qualified `unless \"Policy\".\"Blocker\"` does not dangle)",
           "call": "it"
         },
         {
-          "line": 189,
+          "line": 190,
           "title": "emits the negated condition (qualified + Coalesce) + the guard concept's input & case-feature SD",
           "call": "it"
         },
         {
-          "line": 228,
+          "line": 229,
           "title": "FHIR lane: the applicability condition names the criterion; the criterion-only concept still gets its SD + input",
           "call": "it"
         },
         {
-          "line": 257,
+          "line": 258,
           "title": "FHIR emit is DETERMINISTIC under a fixed date (repeated emit byte-identical)",
           "call": "it"
         }
       ],
-      "inspectionBy": "lead"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "ec44d3d85ea9176618b5af9e8e427ff9005d270e1f90826de16ef4f16f2de4ba"
     },
     {
       "path": "packages/crl/src/imports/tests/criterionMultifile.test.ts",
@@ -14965,39 +14917,40 @@
     },
     {
       "path": "packages/crl/src/imports/tests/definedAsExistsInferred.test.ts",
-      "sha256": "2cdab534174254b965c82d0a2d0c77d6149dc4c7d709e930b07dd2cbee089c51",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "fd33a9e97392d52190a8528628e08c372b7568a8aa95eabb6491ea1423b27f35",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 0,
       "tests": [
         {
-          "line": 27,
+          "line": 28,
           "title": "emits successfully (all inferred-lane exists consumers lower)",
           "call": "it"
         },
         {
-          "line": 31,
-          "title": "baseline — `defined as exists` over a records concept → bare scalar `exists (<LocalPrimitives>.\"X\")`",
+          "line": 32,
+          "title": "baseline — `defined as exists` over a records concept → bare scalar `exists (<LocalElements>.\"X\")`",
           "call": "it"
         },
         {
-          "line": 36,
+          "line": 37,
           "title": "Claude #1 — a bare-ref ALIAS to an exists concept re-exports BARE (never `.asTruths()` / never `.satisfied()` a scalar)",
           "call": "it"
         },
         {
-          "line": 47,
+          "line": 48,
           "title": "Claude #2 — a `sem-or` composition OVER two exists concepts flips to boolean `or` (never `union` two scalar Booleans)",
           "call": "it"
         },
         {
-          "line": 59,
+          "line": 60,
           "title": "refuses rather than silently drop the local-code fold on the canonical local-domain path",
           "call": "it"
         }
       ],
-      "inspectionBy": "lead"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "fd33a9e97392d52190a8528628e08c372b7568a8aa95eabb6491ea1423b27f35"
     },
     {
       "path": "packages/crl/src/imports/tests/dispositionValidate.integration.test.ts",
@@ -15037,9 +14990,9 @@
     },
     {
       "path": "packages/crl/src/imports/tests/emit.test.ts",
-      "sha256": "0bae03035c1f93a3fce6fa5129881b81020197252cb3ace987331c4ef4f7feaa",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "d4c1c3df932c475e4fb5b9b6e1907af555cee65856a5c3e3b4f9aac1e01919b5",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 2,
       "tests": [
@@ -15219,7 +15172,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "lead"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "d4c1c3df932c475e4fb5b9b6e1907af555cee65856a5c3e3b4f9aac1e01919b5"
     },
     {
       "path": "packages/crl/src/imports/tests/foreignPublicationInterface.test.ts",
@@ -15491,9 +15445,9 @@
     },
     {
       "path": "packages/crl/src/imports/tests/publicationEmit.test.ts",
-      "sha256": "ce7a21e655ef154bcbab17e2de1a78c4d73b0fd8b5901df6850a7d11ff5808dd",
-      "inspection": "read; disposition in survey-dispositions.md and reverse-claim-map.md",
-      "execution": "not run in broad audit",
+      "sha256": "bb3abd0fb13d26c9021f1edae5d533c954d9782c91077ed1edeacfba8d1baf0d",
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "execution": "See maintenance668 verification; not inferred from inventory generation",
       "runner": "vitest crl",
       "sourceLoops": 5,
       "tests": [
@@ -15553,7 +15507,8 @@
           "call": "it"
         }
       ],
-      "inspectionBy": "lead"
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "bb3abd0fb13d26c9021f1edae5d533c954d9782c91077ed1edeacfba8d1baf0d"
     },
     {
       "path": "packages/crl/src/imports/tests/registry-and-resolver-v21.test.ts",
@@ -24940,6 +24895,27 @@
       ],
       "inspectionBy": "native CRL emit reviewer, review635",
       "inspectedSourceSha256": "4a8cb1dc5cf60844fb30e94d19bc0d6156404e7ebe1d1abfd6573018e68df42c"
+    },
+    {
+      "path": "packages/crl/src/fhir-emitter/tests/elementLayers.test.ts",
+      "sha256": "41976786299f4fb2fada4369273f27243e67d81a2a4a2984dd66fc808c9ccd47",
+      "tests": [
+        {
+          "line": 15,
+          "title": "resolves the complete closure for policy %s",
+          "call": "it.each([\"elements-example\", \"a\".repeat(60) + \"x\", \"a\".repeat(60) + \"y\"])"
+        },
+        {
+          "line": 64,
+          "title": "distinguishes long shared-prefix policy and layer identities",
+          "call": "it"
+        }
+      ],
+      "sourceLoops": 3,
+      "inspection": "Elements naming delta inspected; unchanged value/query assertions retain prior bounded semantic evidence. See coverage.md maintenance668.",
+      "inspectionBy": "CRL lead, maintenance668",
+      "inspectedSourceSha256": "41976786299f4fb2fada4369273f27243e67d81a2a4a2984dd66fc808c9ccd47",
+      "execution": "See maintenance668 verification; not inferred from inventory generation"
     }
   ],
   "latestInspectionBaseline": "b2ff4762 plus639;301 files read, grouped claim mapping complete with explicit gaps/manual/historical evidence",
@@ -24954,5 +24930,40 @@
       "sha256": "ccf81a09fcbcee9d9ef6e6e44fc2b407bb87feb82003698f8e3af6dbe00b8851",
       "inspection": "Only mapped opt-in and MV gate assertions reviewed; not a full extension census or fresh execution."
     }
-  ]
+  ],
+  "latestMaintenance": {
+    "revision": "pending-reviewed-content",
+    "paths": [
+      "packages/crl/src/ast/tests/definedAsBooleanComposition-t1.test.ts",
+      "packages/crl/src/cql-emitter/tests/caseFeatureGuards.test.ts",
+      "packages/crl/src/cql-emitter/tests/dme101-030-emit.test.ts",
+      "packages/crl/src/cql-emitter/tests/heterogeneousSourceEmit.test.ts",
+      "packages/crl/src/cql-emitter/tests/layeredEmit.test.ts",
+      "packages/crl/src/cql-emitter/tests/ledgerEnrollment2a.test.ts",
+      "packages/crl/src/cql-emitter/tests/lowerLocalCodes.test.ts",
+      "packages/crl/src/cql-emitter/tests/pureQuestionEmit.test.ts",
+      "packages/crl/src/cql-emitter/tests/recencyRecordMerge.test.ts",
+      "packages/crl/src/cql-emitter/tests/recordUnionTerms.test.ts",
+      "packages/crl/src/cql-emitter/tests/semnotLowering.test.ts",
+      "packages/crl/src/cql-emitter/tests/totalScalarBoolean.test.ts",
+      "packages/crl/src/emit/tests/closeIndex.test.ts",
+      "packages/crl/src/emit/tests/declaredResultIndex.test.ts",
+      "packages/crl/src/emit/tests/producerCandidate.test.ts",
+      "packages/crl/src/emit/tests/publicationAge.test.ts",
+      "packages/crl/src/emit/tests/publicationSource.test.ts",
+      "packages/crl/src/fhir-emitter/tests/caseFeatureRecord.test.ts",
+      "packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts",
+      "packages/crl/src/fhir-emitter/tests/decision.test.ts",
+      "packages/crl/src/fhir-emitter/tests/elementLayers.test.ts",
+      "packages/crl/src/fhir-emitter/tests/example-fhir-golden.test.ts",
+      "packages/crl/src/fhir-emitter/tests/partial-split-author-vs-golden.test.ts",
+      "packages/crl/src/fhir-emitter/tests/partial-split-fhir-golden.test.ts",
+      "packages/crl/src/fhir-emitter/tests/structureDefinition.test.ts",
+      "packages/crl/src/imports/tests/criterionEmitEndToEnd.test.ts",
+      "packages/crl/src/imports/tests/definedAsExistsInferred.test.ts",
+      "packages/crl/src/imports/tests/emit.test.ts",
+      "packages/crl/src/imports/tests/publicationEmit.test.ts"
+    ],
+    "scope": "Only listed records refreshed to current source titles, line numbers and SHA256. Other records retain their prior historical source/inspection provenance. This is a naming delta, not a new full semantic audit."
+  }
 }

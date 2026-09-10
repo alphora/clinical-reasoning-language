@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/coded-question/Library/CodedQuestionLocalPrimitives"
+      "resource": "http://example.org/crl/coded-question/Library/CodedQuestionLocalElements"
     }
   ],
   "content": [

@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 /**
  * Slug + name helpers for FHIR emit. Moved from src/cel/emitter/emitFhir.ts
  * (the regex is identical; the move makes the helper a shared CRL/CEL/FHIR
@@ -279,9 +280,9 @@ export function pascalCaseName(name: string): string {
  *
  * PRESERVES each token's internal casing — it uppercases only the FIRST character
  * and keeps the rest verbatim, so a token that is ALREADY PascalCase stays intact:
- * `LocalPrimitives` → `LocalPrimitives` (NOT `Localsource`), `ExternalConcepts`,
+ * `LocalElements` → `LocalElements` (NOT `Localsource`), `ExternalConcepts`,
  * `Interface`, an abbreviation like `BP` → `BP`. (A leading `.toLowerCase()` used
- * to flatten these — #186 layer tokens LocalPrimitives/LocalConcepts/ExternalPrimitives/
+ * to flatten these — #186 layer tokens LocalElements/LocalConcepts/ExternalElements/
  * ExternalConcepts came out `Localsource`/…). In real emit `pascalCaseName` only ever
  * receives a lowercased `slugify` output EXCEPT the layered `S` input
  * (`layerLibraryName`'s raw `<policyId>-<Layer>`), so this preservation changes

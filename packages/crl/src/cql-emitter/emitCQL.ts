@@ -250,19 +250,19 @@ export interface EmitOptions {
   /**
    * Case-feature truth-set emit (the LOCKED case-feature model). When set, this
    * EMITTED LAYER produces the truth-set shape: a `defined as` composition emits
-   * `union`/`intersect`/`except` over operands where a LocalPrimitives leaf renders
-   * `<LocalPrimitives>."L".asTruths()` and an Inferences operand renders `<Inferences>."N"`
+   * `union`/`intersect`/`except` over operands where a LocalElements leaf renders
+   * `<LocalElements>."L".asTruths()` and an Inferences operand renders `<Inferences>."N"`
    * (already a truth-set), and the header gains `include CaseFeatureCommon called
    * CFH`. Set PER EMITTED LAYER by `emitPartitioned` — only for the `Inferences` and
-   * `Interface` layers of a `code is`/LocalPrimitives family split — so the
-   * LocalConcepts/LocalPrimitives layers, the measure (`coded from`/ExternalPrimitives) lane,
+   * `Interface` layers of a `code is`/LocalElements family split — so the
+   * LocalConcepts/LocalElements layers, the measure (`coded from`/ExternalElements) lane,
    * the per-CRL path, and direct single-file callers stay byte-unchanged.
    *   - `kind: "inferred"`  : `defined as` concepts emit the set-op truth-set body.
    *   - `kind: "interface"` : `__interfaceReexport` concepts emit `…satisfied()`.
    * `localSourceLibrary` / `inferredLibrary` are the emitted CQL library names of
-   * the sibling LocalPrimitives / Inferences layers (`partition.libraryNameFor(...)`), so
+   * the sibling LocalElements / Inferences layers (`partition.libraryNameFor(...)`), so
    * the Emitter classifies a requalified composition ref's TARGET layer EXACTLY (a
-   * LocalPrimitives leaf → `.asTruths()`; an Inferences operand → bare) instead of
+   * LocalElements leaf → `.asTruths()`; an Inferences operand → bare) instead of
    * string-suffix-matching a library name.
    */
   caseFeature?: {
@@ -270,14 +270,14 @@ export interface EmitOptions {
     localSourceLibrary: string;
     inferredLibrary: string;
     /**
-     * Fix 2 [important] — the emitted ExternalPrimitives sibling-layer library name
-     * (`partition.libraryNameFor(policyId, "ExternalPrimitives")`), present when the
-     * split has a ExternalPrimitives layer. The truth-set Inferences emit uses it to
-     * DETECT a ExternalPrimitives (`coded from`) operand woven into a truth-set
-     * (LocalPrimitives/Inferences) `defined as` — the FUTURE `code is` + `coded from`
+     * Fix 2 [important] — the emitted ExternalElements sibling-layer library name
+     * (`partition.libraryNameFor(policyId, "ExternalElements")`), present when the
+     * split has a ExternalElements layer. The truth-set Inferences emit uses it to
+     * DETECT a ExternalElements (`coded from`) operand woven into a truth-set
+     * (LocalElements/Inferences) `defined as` — the FUTURE `code is` + `coded from`
      * weave — and hard-error (`emit-mixed-source-inference-unsupported`) instead
      * of unioning a truth-set with a record retrieve-list (invalid). Optional:
-     * absent when the split has no ExternalPrimitives layer (the deliverable, `code is`
+     * absent when the split has no ExternalElements layer (the deliverable, `code is`
      * only → never triggers).
      */
     recordSourceLibrary?: string;
@@ -302,7 +302,7 @@ export interface EmitOptions {
    * #189 Slice-C boundary 1 — a pre-split `concept name → declared shape` map for
    * resolving a REDUCTION operand whose target lives in a DIFFERENT emitted layer
    * library. In the layered path a reduction's records operand is requalified to a
-   * cross-layer ref (`<S>-LocalPrimitives."X Records"`), so `emitConceptBody`'s
+   * cross-layer ref (`<S>-LocalElements."X Records"`), so `emitConceptBody`'s
    * `conceptByName` (built from THIS layer's statements only) cannot see it; this
    * map is computed ONCE from the pre-split working AST (all concepts visible) in
    * `emitPartitioned` and threaded to every layer emitter so the reduction arm can
@@ -319,7 +319,7 @@ export interface EmitOptions {
    * threaded to every layer emitter.
    *
    * ⚠ REQUIRED for the cross-layer case, which is the NORMAL one: a concept declaring named answer options is a
-   * local primitive, while the `"X" in qualifying` predicate over it is an inference — different layers, so
+   * local retrieval, while the `"X" in qualifying` predicate over it is an inference — different layers, so
    * this layer's own `conceptByName` cannot see the subject. Same construction and same reason as
    * `conceptShapesByName` above.
    */
@@ -883,8 +883,8 @@ export function emitCQL(input: string, options: EmitOptions = {}): EmitResult {
 
 /**
  * Internal NORMALIZED case-feature emit mode. The `"off"` arm is the default
- * (per-CRL path, direct single-file callers, the measure/ExternalPrimitives lane, and
- * the lower LocalConcepts/LocalPrimitives layers): no truth-set shape, no CFH include
+ * (per-CRL path, direct single-file callers, the measure/ExternalElements lane, and
+ * the lower LocalConcepts/LocalElements layers): no truth-set shape, no CFH include
  * — byte-unchanged. The two truth-set arms carry the sibling layer library names
  * so the Emitter classifies a requalified composition ref's target layer exactly.
  */
@@ -894,9 +894,9 @@ type CaseFeatureMode =
       kind: "inferred";
       localSourceLibrary: string;
       inferredLibrary: string;
-      // Fix 2 — the ExternalPrimitives sibling library, when present, so the inferred
-      // emit can detect (and hard-error on) a ExternalPrimitives operand woven into a
-      // truth-set composition. Undefined when the split has no ExternalPrimitives layer.
+      // Fix 2 — the ExternalElements sibling library, when present, so the inferred
+      // emit can detect (and hard-error on) a ExternalElements operand woven into a
+      // truth-set composition. Undefined when the split has no ExternalElements layer.
       recordSourceLibrary?: string;
     }
   | {
@@ -1062,21 +1062,21 @@ class Emitter {
    * Fix 1 [critical] — GATE the both-representation (`code is` + `defined as`)
    * split to the truth-set/case-feature lane.
    *
-   * `lowerLocalCodes` splits such a concept UNCONDITIONALLY into a LocalPrimitives
+   * `lowerLocalCodes` splits such a concept UNCONDITIONALLY into a LocalElements
    * retrieve twin + an Inferences fold-in twin (the Inferences twin carries
-   * `__bothRepFoldInLocalPrimitives`). But the fold-in
-   * (`LocalPrimitives."X".asTruths() union (<inference>)`) is only emitted by
+   * `__bothRepFoldInLocalElements`). But the fold-in
+   * (`LocalElements."X".asTruths() union (<inference>)`) is only emitted by
    * `emitDefinedAs` when `caseFeature.kind === "inferred"`. So a both-rep concept
    * reached via a NON-truth-set path — a DIRECT `emitCQL`/`emitCQLFromAST` (both
    * twins land in ONE library → a duplicate `define "X"`), or a layered split with
-   * NO LocalPrimitives layer (`none`-routed / non-decision → `isCaseFeatureSplit`
+   * NO LocalElements layer (`none`-routed / non-decision → `isCaseFeatureSplit`
    * false → the Inferences twin emits with the mode OFF → a fold-in-LESS, invalid
    * Inferences define) — would silently emit invalid CQL.
    *
    * The Inferences twin is the WITNESS: it is the only statement carrying
-   * `__bothRepFoldInLocalPrimitives`. In the VALID truth-set Inferences emit the twin is
-   * present AND `caseFeature.kind === "inferred"` (no error). The LocalPrimitives twin
-   * does NOT carry the marker, so the LocalPrimitives sub-AST (mode off) never trips
+   * `__bothRepFoldInLocalElements`. In the VALID truth-set Inferences emit the twin is
+   * present AND `caseFeature.kind === "inferred"` (no error). The LocalElements twin
+   * does NOT carry the marker, so the LocalElements sub-AST (mode off) never trips
    * this. Any other arrival of the marker → a path that won't fold it in → hard
    * error rather than mis-emit. (For the deliverable — decision-bearing local-code
    * policies — the twin always lands in the Inferences layer in truth-set mode.)
@@ -1084,7 +1084,7 @@ class Emitter {
   private guardBothRepLane(): void {
     if (this.caseFeature.kind === "inferred") return;
     for (const stmt of this.ast.statements) {
-      if (stmt.type === "Concept" && stmt.__bothRepFoldInLocalPrimitives !== undefined) {
+      if (stmt.type === "Concept" && stmt.__bothRepFoldInLocalElements !== undefined) {
         this.emitErrors.push({
           type: "Validation",
           kind: "emit-both-rep-requires-case-feature-lane",
@@ -1094,11 +1094,11 @@ class Emitter {
             `Both-representation concept "${stmt.name}" (\`code is\` + ` +
             `\`${stmt.definition?.type ?? "?"}\`, merge "${stmt.__bothRepMerge ?? "union"}") ` +
             `reached a non-truth-set emit path (mode "${this.caseFeature.kind}"). The ` +
-            `LocalPrimitives-retrieve / Inferences-fold-in split is only valid in the ` +
-            `case-feature truth-set lane (a layered split with a LocalPrimitives layer ` +
+            `LocalElements-retrieve / Inferences-fold-in split is only valid in the ` +
+            `case-feature truth-set lane (a layered split with a LocalElements layer ` +
             `present, emitting the Inferences layer in "inferred" mode). On a direct ` +
             `emit the two twins collide into a duplicate \`define "${stmt.name}"\`; in ` +
-            `a LocalPrimitives-less split the fold-in is dropped — either way the CQL is ` +
+            `a LocalElements-less split the fold-in is dropped — either way the CQL is ` +
             `invalid. Emit this policy through the decision/case-feature lane.`,
         });
       }
@@ -1424,7 +1424,7 @@ class Emitter {
    *  `"satisfied"` = `…satisfied()` = `exists(truths)`, intrinsically total by its OWN existence wrapper. */
   private facadeForm(c: Concept): "recordsource" | "total-boolean" | "record-boolean-value" | "satisfied" {
     if (c.__publication !== undefined) return "recordsource";
-    if (c.__interfaceSourceLayer === "ExternalPrimitives") return "recordsource";
+    if (c.__interfaceSourceLayer === "ExternalElements") return "recordsource";
     if (c.__interfaceSourceLayer === "Inferences" && c.__interfaceReexportMode === "total-boolean") return "total-boolean";
     // ⚠⚠ THIS ELSE-BRANCH IS THE DANGEROUS ONE, and a panel arm flagged it as the single worst silent-miss
     // in this change: a mode this function does not know about falls through to `"satisfied"`, which emits
@@ -1433,7 +1433,7 @@ class Emitter {
     if (c.__interfaceSourceLayer === "Inferences" && c.__interfaceReexportMode === "record-boolean-value") {
       return "record-boolean-value";
     }
-    return "satisfied"; // Inferences `.satisfied()` or LocalPrimitives `.asTruths().satisfied()`
+    return "satisfied"; // Inferences `.satisfied()` or LocalElements `.asTruths().satisfied()`
   }
 
   /**
@@ -1494,7 +1494,7 @@ class Emitter {
           cell: "§3 guard reads the VALUE / featureExpression targets the RECORD (NOT totalized)",
         };
       } else if (form === "recordsource") {
-        obligation = { kind: "not-applicable", nullable: false, reason: "ExternalPrimitives record re-export (no boolean define)" };
+        obligation = { kind: "not-applicable", nullable: false, reason: "ExternalElements record re-export (no boolean define)" };
       } else if (form === "total-boolean") {
         // A bare re-export of a total Inferences reduction — total IFF the reduction is (delegated).
         const ref =
@@ -1721,7 +1721,7 @@ class Emitter {
       // #189 O3 — lock-step with the obligation above: the façade of a three-state merge re-exports bare, so
       // its discharge is three-state, not `facade-delegated` total.
       const form = this.facadeForm(c);
-      if (form === "recordsource") return notBoolean("ExternalPrimitives record re-export");
+      if (form === "recordsource") return notBoolean("ExternalElements record re-export");
       if (form === "total-boolean") return total("facade-delegated"); // bare re-export — delegates to the reduction
       // ⭐ #189 — a value read off the selected record is THREE-STATE, never total: an unselected record
       // yields `null`, which is precisely the PAUSE this issue exists to deliver. Certifying it `total` would
@@ -1779,11 +1779,11 @@ class Emitter {
             return total("null-presence");
           }
           // #189 Piece 1 (disc 506) — the value/interface MEMBER-EXISTENCE fold (`code is` + `defined as exists`
-          // over a recency-value referent, `__bothRepFoldInLocalPrimitives` set, NO `__bothRepMerge`) emits the
+          // over a recency-value referent, `__bothRepFoldInLocalElements` set, NO `__bothRepMerge`) emits the
           // three-leg total OR (`emitMemberExistenceFold`), NOT the generic `composite-delegated` alias re-export.
           // Its DEDICATED `member-existence-fold` discharge satisfies the `intrinsically-total` authored obligation
           // (existence is never null) without being mis-checked as a single `exists(...)` (Claude #8).
-          if (def.body.type === "DefinedAsExists" && c.__bothRepFoldInLocalPrimitives !== undefined) {
+          if (def.body.type === "DefinedAsExists" && c.__bothRepFoldInLocalElements !== undefined) {
             return total("member-existence-fold");
           }
           if (emitsTotalScalarBoolean(c, this.totalityResolvers())) {
@@ -1936,7 +1936,7 @@ class Emitter {
     //
     // FLUENT-RESOLUTION RISK (verified-by-spec, not by an in-repo compiler). The
     // emitted bodies invoke `asTruths()` / `satisfied()` METHOD-STYLE on an
-    // `include`d library with NO `CFH.` qualifier (e.g. `LocalPrimitives."X".asTruths()`).
+    // `include`d library with NO `CFH.` qualifier (e.g. `LocalElements."X".asTruths()`).
     // The CQL spec (§ fluent functions) resolves a fluent function invoked
     // method-style across `include`d libraries, and the ASLP `ASLPPolicyCaseFeatures.cql`
     // precedent relies on exactly this. There is NO CQL→ELM translator in this repo
@@ -2416,7 +2416,7 @@ class Emitter {
       );
     }
     // The SAME qualification the bare-ref alias arm of `emitDefinedAsBody` uses, so the records twin resolves
-    // identically whether it is same-library (direct emit) or cross-layer (the LocalPrimitives layer).
+    // identically whether it is same-library (direct emit) or cross-layer (the LocalElements layer).
     const ref = def.body.ref;
     const crossLib = this.crossLibraryOf(ref);
     const target = crossLib !== null ? cqlQualifiedRef(crossLib, getRefName(ref)) : cqlIdent(getRefName(ref));
@@ -2517,9 +2517,9 @@ class Emitter {
     // Case-feature INTERFACE re-export: collapse the re-exported source-layer
     // truth-set to a boolean for the decision/action-guard surface.
     //   - Inferences source    → `Inferences."X".satisfied()`
-    //   - LocalPrimitives source → `LocalPrimitives."X".asTruths().satisfied()` (a DIRECT
+    //   - LocalElements source → `LocalElements."X".asTruths().satisfied()` (a DIRECT
     //     `code is` condition with no `defined as`: lift the retrieve, then collapse)
-    //   - ExternalPrimitives source→ plain re-export (legacy lane; truth-set is local-only)
+    //   - ExternalElements source→ plain re-export (legacy lane; truth-set is local-only)
     if (
       this.caseFeature.kind === "interface" &&
       c.__interfaceReexport &&
@@ -2557,7 +2557,7 @@ class Emitter {
             return `FHIRHelpers.ToBoolean((${qref}).${carrier} as FHIR.boolean)`;
           }
           return c.__interfaceReexportMode === "total-boolean" ? qref : `${qref}.satisfied()`;
-        case "LocalPrimitives":
+        case "LocalElements":
           // #189 null/pause — a PURE QUESTION reads THREE-STATE. `asTruths().satisfied()` folds "no answer
           // record" and "answered false" into the same `false`, so an unanswered question is indistinguishable
           // from a "no" and the decision DENIES where it must PAUSE and ask. `answeredValue()` keeps them
@@ -2566,7 +2566,7 @@ class Emitter {
           // because this emitter is layer-isolated. REFACTOR:grounded — derived from the design of record and
           // the reference IGs' case-feature read, not from the adjacent truth-set lane.
           return `${qref}.asTruths().satisfied()`;
-        // ExternalPrimitives (and any other) → fall through to the legacy re-export.
+        // ExternalElements (and any other) → fall through to the legacy re-export.
       }
     }
     // #189 Piece 1 (disc 506) — the both-representation RECENCY-VALUE merge (`code is` + `most recent this` +
@@ -2579,7 +2579,7 @@ class Emitter {
     // all its representations". Marker-driven (the retargeted `sem-or` body is NEVER rendered) and dispatched
     // regardless of the case-feature lane, exactly like `recency-value`: a record-valued concept has no
     // truth-set, so routing it through the `defined as` composition lane would hard-error
-    // `emit-mixed-source-inference-unsupported` (MEASURED — an ExternalPrimitives record-list cannot join a
+    // `emit-mixed-source-inference-unsupported` (MEASURED — an ExternalElements record-list cannot join a
     // `.asTruths()` truth-set, and rightly so; that lane is for BOOLEAN determinations).
     if (c.__bothRepMerge === "record-union") {
       return this.emitRecordUnion(c);
@@ -2776,7 +2776,7 @@ class Emitter {
    * Everything this reads off a space member is SHAPE: the recency element to sort by, `id` to break ties,
    * and the carrier element to type-filter. **None of it needs the member to carry the concept's own local
    * code**, which is exactly why a raw source record may sit in the collection un-projected
-   * (`renderSpaceTerms`, the `external-primitives` arm) and cost nothing per member.
+   * (`renderSpaceTerms`, the `external-elements` arm) and cost nothing per member.
    *
    * The identity obligation — *a consumer has to see a CASE FEATURE* (charter §3, operator 2026-09-01) —
    * is discharged at the concept BOUNDARY, on the ONE record this returns, not on the n records it sorted.
@@ -2786,7 +2786,7 @@ class Emitter {
    * ⚠⚠ SO IF THIS FUNCTION EVER NEEDS THE CONCEPT'S IDENTITY — a sort, filter or tie-break that reads the
    * local code rather than the shape — **carve out that case; do not project the space to satisfy it.**
    * Projecting here is a one-line change that moves the cost from 1 to n, on every evaluation, with no
-   * failing test to announce it. See the foot-gun note at the `external-primitives` arm.
+   * failing test to announce it. See the foot-gun note at the `external-elements` arm.
    */
   private emitSelectNewest(
     twinRef: string,
@@ -2806,7 +2806,7 @@ class Emitter {
         ? `\n      where O.${filterElement} is ${valueTypeFilter}`
         : "";
     // `twinRef` is the ALREADY-RENDERED operand expression (bare `"X Records"` on the `none` path, or a
-    // cross-layer `<S>-LocalPrimitives."X Records"` qualified ref on the layered path — Slice-C boundary 1),
+    // cross-layer `<S>-LocalElements."X Records"` qualified ref on the layered path — Slice-C boundary 1),
     // so it is inserted verbatim, NOT re-wrapped with `cqlIdent` (which would double-quote a qualifier).
     return `Last(\n    (${twinRef}) O${whereClause}\n      sort by ${recencyExpr}, id\n  )`;
   }
@@ -2817,7 +2817,7 @@ class Emitter {
    * disc 436 Q3). The operand is the lowered records twin (`<X> Records`):
    *   - `none` path: a BARE local ref — shape from this library's `conceptByName`, rendered `cqlIdent`.
    *   - LAYERED path: `requalifyDefinition` rewrote it to a cross-layer qualified ref
-   *     (`<S>-LocalPrimitives."X Records"`) whose target is NOT in this layer's `conceptByName`; the shape
+   *     (`<S>-LocalElements."X Records"`) whose target is NOT in this layer's `conceptByName`; the shape
    *     comes from the pre-split `conceptShapesByName` map and the render carries the qualifier.
    * A `shape` of `undefined` (unknown operand) fails the caller's `=== "RecordSet"` gate → the reduction
    * falls through to the loud `reductionNotEmittable`, never a silent bad emit.
@@ -2896,8 +2896,8 @@ class Emitter {
   /**
    * #189 — the both-representation RECORD UNION: `<local records> union <source records>`.
    *
-   * The two arms are the twins `lowerLocalCodes` synthesized beside this one — a LocalPrimitives retrieve
-   * over the synthetic local code, and an ExternalPrimitives `"<X> Source"` retrieve over the posrep's
+   * The two arms are the twins `lowerLocalCodes` synthesized beside this one — a LocalElements retrieve
+   * over the synthetic local code, and an ExternalElements `"<X> Source"` retrieve over the posrep's
    * terminology. This define is the PUBLIC determination the author's name resolves to.
    *
    * ⚠ Deliberately NOT deduped. Charter §3 states the union; whether the same clinical fact arriving on both
@@ -3038,14 +3038,14 @@ class Emitter {
     const specs = (c.__recencyProducerSpecs ?? []) as readonly ProducerCandidateSpec[];
     const rendered = terms.map((term) => {
       switch (term.kind) {
-        case "local-primitives":
+        case "local-elements":
           return cqlQualifiedRef(localLib, term.define);
-        case "external-primitives": {
+        case "external-elements": {
           const epRef = cqlQualifiedRef(sourceLib, term.define);
           // ⭐ #189 — A PROJECTED SOURCE ARM IS STILL THE SOURCE TERM, transformed. The retrieve stays what it
           // is (`[Condition: "Obese VS"]` — the honest source records); the projection turns EACH record into
           // a candidate of the CONCEPT's `type is` right here, at the space-assembly site, beside the
-          // producer's candidate. That keeps the ExternalPrimitives twin truthful about what it retrieves and
+          // producer's candidate. That keeps the ExternalElements twin truthful about what it retrieves and
           // keeps every transformation of the space in one place.
           // ⚠⚠ RETURNING THE RAW RECORD IS CORRECT *HERE*, IN THE COLLECTION — and NOT at the boundary.
           //
@@ -3189,7 +3189,7 @@ class Emitter {
   }
 
   private emitRecencyValueMerge(c: Concept): string {
-    const foldIn = c.__bothRepFoldInLocalPrimitives;
+    const foldIn = c.__bothRepFoldInLocalElements;
     const marker = c.__recencyValueDescriptors as
       | { local: EffectiveRepresentationDescriptor; source: EffectiveRepresentationDescriptor }
       | undefined;
@@ -3551,7 +3551,7 @@ class Emitter {
     // #257-deferred — `classifyBooleanTotality` rejects its obligation). `lowerLocalCodes` admits it into the
     // union fold, so refuse LOUD here on the RIGHT axis (the both-rep fold) rather than fall through to the
     // generic "(unknown)" non-total-operand error (code review disc 464, Claude #2b).
-    if (c.__bothRepMerge !== undefined || c.__bothRepFoldInLocalPrimitives !== undefined) {
+    if (c.__bothRepMerge !== undefined || c.__bothRepFoldInLocalElements !== undefined) {
       const loc = body.expression.location.start;
       this.emitErrors.push({
         type: "Validation",
@@ -3685,7 +3685,7 @@ class Emitter {
     // truth-set. The operators stay set-ops (`union`/`intersect`/`except`) and the
     // operand-shape/`exists(...)` bridge is suppressed (every operand IS a
     // truth-set), so we force the parent shape to "refinement" and let
-    // `emitComposition`'s truth-set leaf rendering add `.asTruths()` per LocalPrimitives
+    // `emitComposition`'s truth-set leaf rendering add `.asTruths()` per LocalElements
     // leaf. (A bare-ref `defined as` to another Inferences concept is a truth-set
     // alias — emit the qualified ref with NO `.asTruths()`.)
     if (this.caseFeature.kind === "inferred") {
@@ -3698,18 +3698,18 @@ class Emitter {
       // `body` to bare-ref | composition for the truth-set rendering below.
       if (body.type === "DefinedAsExists") {
         // Claude-3 (disc 461 code review, both arms): a both-rep `code is` + `defined as exists` twin
-        // (`__bothRepFoldInLocalPrimitives` set) would fold `LocalPrimitives."X".asTruths() union exists(...)` — a
+        // (`__bothRepFoldInLocalElements` set) would fold `LocalElements."X".asTruths() union exists(...)` — a
         // truth-set List union a scalar Boolean, ill-typed, silently DROPPING the concept's own local-code
         // records from its truth. The `code is` + `defined as` fold is validator-rejected (E1) but
         // `emitCQLFromAST` is validator-free, so refuse loud here (mirrors the bare-ref both-rep guard below)
         // rather than emit a wrong answer on the canonical local-domain path (charter §2).
-        if (c.__bothRepFoldInLocalPrimitives !== undefined) {
+        if (c.__bothRepFoldInLocalElements !== undefined) {
           // #189 Piece 1 (disc 506) — the value/interface boolean fold. `code is X` + `defined as exists ("V")`
           // where V is a both-rep RECENCY-VALUE concept: the interface is member-EXISTENCE, a three-leg total OR
           //   (i)  own arm — the NEWEST own boolean record's value (NOT `exists(O where value is true)`, which
           //        erases an explicit `false` over a multi-record history — design v7 §1);
-          //   (ii) `exists(LocalPrimitives."V")` — a local member record;
-          //   (iii)`exists(ExternalPrimitives."V Source")` — a source member record.
+          //   (ii) `exists(LocalElements."V")` — a local member record;
+          //   (iii)`exists(ExternalElements."V Source")` — a source member record.
           // All three legs are total (`is true` / `exists`) → the OR is total, no `Coalesce`. NARROWED to a
           // recency-value referent (Piece 1 scope); any other both-rep fold stays the DEFERRED throw below.
           // The member-existence fold twin was VALIDATED at lowering (`isMemberExistenceInterface`: unqualified ref
@@ -3732,14 +3732,14 @@ class Emitter {
       }
       // Both-representation fold-in: the Inferences twin of a `code is` + `defined
       // as` concept must UNION the direct local-source retrieve with its inferred
-      // composition: `LocalPrimitives."X".asTruths() union (<composition>)`. The
-      // LocalPrimitives leaf is an EXPLICIT qualified ref (not a bare same-name ref —
+      // composition: `LocalElements."X".asTruths() union (<composition>)`. The
+      // LocalElements leaf is an EXPLICIT qualified ref (not a bare same-name ref —
       // that would resolve to this very Inferences twin and self-recurse).
       // #189 Slice-C boundary 1 — a bare-ref alias `defined as "R"` to a REDUCTION is ill-typed in the
       // truth-set lane (its façade would apply `.satisfied()` to a bare Boolean). The composition arm below
       // guards via `emitComposition`; guard the bare-ref arm here with the SAME shared assertion so the
       // alias form cannot bypass it (impl-panel round 1, Claude).
-      const foldIn = c.__bothRepFoldInLocalPrimitives;
+      const foldIn = c.__bothRepFoldInLocalElements;
       // #189 Slice C 2b.2 — FLIP: a bare-ref alias whose OWN declaration is boolean AND whose same-layer referent
       // emits a TOTAL Scalar boolean (a reduction / boolean comparator / boolean list-pattern, transitively —
       // `emitsTotalScalarBoolean(c)`, which gates on `c`'s declared value type per charter §3–§4) re-exports that
@@ -3751,7 +3751,7 @@ class Emitter {
         return cqlIdent(getRefName(body.ref));
       }
       // #189 Slice C 2b.2 (code review, Claude #3) — a both-rep UNION whose inferred bare-ref operand is a TOTAL
-      // boolean would emit `LocalPrimitives."X".asTruths() union (<Boolean>)` — ill-typed. The flip is excluded here
+      // boolean would emit `LocalElements."X".asTruths() union (<Boolean>)` — ill-typed. The flip is excluded here
       // (`foldIn !== undefined`) and the retained reduction guard misses a comparator/alias operand, so reject any
       // total-boolean bare-ref operand woven into the union (mirrors the composition-site widening).
       if (
@@ -4002,15 +4002,15 @@ class Emitter {
    * `code is X` + `defined as exists ("V")` interface whose referent V is a both-rep RECENCY-VALUE concept. Legs:
    *   (i)   own arm — the NEWEST own boolean record's value (design v7 §1: newest-wins, NOT `exists(O where value
    *         is true)`, which erases an explicit `false` over a multi-record history);
-   *   (ii)  `exists(LocalPrimitives."V")`      — a local member record of V;
-   *   (iii) `exists(ExternalPrimitives."V Source")` — a source member record of V.
+   *   (ii)  `exists(LocalElements."V")`      — a local member record of V;
+   *   (iii) `exists(ExternalElements."V Source")` — a source member record of V.
    * Every leg is total (`FHIRHelpers.ToBoolean(null) is true` → false; `exists` never null), so the OR is a TOTAL
-   * boolean with NO `Coalesce`. The own LP twin is `c`'s own name (`__bothRepFoldInLocalPrimitives`); V's LP/EP
+   * boolean with NO `Coalesce`. The own LP twin is `c`'s own name (`__bothRepFoldInLocalElements`); V's LP/EP
    * retrieves are `V` / `V Source`. Explicit sibling-QUALIFIED refs (a bare same-name would resolve to the
    * Inferences merge and self-recurse — `buildNameLayerMaps`).
    */
   private emitMemberExistenceFold(c: Concept, referentName: string): string {
-    const foldIn = c.__bothRepFoldInLocalPrimitives!;
+    const foldIn = c.__bothRepFoldInLocalElements!;
     const localLib = this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
     const sourceLib =
       this.caseFeature.kind === "inferred" ? (this.caseFeature.recordSourceLibrary ?? "") : "";
@@ -4059,8 +4059,8 @@ class Emitter {
    * Case-feature truth-set leaf rendering for a composition `CompositionRef` (or a
    * truth-set bare-ref `defined as`). The requalifier (`layeredEmit.ts`) has
    * already qualified cross-LAYER refs and left same-layer refs bare:
-   *   - cross-lib ref whose target is the LocalPrimitives layer → a `code is` LEAF:
-   *     `<LocalPrimitives>."L".asTruths()` (lift the Observation retrieve to a truth-set).
+   *   - cross-lib ref whose target is the LocalElements layer → a `code is` LEAF:
+   *     `<LocalElements>."L".asTruths()` (lift the Observation retrieve to a truth-set).
    *   - cross-lib ref whose target is the Inferences layer → a NESTED `defined as`
    *     operand (already a truth-set): `<Inferences>."N"` (NO `.asTruths()`).
    *   - BARE ref → a SAME-LAYER Inferences sibling (the requalifier drops the
@@ -4091,12 +4091,12 @@ class Emitter {
     if (lib === inferredLibrary) {
       return this.inferredSiblingRef(name);
     }
-    // Fix 2 [important] — a ExternalPrimitives (`coded from`) operand woven into a
-    // truth-set (LocalPrimitives/Inferences) `defined as` composition. This is the
+    // Fix 2 [important] — a ExternalElements (`coded from`) operand woven into a
+    // truth-set (LocalElements/Inferences) `defined as` composition. This is the
     // FUTURE `code is` + `coded from` weave: unioning/intersecting a truth-set
     // with a record retrieve-LIST is invalid. Hard-error rather than mis-emit a
     // bare `RecordLib."X"` into the set-op. (The deliverable is `code is` only →
-    // no ExternalPrimitives layer → `recordSourceLibrary` undefined → never triggers.)
+    // no ExternalElements layer → `recordSourceLibrary` undefined → never triggers.)
     if (recordSourceLibrary !== undefined && lib === recordSourceLibrary) {
       this.emitErrors.push({
         type: "Validation",
@@ -4104,8 +4104,8 @@ class Emitter {
         line: typeof ref === "string" ? 0 : ref.location.start.line,
         column: typeof ref === "string" ? 0 : ref.location.start.column,
         message:
-          `A \`defined as\` truth-set composition references ExternalPrimitives concept ` +
-          `"${name}" (\`coded from\`/record retrieve) alongside LocalPrimitives/Inferences ` +
+          `A \`defined as\` truth-set composition references ExternalElements concept ` +
+          `"${name}" (\`coded from\`/record retrieve) alongside LocalElements/Inferences ` +
           `truth-set operands. Mixing a record retrieve-list into a truth-set ` +
           `set-op (union/intersect/except) is invalid, and the \`code is\` + ` +
           `\`coded from\` weave is a future feature. Keep a \`defined as\` over a ` +
@@ -4211,7 +4211,7 @@ class Emitter {
             );
           }
         }
-        // Case-feature truth-set leaf: `.asTruths()` on LocalPrimitives leaves,
+        // Case-feature truth-set leaf: `.asTruths()` on LocalElements leaves,
         // self-qualified bare truth-set on same-layer Inferences siblings. Bypasses
         // the operand-shape `bridgeOperand` path entirely (no `exists(...)`).
         const truthSet = this.emitTruthSetRef(expr.ref);
@@ -4369,7 +4369,7 @@ class Emitter {
 
   /**
    * Issue #232 — classify a `sem-not` operand's truth-representation. PURE: no
-   * diagnostics pushed (unlike `emitTruthSetRef`, whose ExternalPrimitives branch
+   * diagnostics pushed (unlike `emitTruthSetRef`, whose ExternalElements branch
    * pushes an error), so classification never double-fires or spuriously fires
    * a mixed-source diagnostic. `truth-set` → complement lowers; anything else →
    * loud-refuse. Deliberately conservative: an operand whose flavor cannot be
@@ -4447,7 +4447,7 @@ class Emitter {
         return this.classifyNegationOperand(da.expression, next);
       }
       case "CodedFromDefinition":
-        return "resource-list"; // `coded from` → ExternalPrimitives retrieve
+        return "resource-list"; // `coded from` → ExternalElements retrieve
       case "DefinitionIsDefinition":
         return "unknown"; // temporal/count predicate flavor not modeled → loud
       case "ReductionDefinition":

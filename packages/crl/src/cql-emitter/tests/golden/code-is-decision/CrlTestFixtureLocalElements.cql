@@ -1,4 +1,4 @@
-library CrlTestFixtureLocalPrimitives
+library CrlTestFixtureLocalElements
 
 using FHIR version '4.0.1'
 

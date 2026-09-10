@@ -258,7 +258,7 @@ function computeTotality(
   // ⭐ #189 null/pause T5 step 2b — REFACTOR:grounded. The PURE QUESTION's Inferences twin splits the two
   // questions the SAME way the recency merge does, for the same reason:
   //
-  //   BARE-RE-EXPORTABLE? yes. It emits `<LocalPrimitives half>.answeredValue()` — already a Scalar Boolean,
+  //   BARE-RE-EXPORTABLE? yes. It emits `<LocalElements half>.answeredValue()` — already a Scalar Boolean,
   //     with no `.satisfied()` method — and re-exporting it bare is exactly what carries its null to the guard.
   //   TOTAL?              no.  A question nothing has answered is UNKNOWN. Claiming total here is the
   //     pause→deny flip: a boolean composition would admit it as a proven-total operand and the guard would

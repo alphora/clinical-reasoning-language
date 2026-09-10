@@ -1,4 +1,4 @@
-library Cms22ExternalPrimitives
+library Cms22ExternalElements
 
 using FHIR version '4.0.1'
 

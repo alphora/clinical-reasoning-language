@@ -1,4 +1,4 @@
-library LayeredBasicFixtureExternalPrimitives
+library LayeredBasicFixtureExternalElements
 
 using FHIR version '4.0.1'
 

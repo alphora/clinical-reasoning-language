@@ -1,6 +1,6 @@
 # CMS22 Asserted Concepts
 
-library "cms22-ExternalPrimitives".
+library "cms22-ExternalElements".
 
 // ============ Asserted concepts (unchanged) ============
 

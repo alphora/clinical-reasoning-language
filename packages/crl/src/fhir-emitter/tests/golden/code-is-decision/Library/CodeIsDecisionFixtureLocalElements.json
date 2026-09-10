@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "ServiceRequestLocalPrimitives",
+  "id": "CodeIsDecisionFixtureLocalElements",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/endoluminal-ablation/Library/ServiceRequestLocalPrimitives",
+  "url": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalElements",
   "version": "1.0.0",
-  "name": "ServiceRequestLocalPrimitives",
-  "title": "ServiceRequestLocalPrimitives",
+  "name": "CodeIsDecisionFixtureLocalElements",
+  "title": "CodeIsDecisionFixtureLocalElements",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "THE canonical target for the ServiceRequest membership chain (#189) — `matches this` is a DATUM read, so a wrong-code request is a determinate false and no request at all pauses",
+  "description": "R2 code-is-decision fixture — source-typed split + Interface re-export FHIR closure",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/endoluminal-ablation/Library/ServiceRequestLocalConcepts"
+      "resource": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalConcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/ServiceRequestLocalPrimitives.cql"
+      "url": "../../cql/CodeIsDecisionFixtureLocalElements.cql"
     }
   ]
 }

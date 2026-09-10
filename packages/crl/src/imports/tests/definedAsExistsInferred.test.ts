@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import * as path from "path";
 
 import { describe, it, expect } from "vitest";
@@ -28,9 +29,9 @@ describe("#270 — `defined as exists` inferred-lane consumers (disc 461 code re
     expect(result.success, JSON.stringify(result.errors)).toBe(true);
   });
 
-  it("baseline — `defined as exists` over a records concept → bare scalar `exists (<LocalPrimitives>.\"X\")`", () => {
+  it("baseline — `defined as exists` over a records concept → bare scalar `exists (<LocalElements>.\"X\")`", () => {
     const inferred = libBySuffix(result, "Inferences");
-    expect(inferred).toMatch(/define "Has Adult":\s*\n\s*exists \(\S+LocalPrimitives\."Adult Records"\)/);
+    expect(inferred).toMatch(/define "Has Adult":\s*\n\s*exists \(\S+LocalElements\."Adult Records"\)/);
   });
 
   it("Claude #1 — a bare-ref ALIAS to an exists concept re-exports BARE (never `.asTruths()` / never `.satisfied()` a scalar)", () => {

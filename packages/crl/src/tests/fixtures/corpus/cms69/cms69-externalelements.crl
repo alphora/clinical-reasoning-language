@@ -1,6 +1,6 @@
 # CMS69 Asserted Concepts
 
-library "cms69-ExternalPrimitives".
+library "cms69-ExternalElements".
 
 // "Pregnancy or Other Related Diagnoses" is a valueset (declared in
 // CMS69 Concepts) referenced as a classification argument in

@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 // #189 Slice C boundary 2 (2a) — totality-ledger ENROLLMENT tests: the wiring (role-tag obligation source +
 // dual-write + bidirectional completeness) is honest and the report-mode inventory is REAL, not a stub.
 // Design of record: `tmp/PLAN-2a-impl.md`; disc 439 (both crl-emit arms). The pipeline is driven in
@@ -220,7 +221,7 @@ terminology "HbvVS":
     expect(r.status).toBe("failed");
     // The façade is NOT among the failures — it proves total.
     expect(r.failures.some((f) => f.name === "A And B")).toBe(false);
-    // The `code is` leaves enroll `rejected` (their LocalPrimitives retrieve) → the real bucket-3 failures.
+    // The `code is` leaves enroll `rejected` (their LocalElements retrieve) → the real bucket-3 failures.
     expect(r.failures.some((f) => f.name === "A" && f.reason.includes("rejected"))).toBe(true);
     expect(r.failures.some((f) => f.name === "B" && f.reason.includes("rejected"))).toBe(true);
   });
@@ -393,7 +394,7 @@ decision "D":
     expect(r.failures.some((f) => f.name === "Dx Alias")).toBe(false);
   });
 
-  it("LocalPrimitives `.asTruths().satisfied()` façade (a direct `code is` decision guard) enrolls facade-satisfied", () => {
+  it("LocalElements `.asTruths().satisfied()` façade (a direct `code is` decision guard) enrolls facade-satisfied", () => {
     const { entries } = emitLayered(`library "Direct".
 concept "A":
 - type is Condition.

@@ -5,15 +5,15 @@ using FHIR version '4.0.1'
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
-include Semnot232FixtureLocalPrimitives
+include Semnot232FixtureLocalElements
 
 context Patient
 
 define "Alpha":
-  Semnot232FixtureLocalPrimitives."Alpha Records".answeredValue()
+  Semnot232FixtureLocalElements."Alpha Records".answeredValue()
 
 define "Beta":
-  Semnot232FixtureLocalPrimitives."Beta Records".answeredValue()
+  Semnot232FixtureLocalElements."Beta Records".answeredValue()
 
 define "Not Alpha":
   not ("Alpha")

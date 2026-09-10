@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "CodeIsDecisionVsFixtureExternalPrimitives",
+  "id": "CodedQuestionLocalElements",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureExternalPrimitives",
+  "url": "http://example.org/crl/coded-question/Library/CodedQuestionLocalElements",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVsFixtureExternalPrimitives",
-  "title": "CodeIsDecisionVsFixtureExternalPrimitives",
+  "name": "CodedQuestionLocalElements",
+  "title": "CodedQuestionLocalElements",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
-  "publisher": "unknown",
-  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
+  "publisher": "Smile Digital Health",
+  "description": "Legacy named answer classifier regression corpus",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureExternalConcepts"
+      "resource": "http://example.org/crl/coded-question/Library/CodedQuestionLocalConcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/CodeIsDecisionVsFixtureExternalPrimitives.cql"
+      "url": "../../cql/CodedQuestionLocalElements.cql"
     }
   ]
 }

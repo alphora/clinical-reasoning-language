@@ -5,16 +5,16 @@ using FHIR version '4.0.1'
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
-include CodedQuestionLocalPrimitives
+include CodedQuestionLocalElements
 
 context Patient
 
 define "Service Requested":
-  CodedQuestionLocalPrimitives."Service Requested Records".answeredValue()
+  CodedQuestionLocalElements."Service Requested Records".answeredValue()
 
 define "Documented Symptom":
   Last(
-      (CodedQuestionLocalPrimitives."Documented Symptom Records") O
+      (CodedQuestionLocalElements."Documented Symptom Records") O
         sort by (effective as FHIR.dateTime).value, id
     )
 

@@ -468,7 +468,7 @@ export interface ActivityBecause extends ASTNode {
  * `ast → cql-emitter` import cycle; `buildInterfaceReexports` only ever assigns
  * one of these (its F3 guard rejects every other layer).
  */
-export type InterfaceSourceLayer = "LocalPrimitives" | "ExternalPrimitives" | "Inferences";
+export type InterfaceSourceLayer = "LocalElements" | "ExternalElements" | "Inferences";
 
 // A representation's explicit `value element is <path>.` — the FHIR model-info property path
 // of its datum, plus the path's own source location so Todo 2's validator can anchor a
@@ -496,10 +496,10 @@ export interface ValueElement {
  * the union site — so it is identified by the stage that produced it.
  */
 export type RecordUnionTerm =
-  /** A LocalPrimitives retrieve — the local `code is` arm. */
-  | { kind: "local-primitives"; define: string }
-  /** An ExternalPrimitives retrieve — a `source representation` whose `type is` MATCHES the concept's. */
-  | { kind: "external-primitives"; define: string }
+  /** A LocalElements retrieve — the local `code is` arm. */
+  | { kind: "local-elements"; define: string }
+  /** An ExternalElements retrieve — a `source representation` whose `type is` MATCHES the concept's. */
+  | { kind: "external-elements"; define: string }
   /** A PRODUCER stage's constructed candidate, identified by its 0-based stage index. */
   | { kind: "constructed"; stageIndex: number };
 
@@ -625,12 +625,12 @@ export interface Concept extends ASTNode {
   __interfaceReexport?: boolean;
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The SOURCE
-   * layer (`"LocalPrimitives"` / `"ExternalPrimitives"` / `"Inferences"`) an Interface
+   * layer (`"LocalElements"` / `"ExternalElements"` / `"Inferences"`) an Interface
    * re-export concept (`__interfaceReexport`) re-publishes from. The case-feature
    * CQL emit reads it to pick the Interface define body:
    *   - `"Inferences"`     → `Inferences."X".satisfied()`
-   *   - `"LocalPrimitives"`  → `LocalPrimitives."X".asTruths().satisfied()`
-   *   - `"ExternalPrimitives"` → plain re-export `ExternalPrimitives."X"` (legacy, non-truth-set lane).
+   *   - `"LocalElements"`  → `LocalElements."X".asTruths().satisfied()`
+   *   - `"ExternalElements"` → plain re-export `ExternalElements."X"` (legacy, non-truth-set lane).
    * Set by `buildInterfaceReexports`. Absent on every other concept.
    *
    * Fix 4 [nit] — typed as the closed `InterfaceSourceLayer` union (not bare
@@ -676,14 +676,14 @@ export interface Concept extends ASTNode {
   __pureQuestion?: true;
   /**
    * SYNTHETIC-EMITTER-ONLY (#189 null/pause, T5 step 2b). Marks the INFERENCES TWIN of a pure question — the
-   * define that carries its THREE-STATE read (`<LocalPrimitives twin>.answeredValue()`).
+   * define that carries its THREE-STATE read (`<LocalElements twin>.answeredValue()`).
    *
    * REFACTOR:grounded — re-derived from the charter ("composition is strong Kleene, and totality belongs at
    * the arm, never per operand") and from RUNNING the emitter on both the layered and the direct paths, not
    * from the adjacent truth-set lane.
    *
    * ⭐ WHY THE TWIN EXISTS AT ALL. A pure question has no `definition is`/`defined as`, so before 2b it emitted
-   * only a LocalPrimitives RETRIEVE, and the three-state read lived exclusively on the Interface façade. A
+   * only a LocalElements RETRIEVE, and the three-state read lived exclusively on the Interface façade. A
    * `defined as` COMPOSITION is an Inference, and `LAYER_ORDER` forbids Inferences referencing Interface — so
    * a composition over a question resolved its leaf to the retrieve (a `List<FHIR.Observation>`, not a
    * Boolean) and could only be lowered by the truth-set collapse this slice deletes. Giving the question a
@@ -703,13 +703,13 @@ export interface Concept extends ASTNode {
    * `lowerLocalCodes` only ever sets the marker via `isPureQuestionConcept`, which enforces both; the emit
    * asserts it again because `emitCQLFromAST` is a validator-free public entry.
    *
-   * Its LocalPrimitives half carries `__loweringRole: "records-impl"` and this determination carries
+   * Its LocalElements half carries `__loweringRole: "records-impl"` and this determination carries
    * `"public-determination"` — the same split `code is` + `definition is exists this` already uses.
    */
   __pureQuestionRead?: true;
   /**
    * SYNTHETIC-EMITTER-ONLY (#189). On an Inferences twin whose concept carried a local `code is` AND a
-   * `definition is <selection> "<Named>"`: the name of its LocalPrimitives records twin, so the reduction is
+   * `definition is <selection> "<Named>"`: the name of its LocalElements records twin, so the reduction is
    * applied to `this` ∪ the named set rather than the named set alone.
    *
    * ⭐ That union IS the semantics, not an optimisation: "a reduction over a NAMED set also reduces the
@@ -721,15 +721,15 @@ export interface Concept extends ASTNode {
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
    * INFERRED half of a both-representation (`code is` + `defined as`) concept that
-   * `lowerLocalCodes` SPLIT into a LocalPrimitives retrieve twin + this Inferences twin.
+   * `lowerLocalCodes` SPLIT into a LocalElements retrieve twin + this Inferences twin.
    * The case-feature Inferences emit must FOLD IN the direct local-source retrieve,
-   * emitting `LocalPrimitives."X".asTruths() union (<the original defined-as inference>)`.
+   * emitting `LocalElements."X".asTruths() union (<the original defined-as inference>)`.
    * The string value is the concept's own name; the emit synthesizes the explicit
    * `<localSourceLibrary>."X"` qualified leaf (NOT a bare same-name ref, which would
    * be ambiguous against — or self-recurse into — the Inferences twin). Absent on
    * every other concept.
    */
-  __bothRepFoldInLocalPrimitives?: string;
+  __bothRepFoldInLocalElements?: string;
   /**
    * SYNTHETIC-EMITTER-ONLY (#189 P2). The ORDERED TERMS of a `record-union` twin's space.
    *
@@ -753,10 +753,10 @@ export interface Concept extends ASTNode {
   /**
    * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The
    * MERGE POLICY for a both-representation split (set on the Inferences twin
-   * ALONGSIDE `__bothRepFoldInLocalPrimitives`). Decided at lowering/match time so
+   * ALONGSIDE `__bothRepFoldInLocalElements`). Decided at lowering/match time so
    * the emitter branches on the marker rather than pattern-sniffing the body:
    *   - `"union"`   — the historical `code is` + `defined as` fold-in
-   *     (`LocalPrimitives."X".asTruths() union (<inference>)`). Every existing
+   *     (`LocalElements."X".asTruths() union (<inference>)`). Every existing
    *     both-rep is "union"; behavior is unchanged.
    *   - `"recency-value"` — the #189 Piece 1 GENERAL both-rep value merge
    *     (`code is` + `definition is most recent this` + a `coded from` `source
@@ -834,7 +834,7 @@ export interface Concept extends ASTNode {
    * `BoundaryTransformSpec`): how to normalise this concept's PUBLISHED record into its case feature.
    *
    * ⚠ PRESENCE IS THE GATE. It is set ONLY when the concept publishes a RECORD and its space holds an
-   * UNPROJECTED `external-primitives` term — the one arm that can put a non-conforming record in the space.
+   * UNPROJECTED `external-elements` term — the one arm that can put a non-conforming record in the space.
    * Everything else (the local retrieve, producer candidates, a projected source arm) conforms BY
    * CONSTRUCTION, so a transform there would emit a check whose else-branch is provably dead.
    */
@@ -854,7 +854,7 @@ export interface Concept extends ASTNode {
    * (`emitConcept`) picks its obligation SOURCE without marker-sniffing (disc 439 crit #1/#2):
    *   - `"records-impl"`         — a reduction-lane records twin `"X Records"` (a RecordSet retrieve; no
    *                                boolean define) → manufactured `not-applicable`.
-   *   - `"source-impl"`          — the LocalPrimitives retrieve HALF of a both-representation split (its
+   *   - `"source-impl"`          — the LocalElements retrieve HALF of a both-representation split (its
    *                                determination is the sibling Inferences twin) → manufactured `not-applicable`.
    *   - `"public-determination"` — the emitted PUBLIC determination (a retargeted reduction, a pure `code is`
    *                                lowered form, a both-rep Inferences twin, a standalone age posrep) → inherits

@@ -1,4 +1,4 @@
-library Dme101030LocalPrimitives
+library Dme101030LocalElements
 
 using FHIR version '4.0.1'
 

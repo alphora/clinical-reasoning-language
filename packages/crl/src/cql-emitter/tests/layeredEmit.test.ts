@@ -156,9 +156,9 @@ first:
     expect(result.success).toBe(true);
     const iface = layer(result, "Interface")!;
     expect(iface.libraryName).toBe("CustomInterface");
-    expect(iface.crossLibraryIncludes).toContain("CustomExternalPrimitives");
-    expect(iface.result.result).toContain('CustomExternalPrimitives."Leaf"');
-    expect(iface.result.result).not.toContain('PolicyExternalPrimitives."Leaf"');
+    expect(iface.crossLibraryIncludes).toContain("CustomExternalElements");
+    expect(iface.result.result).toContain('CustomExternalElements."Leaf"');
+    expect(iface.result.result).not.toContain('PolicyExternalElements."Leaf"');
   });
 
   it("keeps a copied FULL's foreign-only Interface and its actual include", () => {
@@ -378,18 +378,18 @@ concept "Top":
     const r = emitLayered(a, "Basic");
     expect(r.success).toBe(true);
     // R2 source-typed layers: hand-authored terminology → ExternalConcepts,
-    // `coded from` → ExternalPrimitives, `defined as` → Inferences. #186: names are the
+    // `coded from` → ExternalElements, `defined as` → Inferences. #186: names are the
     // unified hyphen-free `S` = layerLibraryName(policyId, layer) (policyId ===
     // source name for direct callers), emitted UNQUOTED in refs (simple ident).
     const rc = layerLibraryName("Basic", "ExternalConcepts");
-    const rs = layerLibraryName("Basic", "ExternalPrimitives");
+    const rs = layerLibraryName("Basic", "ExternalElements");
     const inf = layerLibraryName("Basic", "Inferences");
     expect(r.entries.map((e) => e.libraryName)).toEqual([rc, rs, inf]);
-    // ExternalPrimitives retrieves the ExternalConcepts-layer valueset + includes it.
-    const asserted = layer(r, "ExternalPrimitives")!;
+    // ExternalElements retrieves the ExternalConcepts-layer valueset + includes it.
+    const asserted = layer(r, "ExternalElements")!;
     expect(asserted.crossLibraryIncludes).toEqual([rc]);
     expect(asserted.result.result).toContain(`[Observation: ${rc}."VS"]`);
-    // Inferences refs the ExternalPrimitives leaf + includes it.
+    // Inferences refs the ExternalElements leaf + includes it.
     const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Leaf"`);
@@ -416,8 +416,8 @@ concept "Top":
     // layer's unified `S` ref, NOT a dangling `Self."VS"` (library `Self` no
     // longer exists after split).
     const rc = layerLibraryName("Self", "ExternalConcepts");
-    const rs = layerLibraryName("Self", "ExternalPrimitives");
-    const asserted = layer(r, "ExternalPrimitives")!;
+    const rs = layerLibraryName("Self", "ExternalElements");
+    const asserted = layer(r, "ExternalElements")!;
     expect(asserted.crossLibraryIncludes).toEqual([rc]);
     expect(asserted.result.result).toContain(`${rc}."VS"`);
     expect(asserted.result.result).not.toMatch(/\bSelf\."VS"/);
@@ -447,7 +447,7 @@ concept "Top":
     // Foreign `"Shared"."External"` survives untouched + earns an include.
     // "Shared" is a simple CQL identifier so it emits unquoted: `Shared."External"`.
     expect(inferred.crossLibraryIncludes).toEqual([
-      layerLibraryName("Mix", "ExternalPrimitives"),
+      layerLibraryName("Mix", "ExternalElements"),
       "Shared",
     ]);
     expect(inferred.result.result).toContain(`Shared."External"`);
@@ -467,12 +467,12 @@ concept "BMI":
     const r = emitLayered(a, "Ck");
     expect(r.success).toBe(true);
     // The terminology BMI lands in ExternalConcepts; the concept BMI in
-    // ExternalPrimitives, and the concept's `coded from "BMI"` resolves (via the
+    // ExternalElements, and the concept's `coded from "BMI"` resolves (via the
     // terminology slot) to the ExternalConcepts-layer valueset.
     const concepts = layer(r, "ExternalConcepts")!;
     expect(concepts.result.result).toContain(`valueset "BMI"`);
     const rc = layerLibraryName("Ck", "ExternalConcepts");
-    const asserted = layer(r, "ExternalPrimitives")!;
+    const asserted = layer(r, "ExternalElements")!;
     expect(asserted.crossLibraryIncludes).toEqual([rc]);
     expect(asserted.result.result).toContain(`${rc}."BMI"`);
   });
@@ -504,7 +504,7 @@ concept "Top":
 `);
     const r = emitLayered(a, "Nar");
     expect(r.success).toBe(true);
-    const rs = layerLibraryName("Nar", "ExternalPrimitives");
+    const rs = layerLibraryName("Nar", "ExternalElements");
     const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Asserted Leaf"`);
@@ -529,7 +529,7 @@ concept "NotLeaf":
 `);
     const r = emitLayered(a, "Sn");
     expect(r.success).toBe(true);
-    const rs = layerLibraryName("Sn", "ExternalPrimitives");
+    const rs = layerLibraryName("Sn", "ExternalElements");
     const inferred = layer(r, "Inferences")!;
     expect(inferred.crossLibraryIncludes).toEqual([rs]);
     expect(inferred.result.result).toContain(`${rs}."Leaf"`);
@@ -598,7 +598,7 @@ concept "Self":
 
 describe("layeredEmit — F3 non-source-typed decision concept hard error", () => {
   it("emitPartitioned hard-errors when a decision when-concept is not source-typed", () => {
-    // A `code is` concept makes the library `interface`-eligible (LocalPrimitives), but
+    // A `code is` concept makes the library `interface`-eligible (LocalElements), but
     // the decision references a SECOND concept "Ghost" that is representation-bearing
     // → `classifyStatementLayer` returns null (out of scope) → NOT a re-exportable
     // source layer. Pre-F3 it was silently skipped (emptying the Interface → silent
@@ -713,14 +713,14 @@ decision "Cover":
     const r = emitPartitioned(lowered.ast, "Cascade", "example-semand", FULL_PARTITION);
     expect(r.success).toBe(true);
     // The unified S for each present layer (what the FHIR lane will also use).
-    const localSource = layerLibraryName("example-semand", "LocalPrimitives");
+    const localSource = layerLibraryName("example-semand", "LocalElements");
     const inferred = layerLibraryName("example-semand", "Inferences");
 
     // #189 T5 step 2b — "A" and "B" are PURE QUESTIONS, so each now publishes an Inferences determination
-    // reading its LocalPrimitives answer records three-state (`"<X> Records".answeredValue()`), and the parent
+    // reading its LocalElements answer records three-state (`"<X> Records".answeredValue()`), and the parent
     // composes those BOOLEANS rather than weaving truth-set Lists. The cascade invariant is unchanged and is
-    // what this test is actually about: the Inferences body qualifies LocalPrimitives, so its header MUST
-    // `include <LocalPrimitives>` (byte-identical, unquoted).
+    // what this test is actually about: the Inferences body qualifies LocalElements, so its header MUST
+    // `include <LocalElements>` (byte-identical, unquoted).
     const inf = layer(r, "Inferences")!;
     expect(inf.result.result).toContain(`${localSource}."A Records".answeredValue()`);
     expect(inf.result.result).toContain(`${localSource}."B Records".answeredValue()`);
@@ -757,7 +757,7 @@ describe("layeredEmit — #189 Slice-C boundary 1: layered emit for every reduct
     return layer(r, "Inferences")!.result.result;
   };
 
-  it("layered `count \"X\" at least N` → `Count(<S>-LocalPrimitives.\"X Records\") >= N` (cross-layer-qualified)", () => {
+  it("layered `count \"X\" at least N` → `Count(<S>-LocalElements.\"X Records\") >= N` (cross-layer-qualified)", () => {
     const inf = inferredOf(`library "Pol".
 
 concept "Trials":
@@ -775,7 +775,7 @@ activity "R":
 decision "D":
 - when "Enough" then recommend activity "R".
 `);
-    expect(inf).toMatch(/define "Enough":\s*\n\s*Count\(PolLocalPrimitives\."Trials"\) >= 2/);
+    expect(inf).toMatch(/define "Enough":\s*\n\s*Count\(PolLocalElements\."Trials"\) >= 2/);
   });
 
   it("layered Scalar-boolean `most recent this` (B2a) → `Coalesce(FHIRHelpers.ToBoolean((Last(...)))...)` over the qualified twin", () => {
@@ -795,7 +795,7 @@ decision "D":
 - when "Fever" then recommend activity "R".
 `);
     // The select operand is the cross-layer-qualified records twin; the value read + Coalesce wrap the select.
-    expect(inf).toContain(`(PolLocalPrimitives."Fever Records") O`);
+    expect(inf).toContain(`(PolLocalElements."Fever Records") O`);
     expect(inf).toMatch(/where O\.value is FHIR\.boolean/);
     expect(inf).toMatch(/sort by \(effective as FHIR\.dateTime\)\.value, id/);
     expect(inf).toMatch(/Coalesce\(\s*\n\s*FHIRHelpers\.ToBoolean\(/);
@@ -813,7 +813,7 @@ concept "Last Proc":
 - definition is most recent this.
 `);
     expect(proc).toMatch(
-      /define "Last Proc":\s*\n\s*Last\(\s*\n\s*\(PolLocalPrimitives\."Last Proc Records"\) O\s*\n\s*sort by \(performed as FHIR\.dateTime\)\.value, id/,
+      /define "Last Proc":\s*\n\s*Last\(\s*\n\s*\(PolLocalElements\."Last Proc Records"\) O\s*\n\s*sort by \(performed as FHIR\.dateTime\)\.value, id/,
     );
     // none cast (Condition.recordedDate — no `as FHIR.dateTime`):
     const cond = inferredOf(`library "Pol".
@@ -825,7 +825,7 @@ concept "Last Cond":
 - definition is most recent this.
 `);
     expect(cond).toMatch(
-      /define "Last Cond":\s*\n\s*Last\(\s*\n\s*\(PolLocalPrimitives\."Last Cond Records"\) O\s*\n\s*sort by recordedDate\.value, id/,
+      /define "Last Cond":\s*\n\s*Last\(\s*\n\s*\(PolLocalElements\."Last Cond Records"\) O\s*\n\s*sort by recordedDate\.value, id/,
     );
   });
 });
@@ -862,7 +862,7 @@ describe("layeredEmit — #189 Slice-C boundary 1: composition loud-guard", () =
     // The step-7 guard: post-flip a reduction ("R" = `code is` + `exists this`) classifies Inferences, so a
     // `defined as ( "R" sem-or "S" )` becomes layer-emittable. But the truth-set lane renders siblings as
     // `.asTruths()` lists and `union`s them, while "R" is a bare CQL Boolean → `"R" union
-    // <LocalPrimitives>."S".asTruths()` fails to type-check at translator load. Composing `defined as` over
+    // <LocalElements>."S".asTruths()` fails to type-check at translator load. Composing `defined as` over
     // TOTAL booleans is a boundary-2 change; until then the emitter refuses LOUD with a CRL-level kind.
     const a = ast(`library "Pol".
 
@@ -1026,7 +1026,7 @@ decision "Cover":
   it("#189 2b.2 — a both-rep `code is` + `defined as` to a TOTAL comparator fails LOUD, not `List union Boolean` (code review, Claude #3)", () => {
     // The both-rep union twin keeps the bare-ref body and is excluded from the flip (`foldIn !== undefined`); the
     // retained reduction guard misses a comparator (a `DefinitionIsDefinition`). Without the fold-in weave guard,
-    // the union would emit `LocalPrimitives."Merged".asTruths() union ("C")` — a truth-set List `union` a total
+    // the union would emit `LocalElements."Merged".asTruths() union ("C")` — a truth-set List `union` a total
     // Boolean, ill-typed under success:true. The weave guard rejects it.
     const a = ast(`library "Pol".
 

@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import { describe, expect, it } from "vitest";
 
 import { buildCRL } from "../../index";
@@ -56,24 +57,24 @@ describe("record-union terms", () => {
   it("⭐ the twin LISTS its space, in order, with the layer of each term", () => {
     const twin = unionTwin();
     expect(twin.__recordUnionTerms).toEqual([
-      { kind: "local-primitives", define: "Height" },
-      { kind: "external-primitives", define: "Height Source" },
+      { kind: "local-elements", define: "Height" },
+      { kind: "external-elements", define: "Height Source" },
     ]);
   });
 
   it("⚠ the LAYER is part of the term, because it decides the include qualifier", () => {
-    // A LocalPrimitives define and an ExternalPrimitives define are reached through different library
+    // A LocalElements define and an ExternalElements define are reached through different library
     // qualifiers. Deriving the layer from the name (`… Source` ⇒ external) is exactly the implicitness
     // P2 removes — it works only while there is exactly one posrep with exactly that suffix.
     const terms = unionTwin().__recordUnionTerms!;
-    expect(terms.map((t) => t.kind)).toEqual(["local-primitives", "external-primitives"]);
+    expect(terms.map((t) => t.kind)).toEqual(["local-elements", "external-elements"]);
     expect(new Set(terms.map((t) => t.kind)).size).toBe(2);
   });
 
   it("the local term names the concept itself — the LP retrieve twin shares the author's name", () => {
     const terms = unionTwin().__recordUnionTerms!;
-    const local = terms.find((t) => t.kind === "local-primitives");
-    expect(local).toEqual({ kind: "local-primitives", define: "Height" });
+    const local = terms.find((t) => t.kind === "local-elements");
+    expect(local).toEqual({ kind: "local-elements", define: "Height" });
   });
 
   it("⚠ the marker and the terms are set in LOCK-STEP", () => {

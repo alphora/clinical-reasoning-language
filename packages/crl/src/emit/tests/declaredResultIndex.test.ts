@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import { buildCRL } from "../../index";
 import type { CRL, Concept, ReferenceName } from "../../ast/types";
 import {
@@ -296,7 +297,7 @@ describe("makeTotalityFamilyResolver — #189 Slice 0c (the boolean-composition 
   });
 
   it("a RENDERED-LAYER token (classified positively) → a SAME-SOURCE index lookup, NOT a foreign resolution", () => {
-    // A cross-LAYER operand `"Referrer-LocalPrimitives"."Local"` is same-SOURCE (Local is in the referrer's own
+    // A cross-LAYER operand `"Referrer-LocalElements"."Local"` is same-SOURCE (Local is in the referrer's own
     // pre-split concepts) — classified positively BEFORE the cross-lib resolver so it does not scope-miss.
     const withLocalInIndex = buildDeclaredResultIndex([
       { sourceIdentity: "Referrer", concepts: [{ ...BOOL_SCALAR, name: "Local" }] },
@@ -306,8 +307,8 @@ describe("makeTotalityFamilyResolver — #189 Slice 0c (the boolean-composition 
       index: withLocalInIndex,
       fromIdentity: "Referrer",
       resolveRawLibrary,
-      isRenderedLayerToken: (lib) => lib === "Referrer-LocalPrimitives",
+      isRenderedLayerToken: (lib) => lib === "Referrer-LocalElements",
     });
-    expect(resolve(qref("Referrer-LocalPrimitives", "Local"))).toEqual({ kind: "total", total: true });
+    expect(resolve(qref("Referrer-LocalElements", "Local"))).toEqual({ kind: "total", total: true });
   });
 });

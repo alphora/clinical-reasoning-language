@@ -35,17 +35,17 @@ export type CaseFeatureRecordSkip =
  * ⭐⭐ WHERE A CASE FEATURE'S `cpg-featureExpression` POINTS — a (layer, define, resultKind) TRIPLE.
  *
  * ⚠⚠ THIS REPLACED A BARE `recordsDefineId: string`, WHICH BAKED IN TWO THINGS AT ONCE. It named a define
- * AND silently assumed the LocalPrimitives layer (the library identity travelled as a separate argument,
+ * AND silently assumed the LocalElements layer (the library identity travelled as a separate argument,
  * hard-wired by the caller). Disc 531/532, both arms: that is the seam that makes the merge un-targetable,
  * which is why a computed or sourced value can never pre-fill its own question.
  */
 export type FeatureExpressionTarget = {
   /**
    * The LAYER the define lives in, as a ROLE — resolved to a library identity by the caller, which is the
-   * only place that knows the manifest. `local-primitives` = answered records only; `inferences` = the
+   * only place that knows the manifest. `local-elements` = answered records only; `inferences` = the
    * merged space (local ∪ source ∪ constructed candidates).
    */
-  layer: "local-primitives" | "inferences";
+  layer: "local-elements" | "inferences";
   /** The bare CQL define identifier (`text/cql-identifier`). SINGLE SOURCE for a twin: `recordsTwinDefineName`. */
   define: string;
   /**
@@ -142,16 +142,16 @@ export function resolveCaseFeatureRecord(
       concept.definition?.type === "ReductionDefinition" ? concept.definition.reduction : undefined;
     // #189 Piece 1 (disc 506) — a both-rep RECENCY-VALUE concept (`code is` + `most recent this` + a `coded from`
     // source rep) HAS a `ThisRecords` reduction, but `lowerLocalCodes` does NOT synthesize a `"<X> Records"` twin
-    // for it — it publishes the local records retrieve under its OWN name `"<X>"` in LocalPrimitives (the both-rep
+    // for it — it publishes the local records retrieve under its OWN name `"<X>"` in LocalElements (the both-rep
     // same-name convention, exactly the case the comment above names). So target the concept name, not the twin
     // (targeting `"<X> Records"` DANGLES — the Inv-2(d) integrity check catches it).
     const isRecencyValueBothRep = resolveRecencyValueConcept(concept).kind === "recency-value";
     // ⭐ #189 null/pause T5 step 2b — a PURE QUESTION now splits the same way a `ThisRecords` reduction does:
-    // `lowerLocalCodes` publishes its answer records as `"<X> Records"` in LocalPrimitives and its THREE-STATE
+    // `lowerLocalCodes` publishes its answer records as `"<X> Records"` in LocalElements and its THREE-STATE
     // determination (`"<X> Records".answeredValue()`) as `"<X>"` in Inferences. So the `cpg-featureExpression`
     // must target the TWIN. It has no `ReductionDefinition` — a question is a bare `code is` — so the reduction
     // test above cannot see it. MEASURED: without this every question's SD dangled (Inv 2(d) caught all four in
-    // the `guard-define` fixture), because `"<X>"` in LocalPrimitives no longer exists.
+    // the `guard-define` fixture), because `"<X>"` in LocalElements no longer exists.
     const isQuestion = isPureQuestionConcept(concept);
     const hasRecordsTwin =
       isQuestion || (reduction !== undefined && reduction.target.type === "ThisRecords" && !isRecencyValueBothRep);
@@ -159,7 +159,7 @@ export function resolveCaseFeatureRecord(
     // publishes what the concept DECLARES it publishes.** One rule from self-description, not two
     // conventions keyed on library.
     //
-    // ⚠⚠ THE MEASURED DEFECT THIS CLOSES: LocalPrimitives holds ANSWERED RECORDS ONLY, so a computed or
+    // ⚠⚠ THE MEASURED DEFECT THIS CLOSES: LocalElements holds ANSWERED RECORDS ONLY, so a computed or
     // sourced value never pre-filled its own question — ONE `$apply` response computed `Obese`, ACTED on it,
     // and asked the clinician to supply it, blank. A `shape is Record` concept publishes its selected record
     // from the Inferences merge (local ∪ source ∪ constructed candidates, normalised to the case feature by
@@ -242,7 +242,7 @@ export function resolveCaseFeatureRecord(
       kind: "record",
       descriptor: local,
       target: {
-        layer: "local-primitives",
+        layer: "local-elements",
         define: hasRecordsTwin ? recordsTwinDefineName(concept.name) : concept.name,
         // ⚠ A RETRIEVE define, so a LIST — both the `"<X> Records"` twin and the same-name publish. Not an
         // oversight being recorded; it IS the measured latent defect (probe 2), visible in the type.

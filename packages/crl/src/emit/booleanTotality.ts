@@ -628,7 +628,7 @@ export type DefineResult =
 
 /** #189 Slice C 2b.0 — the routing visibility of an emitted define. Public-reference routing must distinguish
  *  the PUBLIC determination other CRL references denote (the Inferences determination wins over its
- *  LocalPrimitives/Records implementation twin, per `buildNameLayerMaps`) from its `impl` twin (never a routing
+ *  LocalElements/Records implementation twin, per `buildNameLayerMaps`) from its `impl` twin (never a routing
  *  target) and its Interface `facade`. Derived from `Concept.__loweringRole` at enrollment; an untagged
  *  authored concept and a criterion define are `public`, and a façade is `facade` ONLY under the same
  *  `caseFeature.kind === "interface"` gate `enrollConcept` uses for façade treatment (else it emitted a legacy
@@ -640,7 +640,7 @@ export type DefineVisibility = "public" | "impl" | "facade";
  *  ALONE (discharge metadata is evidence about a subject, never authority to remove it, disc 429 #1). The
  *  emitted `cql` body is stored ON the entry (disc 429 C8) so the classifier↔lowering agreement test can
  *  check the discharge against the actual text without reconstructing the pairing. `library` + `name` are
- *  the emitted identity — the ledger keys by BOTH (a bare name conflates the LocalPrimitives RecordSet twin and
+ *  the emitted identity — the ledger keys by BOTH (a bare name conflates the LocalElements RecordSet twin and
  *  the Inferences Scalar twin, §4.5). */
 export type EmittedDefineEntry = {
   library: string;
@@ -1009,7 +1009,7 @@ export function proveWholeBoundaryTotality(
           e,
           e.discharge.booleanEffect === "not-boolean" && !isBooleanSubject(e)
             ? // #189 burn-down — OBLIGATION ATTRIBUTION, not a missing read. A `code is` concept lowers into a
-              // LocalPrimitives RETRIEVE twin plus an Interface read, and the twin keeps the concept's NAME,
+              // LocalElements RETRIEVE twin plus an Interface read, and the twin keeps the concept's NAME,
               // so it inherits the concept's boolean obligation from the authored map while emitting records.
               // The read itself is honest and on the façade. ⚠ Fixing it means deciding which twin owns a
               // lowered concept's obligation, which is the whole local lane, not this form.

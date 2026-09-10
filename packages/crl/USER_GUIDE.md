@@ -490,28 +490,28 @@ Validation walks all four ref slots: concept body refs, decision
 `when "C"` / `recommend activity "A"` / `use decision "D"`, and activity
 `with "T"`.
 
-#### Per-CRL emit
+#### Emitted libraries
 
-v2.1.0 emits **one CQL file per CRL library** (not one big flat-inlined CQL
-file like v2.0). Each library produces its own `<libraryName>.cql` with
-its own `library X` header, its own `include FHIRHelpers` + `include
-CRLCommon`, and a CQL `include OtherLib` line for each cross-library
-qualified ref it makes.
+The compiler emits the complete imported library closure. A source library can
+produce several CQL libraries: `LocalConcepts` and `ExternalConcepts` hold
+terminology, `LocalElements` and `ExternalElements` hold retrieval definitions,
+`Inferences` holds derived logic, and `Interface` exposes results to consumers.
+Only applicable layers are generated. CRL concepts remain concepts; these names
+describe compilation responsibilities, not additional concept types.
 
-What's emitted today:
-- `concept` declarations (via `defined as` / `definition is` / `coded from`)
-- `terminology` declarations (valuesets, codes)
-- Cross-library qualified refs emit as CQL native `"Lib"."Name"` /
-  `Lib."Name"` (quoted when the library name contains spaces).
+Generated library names use the policy identity and the existing length-safe
+formatter. CQL declarations, includes, filenames, FHIR Library identities and
+dependency references use the same resulting name. Decisions and activities also
+emit definitional FHIR, with executable expressions linked to the CQL Libraries.
 
-What's NOT emitted today (validation-only support):
-- `decision` declarations
-- `activity` declarations
-
-The validator surfaces ref errors in decision/activity body slots, but
-the emitter doesn't render those statements into CQL. Quality-Measure
-consumers get the `concept` outputs; decision/activity emission is a
-future feature.
+When upgrading an artifact set, re-emit its complete closure into a fresh output
+directory, validate it, and replace the previous generated set together. Update
+other deployed callers of renamed libraries in the same deployment. The writer
+does not automatically prune obsolete CRL-generated files: use the previous
+emission's exact file inventory to remove those files, preserving hand-authored
+files. Do not identify obsolete files by a suffix search; long generated names
+can be shortened with a hash. Copying the new files over the old directory alone
+can leave stale libraries available to the engine.
 
 #### Diagnostic kinds
 

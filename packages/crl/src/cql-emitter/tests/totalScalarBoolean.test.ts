@@ -131,7 +131,7 @@ concept "B":
     expect(emitsTotalScalarBoolean(m.get("A"), resolverFor(m))).toBe(false);
   });
 
-  it("an alias to a plain `code is` boolean (a LocalPrimitives retrieve, NOT a reduction) is NOT total", () => {
+  it("an alias to a plain `code is` boolean (a LocalElements retrieve, NOT a reduction) is NOT total", () => {
     const m = conceptsOf(
       parse(`concept "Base":
 - type is Observation.

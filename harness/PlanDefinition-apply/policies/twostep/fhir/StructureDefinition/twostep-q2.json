@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Q2",
-        "reference": "http://example.org/crl/twostep/Library/TwostepLocalPrimitives"
+        "reference": "http://example.org/crl/twostep/Library/TwostepLocalElements"
       }
     }
   ],

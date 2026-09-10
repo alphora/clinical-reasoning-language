@@ -86,8 +86,8 @@ export interface PerLibraryEmit {
   //   - `concepts` : the terminology-owning entry (partial Concepts sibling OR
   //                  full-split LocalConcepts/ExternalConcepts — owns the
   //                  CodeSystem/author-ValueSet depends-on edges).
-  //   - `layer`    : a full-split source/inference layer (LocalPrimitives /
-  //                  ExternalPrimitives / Inferences) that consumes lower layers.
+  //   - `layer`    : a full-split source/inference layer (LocalElements /
+  //                  ExternalElements / Inferences) that consumes lower layers.
   //   - `interface`: the synthesized `<policyId>-Interface` re-export library
   //                  (decision/action-guard surface). The FHIR lane rewires
   //                  decision/activity/recommendation `library[]` onto it and
@@ -95,7 +95,7 @@ export interface PerLibraryEmit {
   //                  role — that wiring is the FHIR half; here we just expose it.
   role: "root" | "concepts" | "layer" | "interface";
   // #186 — the RAW source-typed partition value this entry was emitted under
-  // (`LocalConcepts` / `ExternalConcepts` / `LocalPrimitives` / `ExternalPrimitives` /
+  // (`LocalConcepts` / `ExternalConcepts` / `LocalElements` / `ExternalElements` /
   // `Inferences` / `Interface`), or `undefined` for the per-CRL/`none` Root (no
   // layer). The FHIR lane derives the layered Library identity `S` DIRECTLY from
   // `layerLibraryName(policyId, layer)` off this field — it does NOT parse `S`
@@ -1037,7 +1037,7 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
         //     depends-on edges onto this entry).
         //   - Interface → "interface": the synthesized re-export library (the
         //     FHIR lane rewires decision/activity `library[]` onto it).
-        //   - LocalPrimitives / ExternalPrimitives / Inferences → "layer": a consuming
+        //   - LocalElements / ExternalElements / Inferences → "layer": a consuming
         //     source/inference layer (depends-on its lower siblings via `includes`).
         const role: PerLibraryEmit["role"] =
           part.layer === "LocalConcepts" || part.layer === "ExternalConcepts"

@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import { isFhirDefError } from "../types";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import * as path from "path";
@@ -15,7 +16,7 @@ import { emitFhirDefFromPath } from "../closureOrchestrator";
  * produces — the decision PlanDefinition's `action[].input[]` (recursive
  * case-feature inputs, in INFERENCE ORDER) and the case-feature
  * `StructureDefinition/*.json` (one per collected `code is` concept,
- * `cpg-featureExpression.reference` → the `<policyId>-LocalPrimitives` Library):
+ * `cpg-featureExpression.reference` → the `<policyId>-LocalElements` Library):
  *   - Every case-feature StructureDefinition that EXISTS under `src/fhir/
  *     StructureDefinition/` is matched BYTE-FOR-BYTE.
  *   - The coverage-determination PlanDefinition's `action[].input` arrays are

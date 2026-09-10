@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import { isFhirDefError } from "../types";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import * as path from "path";
@@ -90,7 +91,7 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     const libs = result.resources.filter(
       (r) => r.resourceType === "Library" && !CATALOG_LIB_IDS.has(r.resource.id as string),
     );
-    // 6 layer Libraries: LocalConcepts, ExternalConcepts, LocalPrimitives, ExternalPrimitives,
+    // 6 layer Libraries: LocalConcepts, ExternalConcepts, LocalElements, ExternalElements,
     // Inferences, Interface. #189 2d — "Adult Patient" migrated to `code is` +
     // `definition is exists this` is now a DERIVATION (`exists("… Records")`), so an
     // INFERRED layer is emitted even though this fixture has no `defined as`
@@ -101,8 +102,8 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     );
     const localConcepts = byId.get("CodeIsDecisionVsFixtureLocalConcepts")!;
     const recordConcepts = byId.get("CodeIsDecisionVsFixtureExternalConcepts")!;
-    const localSource = byId.get("CodeIsDecisionVsFixtureLocalPrimitives")!;
-    const recordSource = byId.get("CodeIsDecisionVsFixtureExternalPrimitives")!;
+    const localSource = byId.get("CodeIsDecisionVsFixtureLocalElements")!;
+    const recordSource = byId.get("CodeIsDecisionVsFixtureExternalElements")!;
     expect(localConcepts).toBeDefined();
     expect(recordConcepts).toBeDefined();
 

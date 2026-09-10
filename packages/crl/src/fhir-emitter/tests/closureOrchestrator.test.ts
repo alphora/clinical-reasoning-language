@@ -223,7 +223,7 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(result.success).toBe(true);
   });
 
-  it("#189 Slice-C flip — case (b) a decision + `code is` + reduction library EMITS successfully (the reduction classifies Inferences → the library splits, so the case-feature lane has its LocalPrimitives target)", () => {
+  it("#189 Slice-C flip — case (b) a decision + `code is` + reduction library EMITS successfully (the reduction classifies Inferences → the library splits, so the case-feature lane has its LocalElements target)", () => {
     // PRE-FLIP this library routed `none` (the `ReductionDefinition` classified null), and a decision +
     // `code is` needs the LAYERED split to emit case-features — so the FHIR lane failed loud with
     // `decision-root-library-missing`. The Slice-C flip makes the reduction Inferences-classifiable, so the
@@ -243,8 +243,8 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     // #189 2d flip (charter §4): a concept that is BOTH a record and a reduction ("Cov" = `code is`
     // Condition + `exists this`) is a case feature VIA ITS RECORD — the SD describes the natural Condition,
     // and its `cpg-featureExpression` targets the "Cov Records" retrieve twin (which DOES exist in the
-    // LocalPrimitives layer), NOT the ephemeral boolean "Cov". Pre-flip this featureExpression dangled at
-    // `LocalPrimitives."Cov"`, so the lane loud-gated (deferral §4.6/G1); the flip retargets it to "Cov Records",
+    // LocalElements layer), NOT the ephemeral boolean "Cov". Pre-flip this featureExpression dangled at
+    // `LocalElements."Cov"`, so the lane loud-gated (deferral §4.6/G1); the flip retargets it to "Cov Records",
     // removing the dangle — so the emit now SUCCEEDS with a real Condition case-feature. (Contrast the
     // code-LESS `count` reduction below, which has no own record and correctly STILL loud-gates.)
     const root = join(ROOT, "src/imports/tests/fixtures/decision-when-reduction/root.crl");
@@ -426,7 +426,7 @@ describe("closureOrchestrator — direct API (emitFhirDefClosure)", () => {
 
 const CODE_IS_BASIC = join(ROOT, "src/cql-emitter/tests/fixtures/code-is-basic/code-is-basic.crl");
 
-// F4 — a decision-bearing fixture that `when`s on TWO eligible LocalPrimitives-boolean
+// F4 — a decision-bearing fixture that `when`s on TWO eligible LocalElements-boolean
 // concepts, so BOTH case-feature StructureDefinitions are emitted AND each
 // when-action must carry the corresponding input.profile.
 const CODE_IS_DECISION_TWO = join(
@@ -550,7 +550,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
   it("emits one FHIR Library PER emitted CQL layer, content urls resolving to the split files (R2 source-typed)", () => {
     // R2 — `code-is-basic` is the FULL-split case (decision-LESS, multi-layer,
     // `code is`): the CQL lane now emits 3 SOURCE-TYPED layer files
-    // (LocalConcepts → LocalPrimitives → Inferences), so the FHIR lane emits 3 Libraries
+    // (LocalConcepts → LocalElements → Inferences), so the FHIR lane emits 3 Libraries
     // matching them (one FHIR Library per manifest entry), NOT one un-split "Code
     // Is Basic" Library pointing at a CQL file the split never wrote.
     const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
@@ -572,7 +572,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     expect([...byTitle.keys()].sort()).toEqual([
       "CodeIsBasicFixtureInferences",
       "CodeIsBasicFixtureLocalConcepts",
-      "CodeIsBasicFixtureLocalPrimitives",
+      "CodeIsBasicFixtureLocalElements",
     ]);
     // Every content url resolves to its split CQL file (Inv 4 passes → no
     // library-content-url-unresolved error).
@@ -581,8 +581,8 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
       expect(content?.[0]?.url).toBe(`../../cql/${title}.cql`);
     }
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
-    // The LocalPrimitives layer depends-on the LocalConcepts layer it `include`s.
-    const localSource = byTitle.get("CodeIsBasicFixtureLocalPrimitives")!;
+    // The LocalElements layer depends-on the LocalConcepts layer it `include`s.
+    const localSource = byTitle.get("CodeIsBasicFixtureLocalElements")!;
     const localSourceDeps = (
       (localSource.relatedArtifact as Array<{ resource?: string }>) ?? []
     ).map((e) => e.resource);
@@ -590,7 +590,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
       "http://example.org/crl/code-is-basic/Library/CodeIsBasicFixtureLocalConcepts",
     );
     // R2: the LocalConcepts LAYER is `role:"concepts"` (Local family), so it owns
-    // the local CodeSystem depends-on edge. The LocalPrimitives/Inferences consuming
+    // the local CodeSystem depends-on edge. The LocalElements/Inferences consuming
     // layers reach it transitively via their LocalConcepts-sibling dep above.
     const localConcepts = byTitle.get("CodeIsBasicFixtureLocalConcepts")!;
     const localConceptsDeps = (
@@ -628,7 +628,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     expect(allCql).toContain(`codesystem "Code Is Basic Fixture Local Codes": '${csUrl}'`);
   });
 
-  it("F4 — two eligible LocalPrimitives-boolean concepts → BOTH case-feature SDs emitted AND each when-action carries its input.profile (silent-omission guard)", () => {
+  it("F4 — two eligible LocalElements-boolean concepts → BOTH case-feature SDs emitted AND each when-action carries its input.profile (silent-omission guard)", () => {
     const result = emitFhirDefFromPath(CODE_IS_DECISION_TWO, { clock: FIXED_CLOCK });
     expect(result.success).toBe(true);
 
@@ -762,11 +762,11 @@ describe("closureOrchestrator — two `code is` libraries disambiguate their loc
       "CodeIsTwoLibFixtureInferences",
       "CodeIsTwoLibFixtureInterface",
       "CodeIsTwoLibFixtureLocalConcepts",
-      "CodeIsTwoLibFixtureLocalPrimitives",
+      "CodeIsTwoLibFixtureLocalElements",
       "CodeIsTwoLibFixtureTwoLibSubInferences",
       "CodeIsTwoLibFixtureTwoLibSubInterface",
       "CodeIsTwoLibFixtureTwoLibSubLocalConcepts",
-      "CodeIsTwoLibFixtureTwoLibSubLocalPrimitives",
+      "CodeIsTwoLibFixtureTwoLibSubLocalElements",
     ]);
 
     // The sibling's LocalConcepts Library depends-on ITS OWN (disambiguated) local

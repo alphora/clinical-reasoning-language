@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import * as path from "node:path";
 
 import { describe, it, expect } from "vitest";
@@ -12,7 +13,7 @@ import { emitCQLImports } from "../../imports/emit";
  * merge is that sentence literally — `union` is the two arms adding, `Last(… sort by …)` is the stage working:
  *
  *     define "Height":
- *       Last( (LocalPrimitives."Height" union ExternalPrimitives."Height Source") O
+ *       Last( (LocalElements."Height" union ExternalElements."Height Source") O
  *               sort by (effective as FHIR.dateTime).value, id )
  *
  * ⚠ WHY THE UNION NEEDS NO CANDIDATE CONSTRUCTION HERE: both arms retrieve the concept's OWN `type is` resource
@@ -74,7 +75,7 @@ describe("#189 — the both-rep RECORD merge (`shape is Record` + `code is` + po
     // works on that collection"* still reads literally here; it just reads on the helper.
     const { cql } = emit();
     expect(cql).toMatch(
-      /define "Height Selected":\s*\n\s*Last\(\s*\n\s*\(\S*LocalPrimitives\."Height"\s*\n?\s*union \S*ExternalPrimitives\."Height Source"\) O\s*\n\s*where O\.value is FHIR\.Quantity\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
+      /define "Height Selected":\s*\n\s*Last\(\s*\n\s*\(\S*LocalElements\."Height"\s*\n?\s*union \S*ExternalElements\."Height Source"\) O\s*\n\s*where O\.value is FHIR\.Quantity\s*\n\s*sort by \(effective as FHIR\.dateTime\)\.value, id\s*\n\s*\)/,
     );
   });
 

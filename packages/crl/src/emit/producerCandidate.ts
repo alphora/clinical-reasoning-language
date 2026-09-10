@@ -464,7 +464,7 @@ export interface BoundaryTransformSpec {
  * Resolve a concept's BOUNDARY transform, or refuse.
  *
  * ⚠ This does NOT decide WHETHER the transform is needed — that is the caller's static gate (only a space
- * that can hold an unprojected `external-primitives` term can publish a non-conforming record). This answers
+ * that can hold an unprojected `external-elements` term can publish a non-conforming record). This answers
  * "given that it is needed, can it be built?".
  */
 export function resolveBoundaryTransform(inputs: {
@@ -561,7 +561,7 @@ export function renderBoundaryIdentityCheck(
  * ⚠⚠ WITHOUT THIS THE ARM IS SILENTLY DROPPED, MEASURED. A heterogeneous arm was previously unioned RAW,
  * and the merge's own conforming filter removed it again:
  *
- *     Last( (LocalPrimitives."X" union ExternalPrimitives."X Source") O
+ *     Last( (LocalElements."X" union ExternalElements."X Source") O
  *           where O.value is FHIR.CodeableConcept       -- a ServiceRequest has no `.value`
  *           sort by (effective as FHIR.dateTime).value, id )   -- nor `.effective`
  *

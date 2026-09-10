@@ -46,7 +46,7 @@ import { getRefLibrary, getRefName } from "./types";
  *
  * ⚠ CROSS-LIBRARY REFS ARE NOT FOLLOWED, and are treated as NOT question-bearing. That is the conservative
  * direction for the corpus (a foreign operand is overwhelmingly evidence — cms22's comparator chain reads
- * `"cms22-ExternalPrimitives"."…"` retrieves) and it keeps every existing golden's boundary intact. It is
+ * `"cms22-ExternalElements"."…"` retrieves) and it keeps every existing golden's boundary intact. It is
  * ALSO the unsafe direction in principle: a foreign ANSWERABLE concept would keep a boundary it should not
  * have. Closing that needs the cross-library capability index, and is tracked with O-UNIFIED — it is a
  * KNOWN limit, not an oversight.

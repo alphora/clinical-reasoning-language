@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/hcsc/dme101-030/Library/Dme101030LocalPrimitives"
+      "resource": "http://example.org/hcsc/dme101-030/Library/Dme101030LocalElements"
     }
   ],
   "content": [

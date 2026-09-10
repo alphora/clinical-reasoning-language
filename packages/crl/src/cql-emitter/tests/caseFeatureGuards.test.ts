@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import { buildCRL } from "../../index";
 import { emitCQLFromAST as emitCQLFromASTRaw } from "../emitCQL";
 import { emitPartitioned, FULL_PARTITION } from "../layeredEmit";
@@ -18,7 +19,7 @@ import type { CRL } from "../../ast/types";
  *   - Fix 1: a both-representation (`code is` + `defined as`) concept reaching a
  *     NON-truth-set emit path hard-errors instead of mis-emitting (duplicate
  *     define / fold-in-less Inferences).
- *   - Fix 2: a ExternalPrimitives (`coded from`) operand woven into a truth-set
+ *   - Fix 2: a ExternalElements (`coded from`) operand woven into a truth-set
  *     `defined as` composition hard-errors (`emit-mixed-source-inference-unsupported`).
  *   - Fix 3: a bare ref to a NON-existent Inferences name under case-feature mode
  *     does NOT silently become `<inferredLib>."name"`.
@@ -69,7 +70,7 @@ concept "Estrogen Or Estradiol Pellets":
     expect(lowered.errors).toEqual([]);
     const result = emitPartitioned(lowered.ast, "Both", "Both", FULL_PARTITION);
     expect(result.success).toBe(true);
-    // The Inferences twin folds in the LocalPrimitives retrieve; no guard error fires.
+    // The Inferences twin folds in the LocalElements retrieve; no guard error fires.
     const allKinds = result.entries.flatMap((e) => e.result.errors?.map((x) => x.kind) ?? []);
     expect(allKinds).not.toContain("emit-both-rep-requires-case-feature-lane");
     const inferred = result.entries.find((e) => e.layer === "Inferences");
@@ -78,12 +79,12 @@ concept "Estrogen Or Estradiol Pellets":
   });
 });
 
-describe("Fix 2 — mixed LocalPrimitives/ExternalPrimitives `defined as` hard-errors", () => {
-  it("a truth-set `defined as` over a ExternalPrimitives (`coded from`) operand is unsupported", () => {
-    // `Mixed` is `defined as` over a `code is` LEAF (LocalPrimitives) and a
-    // `coded from` LEAF (ExternalPrimitives). The split routes the local leaf to
-    // LocalPrimitives and the record leaf to ExternalPrimitives; the Inferences emit then sees
-    // a ExternalPrimitives operand inside the truth-set union → hard error.
+describe("Fix 2 — mixed LocalElements/ExternalElements `defined as` hard-errors", () => {
+  it("a truth-set `defined as` over a ExternalElements (`coded from`) operand is unsupported", () => {
+    // `Mixed` is `defined as` over a `code is` LEAF (LocalElements) and a
+    // `coded from` LEAF (ExternalElements). The split routes the local leaf to
+    // LocalElements and the record leaf to ExternalElements; the Inferences emit then sees
+    // a ExternalElements operand inside the truth-set union → hard error.
     const a = ast(`library "Mix".
 
 terminology "RecVS":

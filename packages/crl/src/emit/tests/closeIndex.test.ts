@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import * as path from "path";
 
 import { describe, it, expect } from "vitest";
@@ -55,7 +56,7 @@ function policyLedgers(result: ReturnType<typeof emitCQLImports>): LibraryLedger
 describe("closeIndex — metadata index (§4.5)", () => {
   it("keys by {libraryIdentity, defineName}, resolving same-named impl twin and public entry to DISTINCT entries", () => {
     const impl = boolEntry({
-      library: "Pol-LocalPrimitives",
+      library: "Pol-LocalElements",
       name: "Adult Patient",
       resultType: "non-Boolean(source-impl)",
       obligation: { kind: "not-applicable", nullable: false, reason: "impl twin" },
@@ -66,10 +67,10 @@ describe("closeIndex — metadata index (§4.5)", () => {
     });
     const pub = boolEntry({ library: "Pol-Inferences", name: "Adult Patient", visibility: "public" });
     const index = buildClosureIndex([
-      { libraryIdentity: "Pol-LocalPrimitives", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
+      { libraryIdentity: "Pol-LocalElements", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
       { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
     ]);
-    const gotImpl = index.lookup({ library: "Pol-LocalPrimitives", name: "Adult Patient" });
+    const gotImpl = index.lookup({ library: "Pol-LocalElements", name: "Adult Patient" });
     const gotPub = index.lookup({ library: "Pol-Inferences", name: "Adult Patient" });
     expect(gotImpl).not.toBe(gotPub);
     expect(gotImpl?.result).toEqual({ shape: "RecordSet", resourceType: "Observation" });
@@ -82,11 +83,11 @@ describe("closeIndex — metadata index (§4.5)", () => {
 // ── §4.5 public-reference routing map (winner rule) ──────────────────────────
 describe("closeIndex — public-reference routing (§4.5)", () => {
   it("routes {source, name} to the UNIQUE public entry — the impl twin and façade are NOT candidates (Inferences-wins)", () => {
-    const impl = boolEntry({ library: "Pol-LocalPrimitives", name: "D", visibility: "impl", discharge: { booleanEffect: "not-boolean" }, resultType: "non-Boolean(source-impl)" });
+    const impl = boolEntry({ library: "Pol-LocalElements", name: "D", visibility: "impl", discharge: { booleanEffect: "not-boolean" }, resultType: "non-Boolean(source-impl)" });
     const pub = boolEntry({ library: "Pol-Inferences", name: "D", visibility: "public" });
     const facade = boolEntry({ library: "Pol-Interface", name: "D", visibility: "facade", origin: "interface-facade", discharge: { booleanEffect: "total", dischargedBy: "facade-satisfied" } });
     const index = buildClosureIndex([
-      { libraryIdentity: "Pol-LocalPrimitives", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
+      { libraryIdentity: "Pol-LocalElements", sourceLibraryName: "Pol", cql: impl.cql, entries: [impl] },
       { libraryIdentity: "Pol-Inferences", sourceLibraryName: "Pol", cql: pub.cql, entries: [pub] },
       { libraryIdentity: "Pol-Interface", sourceLibraryName: "Pol", cql: facade.cql, entries: [facade] },
     ]);
@@ -213,7 +214,7 @@ describe("closeIndex — closure REPORT proof over a real closure", () => {
     //
     //   `Adult Patient`          Observation + boolean + `code is`  → a PURE QUESTION (charter §3). Its
     //                            determination is answerable and its read IS three-state — on the Interface
-    //                            façade. What still reports is the LocalPrimitives RETRIEVE twin, which keeps
+    //                            façade. What still reports is the LocalElements RETRIEVE twin, which keeps
     //                            the concept's name and so inherits its boolean obligation while emitting
     //                            records: obligation ATTRIBUTION across lowered twins, not a missing read.
     //   `Active Crohns Disease`  Condition + boolean + `code is`    → NOT a question (nowhere on a Condition

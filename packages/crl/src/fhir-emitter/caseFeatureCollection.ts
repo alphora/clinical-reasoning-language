@@ -1,9 +1,10 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 /**
  * Recursive `code is` collection in INFERENCE ORDER (the truth-set case-feature
  * FHIR lane).
  *
  * For a decision `when` condition concept C, the case-feature inputs + profiles
- * are the transitive closure of `code is` (LocalPrimitives) concepts reachable from C
+ * are the transitive closure of `code is` (LocalElements) concepts reachable from C
  * by walking C's inference tree:
  *
  *   - START at C. If C has a lowered local code (`code is`), it is the FIRST entry
@@ -63,12 +64,12 @@ export interface CollectedCodeIsConcept {
  * @param libraryName    the source library (for same-library normalization).
  * @param definedAsByName  concept name → the concept carrying its `defined as`
  *   (when one exists). For a both-representation concept (split by
- *   `lowerLocalCodes` into a LocalPrimitives retrieve twin + an Inferences fold-in
+ *   `lowerLocalCodes` into a LocalElements retrieve twin + an Inferences fold-in
  *   twin), this MUST be the twin carrying the `DefinedAsDefinition` so the
  *   operands are recursed.
  * @param codeByConcept  concept name → its lowered local code (from
  *   `lowerLocalCodes().localCodes`). Presence here is the eligibility test
- *   (LocalPrimitives ⟺ a lowered `code is`).
+ *   (LocalElements ⟺ a lowered `code is`).
  */
 export function collectCodeIsConceptsInInferenceOrder(
   conditionRef: ReferenceName,

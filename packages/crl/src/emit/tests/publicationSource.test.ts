@@ -137,7 +137,7 @@ describe("ServiceRequest publication", () => {
       const inference = result.entries.find((lib) => lib.libraryName.endsWith("Inferences"));
       expect(inference).toBeDefined();
       expect(JSON.stringify(inference)).toContain("Requested Source 1");
-      expect(JSON.stringify(inference)).toContain("ExternalPrimitives");
+      expect(JSON.stringify(inference)).toContain("ExternalElements");
     }
   });
   it("refuses a generated source binding collision", () => {
@@ -156,10 +156,10 @@ describe("ServiceRequest publication", () => {
       writeFileSync(entry, two);
       const result = emitCQLImports(entry);
       expect(result.success, JSON.stringify(result.errors)).toBe(true);
-      const primitives = result.cqlByLibrary!.find(l=>l.libraryName.endsWith("ExternalPrimitives"))!.cql;
-      expect(primitives).toContain('define "Requested Source 1":');
-      expect(primitives).toContain('define "Requested Source 2":');
-      expect(primitives).toContain("system: 'http://foreign', code: 'foreign-only'");
+      const elements = result.cqlByLibrary!.find(l=>l.libraryName.endsWith("ExternalElements"))!.cql;
+      expect(elements).toContain('define "Requested Source 1":');
+      expect(elements).toContain('define "Requested Source 2":');
+      expect(elements).toContain("system: 'http://foreign', code: 'foreign-only'");
       const inference = result.cqlByLibrary!.find(l=>l.libraryName.endsWith("Inferences"))!.cql;
       expect(inference).toContain('"Requested Source 1") S return all');
       expect(inference).toContain('"Requested Source 2") S return all');
@@ -184,7 +184,7 @@ describe("ServiceRequest publication", () => {
       const result = emitCQLImports(entry);
       expect(result.success, JSON.stringify(result.errors)).toBe(true);
       expect(result.cqlByLibrary!.some(l => l.libraryName === "PackageTerms")).toBe(true);
-      expect(result.cqlByLibrary!.find(l => l.libraryName.endsWith("ExternalPrimitives"))!.cql)
+      expect(result.cqlByLibrary!.find(l => l.libraryName.endsWith("ExternalElements"))!.cql)
         .toContain("system: 'http://package', code: 'package-only'");
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });

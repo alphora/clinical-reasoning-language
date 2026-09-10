@@ -748,7 +748,7 @@ concept "Both":
     );
     const { ast: out, errors } = lowerLocalCodes(ast);
     expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
-    // The both-rep concept SPLITS into a LocalPrimitives retrieve twin (CodedFromDefinition,
+    // The both-rep concept SPLITS into a LocalElements retrieve twin (CodedFromDefinition,
     // forced Observation) + an Inferences fold-in twin (its `defined as`, marked).
     const both = out.statements.filter(
       (s): s is Concept => s.type === "Concept" && s.name === "Both",
@@ -761,7 +761,7 @@ concept "Both":
       "Observation",
     );
     expect(inferredTwin).toBeDefined();
-    expect(inferredTwin!.__bothRepFoldInLocalPrimitives).toBe("Both");
+    expect(inferredTwin!.__bothRepFoldInLocalElements).toBe("Both");
     expect(localTwin!.code).toBeUndefined();
     expect(inferredTwin!.code).toBeUndefined();
   });

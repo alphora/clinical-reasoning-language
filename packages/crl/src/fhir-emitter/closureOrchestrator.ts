@@ -394,11 +394,11 @@ function classifyClosureDecisions(
  * Truth-set case-feature collection (the recursive `code is` lane).
  *
  * For each decision `when` condition C in a source's decisions, the case-feature
- * inputs + StructureDefinitions are the RECURSIVE `code is` (LocalPrimitives) closure
+ * inputs + StructureDefinitions are the RECURSIVE `code is` (LocalElements) closure
  * of C in INFERENCE ORDER — C's own `code is` first (if any), then C's `defined as`
  * operands left-to-right, recursing into nested inferences (see
  * `caseFeatureCollection.ts`). This REPLACES the prior library-wide
- * `interfaceSurface(lowered.ast)` LocalPrimitives scan: the SD set is now exactly the
+ * `interfaceSurface(lowered.ast)` LocalElements scan: the SD set is now exactly the
  * union (deduped by name) over all decision conditions of their recursive
  * collections, and the per-condition ordered list drives the `action.input[]`.
  *
@@ -421,7 +421,7 @@ function classifyClosureDecisions(
  *
  * `definedAsByName` prefers the `DefinedAsDefinition`-bearing concept when a name
  * resolves to two lowered statements (a both-representation concept that
- * `lowerLocalCodes` split into a LocalPrimitives retrieve twin + an Inferences fold-in
+ * `lowerLocalCodes` split into a LocalElements retrieve twin + an Inferences fold-in
  * twin — the Inferences twin carries the `defined as` to recurse).
  */
 export interface CaseFeatureCollection {
@@ -475,7 +475,7 @@ export function collectCaseFeatures(
     if (stmt.type !== "Concept" || !stmt.name) continue;
     const existing = definedAsByName.get(stmt.name);
     // The AUTHORED definition is anything except the synthesized retrieve (`CodedFromDefinition`, which
-    // `lowerLocalCodes` puts on the LocalPrimitives twin and which carries no concept edges).
+    // `lowerLocalCodes` puts on the LocalElements twin and which carries no concept edges).
     const carriesAuthored = stmt.definition !== undefined && stmt.definition.type !== "CodedFromDefinition";
     if (existing === undefined || carriesAuthored) definedAsByName.set(stmt.name, stmt);
   }
@@ -686,10 +686,10 @@ export function applyInvariant2(
   // (c) StructureDefinition cpg-featureExpression reference integrity. Each
   // emitted case-feature StructureDefinition carries a
   // `extension[cpg-featureExpression].valueExpression.reference` pointing at the
-  // policy's `<policyId>-LocalPrimitives` Library canonical (where the `code is`
+  // policy's `<policyId>-LocalElements` Library canonical (where the `code is`
   // define lives). That reference must resolve to an emitted Library — a dangling
   // case-feature reference (e.g. a malformed manifest with collected `code is`
-  // concepts but no LocalPrimitives entry) is a closure-integrity failure, the same
+  // concepts but no LocalElements entry) is a closure-integrity failure, the same
   // class as a dangling `library[]`.
   for (const r of resources) {
     if (r.resourceType !== "StructureDefinition") continue;
@@ -717,7 +717,7 @@ export function applyInvariant2(
  * Inv 2(d) — StructureDefinition cpg-featureExpression DEFINE integrity. The companion to Inv 2(c): (c)
  * checks the referenced LIBRARY exists; (d) checks the referenced DEFINE exists IN that library's emitted
  * CQL. A case-feature `valueExpression.expression` is a bare CQL define identifier (`"<X> Records"` for a
- * reduction, `"<X>"` for a RecordSet / age-both-rep) in the LocalPrimitives library. If it names a define that
+ * reduction, `"<X>"` for a RecordSet / age-both-rep) in the LocalElements library. If it names a define that
  * was NOT emitted, the featureExpression DANGLES — it resolves at neither translator-load nor emit, failing
  * only at `$apply`. This is the general backstop for the #189 2d dangle class (both round-1 criticals were
  * green-over-a-broken-artifact precisely because nothing checked featureExpression targets). No-op when the
@@ -1645,15 +1645,15 @@ export function emitFhirDefClosure(
     const activityInterfaceScoped =
       suppressConsumer !== undefined ? sourceHasInterface(suppressConsumer) : interfaceEntry !== undefined;
 
-    // The LocalPrimitives Library identity — where each `code is` define lives, the
-    // target of the case-feature `cpg-featureExpression.reference`. `LocalPrimitives`
-    // is a `role:"layer"` manifest entry (imports/emit.ts maps LocalPrimitives →
+    // The LocalElements Library identity — where each `code is` define lives, the
+    // target of the case-feature `cpg-featureExpression.reference`. `LocalElements`
+    // is a `role:"layer"` manifest entry (imports/emit.ts maps LocalElements →
     // "layer", NOT a distinct role), so it is identified by its RAW partition
-    // value (`entry.layer === "LocalPrimitives"`), not by role. A decision-bearing
-    // code-is policy ALWAYS emits a LocalPrimitives layer under the full source-typed
+    // value (`entry.layer === "LocalElements"`), not by role. A decision-bearing
+    // code-is policy ALWAYS emits a LocalElements layer under the full source-typed
     // split; absence here gates the case-feature emit off below (no dangling
     // featureExpression).
-    const localSourceEntry = entryByLayer("LocalPrimitives");
+    const localSourceEntry = entryByLayer("LocalElements");
     const localSourceReferenceSuffix = localSourceEntry
       ? identityForEntry(localSourceEntry)
       : undefined;
@@ -1733,7 +1733,7 @@ export function emitFhirDefClosure(
     // INFERENCE ORDER drives BOTH consumers off ONE `CaseFeatureCollection`, so the
     // input set and the SD set are the SAME set by construction. Gated on the SAME
     // structural condition as step 6: a decision-bearing source with clean lowering
-    // AND a LocalPrimitives layer (the featureExpression target). The resolver maps a
+    // AND a LocalElements layer (the featureExpression target). The resolver maps a
     // normalized condition name → its ordered recursive inputs (each entry's
     // canonical is `caseFeatureCanonicalUrl`, so the `action.input` profile
     // byte-equals the emitted SD `url`).
@@ -1755,8 +1755,8 @@ export function emitFhirDefClosure(
     // the CQL Interface re-exports), NOT on case-feature collection. Emitting a reduction case-feature is
     // unsupported for TWO distinct reasons, and a collection-based gate misses one of them:
     //   • CODE-BEARING reduction ("X" = `code is` + `exists this`): its `code is` still registers under "X",
-    //     so it IS collected — but the case-feature SD's `cpg-featureExpression` targets `LocalPrimitives."X"`,
-    //     which does NOT exist there (LocalPrimitives holds `define "X Records"`; the boolean determination is
+    //     so it IS collected — but the case-feature SD's `cpg-featureExpression` targets `LocalElements."X"`,
+    //     which does NOT exist there (LocalElements holds `define "X Records"`; the boolean determination is
     //     in Inferences/Interface). The featureExpression DANGLES: it resolves at neither translator-load nor
     //     emit, failing only at `$apply` — a broken artifact under success:true.
     //   • NAMED/code-less reduction ("Enough Trials" = `count "Trial Records" at least 2`, no own `code is`):
@@ -1881,14 +1881,14 @@ export function emitFhirDefClosure(
 
     // F3 (impl-review) — direct-caller trap. The deliverable always threads a
     // manifest (`emitFhirDefFromPath`), so a decision-bearing code-is policy
-    // ALWAYS carries a LocalPrimitives layer and the gate opens. But a direct caller
+    // ALWAYS carries a LocalElements layer and the gate opens. But a direct caller
     // (e.g. the closure unit test) can synthesize a graph with `cqlByLibrary: []`
     // → no `localSourceEntry`, so the gate stays CLOSED even when the source has
     // would-be case-features (decision `when` conditions over valid `code is`
     // concepts). Without this guard that caller would SUCCEED while silently
     // emitting ZERO inputs/SDs — a missing-lane that the closure invariants can't
     // catch (there is nothing to dangle). Detect it: clean lowering + decisions +
-    // NO LocalPrimitives entry, yet the recursive collection WOULD have produced
+    // NO LocalElements entry, yet the recursive collection WOULD have produced
     // case-features → hard-error rather than silently skip the case-feature lane.
     if (lib.decisions.length > 0 && lowered.errors.length === 0 && localSourceEntry === undefined) {
       const wouldCollect = collectCaseFeatures(lowered, lib.decisions, lib.libraryName);
@@ -1900,9 +1900,9 @@ export function emitFhirDefClosure(
             `Decision-bearing source "${lib.libraryName}" has decision conditions whose recursive ` +
             `\`code is\` closure would emit case-features (${wouldCollect.unionConcepts
               .map((c) => `"${c.name}"`)
-              .join(", ")}), but the manifest has no LocalPrimitives layer entry (the case-feature ` +
+              .join(", ")}), but the manifest has no LocalElements layer entry (the case-feature ` +
             `\`cpg-featureExpression\` target). The case-feature lane would be silently skipped. A ` +
-            `decision-bearing code-is policy must emit a LocalPrimitives layer; thread the split-manifest ` +
+            `decision-bearing code-is policy must emit a LocalElements layer; thread the split-manifest ` +
             `(\`emitFhirDefFromPath\`) instead of a bare graph.`,
         });
       }
@@ -1989,7 +1989,7 @@ export function emitFhirDefClosure(
     // consumes, so an SD is emitted for EXACTLY the concepts an input addresses).
     //
     // STRUCTURAL gate: only a decision-bearing source with clean lowering AND a
-    // LocalPrimitives layer (the featureExpression target) emits case-features. cms22/
+    // LocalElements layer (the featureExpression target) emits case-features. cms22/
     // cms69 carry NO decisions → structural no-op, keeping their goldens
     // byte-identical. (`caseFeatureGateOpen` is the SAME gate used for step 5a.)
     //
@@ -2004,7 +2004,7 @@ export function emitFhirDefClosure(
     //   - reject            → LOUD, carrying the skip's OWN kind + detail (bare-scalar → author `exists this`;
     //                         unmodeled resource → model it; hybrid → park) — never a silent Observation fallback.
     //
-    // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalPrimitives`
+    // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalElements`
     // Library (where the records-retrieve define lives) via `localSourceReferenceSuffix`.
     if (caseFeatureGateOpen && !reductionCaseFeatureBlocked) {
       for (const { name, code } of caseFeatures.unionConcepts) {
@@ -2120,7 +2120,7 @@ export function emitFhirDefClosure(
           record.publicationTarget ?? (record.target === undefined
             ? undefined
             : resolveFeatureExpressionTarget(record.target, name, {
-                "local-primitives": localSourceReferenceSuffix,
+                "local-elements": localSourceReferenceSuffix,
                 inferences: inferencesReferenceSuffix,
               })),
           valueDatum,

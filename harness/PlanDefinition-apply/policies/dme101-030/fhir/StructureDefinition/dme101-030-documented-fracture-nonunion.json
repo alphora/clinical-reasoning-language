@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Documented Fracture Nonunion Records",
-        "reference": "http://example.org/hcsc/dme101-030/Library/Dme101030LocalPrimitives"
+        "reference": "http://example.org/hcsc/dme101-030/Library/Dme101030LocalElements"
       }
     }
   ],

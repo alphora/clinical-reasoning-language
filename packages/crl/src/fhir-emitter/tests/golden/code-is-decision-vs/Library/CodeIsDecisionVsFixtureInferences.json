@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalPrimitives"
+      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalElements"
     }
   ],
   "content": [

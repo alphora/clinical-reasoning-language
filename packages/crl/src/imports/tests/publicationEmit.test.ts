@@ -109,7 +109,7 @@ describe("prepared publication imports emission", () => {
     expect(target).toEqual({ libraryName: "PublicationInferences", define: "Answer" });
     const emitted = result.cqlByLibrary.find((entry) => entry.libraryName === target?.libraryName)!;
     expect(emitted.cql).toContain('define "Answer":');
-    expect(emitted.includes).toContain("PublicationLocalPrimitives");
+    expect(emitted.includes).toContain("PublicationLocalElements");
     expect(emitted.ledgerEntries?.find((entry) => entry.name === "Answer")).toMatchObject({ result: { shape: "Record", resourceType: "Observation" } });
   });
 

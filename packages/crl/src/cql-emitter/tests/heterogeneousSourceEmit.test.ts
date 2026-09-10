@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import * as path from "node:path";
 
 import { describe, it, expect } from "vitest";
@@ -67,7 +68,7 @@ describe("#189 — the heterogeneous source arm constructs", () => {
     // execution. What is greedy is `returnClause`: `return F(S) union <next term>` folds the next term INTO
     // the return, which is the measured `Union(FHIR.Observation, list<FHIR.Observation>)` failure the
     // projected arm already hit. This arm is only ever final today; the parens make that not matter.
-    expect(cqlFor("Inferences")).toMatch(/union \(\([A-Za-z]+ExternalPrimitives\./);
+    expect(cqlFor("Inferences")).toMatch(/union \(\([A-Za-z]+ExternalElements\./);
   });
 
   it("⭐⭐ the existence interface carries the SAME datum filter as the candidate space", () => {
@@ -76,7 +77,7 @@ describe("#189 — the heterogeneous source arm constructs", () => {
     // (Condition: `code` vs `onset`) the two disagree inside one library — V publishes null and the interface
     // says a member exists. Here they coincide, so this pins the SHAPE that keeps them agreeing.
     expect(cqlFor("Inferences")).toMatch(
-      /or exists \(\([A-Za-z]+ExternalPrimitives\."Requested Service Source"\) S where S\.code is not null\)/,
+      /or exists \(\([A-Za-z]+ExternalElements\."Requested Service Source"\) S where S\.code is not null\)/,
     );
   });
 

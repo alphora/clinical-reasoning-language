@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "CodeIsDecisionVsFixtureLocalPrimitives",
+  "id": "TwostepLocalElements",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalPrimitives",
-  "version": "1.0.0",
-  "name": "CodeIsDecisionVsFixtureLocalPrimitives",
-  "title": "CodeIsDecisionVsFixtureLocalPrimitives",
+  "url": "http://example.org/crl/twostep/Library/TwostepLocalElements",
+  "version": "0.0.0",
+  "name": "TwostepLocalElements",
+  "title": "TwostepLocalElements",
   "status": "draft",
   "experimental": true,
-  "date": "2020-01-01T00:00:00.000Z",
+  "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
+  "description": "TwostepLocalElements",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalConcepts"
+      "resource": "http://example.org/crl/twostep/Library/TwostepLocalConcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/CodeIsDecisionVsFixtureLocalPrimitives.cql"
+      "url": "../../cql/TwostepLocalElements.cql"
     }
   ]
 }

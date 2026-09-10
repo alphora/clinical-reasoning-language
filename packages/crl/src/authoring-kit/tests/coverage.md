@@ -1,5 +1,62 @@
 # Kit evidence ledger
 
+## Maintenance - Elements library names (668)
+
+Baseline: `5e105580a3390bedcbf7874ddb37e9f5f7d6279d`.
+Implementation base: `d79f4c676b2c9ec0f70012ed8017a5982b20eb92`.
+Target: pending reviewed content commit. Kit schema 2.1 and consumer content are unchanged.
+The intervening commit changes only the prior audit stamp and ledger target.
+
+The operator directs the Elements naming throughout this project, including
+project-authored split libraries, fixtures, goldens and harness examples. No new
+concept category is introduced. Ordinary primitive datatype terminology remains.
+
+| Changed evidence | Disposition |
+| --- | --- |
+| Layer routing, internal source tags, generated identity references in emitter/import/closure tests | Not CRL authoring syntax. Assertions retain their query/value contracts and use the new layer names. Existing `artifact-integrity` guidance covers complete, resolvable artifacts. |
+| CMS22/CMS69 authored fixture declarations, filenames, qualified CRL/CEL refs and emitted goldens | Existing `library-scoping` guidance sufficient: declaration/reference identity is consistent. These legacy fixtures remain bounded compiler regressions, not new recommended authoring examples. |
+| CQL/FHIR goldens and checked-in native harness packages | Artifact identity changed, including encoded CQL where present. This does not certify legacy clinical intent; current Bleph and bounded BMI native checks provide separately scoped runtime evidence. |
+| `elementLayers.test.ts`: short/long/shared-prefix identities, CQL includes and FHIR reference closure | Not new CRL syntax. Existing `artifact-integrity` obligation remains sufficient; these assertions add compiler packaging evidence, not a clinical claim. |
+| Existing kit source comment and inventory test titles | Naming reconciliation only; no full JSON/Markdown teaching or navigation content change. |
+| USER_GUIDE emitted-library section | Corrected current compilation responsibilities and complete-set replacement procedure. Existing `emit-output-root` and `artifact-integrity` claims remain sufficient; emission does not automatically prune all old CRL files. |
+
+All changed owning test files are listed below. Each assertion/input change in this
+slice is a layer-name substitution; added coverage is the identity test above.
+Existing `@kit` tags and their clinical/value semantics are unchanged. No new
+claims, examples or aliases are needed merely to name the compilation layers.
+Inventory maintenance668 refreshes the29 affected records with current titles, line numbers and source hashes. Unaffected records retain their prior historical provenance; this is not a new full census.
+
+- `packages/crl/src/ast/tests/definedAsBooleanComposition-t1.test.ts`
+- `packages/crl/src/cql-emitter/tests/caseFeatureGuards.test.ts`
+- `packages/crl/src/cql-emitter/tests/dme101-030-emit.test.ts`
+- `packages/crl/src/cql-emitter/tests/heterogeneousSourceEmit.test.ts`
+- `packages/crl/src/cql-emitter/tests/layeredEmit.test.ts`
+- `packages/crl/src/cql-emitter/tests/ledgerEnrollment2a.test.ts`
+- `packages/crl/src/cql-emitter/tests/lowerLocalCodes.test.ts`
+- `packages/crl/src/cql-emitter/tests/pureQuestionEmit.test.ts`
+- `packages/crl/src/cql-emitter/tests/recencyRecordMerge.test.ts`
+- `packages/crl/src/cql-emitter/tests/recordUnionTerms.test.ts`
+- `packages/crl/src/cql-emitter/tests/semnotLowering.test.ts`
+- `packages/crl/src/cql-emitter/tests/totalScalarBoolean.test.ts`
+- `packages/crl/src/emit/tests/closeIndex.test.ts`
+- `packages/crl/src/emit/tests/declaredResultIndex.test.ts`
+- `packages/crl/src/emit/tests/producerCandidate.test.ts`
+- `packages/crl/src/emit/tests/publicationAge.test.ts`
+- `packages/crl/src/emit/tests/publicationSource.test.ts`
+- `packages/crl/src/fhir-emitter/tests/caseFeatureRecord.test.ts`
+- `packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts`
+- `packages/crl/src/fhir-emitter/tests/decision.test.ts`
+- `packages/crl/src/fhir-emitter/tests/example-fhir-golden.test.ts`
+- `packages/crl/src/fhir-emitter/tests/partial-split-author-vs-golden.test.ts`
+- `packages/crl/src/fhir-emitter/tests/partial-split-fhir-golden.test.ts`
+- `packages/crl/src/fhir-emitter/tests/structureDefinition.test.ts`
+- `packages/crl/src/imports/tests/criterionEmitEndToEnd.test.ts`
+- `packages/crl/src/imports/tests/definedAsExistsInferred.test.ts`
+- `packages/crl/src/imports/tests/emit.test.ts`
+- `packages/crl/src/imports/tests/publicationEmit.test.ts`
+
+Verification: core4855 passed/32 existing skips; core MCP smoke and extension MCP32 passed; builds/typechecks passed. The4 new identity checks cover actual CQL/FHIR references, including long shared-prefix policies. Before/after complete Bleph9CQL/35FHIR and BMI9CQL/20FHIR outputs equal modulo the identity map. Native Bleph116/116 plus returned-QR4/4 pass on the unchanged shipped corrected engine; bounded BMI11/11 passes its documented original4.7 control engine. These do not resolve broader BMI full-response or opaque ValueSet source limitations. Consumer schema2.1/hash28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336 remain unchanged. Review668 native0/0/2: packet completeness accepted, evidence provenance refined; external failed twice with internal error, so external coverage is incomplete. No new clinical or installed-release certification.
+
 ## Maintenance — explicit rule force (665/666)
 
 Baseline: `18799337ec6b91e91a4b1577c0e31a7f1b575714`.

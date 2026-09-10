@@ -1,4 +1,4 @@
-library Semnot232FixtureLocalPrimitives
+library Semnot232FixtureLocalElements
 
 using FHIR version '4.0.1'
 

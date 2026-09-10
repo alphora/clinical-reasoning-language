@@ -164,7 +164,7 @@ export function renderConstructorCall(inputs: ConstructorCallInputs): string {
  * `union` drops. Adding a filter would suggest the value could be absent, which it cannot.
  */
 export function renderProjectedSourceArm(inputs: {
-  /** The source retrieve to project over (`ExternalPrimitives."Obese Source"`). */
+  /** The source retrieve to project over (`ExternalElements."Obese Source"`). */
   sourceRef: string;
   /** The generated constructor's name, from `resolveConstructor`. */
   functionName: string;
@@ -339,7 +339,7 @@ export function renderBoundaryTransform(inputs: {
  * ⚠ The candidate is dated by the SOURCE record, because it IS that record's claim.
  */
 export function renderValueReadSourceArm(inputs: {
-  /** The source retrieve to read over (`ExternalPrimitives."X Source"`). */
+  /** The source retrieve to read over (`ExternalElements."X Source"`). */
   sourceRef: string;
   functionName: string;
   /** The concept's own local code — the record is coded as the CONCEPT, never as the source. */

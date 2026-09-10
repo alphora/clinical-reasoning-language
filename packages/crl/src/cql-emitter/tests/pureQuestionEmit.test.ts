@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 import * as path from "node:path";
 
 import { describe, it, expect } from "vitest";
@@ -147,7 +148,7 @@ concept "Present Records":
     // T5 step 2b — the retrieve itself is byte-identical apart from its name. The question now lowers the same
     // way `code is` + `definition is exists this` already did (a `"<X> Records"` retrieve + a determination
     // under `"<X>"`), which is what lets ONE mechanism serve the layered AND the direct emit paths.
-    expect(cqlFor("LocalPrimitives")).toMatch(
+    expect(cqlFor("LocalElements")).toMatch(
       /define "Can Use Equipment At Home Records":\s*\n\s*\[Observation: \S+\."Can Use Equipment At Home"\]/,
     );
   });

@@ -10,7 +10,7 @@
  * because the resource happens to be value-bearing (presence is orthogonal to the record's value). An
  * unmodeled resource fails LOUD (`unsupported-casefeature-resource`); there is NO Observation fallback.
  *
- * (Historical: #189 2d REMOVED the "LocalPrimitives-always-boolean" hack — the old emit forced every `code is`
+ * (Historical: #189 2d REMOVED the "LocalElements-always-boolean" hack — the old emit forced every `code is`
  * concept into a boolean `Observation.valueBoolean` case feature regardless of its declared `type is`. That is
  * gone; do not reintroduce it.)
  *
@@ -25,7 +25,7 @@
  *     unioned per source in `closureOrchestrator.collectCaseFeatures`) — the SAME
  *     single source the action-level `input[]` resolver consumes, so an emitted SD
  *     and the `action.input` that addresses it are the same set by construction.
- *     The `cpg-featureExpression` then points at the policy's `-LocalPrimitives`
+ *     The `cpg-featureExpression` then points at the policy's `-LocalElements`
  *     Library (where the `code is` define lives), NOT the Interface re-export.
  *   - The `patternCodeableConcept` `code` comes from `lowerLocalCodes().localCodes`
  *     (keyed by concept name) — the SAME `localCodes` that drives the local
@@ -364,7 +364,7 @@ export function emitCaseFeatureStructureDefinition(
   // ⭐ WHERE THE `cpg-featureExpression` POINTS — the RESOLVED target: a library identity plus the bare
   // define, kept as ONE object. ⚠⚠ It used to arrive as TWO independent arguments (a define name here, the
   // library identity in `featureExpressionLibrarySuffix`), which is how the library came to be hard-wired to
-  // LocalPrimitives at the call site — a pair split across parameters is a pair nobody maintains together
+  // LocalElements at the call site — a pair split across parameters is a pair nobody maintains together
   // (disc 532, both arms). The caller resolves the semantic LAYER against the manifest; this function never
   // re-derives it.
   target: ResolvedFeatureExpressionTarget | undefined,
@@ -440,7 +440,7 @@ export function emitCaseFeatureStructureDefinition(
   // `codesystem '<url>'` (one source of truth — the per-library local domain, #198).
   const system = publicationIdentity?.localCode.system ?? localCodeSystemSystemUrl(metadata, localDomainId);
 
-  // The featureExpression references the LocalPrimitives library by canonical (where the records-retrieve define
+  // The featureExpression references the LocalElements library by canonical (where the records-retrieve define
   // lives); its `expression` is the caller-supplied `recordsDefineId` (a `text/cql-identifier`) — the
   // `"<X> Records"` twin for a reduction, or the concept name for a RecordSet / both-rep retrieve. NOT the
   // ephemeral boolean `"<X>"` (a natural-resource SD bound to a Boolean expr is type-incoherent — charter §4).
@@ -488,7 +488,7 @@ export function emitCaseFeatureStructureDefinition(
     meta: { profile: [CPG_CASEFEATURE_PROFILE] },
     // CPG IG extensions (cpg-, NOT cqf-): knowledgeCapability (DROP `executable` —
     // no run-time forms), knowledgeRepresentationLevel `structured`, and the
-    // featureExpression pointing at the LocalPrimitives library's CQL identifier (the
+    // featureExpression pointing at the LocalElements library's CQL identifier (the
     // bare `code is` define).
     // ⚠ `undefined` → NO `cpg-featureExpression` is emitted, which is how a `shape is RecordSet` case
     // feature says "ask this question, do not pre-fill it" (see `cpgCaseFeatureExtensions`).

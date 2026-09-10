@@ -90,8 +90,8 @@ describe("#189 — a producer stage's constructed candidate", () => {
     // The singleton operand's record supplies validity; generic stamp helpers have separate tests.
     // 5. the candidate is a THIRD arm of the space the terminal selection reads, beside local and source
     const thresholdText = cql.slice(cql.indexOf('define "Threshold":'));
-    expect(thresholdText).toContain("LocalPrimitives");
-    expect(thresholdText).toContain("ExternalPrimitives");
+    expect(thresholdText).toContain("LocalElements");
+    expect(thresholdText).toContain("ExternalElements");
     expect(thresholdText).toContain("CRLConstructObservationBoolean(");
     expect(thresholdText).toContain("where C is not null");
     // 6. and it is stamped with the case-feature profile url the FHIR lane emits (parity, not a lookalike)

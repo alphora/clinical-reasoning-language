@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 // #224 ii.1c — end-to-end CQL emit through the PUBLIC entry (`emitCQLImports`) over a
 // decision whose guard references a `criterion`. This exercises the emit-family seams that
 // run OUTSIDE the FHIR decision lane — the CQL emit closure (S6, `computeCqlEmitClosure`) and
@@ -94,7 +95,7 @@ describe("#224 ii.1c — criterion CQL emit (closure + interface surface)", () =
       // #236: the criterion lowers to a named boolean define on the Interface (the reference
       // target every guard cites) — NOT inlined into each guard.
       expect(iface).toContain('define "Eligible"');
-      // The criterion-body concept re-exports on the Interface (NOT merely that some LocalPrimitives
+      // The criterion-body concept re-exports on the Interface (NOT merely that some LocalElements
       // library mentions the name) — proving S8 followed the criterion into its body.
       expect(iface).toContain("Gate Concept");
     });

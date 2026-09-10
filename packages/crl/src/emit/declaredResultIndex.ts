@@ -1,3 +1,4 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 // #189 Slice C boundary 2, slice 2b.3a — the pre-emit, cross-library DECLARED-RESULT index.
 //
 // A PROJECTION of the LOWERED closure (all resolved+lowered library ASTs, post-`lowerLocalCodes`): for a
@@ -23,7 +24,7 @@
 //
 // ⚠ CONSUMER CONTRACT for 2b.3b: the resolver's key-space is the AUTHORED cross-library ref (verified `requalifyRef`
 // leaves a genuinely-foreign qualifier authored, `layeredEmit.ts:594-597`). It does NOT model a RENDERED-layer
-// qualifier (a same-source cross-LAYER operand, e.g. an Inferences composition over a pure-`code is` LocalPrimitives
+// qualifier (a same-source cross-LAYER operand, e.g. an Inferences composition over a pure-`code is` LocalElements
 // concept, is rendered-qualified post-`requalifyRef`). EVERY 2b.3b consult site — including the discharge gate
 // (`emitCQL.ts:1248`), which runs over post-`requalifyRef` layer ASTs — MUST classify a rendered-layer qualifier
 // itself BEFORE consulting this resolver, or a rendered token will miss (or, without the scope resolver, be
@@ -258,7 +259,7 @@ export function makeDeclaredResultResolver(
  *    boolean-composition chain propagates the family resolver through the recursion (a same-library `Z = (Y and R)`
  *    over a same-library `Y = ("Lib"."X" and Q)` must read Y's REAL family-armed verdict, not the index's
  *    conservative uniform projection of Y).
- *  - **rendered-layer qualifier** (`"<policy>-LocalPrimitives"."X"`, classified via `isRenderedLayerToken`) → a
+ *  - **rendered-layer qualifier** (`"<policy>-LocalElements"."X"`, classified via `isRenderedLayerToken`) → a
  *    same-SOURCE cross-LAYER operand: X is in this source's pre-split concepts, so a SAME-SOURCE index lookup
  *    (terminal, on the PUBLIC meaning — `lookupTotality` keys the public candidate, the same concept a cross-layer
  *    ref denotes). Classified POSITIVELY BEFORE the cross-lib resolver, else it scope-misses and is misdiagnosed as
@@ -266,7 +267,7 @@ export function makeDeclaredResultResolver(
  *
  *    ⚠ TWO-SPELLINGS EQUIVALENCE (disc 466 Claude ask-3): this rendered (post-split) path reads the UNIFORM index
  *    projection for X, while the pre-split FAÇADE spelling of the same dependency (a bare ref) recurses with the
- *    family arm. Those agree because a rendered-layer qualifier only ever names a LocalPrimitives / ExternalPrimitives
+ *    family arm. Those agree because a rendered-layer qualifier only ever names a LocalElements / ExternalElements
  *    operand — a `code is` / `coded from` RETRIEVE or a comparator, never a `defined as` boolean composition (a
  *    boolean comp classifies Inferences, so a same-source boolean-comp operand co-resides in the Inferences layer and
  *    stays BARE, taking the recursion branch above). A retrieve/comparator's totality never depends on the family

@@ -20,7 +20,7 @@ library CaseFeatureCommon version '1.0.0'
  * `satisfied` collapses a truth-set back to a boolean for the Interface layer.
  *
  * Both functions are FLUENT, so call sites invoke them method-style
- * (`LocalPrimitives."X".asTruths()`, `Inferences."Y".satisfied()`) and do not need
+ * (`LocalElements."X".asTruths()`, `Inferences."Y".satisfied()`) and do not need
  * the `CFH.` qualifier — only the `include` is required.
  */
 

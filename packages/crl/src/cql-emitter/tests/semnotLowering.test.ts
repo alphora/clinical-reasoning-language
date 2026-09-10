@@ -69,8 +69,8 @@ describe("#232 — sem-not lowering (pure-question leaves → boolean lane)", ()
 
   it("each question leaf publishes its THREE-STATE determination, un-Coalesced", () => {
     const cql = inferredCql(result);
-    expect(cql).toMatch(/define "Alpha":\s*\n\s*Semnot232FixtureLocalPrimitives\."Alpha Records"\.answeredValue\(\)/);
-    expect(cql).toMatch(/define "Beta":\s*\n\s*Semnot232FixtureLocalPrimitives\."Beta Records"\.answeredValue\(\)/);
+    expect(cql).toMatch(/define "Alpha":\s*\n\s*Semnot232FixtureLocalElements\."Alpha Records"\.answeredValue\(\)/);
+    expect(cql).toMatch(/define "Beta":\s*\n\s*Semnot232FixtureLocalElements\."Beta Records"\.answeredValue\(\)/);
     // Totality belongs at the branch guard, never per operand — a `Coalesce` here forecloses the pause.
     expect(cql).not.toContain("Coalesce");
   });

@@ -243,12 +243,12 @@ describe("defined as ( boolean composition ) — corpus parse superset", () => {
     "cms22/cms22.crl",
     "cms22/cms22-inferences.crl",
     "cms22/cms22-externalconcepts.crl",
-    "cms22/cms22-externalprimitives.crl",
+    "cms22/cms22-externalelements.crl",
     "cms22/cms22-strategy.crl",
     "cms69/cms69.crl",
     "cms69/cms69-inferences.crl",
     "cms69/cms69-externalconcepts.crl",
-    "cms69/cms69-externalprimitives.crl",
+    "cms69/cms69-externalelements.crl",
     "cms69/cms69-strategy.crl",
   ];
 

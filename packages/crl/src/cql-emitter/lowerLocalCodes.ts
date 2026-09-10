@@ -404,8 +404,8 @@ export function lowerLocalCodes(
   const loweredConcepts: Concept[] = [];
   // Both-representation INFERRED twins (`code is` + `defined as`): the inference
   // half of a split, appended to the statement list AFTER the rewrite. Each keeps
-  // the original `defined as` and carries `__bothRepFoldInLocalPrimitives` so the emit
-  // unions in the direct LocalPrimitives retrieve. Keyed in declaration order.
+  // the original `defined as` and carries `__bothRepFoldInLocalElements` so the emit
+  // unions in the direct LocalElements retrieve. Keyed in declaration order.
   const bothRepInferredTwins: Concept[] = [];
   // #189 Slice A2 — the RECORDS TWINS of `code is` + `exists this` concepts. A concept "X" with a
   // local `code is` AND `definition is exists this` lowers to TWO statements: this RecordSet
@@ -413,7 +413,7 @@ export function lowerLocalCodes(
   // the retargeted reduction concept "X" (`exists "X Records"`, pushed to `loweredConcepts`). The
   // twins are APPENDED to the statement list (they share no name with an existing statement).
   const recordsTwins: Concept[] = [];
-  // #189 Piece 1 (disc 506) — the synthetic ExternalPrimitives SOURCE concepts (`"<X> Source"`) of a both-rep
+  // #189 Piece 1 (disc 506) — the synthetic ExternalElements SOURCE concepts (`"<X> Source"`) of a both-rep
   // RECENCY-VALUE split. Each is a `coded from` retrieve over the source terminology (`[ServiceRequest: "Covered
   // Devices"]`), appended to the statement list (a new name, no in-place replacement). Sibling of `recordsTwins`.
   const externalSourceTwins: Concept[] = [];
@@ -561,7 +561,7 @@ export function lowerLocalCodes(
     // rebinds `c`. The (AGE) block below strips a consumed Patient-age posrep (`c = { ...c, representations:
     // [] }`), which leaves a concept that LOOKS like a bare `code is` boolean — so classifying later reads an
     // age recency merge, a TWO-ARM determination, as a one-arm question. MEASURED: that mis-marking was
-    // already latent on every age recency twin's LocalPrimitives half before step 2b (harmless only because
+    // already latent on every age recency twin's LocalElements half before step 2b (harmless only because
     // an `source-impl` role short-circuits every consumer of the marker); 2b made it live by giving a
     // question an Inferences twin, and nine `lowerLocalCodes` recency tests failed at once.
     const isPureQuestion = isPureQuestionConcept(stmt);
@@ -596,10 +596,10 @@ export function lowerLocalCodes(
     // single-rep reduction gate below (which rejects a `source representation` 3-way). The shape is classified by
     // the SHARED `resolveRecencyValueConcept` (mirrors `resolveAgeConcept`), so the lowering gate,
     // `classifyBooleanTotality`, and the descriptor deriver cannot drift. Synthesizes THREE outputs — a same-name
-    // LocalPrimitives records retrieve, a synthetic ExternalPrimitives `"<X> Source"` retrieve, and the Inferences
+    // LocalElements records retrieve, a synthetic ExternalElements `"<X> Source"` retrieve, and the Inferences
     // `Scalar<value-type>` recency merge (the PUBLIC determination). REFACTOR:grounded — re-derived from the
     // charter §3 value/interface convention + the layered-emit classification invariants (`classifyStatementLayer`
-    // `retrieveResourceType` set⟺LocalPrimitives / undefined⟺ExternalPrimitives; `requalifyDefinition` ThisRecords
+    // `retrieveResourceType` set⟺LocalElements / undefined⟺ExternalElements; `requalifyDefinition` ThisRecords
     // throw; `buildNameLayerMaps` Inferences-wins for same-name).
     const rv = resolveRecencyValueConcept(c);
     if (rv.kind === "recency-value") {
@@ -722,22 +722,22 @@ export function lowerLocalCodes(
       const localTerminology = buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc);
       syntheticTerminologies.push(localTerminology);
 
-      // (a) LP twin — SAME-NAME local records retrieve `[<localResource>: "X"]` (LocalPrimitives). Mirrors the
+      // (a) LP twin — SAME-NAME local records retrieve `[<localResource>: "X"]` (LocalElements). Mirrors the
       //     both-rep `lowered` concept below; role `source-impl` (its determination is the Inferences merge).
       const localCodedFrom: CodedFromDefinition = {
         type: "CodedFromDefinition",
         terminologyName: c.name,
-        retrieveResourceType: localResource, // SET → LocalPrimitives (classifyStatementLayer)
+        retrieveResourceType: localResource, // SET → LocalElements (classifyStatementLayer)
         location: loc,
       };
-      // F7 co-invariant: synthetic TerminologySystem.name (LocalConcepts) ⟺ retrieveResourceType (LocalPrimitives).
+      // F7 co-invariant: synthetic TerminologySystem.name (LocalConcepts) ⟺ retrieveResourceType (LocalElements).
       const localHasDomainName = localTerminology.body.some(
         (line) => line.type === "TerminologySystem" && line.name !== undefined,
       );
       if (!localHasDomainName || localCodedFrom.retrieveResourceType === undefined) {
         throw new Error(
           `internal invariant violated: recency-value LP twin "${c.name}" has a desynced source-family ` +
-            `discriminator (LocalConcepts ⟺ LocalPrimitives) — both must be set together.`,
+            `discriminator (LocalConcepts ⟺ LocalElements) — both must be set together.`,
         );
       }
       const lpTwin: Concept = {
@@ -751,12 +751,12 @@ export function lowerLocalCodes(
 
       // (b) EP source concept `"<X> Source"` — a hand-authored-style external `coded from` retrieve over the
       //     SOURCE terminology (`[ServiceRequest: "Covered Devices"]`). `retrieveResourceType: undefined` →
-      //     ExternalPrimitives; `conceptType` (from the posrep's `type is`) drives the retrieve resource. Publishes
+      //     ExternalElements; `conceptType` (from the posrep's `type is`) drives the retrieve resource. Publishes
       //     RECORDS (RecordSet, no scalar value — the merge selects newest from it, the fold `exists` over it).
       const sourceCodedFrom: CodedFromDefinition = {
         type: "CodedFromDefinition",
         terminologyName: rv.sourceRep.terminologyName!, // the resolver guarantees `coded from`
-        retrieveResourceType: undefined, // UNDEFINED → ExternalPrimitives (classifyStatementLayer)
+        retrieveResourceType: undefined, // UNDEFINED → ExternalElements (classifyStatementLayer)
         location: loc,
       };
       const epSource: Concept = {
@@ -778,7 +778,7 @@ export function lowerLocalCodes(
       //     (`__bothRepMerge === "recency-value"`), so the retargeted `most recent <self>` reduction body is
       //     NEVER rendered; it exists only to (i) classify Inferences and (ii) survive `requalifyDefinition`
       //     WITHOUT the `ThisRecords` throw (the bare self-name ref is harmless — unrendered). Carries the
-      //     descriptors + the `__bothRepFoldInLocalPrimitives` self-fold include marker.
+      //     descriptors + the `__bothRepFoldInLocalElements` self-fold include marker.
       const mergeReduction: Reduction = {
         kind: "mostRecent",
         target: { type: "ReductionConceptRef", ref: c.name, location: loc } as ReductionConceptRef,
@@ -874,8 +874,8 @@ export function lowerLocalCodes(
       // concepts that have a `code is`."* This branch is code-bearing by construction, so the remaining
       // question is whether this concept's space can ever publish a NON-conforming record.
       //
-      // ⭐ IT CAN, IFF AN UNPROJECTED `external-primitives` TERM IS IN THE SPACE. Enumerate what can be there:
-      // local-primitives conform (the local retrieve IS the local code), producer candidates conform (the
+      // ⭐ IT CAN, IFF AN UNPROJECTED `external-elements` TERM IS IN THE SPACE. Enumerate what can be there:
+      // local-elements conform (the local retrieve IS the local code), producer candidates conform (the
       // constructor writes the local code and the case-feature profile), and a PROJECTED source arm conforms
       // (the projection constructs a local-coded candidate). Only the bare source retrieve does not. That is
       // the SAME predicate `renderSpaceTerms` already tests to decide whether to project the arm.
@@ -890,7 +890,7 @@ export function lowerLocalCodes(
       // questions; the one that matters here is what the define actually holds.
       //
       // ⚠ SINGLE-SOURCE TODAY. `sourceDesc` is the one source arm, so its `arm` IS the per-term fact. When
-      // #257 lands multi-rep this must read the TERM LIST instead (each `external-primitives` term carrying
+      // #257 lands multi-rep this must read the TERM LIST instead (each `external-elements` term carrying
       // its own projected-ness), or a projected rep beside an unprojected one would silently disable the
       // transform for both.
       let boundaryTransformSpec: BoundaryTransformSpec | undefined;
@@ -940,7 +940,7 @@ export function lowerLocalCodes(
         representations: [],
         definition: { type: "ReductionDefinition", reduction: mergeReduction, location: loc },
         __bothRepMerge: "recency-value",
-        __bothRepFoldInLocalPrimitives: c.name, // LP self-fold include (collectLayerIncludes)
+        __bothRepFoldInLocalElements: c.name, // LP self-fold include (collectLayerIncludes)
         // ⭐ #189 — WHAT THIS MERGE PUBLISHES, from the ONE resolver, set in lock-step with the descriptors.
         // `Scalar` → the newest record's value; `Record` → the newest record over the union of the arms.
         __recencyMergePublishes: rv.publishes,
@@ -950,8 +950,8 @@ export function lowerLocalCodes(
         // function, so "what is in this concept's space" has a single reader. Listing it is also what makes
         // `local ∪ n posreps ∪ n constructed candidates` expressible without touching the emitter again.
         __recordUnionTerms: [
-          { kind: "local-primitives" as const, define: c.name },
-          { kind: "external-primitives" as const, define: sourceName },
+          { kind: "local-elements" as const, define: c.name },
+          { kind: "external-elements" as const, define: sourceName },
           ...producerSpecs.map((spec) => ({ kind: "constructed" as const, stageIndex: spec.stageIndex })),
         ],
         __recencyProducerSpecs: producerSpecs,
@@ -1329,8 +1329,8 @@ export function lowerLocalCodes(
 
       // The RECORDS TWIN "X Records": a `shape is RecordSet` retrieve over the local code, at the
       // concept's NATURAL resource (§4.3 — NOT forced Observation; that force is only for the
-      // boolean-determination LocalPrimitives retrieve of a plain `code is`). `retrieveResourceType` is
-      // set explicitly (= the natural resource) so the F7 LocalConcepts⟺LocalPrimitives discriminator
+      // boolean-determination LocalElements retrieve of a plain `code is`). `retrieveResourceType` is
+      // set explicitly (= the natural resource) so the F7 LocalConcepts⟺LocalElements discriminator
       // stays in sync for the layered path (Slice C). `shape: "RecordSet"` is what `emitConceptBody`'s
       // Slice-A gate keys on to emit `exists ("X Records")`.
       const twinCodedFrom: CodedFromDefinition = {
@@ -1341,7 +1341,7 @@ export function lowerLocalCodes(
       };
 
       // R2 CO-INVARIANT ASSERT (F7) — hoisted from the plain-path site (crl-emit R1 probe 4): the twin's
-      // two LocalConcepts⟺LocalPrimitives discriminators (synthetic `TerminologySystem.name` and
+      // two LocalConcepts⟺LocalElements discriminators (synthetic `TerminologySystem.name` and
       // `retrieveResourceType`) MUST be set together, or the Slice-C layered split would emit a
       // cross-family include. True by construction here, but the assert exists to catch a future edit.
       const twinHasDomainName = twinTerminology.body.some(
@@ -1353,7 +1353,7 @@ export function lowerLocalCodes(
             `discriminator — synthetic TerminologySystem.name ${twinHasDomainName ? "set" : "UNSET"}, ` +
             `CodedFromDefinition.retrieveResourceType ` +
             `${twinCodedFrom.retrieveResourceType === undefined ? "UNSET" : "set"}. Both must be set ` +
-            `together (LocalConcepts ⟺ LocalPrimitives) or the layered split would emit a cross-family include.`,
+            `together (LocalConcepts ⟺ LocalElements) or the layered split would emit a cross-family include.`,
         );
       }
       const recordsTwin: Concept = {
@@ -1429,7 +1429,7 @@ export function lowerLocalCodes(
     // `obesityTarget.test.ts` already records as measured ("an answer slot nothing reads").
     //
     // TWO OUTPUTS (no EP twin — there is no posrep here):
-    //   (a) LP twin    — the same-name LOCAL records retrieve        (LocalPrimitives)
+    //   (a) LP twin    — the same-name LOCAL records retrieve        (LocalElements)
     //   (b) Inferences — the PUBLIC determination: the reduction, over `this` ∪ the named set
     //
     // ⚠ SHAPE-EXACT: a SELECTION pattern (instance-returning: MostRecent/Last/Earliest/First/Highest/Lowest)
@@ -1479,7 +1479,7 @@ export function lowerLocalCodes(
           buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc),
         );
 
-        // (a) LP twin — the local records retrieve. `retrieveResourceType` SET ⟺ LocalPrimitives.
+        // (a) LP twin — the local records retrieve. `retrieveResourceType` SET ⟺ LocalElements.
         const lpTwin: Concept = {
           ...c,
           representations: [],
@@ -1510,7 +1510,7 @@ export function lowerLocalCodes(
     }
 
     // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION is SUPPORTED (the
-    //     case-feature model): the concept SPLITS into a LocalPrimitives retrieve twin (the
+    //     case-feature model): the concept SPLITS into a LocalElements retrieve twin (the
     //     direct local code) + an Inferences twin. Supported both-rep flavors:
     //       - `code is` + `defined as`                 → UNION fold-in (historical).
     //     Age is handled only through explicit Record publication, before this legacy branch.
@@ -1573,8 +1573,8 @@ export function lowerLocalCodes(
     // working arms"; the SOURCE arm had no lowering at all.
     //
     // THREE OUTPUTS, mirroring the recency-value split above (keep them in lock-step):
-    //   (a) LP twin      — the same-name LOCAL records retrieve            (LocalPrimitives)
-    //   (b) EP source    — `"<X> Source"`, the external retrieve           (ExternalPrimitives)
+    //   (a) LP twin      — the same-name LOCAL records retrieve            (LocalElements)
+    //   (b) EP source    — `"<X> Source"`, the external retrieve           (ExternalElements)
     //   (c) Inferences   — the same-name PUBLIC determination: `( "X" sem-or "X Source" )` = the UNION
     //
     // `sem-or` IS union (charter §3 set algebra), so (c) invents no operation — it states the charter's rule
@@ -1647,7 +1647,7 @@ export function lowerLocalCodes(
         buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc),
       );
 
-      // (a) LP twin — the LOCAL records retrieve. `retrieveResourceType` SET ⟺ LocalPrimitives.
+      // (a) LP twin — the LOCAL records retrieve. `retrieveResourceType` SET ⟺ LocalElements.
       const lpTwin: Concept = {
         ...c,
         representations: [],
@@ -1662,7 +1662,7 @@ export function lowerLocalCodes(
       delete lpTwin.code;
       loweredConcepts.push(lpTwin);
 
-      // (b) EP source twin — the EXTERNAL retrieve. `retrieveResourceType` UNDEFINED ⟺ ExternalPrimitives.
+      // (b) EP source twin — the EXTERNAL retrieve. `retrieveResourceType` UNDEFINED ⟺ ExternalElements.
       const epSource: Concept = {
         ...c,
         name: sourceName,
@@ -1687,8 +1687,8 @@ export function lowerLocalCodes(
       //
       // ⚠ MARKER-DRIVEN, not composition-driven. Routing this through `defined as ( "X" sem-or "X Source" )`
       // was tried and MEASURED: it lands in the TRUTH-SET lane and hard-errors
-      // `emit-mixed-source-inference-unsupported`, because `.asTruths()` lifts LocalPrimitives records into a
-      // BOOLEAN truth-set and an ExternalPrimitives record-list cannot join one. That lane is right for a
+      // `emit-mixed-source-inference-unsupported`, because `.asTruths()` lifts LocalElements records into a
+      // BOOLEAN truth-set and an ExternalElements record-list cannot join one. That lane is right for a
       // boolean determination and wrong for a record-valued one: a `RecordSet<Quantity>` has no truth-set.
       // The retargeted body below is therefore NEVER rendered (the `record-union` emit reads the marker); it
       // exists only to classify the twin as Inferences and to survive `requalifyDefinition`.
@@ -1712,14 +1712,14 @@ export function lowerLocalCodes(
           location: loc,
         } as DefinedAsDefinition,
         __bothRepMerge: "record-union",
-        __bothRepFoldInLocalPrimitives: c.name,
+        __bothRepFoldInLocalElements: c.name,
         // #189 P2 — the space, LISTED rather than derived from the fold-in name. Today exactly the two
         // terms the derived form produced (byte-identical output, pinned by the goldens); the point is that
         // `local ∪ n posreps ∪ n constructed candidates` is now expressible without changing the emitter
         // again (design P2-D3).
         __recordUnionTerms: [
-          { kind: "local-primitives", define: c.name },
-          { kind: "external-primitives", define: sourceName },
+          { kind: "local-elements", define: c.name },
+          { kind: "external-elements", define: sourceName },
         ],
         __loweringRole: "public-determination",
       };
@@ -1851,12 +1851,12 @@ export function lowerLocalCodes(
     };
 
     // R2 CO-INVARIANT ASSERT (F7) — the two synthetic-only discriminators
-    // `classifyStatementLayer` keys on (LocalConcepts vs ExternalConcepts; LocalPrimitives
-    // vs ExternalPrimitives) MUST be set TOGETHER for one lowered `code is` concept. The
+    // `classifyStatementLayer` keys on (LocalConcepts vs ExternalConcepts; LocalElements
+    // vs ExternalElements) MUST be set TOGETHER for one lowered `code is` concept. The
     // synthetic Terminology's `TerminologySystem.name` marks LocalConcepts; the
-    // synthetic `CodedFromDefinition.retrieveResourceType` marks LocalPrimitives. A
+    // synthetic `CodedFromDefinition.retrieveResourceType` marks LocalElements. A
     // future edit that sets one without the other would silently desync the two
-    // source families (a LocalConcepts code with a ExternalPrimitives retrieve, or the
+    // source families (a LocalConcepts code with a ExternalElements retrieve, or the
     // inverse) → a cross-family include downstream. Fail loudly here, matching the
     // loudness bar of the cross-family throw in `collectLayerIncludes`.
     const hasSyntheticDomainName = syntheticTerminology.body.some(
@@ -1868,15 +1868,15 @@ export function lowerLocalCodes(
           `desynced source-family discriminator — synthetic TerminologySystem.name ` +
           `${hasSyntheticDomainName ? "set" : "UNSET"}, CodedFromDefinition.retrieveResourceType ` +
           `${codedFrom.retrieveResourceType === undefined ? "UNSET" : "set"}. Both must be set ` +
-          `together (LocalConcepts ⟺ LocalPrimitives) or the layered split would emit a cross-family include.`,
+          `together (LocalConcepts ⟺ LocalElements) or the layered split would emit a cross-family include.`,
       );
     }
 
-    // The LocalPrimitives retrieve twin (or, for a pure `code is` concept, THE
+    // The LocalElements retrieve twin (or, for a pure `code is` concept, THE
     // lowered concept). `definition` is replaced with the synthetic retrieve and
     // `code` cleared (idempotent). For a both-rep concept this is the direct
     // local-source half; its `defined as` lives on the Inferences twin below.
-    // #189 Slice C 2a — the LocalPrimitives retrieve's lowering ROLE: for a both-representation split it is the
+    // #189 Slice C 2a — the LocalElements retrieve's lowering ROLE: for a both-representation split it is the
     // implementation HALF (`source-impl` → manufactured `not-applicable`; the determination is the Inferences
     // twin below); for a PURE `code is` concept it IS the sole public determination (`public-determination`
     // → inherits the authored obligation — a bare-scalar boolean's authored `rejected`, or a RecordSet's
@@ -1978,8 +1978,8 @@ export function lowerLocalCodes(
     loweredConcepts.push(lowered);
 
     // BOTH-REPRESENTATION: also synthesize the INFERRED twin carrying the original
-    // definition, marked so the emit merges in the direct LocalPrimitives retrieve.
-    // Same name as the LocalPrimitives twin — they land in different layer libraries;
+    // definition, marked so the emit merges in the direct LocalElements retrieve.
+    // Same name as the LocalElements twin — they land in different layer libraries;
     // `buildNameLayerMaps` resolves the name to Inferences (the public determination).
     //   - `defined as` twin → `__bothRepMerge: "union"` (asTruths() union inference).
     if (bothRepDefinedAs !== undefined) {
@@ -1989,13 +1989,13 @@ export function lowerLocalCodes(
       // NO `__bothRepMerge` marker — that marker forces the non-total truth-set classification at the totality
       // authorities (`emittedDischargeAndType` / `computeTotality` early-return on `__bothRepMerge !== undefined`),
       // whereas WITHOUT it those authorities reach their `defined as exists` arm and correctly classify it total
-      // (composite-delegated). The fold DISPATCH keys on `__bothRepFoldInLocalPrimitives` (still set), and the
+      // (composite-delegated). The fold DISPATCH keys on `__bothRepFoldInLocalElements` (still set), and the
       // Interface façade re-exports it BARE. Every OTHER `code is` + `defined as` stays the deferred `"union"`.
       // disc 507 A/B — shape-EXACT on BOTH the referent AND the interface's own arm (unqualified ref, recency-value
       // referent, Scalar<boolean> Observation at the default value carrier), via the SHARED predicate every site uses.
       const isMemberExistenceFold = isMemberExistenceInterface(c, (name) => recencyValueNames.has(name));
       // ⭐⭐ #189 — REFUSE a member-existence fold over a PRODUCER-BEARING referent. MEASURED, and it is a
-      // silent WRONG ANSWER, not a missing feature: the fold's arms read the LocalPrimitives / ExternalPrimitives
+      // silent WRONG ANSWER, not a missing feature: the fold's arms read the LocalElements / ExternalElements
       // RETRIEVES directly (`exists(...)`), while a producer's candidate exists only in the merge. So
       // `define "Is Obese"` evaluated FALSE on data where `Obese` is a constructed `true`
       // (`tmp/NOTES-producer-wiring-executed.md`) — two defines in one library publishing contradictory
@@ -2031,7 +2031,7 @@ export function lowerLocalCodes(
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinedAs,
-        __bothRepFoldInLocalPrimitives: c.name,
+        __bothRepFoldInLocalElements: c.name,
         ...(isMemberExistenceFold ? {} : { __bothRepMerge: "union" as const }),
         // #189 Slice C 2a — the both-rep public determination; inherits the authored obligation.
         __loweringRole: "public-determination",
@@ -2073,7 +2073,7 @@ export function lowerLocalCodes(
     ...ast,
     // Synthetic local terminologies at the FRONT (Concepts layer); the
     // both-representation INFERRED twins APPENDED at the end (Inferences layer) —
-    // they share a name with their LocalPrimitives twin already present in
+    // they share a name with their LocalElements twin already present in
     // `rewritten`, so they cannot be the in-place replacement and must be added
     // as additional statements. The emitter sections by kind/layer, so absolute
     // position is immaterial beyond stable intra-layer ordering.
@@ -2201,7 +2201,7 @@ export function leafEligibleConcepts(ast: CRL): Set<string> {
  * (#189 Slice A2). The records twin holds the concept's own natural-resource records (`[<R>: <local code>]`);
  * the retargeted reduction concept `"<X>"` reads it (`exists "<X> Records"`). SINGLE SOURCE OF TRUTH: this is the
  * lowering's twin-name rule (used at the twin synthesis above); the #189 2d case-feature lane reuses it so the
- * `cpg-featureExpression` target (`LocalPrimitives."<X> Records"`) byte-equals the emitted define — the featureExpression
+ * `cpg-featureExpression` target (`LocalElements."<X> Records"`) byte-equals the emitted define — the featureExpression
  * points at the RECORDS define, NOT the ephemeral boolean `"<X>"` (charter §4; panel disc 481/482).
  */
 export function recordsTwinDefineName(conceptName: string): string {

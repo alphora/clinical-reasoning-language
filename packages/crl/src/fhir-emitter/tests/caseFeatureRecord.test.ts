@@ -42,7 +42,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     // and "every current target is a record-list" was a COMMENT-ONLY claim until this line — which is
     // exactly the shape probe 2 measured failing at ≥2 records. T4 is what introduces a `record` target.
     expect(r.target.resultKind).toBe("record-list");
-    expect(r.target.layer).toBe("local-primitives");
+    expect(r.target.layer).toBe("local-elements");
   });
 
   it("MedicationRequest + exists this → a valueless record (NOT forced to Observation — the hack is gone)", () => {
@@ -129,7 +129,7 @@ describe("resolveCaseFeatureRecord — #189 2d P2 (case-feature record resolutio
     expect(r.descriptor.valueElement).toBe("value");
     expect(r.descriptor.datumValueType).toBe("boolean");
     // T5 step 2b — a question now lowers exactly like `code is` + `definition is exists this`: the answer
-    // RECORDS are published as `"<X> Records"` in LocalPrimitives and `"<X>"` is the three-state determination
+    // RECORDS are published as `"<X> Records"` in LocalElements and `"<X>"` is the three-state determination
     // in Inferences. The featureExpression must target the records define, or it dangles (Inv 2(d)).
     expect(r.target.define).toBe("Can Use Equipment At Home Records");
   });

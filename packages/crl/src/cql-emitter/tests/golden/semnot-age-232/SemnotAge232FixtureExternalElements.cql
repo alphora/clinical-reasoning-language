@@ -1,4 +1,4 @@
-library SemnotAge232FixtureExternalPrimitives
+library SemnotAge232FixtureExternalElements
 
 using FHIR version '4.0.1'
 

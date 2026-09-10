@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Service Requested Records",
-        "reference": "http://example.org/crl/coded-question/Library/CodedQuestionLocalPrimitives"
+        "reference": "http://example.org/crl/coded-question/Library/CodedQuestionLocalElements"
       }
     }
   ],

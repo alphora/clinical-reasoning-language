@@ -316,7 +316,7 @@ concept "Most Recent BMI":
 - defined as "Most Recent BMI Selection".
 
 // "Calculated BMI" preserves the BMI = weight / height² derivation
-// chain. It composes the two source primitives (Height + Weight) via
+// chain. It composes the two source concepts (Height + Weight) via
 // sem-and — semantic intersection at the composition layer. The
 // `evidence is` text records the formula the implementation honors;
 // the WHAT-vs-HOW principle keeps the formula out of the CRL grammar.

@@ -1,6 +1,7 @@
+// REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 // #189 Piece 1 (disc 506) — the both-rep value/interface flip, end-to-end on the acceptance policy dme101-030.
 // The value concept `Covered Device` (a `code is` + `most recent this` + a `coded from` `source representation`)
-// lowers to a 3-OUTPUT split — a LocalPrimitives records retrieve, an ExternalPrimitives `[ServiceRequest:
+// lowers to a 3-OUTPUT split — a LocalElements records retrieve, an ExternalElements `[ServiceRequest:
 // "Covered Devices"]` source retrieve, and an Inferences `Scalar<CodeableConcept>` recency merge — and the boolean
 // interface `Covered Device Requested` (`code is` + `defined as exists`) emits the three-leg member-existence fold
 // (own-arm NEWEST-read, per design v7). This test pins the emitted structure + a CLEAN whole-boundary totality proof
@@ -34,14 +35,14 @@ describe("#189 Piece 1 — dme101-030 both-rep value/interface flip emits", () =
     expect(res.success).toBe(true);
   });
 
-  it("Covered Device — LocalPrimitives records retrieve (same-name)", () => {
-    expect(libText("LocalPrimitives")).toMatch(
+  it("Covered Device — LocalElements records retrieve (same-name)", () => {
+    expect(libText("LocalElements")).toMatch(
       /define "Covered Device":\s*\n\s*\[Observation: \S+LocalConcepts\."Covered Device"\]/,
     );
   });
 
-  it("Covered Device Source — ExternalPrimitives source retrieve", () => {
-    expect(libText("ExternalPrimitives")).toMatch(
+  it("Covered Device Source — ExternalElements source retrieve", () => {
+    expect(libText("ExternalElements")).toMatch(
       /define "Covered Device Source":\s*\n\s*\[ServiceRequest: \S+ExternalConcepts\."Covered Devices"\]/,
     );
   });
@@ -59,14 +60,14 @@ describe("#189 Piece 1 — dme101-030 both-rep value/interface flip emits", () =
     expect(inf).toMatch(/else if CFH\.recencyLocalWins\([\s\S]*?authoredOn\.value\) then/); // tie-break on real ts
     expect(inf).toMatch(/\.value as FHIR\.CodeableConcept/); // local value read (conforming cast)
     expect(inf).toMatch(/where O\.value is FHIR\.CodeableConcept/); // conforming-row filter (non-conforming masks nothing)
-    expect(inf).toMatch(/ExternalPrimitives\."Covered Device Source"/);
+    expect(inf).toMatch(/ExternalElements\."Covered Device Source"/);
     expect(inf).not.toMatch(/define "Covered Device":[\s\S]*?Coalesce/);
   });
 
-  it("Inferences includes BOTH Local and External Primitives", () => {
+  it("Inferences includes BOTH Local and External Elements", () => {
     const inf = libText("Inferences");
-    expect(inf).toMatch(/include \S+LocalPrimitives/);
-    expect(inf).toMatch(/include \S+ExternalPrimitives/);
+    expect(inf).toMatch(/include \S+LocalElements/);
+    expect(inf).toMatch(/include \S+ExternalElements/);
   });
 
   it("Covered Device Requested — three-leg member-existence fold (own NEWEST-read, not any-true)", () => {
@@ -77,8 +78,8 @@ describe("#189 Piece 1 — dme101-030 both-rep value/interface flip emits", () =
     );
     expect(inf).not.toMatch(/define "Covered Device Requested":[\s\S]*?where O\.value[\s\S]*?is true\)/);
     // member legs.
-    expect(inf).toMatch(/or exists \(\S+LocalPrimitives\."Covered Device"\)/);
-    expect(inf).toMatch(/or exists \(\S+ExternalPrimitives\."Covered Device Source"\)/);
+    expect(inf).toMatch(/or exists \(\S+LocalElements\."Covered Device"\)/);
+    expect(inf).toMatch(/or exists \(\S+ExternalElements\."Covered Device Source"\)/);
   });
 
   it("Interface re-exports the fold BARE (not `.satisfied()` on a bare boolean)", () => {
@@ -104,7 +105,7 @@ describe("#189 Piece 1 — dme101-030 both-rep value/interface flip emits", () =
     expect(fhirErrors, JSON.stringify(fhirErrors)).toHaveLength(0);
     expect(fhir.success).toBe(true);
     // Covered Device gets a case-feature StructureDefinition (a record-bearing concept, North Star §4), and its
-    // cpg-featureExpression targets the SAME-NAME LocalPrimitives define "Covered Device" (NOT "Covered Device
+    // cpg-featureExpression targets the SAME-NAME LocalElements define "Covered Device" (NOT "Covered Device
     // Records" — the recency-value split uses the both-rep same-name convention). Inv 2(d) would have caught a dangle.
     const sd = fhir.resources.find(
       (r) => r.resourceType === "StructureDefinition" && (r.resource as { id?: string }).id === "dme101-030-covered-device",

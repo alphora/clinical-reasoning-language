@@ -46,7 +46,7 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperLocalPrimitives"
+      "resource": "http://example.org/crl/patient-age-upper/Library/PatientAgeUpperLocalElements"
     }
   ],
   "content": [

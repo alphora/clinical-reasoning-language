@@ -57,7 +57,7 @@ describe("pattern-owned age publication", () => {
     for (const partition of [FULL_PARTITION, { ...FULL_PARTITION, libraryNameFor: (_p: string, view: string) => `Custom${view}` }]) {
       const result = emitPartitioned(lowered.ast, "Age Publication", options.policyId, partition, options);
       expect(result.success, JSON.stringify(result.errors)).toBe(true);
-      expect(JSON.stringify(result.entries.find(e => e.libraryName.endsWith("Inferences")))).toContain("ExternalPrimitives");
+      expect(JSON.stringify(result.entries.find(e => e.libraryName.endsWith("Inferences")))).toContain("ExternalElements");
     }
   });
   it.each(["age today less than 18 years", "age today at least 18 days", "exists this"])("does not admit unsupported Patient %s", projection => {
