@@ -1,6 +1,6 @@
 // QUESTIONNAIRE pane RENDERER (vscode-free, unit-tested) — the read-only Medical Validation questionnaire panel.
-// #187 Todo 3: it projects the pure `buildQuestionnaire` full-surface result into an INDENTED, read-only list of
-// "<concept>?" questions (each with the case's answer highlighted) — on-path rows normal, `first:`-preempted rows dimmed,
+// Projects the pure `buildQuestionnaire` reached-path result into an INDENTED, read-only list of
+// questions (each with the case's answer highlighted), omitting skipped conditions even if they have supplied values;
 // non-Source concepts greyed, inferred composites expanded into their leaves — ending in the produced outcome or a
 // terminal message. Design authority: .vibe-tools/discussions/193-mv-panes-todo3-questionnaire-render-plan.md.
 //
@@ -84,13 +84,12 @@ function renderQuestionNav(currentIndex: number, count: number): string {
   );
 }
 
-/** #187 Option-3: render a leaf's Yes/No options with the case's answer highlighted (an "unknown" off-path answer
- *  highlights NEITHER + shows an n/a marker — the Todo-2 contract). Shared shape with `renderQuestion`'s opts. */
+/** Render a definite answer or an explicit unknown, shared by condition titles and explanation operands. */
 function renderExpOpts(answer: "yes" | "no" | "unknown"): string {
   const opts = ["Yes", "No"]
     .map((o) => `<span class="${(answer === "yes" || answer === "no") && o.toLowerCase() === answer ? "q-opt q-opt-answer" : "q-opt"}">${o}</span>`)
     .join("");
-  const unknown = answer === "unknown" ? `<span class="q-unknown" title="no case answer — a question this path never asked">n/a</span>` : "";
+  const unknown = answer === "unknown" ? `<span class="q-unknown" title="No determination available">Not answered</span>` : "";
   return `<span class="q-opts">${opts}${unknown}</span>`;
 }
 
@@ -107,12 +106,9 @@ function connDiv(op: "or" | "and" | "not", top: boolean): string {
  * `<li>` — the whole expansion lives in ONE `<li class="q-exp">`, so the flat `q-item` regex can't mis-slice it).
  * The `not` operand is ALWAYS rendered (a dropped operand would vanish a criterion `$apply` still asks).
  */
-/** Render a `defined as` body: a FORCED top `or` chip — every `defined as` is a disjunction of alternative
- *  representations, so its top is always `or` (a top-level `and` reads `or` then its single ALL OF compound) — then the
- *  body's own structure (its ALL OF / ANY OF box, unchanged). Used at each `defined as` boundary (the when's expansion +
- *  each named-composite operand's body). Sub-question nesting is shown by the BOX borders (no per-leaf number/indent). */
+/** Render the authored definition body without inventing an additional connective. */
 function renderExpansion(body: QExpr): string {
-  return connDiv("or", true) + renderQExpr(body);
+  return renderQExpr(body);
 }
 
 /** #224 i.4c: render a decision GUARD's boolean tree — NO forced top `or` chip (a guard is NOT a representation-
@@ -169,7 +165,7 @@ function renderQExpr(e: QExpr): string {
       const blkTitle = e.blocking ? ` title="this criterion blocked the branch"` : "";
       const row = `<div class="${cls.join(" ")}"${blkTitle}><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
       // A named-composite / both-rep operand is answerable AND expandable → its OWN `defined as` body renders below (with
-      // its own forced top `or`, since it too is a disjunction of alternatives).
+      // its own authored operator structure).
       return e.composite ? row + renderExpansion(e.composite) : row;
     }
     case "external":
@@ -205,9 +201,8 @@ function renderQExpr(e: QExpr): string {
 }
 
 /** Render one question <li>: "<concept>?" + the two Yes/No options with the case's answer highlighted, plus a subtle
- *  value-type label for a non-boolean concept. #187 Todo 3: INDENT by `depth` (a `q-d<n>` class); DIM `first:`-preempted
- *  rows; mark non-Source (no `code is`) on an inner channel that does NOT fight the `.this-node` wash; render an "unknown"
- *  off-path answer as blank + a marker (NEVER "No" — the Todo-2 contract). `data-q` carries the (runtime or synthetic
+ *  value-type label for a non-boolean concept. Mark non-Source (no `code is`) on an inner channel that does NOT fight
+ *  the `.this-node` wash; render an unknown answer as blank + a marker, never No. `data-q` carries the (runtime or synthetic
  *  leaf) nodeId; the <li> id is the highlight target keyed in `anchors`. */
 function renderQuestion(q: Question, gid: string): string {
   const opts = q.options
@@ -223,17 +218,14 @@ function renderQuestion(q: Question, gid: string): string {
       : "";
   const unknown =
     q.answer === "unknown"
-      ? `<span class="q-unknown" title="no case answer — a question this path never asked">n/a</span>`
+      ? `<span class="q-unknown" title="No determination; this reached condition is unanswered">Not answered</span>`
       : "";
   // A MAIN question carries its decision-nesting DEPTH as a LAYER NUMBER badge instead of indentation (flat left edge).
   const cls = ["q-item"];
-  if (q.reach === "preempted") cls.push("q-preempted");
   if (!q.isSource) cls.push("q-nonsource");
   if (q.isInferred) cls.push("q-inferred");
-  // Non-color affordance (VS Code high-contrast can collapse opacity/tint) — reach AND source state as a tooltip (a row
-  // that is BOTH preempted and non-Source shows both hints, so neither affordance is lost).
+  // The tooltip identifies non-source concepts without relying on color.
   const titleParts: string[] = [];
-  if (q.reach === "preempted") titleParts.push("skipped by an earlier first: match");
   if (!q.isSource) titleParts.push("inferred / non-source concept (no local code)");
   const titleAttr = titleParts.length ? ` title="${escapeHtml(titleParts.join(" · "))}"` : "";
   // 1-based for readability (a top-level when reads "1", not the raw 0-based decision depth).
@@ -379,14 +371,12 @@ export const QUESTIONNAIRE_STYLE =
   `.q-list{list-style:none;margin:0;padding-left:0}` +
   `.q-item{padding:2px 4px 2px 6px;border-radius:3px;margin:1px 0}` +
   // #187 Option-3: main questions are FLAT (no decision-depth indent) — their nesting shows as a `.q-layer` number badge.
-  // DIM a first:-preempted (skipped-by-an-earlier-match) row.
-  `.q-preempted{opacity:.5}` +
   // NON-SOURCE (no local `code is`): a grey wash on the INNER `.q-prompt` span — a channel DISTINCT from the `.q-item`
   // background, so it never fights the `.this-node` li wash (disc 193, Claude). Reads as "▒grey▒" behind the concept.
   `.q-nonsource .q-prompt{background:var(--vscode-editorWidget-background,#2b2b2e);border-radius:3px;padding:0 5px}` +
   // A composite-operand leaf is lighter weight than a decision `when`.
   `.q-exp-leaf .q-concept{font-weight:normal;opacity:.92}` +
-  // An "unknown" off-path answer (no conceptTruth) — a subtle marker; NEITHER Yes/No option is highlighted.
+  // An unknown answer — a subtle marker; NEITHER Yes/No option is highlighted.
   `.q-unknown{font-size:.75em;opacity:.6;font-style:italic;margin-left:6px}` +
   `.q-prompt{margin-right:6px}` +
   `.q-concept{font-weight:bold;color:var(--vscode-symbolIcon-keywordForeground,#c586c0)}` +

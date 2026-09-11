@@ -48,6 +48,8 @@ export type { ValidateImportsOptions, ValidateImportsResult } from "./imports/va
 export { tokenizeCEL, parseCEL, buildCEL } from "./cel";
 export type { CELToken, CELParseResult } from "./cel";
 export { resolveCelImports } from "./cel/imports";
+// REFACTOR:grounded: MV wording proposals use the emitter's presentation authority.
+export { createPresentationCatalog, type PresentationContext, type PresentationText } from "./emit/presentation";
 export type {
   ResolveCelImportsOptions,
   ResolvedCelGraph,
@@ -144,6 +146,7 @@ export type {
 export {
   buildCorrespondenceModel,
   buildCockpitModel,
+  buildExecutionModel,
   buildCrlRevealMaps,
   caseIdsForUnit,
   caseIdsForNode,

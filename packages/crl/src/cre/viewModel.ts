@@ -123,6 +123,8 @@ export interface ScenarioViewModel {
   /** The case's per-concept case-derived answer over the whole closure (#187 Todo 2) — feeds the panes' OFF-path
    *  (dimmed) rendering. Empty on an error run. Additive/optional-in-spirit (no schema bump). */
   conceptTruth: ConceptTruthView[];
+  /** REFACTOR:grounded: a CodeableConcept/Quantity answer is distinct from its qualification. */
+  conceptValues?: { name: string; libraryName: string; answerValue: { type: string; value: unknown } }[];
 }
 
 export interface CaseView {
@@ -411,6 +413,7 @@ function buildScenario(
       libraryName: r.lib,
       satisfied: r.satisfied,
     })),
+    conceptValues: (run.conceptValues ?? []).map(r => ({ name: r.name, libraryName: r.lib, answerValue: r.answerValue })),
   };
 }
 

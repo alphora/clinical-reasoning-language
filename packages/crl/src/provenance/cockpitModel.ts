@@ -104,30 +104,34 @@ export function buildCockpitModelFromResolved(
   opts: { artifactPath: string; celPath: string },
 ): CockpitModel {
   const { artifactPath, celPath } = opts;
-  const { caseIdByName, frozenCollisions, duplicateScenarioNames } = buildCaseIdJoin(r.graph);
+  return { ...buildExecutionModel(r.graph), correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }) };
+}
+
+/** REFACTOR:grounded: CRL/CEL execution does not depend on source correspondence. */
+export function buildExecutionModel(graph: ResolvedCelGraph): Omit<CockpitModel, "correspondence"> {
+  const { caseIdByName, frozenCollisions, duplicateScenarioNames } = buildCaseIdJoin(graph);
 
   // #187 Todo 1b: the per-concept shape index. Leaf-eligibility is the emitter's own lowering
   // (`leafEligibleConcepts`, fail-closed on lowering errors) computed per source library HERE — the impure
   // step — and passed into the PURE `buildConceptShapeIndex` (keeps `cql-emitter` out of the shape builder).
   // #242: the shared assembly (also consumed by the flow↔questionnaire parity test) — one collectLibs + one
   // leafEligible pass yields conceptLayer + the drift-guarded-equal conceptShape ($apply) and defExpr (operator tree).
-  const { conceptLayer, conceptShape, defExpr } = assembleConceptProjections(r.graph);
+  const { conceptLayer, conceptShape, defExpr } = assembleConceptProjections(graph);
   // #233 Todo 2b: the canonical per-declaration criterion inventory (the gate/verdict identity source), same defExpr —
   // built ONCE and threaded into `buildGuardOutlines` so the criterion nodes' STAMPED bodyHash == the gate's inventory hash
   // structurally (one value), and a second expansion pass is dropped (disc 330 nit).
-  const criterionIdentities = buildCriterionIdentities(r.graph, defExpr);
+  const criterionIdentities = buildCriterionIdentities(graph, defExpr);
   // #224 ii.3 Todo 3 / #242: guard outlines for every compound (or criterion-bearing) when (Flow pane), same defExpr index.
-  const guardOutlines = buildGuardOutlines(r.graph, defExpr, criterionIdentities);
+  const guardOutlines = buildGuardOutlines(graph, defExpr, criterionIdentities);
 
   return {
-    correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
-    crlStructure: buildCrlStructure(r.graph),
+    crlStructure: buildCrlStructure(graph),
     conceptLayer,
     conceptShape,
     defExpr,
     guardOutlines,
     criterionIdentities,
-    scenarios: renderScenario(r.graph),
+    scenarios: renderScenario(graph),
     caseIdByName,
     caseNameCollisions: frozenCollisions,
     duplicateScenarioNames,

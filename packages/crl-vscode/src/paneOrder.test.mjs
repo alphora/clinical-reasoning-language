@@ -89,9 +89,9 @@ check("MV: worklist and cel are DISTINCT panes — listing both opens both (disc
   assert.deepEqual(mv(["cel", "worklist"]), ["cel", "worklist"]);
 });
 
-check("MV: both questionnaire panes can be open at once, in either order", () => {
-  assert.deepEqual(mv(["questionnaire", "fhirQuestionnaire"]), ["questionnaire", "fhirQuestionnaire"]);
-  assert.deepEqual(mv(["fhirQuestionnaire", "questionnaire"]), ["fhirQuestionnaire", "questionnaire"]);
+check("REFACTOR:grounded: retired CRL Questionnaire is removed from saved pane orders", () => {
+  assert.deepEqual(mv(["questionnaire", "fhirQuestionnaire"]), ["fhirQuestionnaire"]);
+  assert.deepEqual(mv(["fhirQuestionnaire", "questionnaire"]), ["fhirQuestionnaire"]);
 });
 
 check("INVARIANT: output is always a dupe-free subset of the spec's valid set, in the user's order", () => {

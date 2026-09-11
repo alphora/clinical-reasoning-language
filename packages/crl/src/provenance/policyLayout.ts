@@ -1,3 +1,4 @@
+// REFACTOR:grounded: a CRL/CEL policy remains launchable without source provenance.
 // #212 — the policy source-layout primitive. Given any path inside a policy artifact (a `.cel`, a `.crl`, …), find the
 // policy's `src/` directory (the one carrying `provenance/`). Extracted to core (from crl-vscode's provenanceFindings) so the
 // flag store (`flags/mvFlagStore`) AND the crl-vscode provenance/MV code share ONE resolver; crl-vscode re-exports it, so its
@@ -26,7 +27,7 @@ function isDirectory(p: string): boolean {
 export function findPolicySrcFromDir(startDir: string): string | undefined {
   let dir = startDir;
   for (;;) {
-    if (basename(dir) === "src" && isDirectory(join(dir, "provenance"))) return dir;
+    if (basename(dir) === "src" && (isDirectory(join(dir, "provenance")) || (isDirectory(join(dir, "crl")) && isDirectory(join(dir, "cel"))))) return dir;
     const parent = dirname(dir);
     if (parent === dir) return undefined;
     dir = parent;
@@ -47,7 +48,7 @@ export function findPolicySrcNear(dir: string): string | undefined {
   const up = findPolicySrcFromDir(dir);
   if (up) return up;
   const down = join(dir, "src");
-  return isDirectory(join(down, "provenance")) ? down : undefined;
+  return findPolicySrcFromDir(down);
 }
 
 /** The result of enumerating a policy's launch candidates. `complete` is false when any subtree could not be read or the

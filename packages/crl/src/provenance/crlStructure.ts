@@ -12,7 +12,7 @@
  * closure — a source viewer must not silently drop an authored-but-unreached decision.
  */
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
-import type { ActionStatement, BranchCondition, ReferenceName, WhenBlock } from "../ast/types";
+import type { ActionStatement, BlockQualifier, BranchCondition, OtherwiseBlock, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { describeBranchCondition } from "../ast/branchCondition";
 import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
@@ -43,6 +43,8 @@ export interface CrlStructureNode {
   sigLabel?: string;
   location: LsLocation; // always present: location-less nodes are skipped (mirrors the indexer) to keep nodeKey parity
   children: CrlStructureNode[];
+  /** Mode of this node's child block, not the mode of its enclosing block. */
+  childrenQualifier?: BlockQualifier;
 }
 
 export interface CrlDecisionStructure {
@@ -51,6 +53,7 @@ export interface CrlDecisionStructure {
   nodeKey: string; // the decision-level key (no nodeId)
   location: LsLocation;
   children: CrlStructureNode[];
+  childrenQualifier?: BlockQualifier;
 }
 
 function labelOf(kind: CrlNodeKind, node: WhenBlock | ActionStatement | { type: string }): string {
@@ -208,6 +211,9 @@ export function buildCrlStructure(
             : {}),
           location,
           children: [],
+          ...(sn.kind !== "action" && (sn.node as WhenBlock | OtherwiseBlock).body.type === "BlockBody"
+            ? { childrenQualifier: ((sn.node as WhenBlock | OtherwiseBlock).body as import("../ast/types").BlockBody).qualifier }
+            : {}),
         });
       }
       out.push({
@@ -216,6 +222,7 @@ export function buildCrlStructure(
         nodeKey: nodeKey(decisionDeclRef(lib, name)),
         location: declLoc,
         children: nest(flat),
+        childrenQualifier: s.body.qualifier,
       });
     }
   }

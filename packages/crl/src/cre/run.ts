@@ -290,6 +290,8 @@ export interface CaseRun {
    *  case-derived answer for an OFF-path (preempted) concept that `:first` never evaluated. Empty on an error run.
    *  CONTRACT: an ABSENT `(lib,name)` (a concept outside this list) supplies no authoritative Boolean value — render blank, never infer `false` or a required answer. */
   conceptTruth: ConceptTruthRow[];
+  /** REFACTOR:grounded: typed selected publications need not have Boolean satisfaction. */
+  conceptValues?: { lib: string; name: string; answerValue: { type: string; value: unknown } }[];
 }
 
 export interface CelRunResult {
@@ -1302,6 +1304,18 @@ function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
   }
   rows.sort((a, b) => a.lib.localeCompare(b.lib) || a.name.localeCompare(b.name));
   return rows;
+}
+
+// Read only the already evaluated publication selections; never infer values from CEL literals.
+function collectConceptValues(ctx: Ctx): NonNullable<CaseRun["conceptValues"]> {
+  const rows: NonNullable<CaseRun["conceptValues"]> = [];
+  for (const [id, ev] of ctx.cache) {
+    const entry = ctx.concepts.get(id);
+    if (!entry || ev.publicationResult?.state !== "selected") continue;
+    const values = Object.entries(ev.publicationResult.candidate.resource).filter(([k]) => /^value[A-Z]/.test(k));
+    if (values.length === 1) rows.push({ lib: entry.lib, name: entry.node.name, answerValue: { type: values[0][0].slice(5), value: values[0][1] } });
+  }
+  return rows.sort((a,b) => a.lib.localeCompare(b.lib) || a.name.localeCompare(b.name));
 }
 
 /** A composition operand reference resolves against the DEFINING concept's
@@ -2507,6 +2521,7 @@ function runCase(
     diagnostics: ctx.diagnostics,
     ...(ctx.discardedUnknown ? { discardedUnknown: true as const } : {}),
     conceptTruth: collectConceptTruth(ctx),
+    conceptValues: collectConceptValues(ctx),
   };
 }
 

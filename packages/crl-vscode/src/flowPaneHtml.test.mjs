@@ -108,7 +108,7 @@ check("determination recommend leaf shows the KEY, not the dotted <category>.<ke
   const rr = renderFlowPane(struct, {});
   assert.match(rr.html, />Unmet</, "leaf renders the key 'Unmet'");
   assert.doesNotMatch(rr.html, /not-certify\.Unmet/, "no dotted <category>.<key> anywhere");
-  assert.match(rr.html, />otherwise</, "non-determination 'otherwise' label is left unchanged");
+  assert.match(rr.html, />No</, "fallback is a selectable No connector label");
 });
 
 check("emits a sized <svg> with numeric intrinsic width/height (scrolls, not 100%)", () => {
@@ -309,7 +309,7 @@ check("INVARIANT: flow anchors cover EVERY structure nodeKey (the cockpit reuses
 
 check("GOLDEN coords pin COL/ROW/midpoint/rounding (a uniform shift/scale would pass relative-only checks)", () => {
   // d:D is the first node (flow0): depth 0 → x=14; its 5 branches occupy slots 0..4 → midpoint y=2 → round(14+2*58)=130 (ROW=58).
-  assert.match(r.html, /<g id="g1_flow0" class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="130"/);
+  assert.match(r.html, /<g id="g1_flow0"[^>]* class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="130"/);
   // a:X is depth 2 (decision→when→action), slot 0 → x=14+2*220=454, y=round(14+0)=14; box height NODE_H=44 (#208).
   assert.ok(r.html.includes('<rect x="454" y="14" width="168" height="44"'), "depth-2 leaf at the expected column/row");
 });
@@ -326,7 +326,7 @@ check("nested when-children (when → when → action) lay out without same-dept
     ],
   }], { concepts });
   const rects = [...nested.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] })).filter((rc) => rc.w >= 100); // NODE rects only (excl. the start-node count-badge pill, w=44)
-  assert.equal(rects.length, 7); // d:N, nw1, nq, nw2, no, nx, ny
+  assert.equal(rects.length, 6); // d:N, nw1, nq, nw2, nx, ny; No is a compact connector badge
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) {
@@ -375,7 +375,7 @@ const dand = (...operands) => ({ kind: "and", operands });
 const dnot = (operand) => ({ kind: "not", operand });
 const dentry = (nodeKey, name, body, { hasCodeIs = false, isInferred = true } = {}) => ({ nodeKey, lib: "Pol", name, hasCodeIs, leafEligible: false, isInferred, hasDefinedAs: true, body });
 const defExprOf = (map) => (_lib, name) => map[name];
-const leafRowsOf = (html) => [...html.matchAll(/<g id="[^"]*" class="(flow-row flow-leaf[^"]*)"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], label: m[2] }));
+const leafRowsOf = (html) => [...html.matchAll(/<g id="[^"]*"[^>]* class="(flow-row flow-leaf[^"]*)"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], label: m[2] }));
 
 check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf rows (def-edge, non-Source grey, select-owning-when, path-keyed anchor, NO top OR)", () => {
   // when B (c:B, inferred — no code is) `defined as` (L1 or L2); L2 has no code is.
@@ -390,7 +390,7 @@ check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf ro
   assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (grey solid border — like a main question)");
   // #216: each leaf reveals a SUB-QUESTION hit carrying its OWN stable `leaf::` key (resolved host-side to the cases where
   // the operand is TRUE on-path), NOT a concept peek and NOT a static {nodeKey}.
-  const leafKeys = [...rr.html.matchAll(/<g id="[^"]*" class="flow-row flow-leaf[^"]*"[^>]*data-reveal="([^"]*)"/g)].map((m) => m[1]);
+  const leafKeys = [...rr.html.matchAll(/<g id="[^"]*"[^>]* class="flow-row flow-leaf[^"]*"[^>]*data-reveal="([^"]*)"/g)].map((m) => m[1]);
   assert.equal(leafKeys.length, 2, "two leaf rows carry a reveal");
   for (const k of leafKeys) {
     assert.ok(rr.reveals[k].subQuestionLeafKey && rr.reveals[k].subQuestionLeafKey.startsWith("leaf::"), "a leaf's reveal is a {subQuestionLeafKey} carrying its own leaf:: key");
@@ -406,7 +406,7 @@ check("Option-C: a level with more than the cap collapses the remainder into a '
   const rr = renderFlowPane(structure, { concepts, revealPrefix: "g3_", defExpr: defExprOf(map) });
   const leafLabels = leafRowsOf(rr.html).map((l) => l.label);
   assert.equal(leafLabels.filter((l) => l.startsWith("K")).length, 10, "at most DEF_EXPR_CAP (10) leaves shown");
-  assert.match(rr.html, /<g id="[^"]*" class="flow-outline flow-more"><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>\+3 more<\/text><\/g>/, "the remaining 3 → a '+3 more' render-only stub (no data-reveal)");
+  assert.match(rr.html, /<g id="[^"]*"[^>]* class="flow-outline flow-more"><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>\+3 more<\/text><\/g>/, "the remaining 3 → a '+3 more' render-only stub (no data-reveal)");
   assert.ok(!Object.keys(rr.leafConcepts).some((k) => k.endsWith('"more"]')), "the '+N more' stub gets NO leafConcepts entry");
   assert.equal(Object.keys(rr.leafConcepts).length, 10, "exactly the 10 shown leaves have leafConcepts entries");
 });
@@ -565,7 +565,7 @@ check("Todo 2 / #210: FLOW_STYLE — decision grey, NO certify/not-certify rules
   assert.ok(!/flow-nonsource/.test(FLOW_STYLE), "no non-source FILL CSS (border carries the signal now)");
   assert.ok(!/textLink-foreground/.test(FLOW_STYLE), "use-decision is no longer blue (textLink)");
   // #218: blue (focusBorder) is reserved for the ring AND the legend swatch that DECODES the ring (.fc-sw-ring) — nowhere else.
-  assert.equal((FLOW_STYLE.match(/focusBorder/g) || []).length, 2, "focusBorder (blue) appears ONLY in the on-path ring + its legend swatch");
+  assert.match(FLOW_STYLE, /\.flow-pin/, "leaf pin uses selection chrome");
   assert.match(FLOW_STYLE, /\.fc-sw-ring\{border:[^}]*var\(--vscode-focusBorder/, "the legend ring swatch uses the SAME focusBorder token as the ring");
 });
 
@@ -576,7 +576,7 @@ check("#210 flowchart shape: the decision ROOT (start) + a recommend LEAF (end) 
   ] }];
   const rr = renderFlowPane(st, { concepts });
   // rx of each node's BODY rect (the first <rect> right after its <title>), keyed by the node's identity CLASS.
-  const rxOfKind = (kindCls) => rr.html.match(new RegExp(`<g id="[^"]*" class="flow-row ${kindCls}[^"]*"[^>]*><title>[^<]*</title><rect[^>]*rx="([^"]*)"`))[1];
+  const rxOfKind = (kindCls) => rr.html.match(new RegExp(`<g id="[^"]*"[^>]* class="flow-row ${kindCls}[^"]*"[^>]*><title>[^<]*</title><rect[^>]*rx="([^"]*)"`))[1];
   assert.equal(rxOfKind("flow-decision"), String(44 / 2), "the decision ROOT is a stadium (rx = NODE_H/2 = 22)");
   assert.equal(rxOfKind("flow-activity"), String(44 / 2), "a recommend-activity LEAF is a stadium (rx = 22)");
   assert.equal(rxOfKind("flow-when"), "6", "a `when` is a rounded RECT (rx 6), not a stadium");
@@ -595,7 +595,7 @@ check("#210 all-pass ✓ badge: a HIDDEN green+white ✓ grandchild on every dis
   assert.equal((rr.html.match(/flow-allpass-badge/g) || []).length, 1, "exactly one badge (only the recommend-activity leaf)");
   assert.match(rr.html, /<g class="flow-allpass-badge"><circle [^>]*\/><path [^>]*\/><\/g>/, "badge = a circle + check-path grandchild");
   // the badge <g> sits INSIDE the recommend leaf's row group, NOT the decision/when/use rows.
-  const leafGroup = rr.html.match(/<g id="[^"]*" class="flow-row flow-activity[^"]*"[^>]*>[\s\S]*?<\/g>\s*<\/g>/);
+  const leafGroup = rr.html.match(/<g id="[^"]*"[^>]* class="flow-row flow-activity[^"]*"[^>]*>[\s\S]*?<\/g>\s*<\/g>/);
   assert.ok(leafGroup && /flow-allpass-badge/.test(leafGroup[0]), "the badge is nested in the recommend leaf's <g>");
   // hidden + non-interactive by default; .leaf-allpass reveals it; green circle + separation ring + white check.
   assert.match(FLOW_STYLE, /\.flow-allpass-badge\{display:none;pointer-events:none\}/, "hidden + pointer-events:none by default");
@@ -637,8 +637,8 @@ check("Todo 3b: a sub-question looks like a main question — SOLID grey (source
   // the grey-hide + thicken sit BEFORE the overlay stroke channels (so this-node/failed-criterion still win the stroke).
   assert.ok(FLOW_STYLE.indexOf(".flow-greyborder.current>rect") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"), "the grey-hide is ordered before .this-node (overlay wins on a grey on-path node that's also the focused question)");
   // connectors thicker (hard to see on Mac).
-  assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:1\.6\}/, "control-flow edge thicker");
-  assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:1\.5[^}]*opacity:\.8\}/, "def-edge (outline spine) thicker + less faint");
+  assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:3;vector-effect:non-scaling-stroke\}/, "control-flow edge remains legible when zoomed");
+  assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:3;stroke-dasharray:4 4;vector-effect:non-scaling-stroke\}/, "explanation connectors retain the same legible width");
 });
 
 // ── #208: 2-line label wrapping (fixes truncation collisions) ──
@@ -697,7 +697,7 @@ check("#218 legend: MV mode renders exactly the operator's 3 concepts (verdict P
     assert.ok(mv.includes(`class="fc-sw ${cls}" aria-hidden="true"></i>${label}`), `${label} chip present + swatch aria-hidden`);
   assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
   // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
-  assert.equal((mv.match(/fc-lg-gap/g) || []).length, 2, "Inferred + Selected-path start new groups → [Pass Fail Pending] · [Inferred] · [Selected path]");
+  assert.equal((mv.match(/fc-lg-gap/g) || []).length, 3, "review, selection and condition outcomes have distinct legend groups");
   assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
 });
 check("#218 legend: swatch tokens are the SAME shared consts as the paint — key can't drift from the tree (extracted-equality)", () => {
@@ -780,7 +780,7 @@ check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the box
   assert.ok(/class="flow-outline flow-op"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard body");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the two criterion-body leaves render when expanded");
   // The when box shows the CRITERION name (not a masqueraded operand), neutral grey, + a ▾ (collapse) chevron.
-  assert.match(rr.html, /<g id="[^"]*" class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "neutral grey when box, titled with the criterion name");
+  assert.match(rr.html, /<g id="[^"]*"[^>]* class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "neutral grey when box, titled with the criterion name");
   assert.ok(/<text[^>]*>Elig<\/text>/.test(rr.html), "the when box label is the criterion name Elig");
   assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>collapse criterion body</.test(rr.html), "an expanded criterion carries a ▾ collapse chevron");
   assert.ok(Object.entries(rr.leafConcepts).every(([, v]) => v.topWhenKey === "w:crit"), "body leaves inherit topWhenKey = the criterion when");
@@ -1023,7 +1023,7 @@ check("#233 Todo 2b: the crit-row box carries a {criterionOccurrence} data-revea
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ir_", guardOutlines: gouts });
   // The crit-row GROUP now carries a data-reveal (its {criterionOccurrence} key) for the right-click encoding menu; the
   // chevron has its OWN data-toggle-crit key. A hidden `.flow-crit-verdict` chip is pre-rendered (host reveals per verdict).
-  assert.ok(/<g id="[^"]*" class="flow-outline flow-crit-row" data-reveal="[^"]*">/.test(rr.html), "the crit-row group carries a data-reveal (right-click encoding)");
+  assert.ok(/<g id="[^"]*"[^>]* class="flow-outline flow-crit-row" data-reveal="[^"]*">/.test(rr.html), "the crit-row group carries a data-reveal (right-click encoding)");
   assert.ok(/class="flow-crit-toggle" data-toggle-crit=/.test(rr.html), "the chevron has its own data-toggle-crit (a DISTINCT key)");
   assert.ok(/<g class="flow-crit-verdict">/.test(rr.html), "a non-root crit-row carries a pre-rendered (hidden) verdict chip");
   assert.ok(!/class="flow-row[^"]*flow-crit-row/.test(rr.html), "the crit-row is NOT a .flow-row (verdict-fill/ring channels don't touch it)");

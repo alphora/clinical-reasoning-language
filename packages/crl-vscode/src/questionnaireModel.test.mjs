@@ -108,6 +108,62 @@ function renderCase(files, celName, caseName) {
 // let a test assert WHICH (lib,name) the builder queried (the cross-lib same-name trap).
 const booleanResolver = () => ["boolean"];
 
+check("false calculated condition retains the operand that explains its negative route", () => {
+  const operand = { kind: "ref", ref: { name: "Concurrent", lib: "P", crossLib: false,
+    nodeKey: "k:Concurrent", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false } };
+  const entry = { nodeKey: "k:NotConcurrent", lib: "P", name: "NotConcurrent", hasCodeIs: false,
+    leafEligible: false, isInferred: true, hasDefinedAs: true, body: { kind: "not", operand } };
+  const sv = { tree: [{ nodeId: "w", kind: "when", label: "when NotConcurrent", evaluated: true,
+    condition: { satisfied: false, expr: { op: "ref", concept: { name: "NotConcurrent", libraryName: "P" } } } },
+    { nodeId: "else", kind: "otherwise", children: [{ nodeId: "deny", kind: "action", label: "Deny", action: { produced: true } }] }],
+    conceptTruth: [{ libraryName: "P", name: "Concurrent", satisfied: true }] };
+  const q = buildQuestionnaire(sv, booleanResolver, "P", { defExpr: (_lib, name) => name === "NotConcurrent" ? entry : undefined });
+  assert.deepEqual(q.questions.map(x => [x.conceptName, x.answer]), [["NotConcurrent", "no"]]);
+  assert.equal(q.questions[0].expansion.kind, "not");
+  assert.equal(q.questions[0].expansion.operand.answer, "yes");
+  assert.equal(q.questions[0].expansion.operand.blocking, undefined, "definition evidence is not invented runtime blocking evidence");
+  assert.deepEqual(producedPathDiverterIds(q), ["w"]);
+  assert.deepEqual(q.outcome, { activity: "Deny" });
+  const missing = buildQuestionnaire({ ...sv, conceptTruth: [] }, booleanResolver, "P", { defExpr: (_lib, name) => name === "NotConcurrent" ? entry : undefined });
+  assert.equal(missing.questions[0].expansion.operand.answer, "unknown", "missing definition evidence is not fabricated");
+});
+
+check("parallel produced branches preserve both reached conditions", () => {
+  const branch = (name, activity) => ({ nodeId: name, kind: "when", label: `when ${name}`, evaluated: true,
+    condition: { satisfied: true, expr: { op: "ref", concept: { name, libraryName: "P" } } },
+    children: [{ nodeId: activity, kind: "action", label: activity, action: { produced: true } }] });
+  const q = buildQuestionnaire({ tree: [branch("A", "X"), branch("B", "Y")] }, booleanResolver, "P");
+  assert.deepEqual(q.questions.map(x => x.conceptName), ["A", "B"]);
+  assert.match(q.note, /multiple produced/);
+});
+
+check("skip all off-path questions, including supplied true/false, and preserve reached unknowns", () => {
+  const when = (name, preempted) => ({ nodeId: name, kind: "when", label: `when ${name}`,
+    evaluated: !preempted, ...(preempted ? { unreachedReason: "preempted" } : { unknown: true }),
+    condition: { expr: { op: "ref", concept: { name, libraryName: "P" } } }, children: [] });
+  const sv = { tree: [when("Reached", false), when("PresentYes", true), when("PresentNo", true), when("Missing", true)],
+    conceptTruth: [{ libraryName: "P", name: "PresentYes", satisfied: true },
+      { libraryName: "P", name: "PresentNo", satisfied: false }] };
+  const q = buildQuestionnaire(sv, booleanResolver, "P");
+  assert.deepEqual(q.questions.map(x => [x.conceptName, x.answer]),
+    [["Reached", "unknown"]]);
+  assert.equal(q.terminalKind, "paused");
+  assert.ok(q.questions.every(x => !x.diverterEligible));
+});
+
+check("skipped single-ref composite is omitted even with known operands", () => {
+  const node = { nodeId: "comp", kind: "when", label: "when Composite", evaluated: false,
+    unreachedReason: "preempted", condition: { expr: { op: "ref", concept: { name: "Composite", libraryName: "P" } } }, children: [] };
+  const ref = name => ({ kind: "ref", ref: { name, lib: "P", crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false } });
+  const entry = { nodeKey: "k:Composite", lib: "P", name: "Composite", hasCodeIs: false, leafEligible: false,
+    isInferred: true, hasDefinedAs: true, body: { kind: "and", operands: [ref("A"), ref("B")] } };
+  const opts = { defExpr: (_lib, name) => name === "Composite" ? entry : undefined };
+  const sv = { tree: [node], conceptTruth: [{ libraryName: "P", name: "A", satisfied: true }] };
+  const q = buildQuestionnaire(sv, booleanResolver, "P", opts);
+  assert.equal(q.questions.length, 0);
+  assert.equal(buildQuestionnaire({ ...sv, conceptTruth: [] }, booleanResolver, "P", opts).questions.length, 0);
+});
+
 check("a reached unknown composite retains known and missing operand answers", () => {
   const crl = `library "CompositePolicy".
 concept "X":
@@ -345,11 +401,8 @@ case "exclusion present, but result claims Approve":
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
   assert.equal(q.terminalKind, "produced", "the questionnaire shows the ACTUAL produced path, not blocked");
   assert.deepEqual(q.outcome, { activity: "Deny" }, "outcome is the ACTUALLY produced disposition (Deny), NOT expected Approve");
-  // Exclusion satisfied → fires Deny; Covered is first:-preempted. #187 Todo 3: the FULL surface now SHOWS the preempted
-  // Covered sibling (DIMMED, terminal), where the old pruned path hid it.
-  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Exclusion", "Covered"], "the fired exclusion + the preempted Covered sibling");
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Exclusion"]);
   assert.equal(q.questions[0].answer, "yes", "the exclusion held");
-  assert.equal(q.questions[1].reach, "preempted", "Covered is first:-preempted → dimmed terminal");
 });
 
 // ── 3. A "no" question on the path: "Is X? No → (first: fall through) → Is Y? Yes → Approve" → questions
@@ -444,12 +497,8 @@ case "both hold; Excl preempts → Deny":
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
   assert.equal(q.terminalKind, "produced", "the preempting branch produced Deny → not blocked");
   assert.deepEqual(q.outcome, { activity: "Deny" });
-  // #187 Todo 3: the preempted Covered sibling is STILL shown (dimmed). It IS asserted, so its conceptTruth answer is
-  // "yes" even though `first:` never evaluated it — the corpus-faithful "preempted but present" case.
-  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Excl", "Covered"], "the fired Excl + the preempted-but-present Covered");
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Excl"], "supplied Covered data is off the selected route");
   assert.equal(q.questions[0].answer, "yes");
-  assert.equal(q.questions[1].reach, "preempted", "Covered is first:-preempted (dimmed)");
-  assert.equal(q.questions[1].answer, "yes", "Covered's case answer is YES (asserted) despite being preempted — from conceptTruth");
 });
 
 // ── 5. Guard-on-PASS must NOT terminate: a PASS where an unrelated `any:`-menu sibling is guarded out → still
@@ -957,8 +1006,8 @@ check("producedPathDiverterIds: a multi-diverter produced case (e.g. adult, neit
   assert.deepEqual(producedPathDiverterIds(q), ["when[0]/when[0]", "when[0]/when[1]"], "both failed disease whens are diverters");
 });
 
-// ── #187 Todo 3: the FULL first:-chain surface — preempted siblings + composite leaf expansion ──
-check("Todo 3: a first:-preempted sibling is STILL shown (dimmed) with its conceptTruth answer, not recursed", () => {
+// ── #187 Todo 3: the reached first:-chain surface and composite explanations ──
+check("a first:-preempted sibling and its children are omitted", () => {
   const crl = `# P
 library "FS".
 concept "Covered":
@@ -996,12 +1045,7 @@ case "covered wins; Other preempted":
   const covered = q.questions.find((x) => x.conceptName === "Covered");
   const other = q.questions.find((x) => x.conceptName === "Other");
   assert.ok(covered && covered.answer === "yes" && covered.reach === "evaluated", "Covered: evaluated, fired yes");
-  assert.ok(other, "the preempted Other sibling is STILL rendered (full surface, not pruned)");
-  assert.equal(other.reach, "preempted", "Other is dimmed (first:-preempted)");
-  assert.equal(other.rowKind, "when-preempted");
-  assert.equal(other.answer, "no", "Other's case answer comes from conceptTruth (not asserted → no)");
-  assert.equal(other.isNavStop, true, "a preempted runtime when is a nav-stop");
-  assert.equal(other.diverterEligible, false, "a preempted row is NEVER a produced-path diverter");
+  assert.equal(other, undefined, "preempted sibling is absent from both questions and navigation");
 });
 
 check("Option-3: an on-path composite `when` carries its `defined as` operator tree as `expansion` (leaves are NOT flat questions)", () => {
@@ -1282,14 +1326,7 @@ first:
   const cel = guardCel(["A", "B"]).replace(`- result is "G" is "Deny".`, `- result is "G" is "First".`);
   const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": cel }, "g.cel", "c");
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
-  const pre = q.questions.find((x) => x.rowKind === "when-preempted");
-  assert.ok(pre, "the `B and C` when is preempted by the matched `A`");
-  assert.equal(pre.expansionKind, "guard", "a preempted compound still shows its atom box");
-  assert.ok(pre.expansion.operands.every((o) => !o.blocking), "a preempted (never-evaluated) guard marks NOTHING blocking");
-  // answer-source contract: a preempted atom uses conceptTruth (present → yes, absent-but-declared → no).
-  const byName = Object.fromEntries(pre.expansion.operands.map((o) => [o.name, o]));
-  assert.equal(byName.B.answer, "yes", "B present in the case → conceptTruth yes");
-  assert.equal(byName.C.answer, "no", "C absent-but-declared → conceptTruth no (never blank/unknown here)");
+  assert.deepEqual(q.questions.map(x => x.conceptName), ["A"], "the skipped compound and its operands are absent");
 });
 
 // ── #224 iii.3b: precise BLOCKING attribution under negation. A `not X` box's leaf blocks when X is
@@ -1436,10 +1473,7 @@ first:
   const cel = guardCel(["A"]).replace(`- result is "G" is "Deny".`, `- result is "G" is "First".`);
   const { sv, rootLib } = renderCase({ "g.crl": crl, "g.cel": cel }, "g.cel", "c");
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
-  const pre = q.questions.find((x) => x.rowKind === "when-preempted");
-  assert.ok(pre, "the `not B` when is preempted by the matched `A`");
-  assert.equal(pre.expansion.kind, "not");
-  assert.ok(!pre.expansion.operand.blocking, "a preempted (never-evaluated) negated guard marks NOTHING blocking");
+  assert.deepEqual(q.questions.map(x => x.conceptName), ["A"], "the skipped negation and its operand are absent");
 });
 
 check("i.4c: a SATISFIED `A or B` (A=yes,B=no) IS boxed — both runtime answers shown, NOTHING blocking", () => {
@@ -1683,7 +1717,7 @@ all:
   assert.equal(second.expansion.body, undefined, "later occurrence is BODY-LESS (a reference, not a re-expansion)");
 });
 
-check("ii.3: a PREEMPTED criterion guard → answer 'unknown', NEVER blocking (never evaluated)", () => {
+check("a skipped criterion with no result or trace body adds no empty question", () => {
   const crl = `library "Crit".
 concept "A":
 - type is Condition.
@@ -1707,11 +1741,7 @@ first:
   // A present → branch 0 matches → branch 1 (`when Eligible`) PREEMPTED.
   const { sv, rootLib } = renderCase({ "c.crl": crl, "c.cel": critCel(["A"]) }, "c.cel", "c");
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
-  const preempted = q.questions.find((x) => x.rowKind === "when-preempted");
-  assert.equal(preempted.conceptName, "Eligible");
-  assert.equal(preempted.expansion.kind, "criterion");
-  assert.equal(preempted.expansion.answer, "unknown", "preempted → never evaluated → unknown");
-  assert.ok(!preempted.expansion.blocking, "a preempted criterion is informational, never a blocker");
+  assert.deepEqual(q.questions.map(x => x.conceptName), ["A"], "the skipped criterion is absent");
 });
 
 check("ii.3: a false criterion under a SATISFIED `or` is INFORMATIONAL, never blocking (underSatisfiedOr)", () => {

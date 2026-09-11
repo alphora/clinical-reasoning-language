@@ -77,6 +77,7 @@ export {
 export type { GuardOutline, CriterionIdentity } from "./guardOutline";
 export {
   buildCockpitModel,
+  buildExecutionModel,
   buildCockpitModelFromResolved,
   assembleConceptProjections,
 } from "./cockpitModel";

@@ -1,3 +1,4 @@
+// REFACTOR:grounded: source maps are optional; structural maps are not.
 // Cross-pane reveal maps (vscode-free, unit-tested) — three-pane viewer C2b-2 (#156).
 // Bridges the correspondence model (source↔CRL units, keyed by the refs the artifact clusters cite — often concept/
 // activity keys) to the CRL-structure rows (the decision tree). A row is reachable by ANY of its keys: its own decision
@@ -65,7 +66,7 @@ function walk(nodes: CrlStructureNode[], visit: (n: CrlStructureNode) => void): 
 }
 
 export function buildCrlRevealMaps(
-  correspondence: CorrespondenceModel,
+  correspondence: CorrespondenceModel | undefined,
   structure: CrlDecisionStructure[],
   conceptLayer: CrlConceptNode[] = [],
 ): CrlRevealMaps {
@@ -74,7 +75,7 @@ export function buildCrlRevealMaps(
   const sourceBearingUnits = new Set<string>();
   const unitToCaseIds = new Map<string, string[]>();
   const caseIdToUnits = new Map<string, string[]>();
-  for (const u of correspondence.units) {
+  for (const u of correspondence?.units ?? []) {
     // "source-bearing" = has a RESOLVED span (a displayRange) — the source pane only renders/cycles those, so a unit
     // with only malformed source refs can't be a CRL→source reveal target.
     if (u.source.some((s) => s.displayRange)) sourceBearingUnits.add(u.id);

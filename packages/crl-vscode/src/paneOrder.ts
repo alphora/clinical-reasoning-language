@@ -1,3 +1,4 @@
+// REFACTOR:grounded: MV cards replace the standalone CRL Questionnaire; serializers still dispose its old view type.
 // Pane-order normalization (vscode-free, unit-tested) — three-pane viewer C2b-4 (#156).
 // The `crl.cockpit.paneOrder` / `crl.medical-validation.paneOrder` settings are user-editable JSON, so they can be
 // malformed (dupes, unknown ids, missing panes, not even an array). normalizePaneOrder repairs ANY input so a bad setting
@@ -53,7 +54,7 @@ export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
   // including the 1.85 MB LForms shell — side by side on a browser-only clinician's screen, for panes most of
   // them never open. Discoverability comes from the settings enum, which is where someone editing paneOrder
   // already is.
-  valid: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
+  valid: ["worklist", "source", "tree", "fhirQuestionnaire", "crl", "cel"],
   canonical: ["source", "fhirQuestionnaire", "tree"],
 };
 

@@ -637,7 +637,7 @@ check("slice 5: data-qnav buttons are CSP-safe (opaque prev/next action, no inli
 });
 
 // ── #187 Todo 3: the new visual branches — dim (preempted), grey (non-Source), leaf indent, and the "unknown never No" contract ──
-check("Option-3 render: preempted DIMMED + non-Source GREY when; a composite expands into an ANY OF box; an unknown leaf highlights NEITHER option", () => {
+check("Option-3 render: preempted informational + non-Source GREY when; a composite expands into an ANY OF box; an unknown leaf highlights NEITHER option", () => {
   const crl = `# P
 library "V".
 concept "Covered":
@@ -692,7 +692,7 @@ case "cov+comp; Other preempted":
   const row = (n) => items.find((it) => it.cls.includes("q-item") && it.inner.includes(`q-concept">${n}<`));
   // Comp has no code-is → INFERRED → its concept moves onto the box title (a q-inferred-when), not a separate answerable row.
   assert.match(r.html, /<li class="q-item q-inferred-when"[^>]*>[\s\S]*?<span class="q-inferred-title">\(<span class="q-prompt"><span class="q-concept">Comp<\/span>/, "Comp (no code-is) renders as an inferred-when with its concept (in parens) above the box");
-  assert.ok(row("Other").cls.includes("q-preempted"), "Other (first:-preempted) is dimmed");
+  assert.equal(row("Other"), undefined, "the skipped question has no rendered row");
   // Comp = (SomeLeaf or Extra) → an ANY OF box with an infix 'or'; NO top OR (inferred).
   assert.match(r.html, /class="q-box q-box-or"/, "Comp = (…or…) → an ANY OF box");
   assert.match(r.html, /class="q-box-tab">any of</, "the box is labelled 'any of'");
@@ -746,10 +746,10 @@ case "root holds":
   // the external stub carries NO Yes/No options.
   const ext = r.html.match(/<div class="q-exp-leaf q-external"[^>]*>((?:(?!<\/div>).)*)<\/div>/);
   assert.ok(ext && !ext[1].includes("q-opt"), "an external stub has NO Yes/No options (not evaluated here)");
-  // Root HAS a code is (both-rep) → it stays an ANSWERABLE row + a FORCED top OR before the box (NOT an inferred-when).
+  // A coded Root stays an answerable row followed by its authored definition body.
   assert.ok(!/q-inferred-when/.test(r.html), "a code-is composite is NOT an inferred-when");
   const exp = r.html.match(/<li class="q-exp">([\s\S]*?)<\/li>/)[1];
-  assert.ok(exp.indexOf("q-conn q-conn-or") >= 0 && exp.indexOf("q-conn q-conn-or") < exp.indexOf("q-box q-box-or"), "a forced top OR precedes the ANY OF box for a code-is composite");
+  assert.ok(!exp.includes('q-conn-top'), "no unauthored OR is added above a coded concept's definition");
 });
 
 check("Option-3 render: an INFERRED composite (no code is) moves its concept + DERIVED answer onto the box border; NO top OR; purple answer (the confirmed BMI Qualifies shape)", () => {
@@ -791,7 +791,7 @@ case "bmi holds":
   const li = r.html.match(/<li class="q-item q-inferred-when"[^>]*>([\s\S]*?)<\/li>/)[1];
   assert.match(li, /^<span class="q-layer"[^>]*>1<\/span>/, "the inferred when carries its 1-based layer number");
   assert.match(li, /<span class="q-inferred-title">\(<span class="q-prompt"><span class="q-concept">BMI Qualifies<\/span>\?<\/span>/, "BMI Qualifies + its derived answer render (in parens) above the box");
-  assert.ok(!li.includes("q-conn-top"), "an INFERRED composite has NO forced top OR chip (that is only for code-is both-rep)");
+  assert.ok(!li.includes("q-conn-top"), "an inferred composite has no unauthored connective");
   assert.match(li, /q-box-tab">any of</, "the sem-or body renders an ANY OF box");
   assert.match(li, /q-box q-box-and"><span class="q-box-tab">all of</, "the nested sem-and renders an ALL OF box");
   const body = li.match(/q-box-body">([\s\S]*)$/)[1];
@@ -880,7 +880,7 @@ case "onlyA":
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
   // the guard box is a q-guard-exp <li> (never the inferred-when box-on-border form).
   assert.match(r.html, /<li class="q-exp q-guard-exp">/, "the compound guard renders a q-guard-exp box");
-  // NO forced top `or` chip immediately inside the guard-exp li (that chip is a `defined as` representation form).
+  // No unauthored connective immediately inside the guard explanation.
   assert.doesNotMatch(r.html, /<li class="q-exp q-guard-exp"><div class="q-conn q-conn-or q-conn-top">/, "no forced or chip on a guard box");
   // the ALL OF box is present (A and B), and the false conjunct B carries the blocking class.
   assert.match(r.html, /q-box q-box-and/, "A and B → ALL OF box");

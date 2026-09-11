@@ -1,3 +1,4 @@
+// REFACTOR:grounded: terminal pins and condition halos implement the selected-route MV design.
 // CRL FLOW pane RENDERER (vscode-free, unit-tested) — the graphical decision-tree flowchart (T2, disc 132).
 // Renders CrlDecisionStructure[] as an SVG forest: each decision root branches through its when/otherwise/action sub-nodes;
 // a composite `when` hangs its `defined as` operator OUTLINE below it, and recommend targets are determination boxes.
@@ -13,6 +14,7 @@
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
 import { buildDefStruct, displayDetermination, topCriterion, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
+import { projectFlowStructure, type ProjectedFlowNode } from "./flowProjection";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
  *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
@@ -194,6 +196,8 @@ const LEAF_LABEL_MAX = 17;
 type FlowKind = "decision" | "when" | "otherwise" | "action" | "leaf";
 
 interface LaidNode {
+  incomingOutcome?: "Yes" | "No";
+  delegatedDecisionKey?: string;
   nodeKey: string;
   kind: FlowKind;
   useDecision: boolean; // an action with actionKind "use-decision"
@@ -582,6 +586,8 @@ function buildLaid(
     const children = [...structureChildren, ...outlineRoots];
     return {
       nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf,
+      incomingOutcome: (n as ProjectedFlowNode).incomingOutcome,
+      delegatedDecisionKey: useDecision ? n.refKeys[0] : undefined,
       ...(sole ? { criterionCollapse: { collapsed, lib: sole.lib, name: sole.name, bodyConcepts: critBodyConcepts } } : {}),
     };
   };
@@ -640,7 +646,7 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth } = buildLaid(structure, conceptMap, {
+  const { roots, maxDepth } = buildLaid(projectFlowStructure(structure), conceptMap, {
     defExpr: opts.defExpr,
     guardOutlines: opts.guardOutlines,
     expandedGuardWhens: opts.expandedGuardWhens,
@@ -663,7 +669,7 @@ export function renderFlowPane(
   // (an op row always has an operand at indent+1 that extends ≥OUTLINE_NODE_W further right; a top-OR sits above the body
   // root) — but it keeps the extent honest if the outline shape ever changed.
   const nodeW = (n: LaidNode): number =>
-    n.outline ? (n.outlineRow === "op" || n.outlineRow === "topor" ? 60 : OUTLINE_NODE_W) : NODE_W;
+    n.kind === "otherwise" && n.label === "No" ? 42 : n.outline ? (n.outlineRow === "op" || n.outlineRow === "topor" ? 60 : OUTLINE_NODE_W) : NODE_W;
   // left x: an OUTLINE row uses its precomputed INDENT-based `absX`; a structure node uses its depth column.
   const left = (n: LaidNode): number => n.absX ?? PAD + n.depth * COL;
   const top = (n: LaidNode): number => Math.round(PAD + n.y * ROW); // node top y (rounded)
@@ -690,12 +696,15 @@ export function renderFlowPane(
         // parent + a horizontal run to the child's left) — NOT the horizontal control-flow Bézier. The spine sits just
         // inside the parent's left so nested rows fan down like a file tree, never reading as a fired branch.
         const sx = left(n) + (n.outline ? 8 : 10);
-        body += `<path class="flow-def-edge" d="M${sx} ${py} V${midY(c)} H${left(c)}"/>`;
+        body += `<path class="flow-def-edge" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" d="M${sx} ${py} V${midY(c)} H${left(c)}"/>`;
       } else {
         const ex = left(c);
         const ey = midY(c);
         const mx = Math.round((px + ex) / 2);
-        body += `<path class="flow-edge" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
+        body += `<path class="flow-edge" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
+        if (c.incomingOutcome && c.kind !== "otherwise") {
+          body += `<text class="flow-outcome-label" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" x="${mx}" y="${Math.round((py + ey) / 2) - 7}">${c.incomingOutcome}</text>`;
+        }
       }
     }
   }
@@ -711,6 +720,15 @@ export function renderFlowPane(
     // an operator / top-OR / external / more row is RENDER-ONLY (no anchor, no reveal — a click resolves to nothing).
     const addressable = !n.outline || n.outlineRow === "leaf";
     if (addressable) anchors[n.nodeKey] = { scrollTo: gid, segmentIds: [gid] };
+    if (n.kind === "otherwise" && n.label === "No") {
+      // The small connector label retains the old fallback identity and its review
+      // controls. It is not a second condition or a new clinical activity.
+      reveals[key] = { nodeKey: n.nodeKey };
+      body += `<g id="${escapeHtml(gid)}" class="flow-row flow-fallback" data-reveal="${escapeHtml(key)}">` +
+        `<title>No — preceding conditions were false</title><rect x="${x}" y="${y + 14}" width="42" height="24" rx="5"/>` +
+        `<text x="${x + 12}" y="${y + 30}">No</text>` + flowRing(x, y + 14, 42, 24, 2.5, 7) + `</g>`;
+      continue;
+    }
 
     // #233 Todo 2a/2b: a NON-ROOT criterion boundary — a NAMED collapsible box. TWO channels: a ▸/▾ chevron
     // (`data-toggle-crit` → `{criterionToggle: posKey}` → `toggleCriterionExpand`), and the box BODY (`data-reveal` →
@@ -904,6 +922,7 @@ export function renderFlowPane(
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
       (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
+      (n.kind === "when" ? `<g class="flow-truth-ring"><rect x="${x - 4.7}" y="${y - 4.7}" width="${NODE_W + 9.4}" height="${NODE_H + 9.4}" rx="10"/></g><text class="flow-truth-unknown" x="${x + NODE_W - 12}" y="${y - 8}"><title>Not answered — evaluation paused here</title>?</text>` : "") +
       guardTab +
       critToggleMarkup +
       critVerdictMarkup +
@@ -911,7 +930,18 @@ export function renderFlowPane(
       allPassBadge +
       flagBadgeMarkup +
       startFlagMarkup +
+      (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + 4}" y="${y + 4}" width="22" height="22" rx="4"/><path d="M${x + 10} ${y + 9} h10 l-2 6 l3 3 h-12 l3-3 z M${x + 15} ${y + 18} v5"/></g>` : "") +
       `</g>`;
+  }
+
+  const parents = new Map<string, string>();
+  for (const n of all) for (const child of n.children) parents.set(child.nodeKey, n.nodeKey);
+  for (const [i, n] of all.entries()) {
+    const id = `${prefix}flow${i}`;
+    const metadata = ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
+      (n.outline ? ` data-flow-outline="1"` : "") +
+      (n.delegatedDecisionKey ? ` data-flow-target="${escapeHtml(n.delegatedDecisionKey)}"` : "");
+    body = body.replace(`<g id="${escapeHtml(id)}"`, `<g id="${escapeHtml(id)}"${metadata}`);
   }
 
   const svg =
@@ -979,17 +1009,29 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
   const chip = (cls: string, label: string, gap: boolean): string =>
     `<span class="fc-lg${gap ? " fc-lg-gap" : ""}"><i class="fc-sw ${cls}" aria-hidden="true"></i>${label}</span>`;
   return (
-    `<div class="fc-legend" role="group" aria-label="Tree color key: green fill Pass, red fill Fail, yellow fill Pending, purple border Inferred, blue ring Selected path">` +
+    `<div class="fc-legend" role="group" aria-label="Tree color key: green fill Pass, red fill Fail, yellow fill Pending, purple border Inferred, blue ring Selected path, green halo Condition true, red halo Condition false, question mark Unanswered">` +
     chip("fc-sw-pass", "Pass", false) +
     chip("fc-sw-fail", "Fail", false) +
     chip("fc-sw-pending", "Pending", false) +
     chip("fc-sw-inferred", "Inferred", true) + // fc-lg-gap → 3 visual concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path]
     chip("fc-sw-ring", "Selected path", true) +
+    `<span class="fc-lg fc-lg-gap"><i class="fc-sw fc-sw-true" aria-hidden="true"></i>Condition true</span>` +
+    `<span class="fc-lg"><i class="fc-sw fc-sw-false" aria-hidden="true"></i>Condition false</span><span class="fc-lg">? Unanswered</span>` +
     `</div>`
   );
 }
 
 export const FLOW_STYLE =
+  `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pin-available>.flow-pin,.flow-pinned>.flow-pin{display:inline}` +
+  `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
+  `.fc-sw-true{border:2px solid var(--vscode-testing-iconPassed,#3fb950);border-radius:50%}.fc-sw-false{border:2px solid var(--vscode-editorError-foreground,#f14c4c);border-radius:50%}` +
+  `.flow-outcome-label{fill:var(--vscode-foreground,#cccccc);font-size:12px;text-anchor:middle;paint-order:stroke;stroke:var(--vscode-editor-background,#1e1e1e);stroke-width:4;stroke-linejoin:round}` +
+  `.flow-truth-ring,.flow-truth-unknown{display:none;pointer-events:none}` +
+  `.flow-truth-ring>rect{fill:none;stroke-width:2.5}` +
+  `.flow-condition-true>.flow-truth-ring,.flow-condition-false>.flow-truth-ring{display:inline}` +
+  `.flow-condition-true>.flow-truth-ring>rect{stroke:var(--vscode-testing-iconPassed,#3fb950)}` +
+  `.flow-condition-false>.flow-truth-ring>rect{stroke:var(--vscode-editorError-foreground,#f14c4c)}` +
+  `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-charts-yellow,#d29922);font-weight:bold}` +
   `.flow-wrap{display:inline-block;min-width:100%}` +
   // `cursor:grab` = the grab-drag pan affordance on the tree background (a `.flow-row` overrides it with `pointer`, so nodes
   // still read as clickable); `user-select:none` so a pan-drag over node text doesn't select it.
@@ -1027,10 +1069,10 @@ export const FLOW_STYLE =
   `.flow-crit-chevron{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
   `.flow-crit-toggle:hover .flow-crit-hit{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
   `.flow-crit-toggle:hover .flow-crit-chevron{fill:var(--vscode-foreground,#cccccc)}` +
-  `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.6}` + // slightly thicker — hard to see on Mac (operator feedback)
+  `.flow-edge{fill:none;stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:3;vector-effect:non-scaling-stroke}` +
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
   // Slightly THICKER + less faint so the connector reads on Mac (operator feedback).
-  `.flow-def-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.5;stroke-dasharray:2 2;opacity:.8}` +
+  `.flow-def-edge{fill:none;stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:3;stroke-dasharray:4 4;vector-effect:non-scaling-stroke}` +
   // an outline operand SUB-QUESTION looks EXACTLY like a main `when` question: a SOLID border — GREY (has a local `code is`)
   // / PURPLE (inferred, decomposes into its own sub-questions recursively). On-path → the blue ring, same as a main node.
   // (Solid, not the Todo-2 dashed chip: the indent + smaller box + dashed spine already distinguish it from a decision box.)

@@ -490,7 +490,7 @@ check("BUCKETING: leafBucketsFromQuestionnaire resolves when-evaluated/yes rows 
   const questions = [
     { rowKind: "when-evaluated", answer: "yes", nodeId: "rt:on" }, //   → w:On (satisfied composite)
     { rowKind: "when-evaluated", answer: "no", nodeId: "rt:off" }, //   answer !== yes → w:Off NOT satisfied
-    { rowKind: "when-preempted", answer: "yes", nodeId: "rt:pre" }, //  wrong rowKind → skipped
+    { rowKind: "guard", answer: "yes", nodeId: "rt:pre" }, // action guard is not a satisfied when
     { rowKind: "when-evaluated", answer: "yes", nodeId: "rt:dangle" }, // resolveKey → undefined → skipped
   ];
   const resolveKey = (id) => ({ "rt:on": "w:On", "rt:off": "w:Off", "rt:pre": "w:Pre", "rt:dangle": undefined })[id];
@@ -555,11 +555,10 @@ check("#210 all-pass badge: reach is EXECUTION (collectProducedActions), over th
   assert.ok(/deriveAllPassLeaves\(badgeEntries\)/.test(COCKPIT_SRC), "the all-pass fold decides the badge set");
   assert.ok(/allPassLeaves: segmentsFor\(tree, \[\.\.\.allPassLeaves\]\)\.segmentIds/.test(COCKPIT_SRC), "allPassLeaves posted as the 5th markReviewOverlay set");
 });
-check("Slice 1b: questionnaireFor routes the FOCUSED case to the memo, a NON-focused case to buildQuestionnaireRaw (no memo poisoning)", () => {
+check("REFACTOR:grounded: case verdicts use complete execution, never the selected route memo", () => {
   const m = COCKPIT_SRC.match(/function questionnaireFor\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "questionnaireFor body");
-  assert.ok(/state\.selection\.caseId === caseId/.test(m[1]), "gated on the FOCUSED selection's caseId");
-  assert.ok(/\? buildFocusedQuestionnaire\(sv\) : buildQuestionnaireRaw\(sv\)/.test(m[1]), "focused → memo; non-focused → raw build (never poisons the focused memo slot)");
+  assert.ok(m); assert.match(m[1], /return buildQuestionnaireRaw\(sv\)/);
+  assert.doesNotMatch(m[1], /buildFocusedQuestionnaire\(/);
 });
 
 // ── #214 worklist verdict filter — HOST wiring source-locks (the handler/reset/auto-widen live outside the webview SCRIPT) ──
@@ -647,7 +646,7 @@ check("#217 host: litNodeKeysForCase is the SHARED reach — driveDoneOverlay pa
   assert.ok(m, "litNodeKeysForCase body");
   assert.ok(/questionnaireFor\(caseId, sv\)/.test(m[1]), "routes through questionnaireFor (guards the focused/raw split)");
   assert.ok(!/buildFocusedQuestionnaire/.test(m[1]), "must NOT call buildFocusedQuestionnaire (its memo poisons on a non-focused sv the resolver passes)");
-  assert.ok(/crlAnchorsForUnits\(unitsForCase\(caseId, m\), m\)\.filter\([\s\S]*producedDispositionLeafKeys\(sv, dispositionLeafKeys\)/.test(m[1]), "interior (minus disposition leaves) ∪ produced — recomputes produced (no overlay-local map)");
+  assert.ok(/routesForCase\(caseId\)\.flatMap[\s\S]*producedDispositionLeafKeys\(sv, dispositionLeafKeys\)/.test(m[1]), "interior (minus disposition leaves) ∪ produced — recomputes produced (no overlay-local map)");
   assert.ok(/litNodeKeysForCase\(caseId, scenarioByCaseId\.get\(caseId\), m, dispositionLeafKeys, tree\.leafConcepts\)/.test(COCKPIT_SRC), "driveDoneOverlay's paint callback uses the SAME shared reach");
 });
 check("#217 host: applyVerdict is the shared persist tail (validates + returns boolean + aborts on save-fail), used by BOTH setWorklist and the quick-pick", () => {
@@ -681,7 +680,7 @@ check("#219 host: postReveal suppresses scroll for the origin pane; highlightRow
   assert.ok(/const noScroll = pane === scrollSuppressPane;/.test(COCKPIT_SRC), "postReveal computes noScroll = pane is the click origin");
   // every highlightRows call in postReveal threads noScroll (cross-pane targets still scroll; the origin pane does not).
   assert.ok(!/highlightRows\(v, crlAnchorsForUnits\(unitsForCase\(target\.id, m\), m\)\);/.test(COCKPIT_SRC), "the case→tree highlight passes noScroll (no bare call left)");
-  assert.ok(/highlightRows\(v, crlAnchorsForUnits\(unitsForCase\(target\.id, m\), m\), noScroll\)/.test(COCKPIT_SRC), "case→tree/crl highlight threads noScroll");
+  assert.ok(/highlightRows\(v, \[\.\.\.new Set\(keys\)\], noScroll\)/.test(COCKPIT_SRC), "case→tree/crl highlight threads noScroll");
   assert.ok(/scrollTo: suppressScroll \? undefined : scrollTo, segmentIds/.test(COCKPIT_SRC), "highlightRows omits scrollTo when suppressScroll (paints .current, no scroll)");
 });
 check("#219 host: the OTHER scroll path — markFailedCriteria — is ALSO suppressed for the origin pane (it runs in the same dispatch)", () => {
@@ -1115,7 +1114,16 @@ check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + the − / reset /
   assert.match(SCRIPT, /addEventListener\('wheel',\(e\)=>\{if\(!e\.ctrlKey\)return;if\(!root\.querySelector\('\.flow-svg'\)\)return;e\.preventDefault\(\)/); // Ctrl+wheel, tree only
   assert.match(SCRIPT, /\{passive:false\}/); // preventDefault must work on wheel
   assert.match(SCRIPT, /closest\('\[data-zoom\]'\)[\s\S]*?setZoom\(a==='in'\?treeZoom\*1\.2:a==='out'\?treeZoom\/1\.2:1\)/); // control buttons
-  assert.doesNotMatch(SCRIPT, /keydown[\s\S]*?setZoom/); // no keyboard zoom leg — it collides with VS Code's global zoom
+  // Inspect only keyboard listener bodies; a later wheel/click handler may legitimately zoom.
+  for (const match of SCRIPT.matchAll(/addEventListener\('keydown',(?:\(e\)|e)=>\{/g)) {
+    let depth = 1, end = match.index + match[0].length;
+    const start = end;
+    for (; end < SCRIPT.length && depth; end++) {
+      if (SCRIPT[end] === "{") depth++;
+      else if (SCRIPT[end] === "}") depth--;
+    }
+    assert.doesNotMatch(SCRIPT.slice(start, end - 1), /setZoom/);
+  }
 });
 
 // ── #210 Todo D (disc 241): the capability registry / set_verdict HOST wiring (source-grep locks) ──
@@ -1324,7 +1332,7 @@ check("bulk-verdict: apply persists ONCE + repaints both halves + notifies once;
 check("bulk-verdict: the grid is a #flagDrawer MODE — its style/script fold into the cockpit shell, no separate panel shell", () => {
   assert.doesNotMatch(COCKPIT_SRC, /reviewGridShellHtml/, "the panel-era shell is removed (no-legacy)");
   // the drawer style/script are concatenated into the ONE cockpit shell + COCKPIT_WEBVIEW_SCRIPT (CSP-nonced there).
-  assert.match(COCKPIT_SRC, /\$\{QUESTIONNAIRE_STYLE\}\$\{REVIEW_GRID_DRAWER_STYLE\}/, "drawer CSS folded into the cockpit <style>");
+  assert.match(COCKPIT_SRC, /\$\{QUESTIONNAIRE_STYLE\}\$\{ROUTE_CARD_STYLE\}\$\{REVIEW_GRID_DRAWER_STYLE\}/, "drawer CSS folded into the cockpit <style>");
   assert.match(COCKPIT_SRC, /REVIEW_GRID_DRAWER_SCRIPT;/, "drawer IIFE appended to COCKPIT_WEBVIEW_SCRIPT (reuses fld/v; one acquireVsCodeApi)");
   // the grid body is posted via the SAME flagDrawer message (innerHTML) — rendered FROM the snapshot (the one render authority).
   assert.match(COCKPIT_SRC, /reviewGridSnapshot\s*\n\s*\?\s*reviewGridHtml\(reviewGridViewModel\(reviewGridSnapshot\.items\), reviewGridSnapshot\.epoch\)/);

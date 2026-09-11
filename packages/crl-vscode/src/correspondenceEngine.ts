@@ -49,7 +49,7 @@ export interface CelNavItem {
 export type Selection =
   | { primary: "source"; unitId: string }
   | { primary: "crl"; nodeKey: string }
-  | { primary: "cel"; caseId: string };
+  | { primary: "cel"; caseId: string; routeId?: string };
 
 export interface State {
   primary: PrimaryPane;
@@ -178,7 +178,8 @@ export function reduce(state: State, action: Action): ReduceResult {
       // Remap selection: keep only if it still resolves against the new index; re-reveal it (the shell re-queues
       // against the new render/indexVersion via the coordinator).
       const keep = selectionResolves(action.index, state.selection);
-      const selection = keep ? state.selection : undefined;
+      // REFACTOR:grounded: runtime route IDs are positional, so never survive a semantic rebuild.
+      const selection = keep && state.selection?.primary === "cel" ? { primary: "cel" as const, caseId: state.selection.caseId } : keep ? state.selection : undefined;
       const next: State = { ...state, index: action.index, selection };
       return { state: next, effects: selection ? revealAllVisible(next, selection) : [] };
     }

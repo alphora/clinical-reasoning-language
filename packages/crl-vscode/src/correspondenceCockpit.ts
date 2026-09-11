@@ -1,3 +1,4 @@
+// REFACTOR:grounded: pinned route cards and MV-scoped proposals (docs/medical-validation-plan.md).
 // Correspondence cockpit SHELL (thin vscode) — three-pane viewer C2a (#156).
 // Wires the pure cores to VS Code: a CRL activity-bar navigator (TreeView) + three webview panes (Source rendered;
 // CRL/CEL placeholders that participate in the reveal protocol). Holds the full ViewerModel; feeds the engine a COMPACT
@@ -10,6 +11,8 @@ import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 
 import {
   buildCockpitModel,
+  buildExecutionModel,
+  resolveCelImports,
   buildCRL,
   conceptDeclRef,
   criterionGateIdentities,
@@ -137,6 +140,11 @@ import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
 import { SnapshotCapture, screenCapturedDom, snapshotFileName } from "./snapshotCapture";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
+import { definitionValueInputs, buildRouteCards } from "./routeCards";
+import { installRouteCards, ROUTE_CARD_STYLE } from "./routeCardsWebview";
+import { graphWordingSources, resolveWordingTarget, createPresentationProposal, savePresentationProposal, pendingPresentationProposals, type WordingTarget } from "./presentationProposal";
+import { conditionTruthKeys } from "./flowProjection";
+import { executionRoutes, routeScenario, buildRouteQuestionnaire, type ExecutionRoute } from "./executionRoutes";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
@@ -283,16 +291,16 @@ function toCelNav(
 }
 
 function toIndex(
-  model: ViewerModel,
+  model: ViewerModel | undefined,
   structure: CrlDecisionStructure[],
   celNav: CelNavItem[],
   version: number,
 ): CockpitIndex {
   return {
     version,
-    anchorFilePath: model.anchor.filePath,
-    steps: model.steps,
-    sourceCycleIds: model.steps.filter((s) => s.source.length > 0).map((s) => s.unitId),
+    anchorFilePath: model?.anchor.filePath ?? "",
+    steps: model?.steps ?? [],
+    sourceCycleIds: (model?.steps ?? []).filter((s) => s.source.length > 0).map((s) => s.unitId),
     crlNav: toCrlNav(structure),
     celNav,
   };
@@ -707,6 +715,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   // ── dispatch / effects ──
   function dispatch(action: Action): void {
+    const previousRoute = state.selection?.primary === "cel" ? state.selection.routeId : undefined;
     const prevCaseId = focusedCaseId(state); // #177 slice 3: capture the focused case BEFORE reduce (real-change detection)
     const { state: next, effects } = reduce(state, action);
     state = next;
@@ -753,7 +762,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (
       shouldRerenderQuestionnaire({
         prevCaseId,
-        nextCaseId: focusedCaseId(next),
+        nextCaseId: previousRoute !== (next.selection?.primary === "cel" ? next.selection.routeId : undefined)
+          ? `${focusedCaseId(next)}:route:${next.selection?.primary === "cel" ? next.selection.routeId : ""}` : focusedCaseId(next),
         // Either questionnaire pane being open is reason enough to run this hook — they render the same case
         // from different sources (CRL projection vs the emitted artifact) and both must follow the selection.
         paneOpen: views.has("questionnaire") || views.has("fhirQuestionnaire"),
@@ -854,9 +864,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else {
       // celCase — both case-display panes light the same case block/row (fanned to each; each paints its own DOM).
       if (pane === "cel" || pane === "worklist") highlightRows(v, [target.id], noScroll);
-      else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)), noScroll);
+      else if (pane === "source") highlightRows(v, (mode === "medical-validation" ? [...new Set(inspectedRoutes(target.id).flatMap(r => r.nodeKeys.flatMap(k => unitsForRow(k,m))))] : unitsForCase(target.id, m)).filter((u) => m.sourceBearingUnits.has(u)), noScroll);
       // #166 3b-fix: case → its units' driving decisions (direct + containment) AND their applicable concept rows.
-      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m), noScroll);
+      else if (pane === "crl" || pane === "tree") {
+        const keys = mode === "medical-validation" ? inspectedRoutes(target.id).flatMap(r => r.nodeKeys) : crlAnchorsForUnits(unitsForCase(target.id, m), m);
+        highlightRows(v, [...new Set(keys)], noScroll);
+      }
     }
   }
 
@@ -968,9 +981,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // rendered single-criterion identities (a stale-or-changed pass is NOT a pass); it is "" / inert when the policy has
       // no criteria, so a criterion-free policy's chrome is byte-unchanged. Composed at the DISPLAY level with the other two.
       const cp = criterionProgress(buildLiveCriterionIdentities(), criterionVerdicts);
-      progress = mvComplete(p, fc, cp)
+      const proposalSrc = currentCel && findPolicySrc(currentCel);
+      const proposals = proposalSrc ? pendingPresentationProposals(proposalSrc) : { pending: 0, unreadable: 0 };
+      progress = !proposals.pending && !proposals.unreadable && mvComplete(p, fc, cp)
         ? `<div class="mv-progress mv-progress-done mv-gate-complete">✓ Medical validation complete</div>`
-        : renderProgressChrome(p) + renderFlagChrome(fc) + renderCriterionChrome(cp);
+        : renderProgressChrome(p) + renderFlagChrome(fc) + renderCriterionChrome(cp) + (proposals.pending || proposals.unreadable ? `<div class="mv-progress">CRL wording patches: ${proposals.pending} pending, ${proposals.unreadable} unreadable</div>` : "");
     }
     const btn = (mode: "blocking" | "all", label: string): string =>
       `<button class="fc-toggle-btn${failedCriteriaMode === mode ? " fc-active" : ""}" data-fc-mode="${mode}">${label}</button>`;
@@ -1568,7 +1583,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     dispositionLeafKeys: Set<string>,
     leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>,
   ): string[] {
-    const interior = crlAnchorsForUnits(unitsForCase(caseId, m), m).filter((k) => !dispositionLeafKeys.has(k));
+    const interior = routesForCase(caseId).flatMap(r => r.nodeKeys).filter((k) => !dispositionLeafKeys.has(k));
     const produced = sv ? producedDispositionLeafKeys(sv, dispositionLeafKeys) : [];
     const yes = !sv || sv.status === "error" ? [] : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, leafConcepts).yesKeys;
     return [...interior, ...produced, ...yes];
@@ -1927,7 +1942,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  superseded render is dropped by the webview (mirrors markReviewOverlay); the webview branch clears both leaf classes
    *  before applying, so an EMPTY mark is a valid clear-effect (used in MV steady state, gen-ordered — never an ungated race). */
   function markLeaves(v: PaneView, yesIds: string[], noIds: string[]): void {
-    void v.panel.webview.postMessage({ type: "markLeaves", gen: v.gen, yesIds, noIds });
+    const sv = focusedScenario();
+    const caseId = state.selection?.primary === "cel" ? state.selection.caseId : undefined;
+    const routes = caseId ? inspectedRoutes(caseId) : [];
+    const selected = routes.length === 1 ? routes[0] : undefined;
+    const selectedIds = new Set(routes.flatMap(r => r.nodeIds));
+    const conditions = sv && sv.status !== "error"
+      ? conditionTruthKeys(sv.tree, id => selectedIds.has(id) ? whenKeyResolver(sv)(id) : undefined).map(m => ({ ids: segmentsFor(v, [m.key]).segmentIds, result: m.result })) : [];
+    const pinLeafIds = selected ? segmentsFor(v, [selected.nodeKeys[selected.nodeKeys.length - 1]]).segmentIds : [];
+    void v.panel.webview.postMessage({ type: "markLeaves", gen: v.gen, yesIds, noIds, conditions, pinLeafIds,
+      pinnedMarks: pinnedCards ? {
+        yesIds: segmentsFor(v, pinnedCards.payload.marks.yesKeys).segmentIds,
+        noIds: segmentsFor(v, pinnedCards.payload.marks.noKeys).segmentIds,
+        conditions: pinnedCards.payload.marks.conditions.map((m: { key: string; result: string }) => ({ ids: segmentsFor(v,[m.key]).segmentIds, result: m.result }))
+      } : undefined, routeCaseId: caseId, routeId: selected?.terminalId, routeKeys: selected?.nodeKeys ?? [], routeLabel: selected && sv ? `${sv.case.name}: ${selected.activity ?? selected.terminalKind}` : "" });
   }
 
   /**
@@ -2020,7 +2048,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // ── render a pane ──
   function renderPane(pane: Pane): void {
     const v = views.get(pane);
-    if (!v || !model) return;
+    if (!v || pane === "questionnaire") return;
     const gen = coord.startRender(pane);
     v.gen = gen;
     v.indexVersion = indexVersion;
@@ -2033,6 +2061,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     v.flaggableGids = [];
     v.startNodeGid = undefined;
     if (pane === "source") {
+      if (!model) { void v.panel.webview.postMessage({ type: "render", gen, indexVersion, mode, html: "<p>Source correspondence is unavailable. The CRL tree and CEL route inspection remain available.</p>" }); return; }
       const units: UnitSpan[] = model.steps.flatMap((s) =>
         s.source.map((loc) => ({ unitId: s.unitId, range: loc.range })),
       );
@@ -2266,11 +2295,37 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return sel && sel.primary === "cel" ? scenarioByCaseId.get(sel.caseId) : undefined;
   }
 
+  let routeCacheVersion = -1;
+  const routeCache = new Map<string, ExecutionRoute[]>();
+  function routesForCase(caseId: string): ExecutionRoute[] {
+    if (routeCacheVersion !== indexVersion) { routeCache.clear(); routeCacheVersion = indexVersion; }
+    let routes = routeCache.get(caseId);
+    if (!routes) {
+      const sv = scenarioByCaseId.get(caseId);
+      routes = sv ? executionRoutes(sv, crlStructure) : [];
+      routeCache.set(caseId, routes);
+    }
+    return routes;
+  }
+  function inspectedRoutes(caseId: string): ExecutionRoute[] {
+    const routes = routesForCase(caseId), sel = state.selection;
+    return sel?.primary === "cel" && sel.caseId === caseId && sel.routeId ? routes.filter(r => r.terminalId === sel.routeId) : routes;
+  }
+  function selectRoutesThroughNode(nodeKey: string): void {
+    const options = [...scenarioByCaseId].flatMap(([caseId, sv]) => routesForCase(caseId)
+      .filter(r => r.nodeKeys.includes(nodeKey))
+      .map(r => ({ label: `${sv.case.name} — ${r.activity ?? r.terminalKind}`, description: r.terminalId,
+        value: { primary: "cel" as const, caseId, routeId: r.terminalId } })));
+    if (options.length === 1) dispatch({ type: "select", selection: options[0].value });
+    else if (options.length > 1) pickThenSelect(options, "Select the case and executed route to inspect", value => value, scrollSuppressPane);
+    else void vscode.window.setStatusBarMessage("Medical Validation: no case executes a route through this node.", 4000);
+  }
+
   // #187 Todo 5 (Claude impl review): a SINGLE-SLOT memo for the focused case's questionnaire. Both `driveDiverters` and
   // `driveLeafMarks` run buildQuestionnaire on the SAME (sv) back-to-back per dispatch/ack — the walk is deterministic in
   // (focused caseId, indexVersion) (sv, crlMaps + all resolvers are rebuilt together, bumping indexVersion), so a slot
   // keyed on that pair serves both without a second walk. Auto-invalidates on any case/model change (no explicit clear).
-  let focusedQMemo: { caseId: string; iv: number; q: Questionnaire } | undefined;
+  let focusedQMemo: { caseId: string; routeId?: string; iv: number; q: Questionnaire } | undefined;
   /** The UN-memoized questionnaire build for ANY case's sv. #210 Slice 1b: `driveDoneOverlay` builds a per-reviewed-case
    *  questionnaire and MUST NOT touch `focusedQMemo` for a non-focused sv (its caseId key would poison the focused slot),
    *  so it routes through `questionnaireFor` → this raw builder for non-focused cases. */
@@ -2285,24 +2340,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // non-focused build). Every caller passes `focusedScenario()`; per-case builds MUST route through `questionnaireFor`.
   function buildFocusedQuestionnaire(sv: ScenarioViewModel): Questionnaire {
     const caseId = state.selection?.primary === "cel" ? state.selection.caseId : "";
-    if (focusedQMemo && focusedQMemo.caseId === caseId && focusedQMemo.iv === indexVersion) return focusedQMemo.q;
-    const q = buildQuestionnaireRaw(sv);
-    focusedQMemo = { caseId, iv: indexVersion, q };
+    const routeId = state.selection?.primary === "cel" ? state.selection.routeId : undefined;
+    if (focusedQMemo && focusedQMemo.caseId === caseId && focusedQMemo.routeId === routeId && focusedQMemo.iv === indexVersion) return focusedQMemo.q;
+    const route = routeId ? routesForCase(caseId).find(r => r.terminalId === routeId) : undefined;
+    const q: Questionnaire = routeId && !route
+      ? { questions: [], outcome: null, terminalKind: "error", note: "The selected route is no longer present; select an executed route." }
+      : route ? buildRouteQuestionnaire(sv, route, buildResolveValueTypes(), sv.decision?.libraryName, { conceptShape: buildConceptShapeResolver(), defExpr: buildDefExprResolver() }) : buildQuestionnaireRaw(sv);
+    focusedQMemo = { caseId, routeId, iv: indexVersion, q };
     return q;
   }
   /** #210 Slice 1b: the questionnaire for an ARBITRARY reviewed case. The FOCUSED case shares the `focusedQMemo` build
    *  (driveDiverters/driveLeafMarks already walked it this dispatch/ack); a NON-focused case builds raw (never the memo —
    *  its caseId key would poison the focused slot). Keyed on the SAME `state.selection.caseId` the memo keys on. */
   function questionnaireFor(caseId: string, sv: ScenarioViewModel): Questionnaire {
-    const focused = state.selection?.primary === "cel" && state.selection.caseId === caseId;
-    return focused ? buildFocusedQuestionnaire(sv) : buildQuestionnaireRaw(sv);
+    // Review coverage concerns the complete case, independently of the route under inspection.
+    return buildQuestionnaireRaw(sv);
   }
   /** #210 Slice 1b: the injected `resolveKey` for `leafBucketsFromQuestionnaire` — a runtime `nodeId` → its structure
    *  `when` nodeKey, via the SAME `resolveThisNode` join `driveDiverters`/`driveThisNode`/`driveLeafMarks` use (keyed by
    *  structure nodeKey = the flow render's `topWhenKey`). Returns undefined off-model (crlMaps null) → the row is skipped. */
   function whenKeyResolver(sv: ScenarioViewModel): (nodeId: string) => string | undefined {
     const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
-    return (nodeId) => (crlMaps ? resolveThisNode(nodeId, root, sv.tree, runtimeRefIndex, crlMaps).nodeKey : undefined);
+    return (nodeId) => resolveThisNode(nodeId, root, sv.tree, runtimeRefIndex, crlMaps ?? undefined).nodeKey;
   }
   /** #210 (all-pass badge + leaf-paint align): the SOUND execution reach — the disposition-leaf structure nodeKeys a
    *  scenario actually PRODUCED. `collectProducedActions(sv.tree)` (the fired `n.action?.produced` leaves) re-rooted via
@@ -2362,12 +2421,77 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
+  // REFACTOR:grounded: the host owns pin identity and proposal targets; webview never supplies paths.
+  let wordingSources = new Map<string, { filePath: string; source: string }>();
+  let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; payload: any; targets: Map<string, WordingTarget> } | undefined;
+  function pinCards(caseId: string, routeId: string): void {
+    const view = views.get("tree"), sv = scenarioByCaseId.get(caseId);
+    const route = routesForCase(caseId).find(r => r.terminalId === routeId);
+    if (!view || !sv || !route || mode !== "medical-validation") return;
+    const resolveKey = whenKeyResolver(sv);
+    const q = buildRouteQuestionnaire(sv, route, buildResolveValueTypes(), sv.decision?.libraryName, { conceptShape: buildConceptShapeResolver(), defExpr: buildDefExprResolver() });
+    const built = buildRouteCards(q, sv, resolveKey, (lib, name, nodeId, criteria) => {
+      const source = wordingSources.get(lib);
+      if (!source) return undefined;
+      const ownerKey = resolveKey(nodeId);
+      const contains = (nodes: CrlStructureNode[]): boolean => nodes.some(n => n.nodeKey === ownerKey || contains(n.children));
+      const owner = crlStructure.find(d => d.nodeKey === ownerKey || contains(d.children));
+      const target = resolveWordingTarget(source.filePath, source.source, name, owner?.lib === lib ? { decision: owner.decision, criteria: new Set(criteria) } : undefined);
+      if (!target) return undefined;
+      const src = currentCel && findPolicySrc(currentCel);
+      const ownerPath = src ? relative(dirname(src), target.filePath) : "..";
+      const foreign = isAbsolute(ownerPath) || ownerPath === ".." || ownerPath.startsWith(".." + sep);
+      const dirty = vscode.workspace.textDocuments.some(d => d.uri.fsPath === target.filePath && d.isDirty);
+      return { ...target, editable: !foreign && !dirty, readOnlyReason: foreign ? "Wording belongs to an imported library. Its CRL owner must propose the change." : dirty ? "Save or revert the unsaved CRL edits, then re-pin to propose wording." : undefined };
+    }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer));
+    const leafMarks = leafBucketsFromQuestionnaire(q.questions, resolveKey, sv.conceptTruth, view.leafConcepts);
+    const selectedIds = new Set(route.nodeIds);
+    const marks = { yesKeys: leafMarks.yesKeys, noKeys: leafMarks.noKeys,
+      conditions: conditionTruthKeys(sv.tree, id => selectedIds.has(id) ? resolveKey(id) : undefined) };
+    const token = randomUUID();
+    const payload = { token, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
+      pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
+    pinnedCards = { token, epoch: indexVersion, caseId, routeId, payload, targets: built.targets };
+    void view.panel.webview.postMessage({ type: "routeCards", gen: view.gen, ...payload });
+    driveLeafMarks();
+  }
+  function hasPendingWording(): boolean { const src = currentCel && findPolicySrc(currentCel); if (!src) return false; const p = pendingPresentationProposals(src); return !!(p.pending || p.unreadable); }
+  function proposeCard(msg: { token?: unknown; key?: string; fields?: unknown }): void {
+    const pin = pinnedCards, view = views.get("tree");
+    if (!pin || !view || pin.epoch !== indexVersion || msg.token !== pin.token || !msg.key || mode !== "medical-validation") return;
+    const target = pin.targets.get(msg.key), fields = msg.fields as { questionText?: unknown; questionDescription?: unknown } | undefined;
+    if (!target || typeof fields?.questionText !== "string" || typeof fields.questionDescription !== "string") return;
+    try {
+      const src = currentCel && findPolicySrc(currentCel);
+      if (!src) throw new Error("No policy MV scope is available.");
+      const dirty = vscode.workspace.textDocuments.some(d => d.uri.fsPath === target.filePath && d.isDirty);
+      if (dirty) throw new Error("Save or revert the unsaved CRL edits, then re-pin to propose wording.");
+      if (crlText(target.filePath) !== target.baseline) throw new Error("The CRL changed since this card was pinned. Re-pin before proposing wording.");
+      const proposal = createPresentationProposal(target, fields.questionText, fields.questionDescription, src,
+        { caseId: pin.caseId, routeId: pin.routeId, unsavedBaseline: dirty });
+      const filePath = savePresentationProposal(src, proposal);
+      renderTreeChrome();
+      void view.panel.webview.postMessage({ type: "routeCardProposalResult", gen: view.gen, token: pin.token, key: msg.key, ok: true,
+        message: `MV patch saved: ${basename(filePath)}. Awaiting the CRL owner and re-emit.` });
+    } catch (error) { void view.panel.webview.postMessage({ type: "routeCardProposalResult", gen: view.gen, token: pin.token, key: msg.key, ok: false, message: String(error instanceof Error ? error.message : error) }); }
+  }
+
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown; assignments?: unknown; dirty?: unknown; epoch?: unknown },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown; assignments?: unknown; dirty?: unknown; epoch?: unknown; caseId?: string; routeId?: string },
   ): void {
     const v = views.get(pane);
     if (!v) return;
+    if (pane === "tree" && msg.gen === v.gen) {
+      if (msg.type === "pinRoute" && typeof msg.caseId === "string" && typeof msg.routeId === "string") { pinCards(msg.caseId, msg.routeId); return; }
+      if (msg.type === "unpinRoute") { pinnedCards = undefined; driveLeafMarks(); return; }
+      if (msg.type === "routeCardProposal") { proposeCard(msg); return; }
+      if (msg.type === "routeCardSource" && pinnedCards && pinnedCards.token === msg.token && pinnedCards.epoch === indexVersion) {
+        const card = pinnedCards.payload.cards.find((c: any) => c.id === msg.key);
+        if (card && crlMaps) { const units = unitsForRow(card.ownerKey, crlMaps); if (units[0]) postReveal("source", { kind: "unit", id: units[0] }); else flagNote("No source correspondence for this condition."); }
+        return;
+      }
+    }
     if (msg.type === "ready" && typeof msg.gen === "number") {
       if (msg.gen !== v.gen) return; // superseded render's ack
       v.acked = true;
@@ -2380,6 +2504,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // through the `if (opened && state.selection) dispatch(...)` path in reconcilePaneOrder.
       if (pane === "tree") {
         renderTreeChrome();
+        if (pinnedCards?.epoch === indexVersion) void v.panel.webview.postMessage({ type: "routeCards", gen: v.gen, ...pinnedCards.payload });
         // #156 slice 5 / #210: a freshly-(re)rendered tree loses its verdict classes (innerHTML replaced) — re-post the MV
         // review overlay on ack so the at-rest verdict painting survives a render. (The failed-criterion overlay
         // re-applies via the selection-driven dispatch path; the review overlay is selection-INDEPENDENT, so it re-drives here.)
@@ -2554,6 +2679,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         if (isCriterionOccurrenceHit(hit)) return;
         // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
         const p = state.primary;
+        if (mode === "medical-validation" && p === "cel" && "nodeKey" in hit) {
+          selectRoutesThroughNode(hit.nodeKey);
+          return;
+        }
         // record the open-raw locus only for a source-span click while source-primary
         lastClicked = "unitId" in hit && p === "source" ? { unitId: hit.unitId, range: hit.range } : undefined;
         selectInPrimary(mapHitToPrimary(hit, p, crlMaps), p);
@@ -2594,7 +2723,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if ("unitId" in hit)
       return primary === "source" ? [hit.unitId] : primary === "crl" ? rowNodeKeysForUnit(hit.unitId, m) : caseIdsForUnit(hit.unitId, m);
     if ("nodeKey" in hit)
-      return primary === "crl" ? [hit.nodeKey] : primary === "source" ? unitsForRow(hit.nodeKey, m) : caseIdsForNode(hit.nodeKey, m);
+      return primary === "crl" ? [hit.nodeKey] : primary === "source" ? unitsForRow(hit.nodeKey, m)
+        : mode === "medical-validation" ? [...scenarioByCaseId.keys()].filter(id => routesForCase(id).some(r => r.nodeKeys.includes(hit.nodeKey))) : caseIdsForNode(hit.nodeKey, m);
     return primary === "cel"
       ? [hit.caseId]
       : primary === "source"
@@ -2701,13 +2831,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function rebuild(): void {
     if (!currentCel) return;
     const d = discoverProvenance(currentCel);
-    if (!d.found) {
-      resetToEmpty(`${basename(currentCel)}: ${d.reason}`);
-      return;
-    }
     try {
-      const cm = buildCockpitModel(d.artifactPath, currentCel, d.anchorPath, PANEL_VALIDATION_MODE); // resolve ONCE → corr + structure + scenarios
-      correspondence = cm.correspondence;
+      const graph = resolveCelImports(currentCel);
+      const cm = buildExecutionModel(graph);
+      wordingSources = graphWordingSources(graph);
+      correspondence = undefined;
+      model = undefined;
+      if (d.found) {
+        try { correspondence = buildCockpitModel(d.artifactPath, currentCel, d.anchorPath, PANEL_VALIDATION_MODE).correspondence; model = buildViewerModel(correspondence); }
+        catch (error) { console.warn("[crl.mv] Source correspondence unavailable", error); }
+      }
+      pinnedCards = undefined;
       crlStructure = cm.crlStructure;
       conceptLayer = cm.conceptLayer;
       conceptShape = cm.conceptShape; // #187 Todo 3
@@ -2728,9 +2862,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         console.warn(
           `[crl.cockpit] CEL has cases sharing a name (${cm.caseNameCollisions.join(", ")}) — those cases render but aren't cross-pane reveal targets; give each a distinct name.`,
         );
-      model = buildViewerModel(cm.correspondence);
+
     } catch (e) {
-      resetToEmpty(`Failed to build provenance: ${e instanceof Error ? e.message : String(e)}`);
+      resetToEmpty(`Failed to build CRL/CEL model: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
     indexVersion += 1;
@@ -2754,7 +2888,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     ]);
     // #163 at-rest key: number units by model.steps order (= nav order); precompute the CRL-row + CEL-case number lists
     // (branch-scoped for rows). Cached so the showKeys toggle re-renders without rebuilding. Only non-empty entries stored.
-    unitNumber = new Map(model.steps.map((s, i) => [s.unitId, i + 1]));
+    unitNumber = new Map((model?.steps ?? []).map((s, i) => [s.unitId, i + 1]));
     rowKeyNumbers = {};
     const numberRows = (nodes: CrlStructureNode[]): void => {
       for (const n of nodes) {
@@ -5108,7 +5242,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           progress: { total: progress.total, passed: progress.passed, failed: progress.failed, pending: progress.pending, unreviewable: progress.unreviewable, stale: progress.stale },
           // #224 ii.3 Slice 2b: the agent's perceived gate must ALSO honor the criterion half (else it reports "complete"
           // while a criterion encoding is unreviewed/wrong/stale). Same live-identities tally the chrome uses.
-          mvComplete: mvComplete(progress, fc, criterionProgress(buildLiveCriterionIdentities(), criterionVerdicts)),
+          mvComplete: !hasPendingWording() && mvComplete(progress, fc, criterionProgress(buildLiveCriterionIdentities(), criterionVerdicts)),
           cases,
           flags,
           flagStateError: flagStateErrorSnapshot,
@@ -5519,7 +5653,7 @@ body:has(.flag-drawer) .flow-zoom{display:none}
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
@@ -5582,7 +5716,11 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // mark/clearLeaves, NEVER by the selection REVEAL (highlight/clearHighlight) — so a leaf's tick survives a reveal within
   // the focused case. (The host re-drives per focused case: it clears in lockstep with the questionnaire when no case is
   // focused — the this-node/diverter lifecycle, driven by focusedScenario — NOT the case-independent done-overlay one.)
-  `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no')){el.classList.remove('flow-leaf-yes');el.classList.remove('flow-leaf-no');}};` +
+  `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
+  `let pinnedFlowKey='',pinnedRouteKeys=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
+  `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,applyZoom);` +
+  `const applyFlowPin=()=>{const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey?'Pinned route: '+pinnedRouteLabel+(pinnedRouteLabel!==currentRouteLabel?' (selection is now '+(currentRouteLabel||'another case')+')':''):'';if(!pinnedFlowKey)return;const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');};` +
+  `const toggleFlowPin=k=>{if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();}else{if(!currentRouteKeys.includes(k))return;v.postMessage({type:'pinRoute',gen,caseId:currentRouteCase,routeId:currentRouteId});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
   // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
@@ -5593,7 +5731,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;applyZoom();` +
+  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
@@ -5691,8 +5829,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='clearLeaves'){clrLeaf();}` +
-  `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();}` +
+  `else if(m.type==='routeCardProposalResult'){if(m.gen===gen)routeCardUi.result(m);}` +
+  `else if(m.type==='clearLeaves'){clrLeaf();for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');}` +
+  `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();currentRouteKeys=m.routeKeys||[];currentRouteLabel=m.routeLabel||'';currentRouteCase=m.routeCaseId||'';currentRouteId=m.routeId||'';applyFlowPin();if(pinnedFlowKey&&m.pinnedMarks)Object.assign(m,m.pinnedMarks);` +
+  `for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');for(const id of (m.pinLeafIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-pin-available');}` +
+  `for(const c of (m.conditions||[])){if(!['true','false','unknown'].includes(c.result))continue;for(const id of c.ids){const el=document.getElementById(id);if(el)el.classList.add('flow-condition-'+c.result);}}` +
   `for(const id of (m.yesIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-yes');}` +
   `for(const id of (m.noIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-no');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
@@ -5813,10 +5955,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #224 ii.3 Slice 2 / #233 Todo 2a: a criterion collapse chevron (▸/▾) — intercepted BEFORE [data-reveal] (the chevron
   // <g> is nested in the row's data-reveal); posts the opaque reveal key, the host resolves it → a ROOT criterion's `when`
   // nodeKey OR a NON-ROOT criterion's `{criterionToggle}` position key, then flips collapse + re-renders.
+  `const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(fp){e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);return;}` +
   `const ct=e.target.closest&&e.target.closest('[data-toggle-crit]');` +
   `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',key:ct.getAttribute('data-toggle-crit')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
+  `document.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(!fp)return;e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);});` +
   // #217: RIGHT-CLICK a flow node → the host opens a verdict quick-pick for the case(s) whose fired path runs through it.
   // Gate: MV mode (live `data-mode`) + inside `.flow-svg` (the FLOW/tree pane ONLY — the script is shared by every pane, so
   // without this we'd `preventDefault` the native menu in source/cel/worklist too) + a `.flow-row[data-reveal]` (a rendered

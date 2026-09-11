@@ -1,16 +1,10 @@
 // Pure, vscode-free `buildQuestionnaire` — the heart of the read-only Medical Validation questionnaire panel.
-// #187 Todo 3: it now renders the FULL first:-chain question surface (not the pruned fired path) so the panel is
-// FAITHFUL to what the emitted PlanDefinition asks under `$apply`: on-path decisions RECURSE, `first:`-preempted
-// siblings show DIMMED (terminal), an inferred composite `when` EXPANDS its `defined as` leaves (from the shipped
-// `conceptShape`), and every row shows a case-derived answer (on-path from the run; off-path from `conceptTruth`).
-// Design authority: .vibe-tools/discussions/193-mv-panes-todo3-questionnaire-render-plan.md (+ its round-1 review).
+// Show the selected case's reached questions, including false conditions that route to another branch and
+// unknowns that explain a pause. Skip preempted conditions even when the case supplies values for them.
+// Retain the operands of reached calculated conditions as explanations. Parallel evaluated paths remain visible.
+// This is a CRL execution explanation, not a projection of the native FHIR Questionnaire.
 //
-// SCOPE — the "full first:-chain surface": on-path recursion + reached siblings (evaluated, shown) + first:-preempted
-// siblings (dimmed terminal). A `when` in an UNREACHED subtree (under a terminal parent) is NOT shown (the parent is
-// terminal) — by design. Leaf expansion fires ONLY for an ON-PATH (recursed) composite `when`.
-//
-// ANSWER SOURCING (MIX, disc 193 Q2): an EVALUATED `when` shows `condition.satisfied` (what actually FIRED); a PREEMPTED
-// `when` + an expanded LEAF show `conceptTruth` — absent ⇒ UNKNOWN (render blank), NEVER "no" (the Todo-2 contract).
+// Row answers come from evaluated conditions. Expanded definition operands use conceptTruth; absent means unknown.
 //
 // NAV/GROUNDING (disc 193 Q4/Q5): only RUNTIME rows (whens + the blocked guard) are nav-stops + cross-pane markable
 // (their `nodeId` grounds in `sv.tree` via `resolveThisNode`). Expanded LEAF rows render but are NOT nav-stops — a
@@ -61,12 +55,12 @@ export type QExpr =
    *  criterion wraps recursively. */
   | { kind: "criterion"; name: string; answer: "yes" | "no" | "unknown"; blocking?: boolean; body?: QExpr };
 
-/** How a row was reached — drives dimming (`preempted` ⇒ dim) and is future-proof for unreached rows. */
-export type Reach = "evaluated" | "preempted";
+/** Only reached runtime conditions become question rows. */
+export type Reach = "evaluated";
 /** What KIND of row this is — drives nav-stop + diverter eligibility + the leaf/guard render. */
-export type RowKind = "when-evaluated" | "when-preempted" | "guard";
+export type RowKind = "when-evaluated" | "guard";
 
-/** A single question row on the FULL surface. */
+/** A reached question row in the selected case's execution. */
 export interface Question {
   /** The runtime nodeId (a `when`/guard row — grounds cross-pane) OR a synthetic `<parentNodeId>|<nodeKey>` (a leaf). */
   nodeId: string;
@@ -76,7 +70,7 @@ export interface Question {
   libraryName?: string;
   valueType: ConceptValueType | null;
   options: string[];
-  /** "yes"/"no" — the case's answer; "unknown" — no conceptTruth for an off-path row (render blank); null — n/a. */
+  /** "yes"/"no" — the case's answer; "unknown" — the reached condition has no determination; null — n/a. */
   answer: "yes" | "no" | "unknown" | null;
   isBoolean: boolean;
   /** Indent level — DECISION nesting / guard depth only (composite operands render inside `expansion`, not as flat rows). */
@@ -91,14 +85,11 @@ export interface Question {
   isNavStop: boolean;
   /** An evaluated on-path `when` — the ONLY rows `producedPathDiverterIds` may light (never a leaf/preempted row). */
   diverterEligible: boolean;
-  /** #187 Option-3: on an ON-PATH-SATISFIED composite (single-ref `defined as`) `when`, its `defined as` operator tree
-   *  (ANY OF / ALL OF boxes). #224 i.4c: ALSO the per-atom case-feature box of a COMPOUND guard at EVERY evaluated
-   *  state — satisfied, failed, OR preempted (blocking styling only when it failed; satisfied/preempted read
-   *  informational). Absent for a non-composite single-ref / an off-path when (those stay flat rows). */
+  /** The retained condition's authored explanation. Preserve all operands, including unknowns.
+   * Definition operands use whole-case concept values as explanatory context; they do not claim separate runtime questions.
+   * The static structure supplies qualified identities absent from the composition trace. */
   expansion?: QExpr;
-  /** #224 i.4c: which KIND of `expansion` this is — a `defined as` representation-disjunction ("defined-as", the
-   *  default, gets a forced top `or` chip) vs a decision guard's boolean tree ("guard", rendered with NO forced `or`
-   *  chip: `and`→ALL OF, `or`→ANY OF as authored). Present only when `expansion` is. */
+  /** Definition body or decision guard; both preserve only authored connectives. */
   expansionKind?: "defined-as" | "guard";
   source?: ViewNode["source"];
 }
@@ -112,9 +103,8 @@ export interface Questionnaire {
 
 /**
  * The produced-path DIVERTERS — the evaluated-false ("no") on-path `when`s that routed the case to its produced
- * disposition, IFF something was produced. #187 Todo 3: on the FULL surface a "no" answer also appears on preempted
- * whens + composite leaves, which are NOT diverters — so filter on `diverterEligible` (evaluated on-path `when` only),
- * never on the answer alone. Reuses the ONE fired-path authority (`buildQuestionnaire`) — no second walk.
+ * disposition, IFF something was produced. Use diverterEligible to exclude action guards and explanation operands,
+ * never the answer alone. Reuses the ONE fired-path authority (`buildQuestionnaire`) — no second walk.
  */
 export function producedPathDiverterIds(q: Questionnaire): string[] {
   if (q.outcome === null) return [];
@@ -129,7 +119,7 @@ export type ResolveConceptShape = (lib: string | undefined, name: string) => Con
 export type ResolveDefExpr = (lib: string | undefined, name: string) => DefExprEntry | undefined;
 
 /**
- * Reconstruct the FULL first:-chain question surface of a rendered scenario.
+ * Reconstruct the reached question surface of a rendered scenario.
  *
  * @param sv               the rendered scenario (a real `ScenarioViewModel`; carries `conceptTruth`).
  * @param resolveValueTypes injected concept→value-types resolver (frame-aware).
@@ -141,9 +131,9 @@ export function buildQuestionnaire(
   sv: ScenarioViewModel,
   resolveValueTypes: ResolveValueTypes,
   rootLib: string | undefined,
-  opts: { conceptShape?: ResolveConceptShape; defExpr?: ResolveDefExpr } = {},
+  opts: { conceptShape?: ResolveConceptShape; defExpr?: ResolveDefExpr; inspectAttemptedRoute?: boolean } = {},
 ): Questionnaire {
-  if (sv.status === "error" && !sv.discardedUnknown) {
+  if (sv.status === "error" && !sv.discardedUnknown && !opts.inspectAttemptedRoute) {
     return { questions: [], outcome: null, terminalKind: "error", note: sv.diagnostics[0] ?? "evaluation error" };
   }
 
@@ -163,7 +153,7 @@ export function buildQuestionnaire(
 
   const shapeOf = (lib: string, name: string): ConceptShapeNode | undefined => opts.conceptShape?.(lib, name);
 
-  // Emit a runtime `when` (or guard) row. `evaluatedSat` present ⇒ show what FIRED; absent ⇒ off-path `conceptTruth`.
+  // Emit a runtime `when` (or guard) row. Missing evaluation stays unknown, regardless of whole-case conceptTruth.
   // Returns the pushed Question so an on-path composite can attach its `expansion` (the ANY OF / ALL OF box tree).
   const emitWhen = (
     concept: { name: string; libraryName?: string },
@@ -178,7 +168,7 @@ export function buildQuestionnaire(
     const valueTypes = resolveValueTypes(lib, concept.name);
     const shape = shapeOf(lib, concept.name);
     const answer: Question["answer"] =
-      evaluatedSat !== undefined ? (evaluatedSat ? "yes" : "no") : truthAnswer(lib, concept.name);
+      evaluatedSat !== undefined ? (evaluatedSat ? "yes" : "no") : "unknown";
     const q: Question = {
       nodeId: node.nodeId,
       conceptName: concept.name,
@@ -258,9 +248,7 @@ export function buildQuestionnaire(
     if (!opts.defExpr) return;
     const lib = concept.libraryName ?? frameLib ?? "";
     const entry = opts.defExpr(lib, concept.name);
-    // The `expansion` is the RAW operator tree (the ALL OF / ANY OF structure is unchanged). `defined as` is a disjunction
-    // of alternative representations, but that top-level `or` is a RENDER annotation (a forced `or` chip above the body —
-    // see renderExpansion), NOT an extra box — so a top-level `and` shows `or` then its ALL OF, one compound alternative.
+    // Preserve the authored body; the renderer adds no implicit representation operator.
     if (entry?.hasDefinedAs && entry.body) {
       q.expansion = enrich(buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1));
       q.expansionKind = "defined-as";
@@ -349,7 +337,7 @@ export function buildQuestionnaire(
     const atomFailed = negated ? expr.satisfied === true : expr.satisfied === false;
     if (branchFalse && atomFailed && !underSatisfiedOr) leaf.blocking = true;
     // A composite atom (its own `defined as`) is answerable AND expandable → nest its body via the SHARED positional
-    // builder (a representation-disjunction — the forced top `or` chip is CORRECT for it, unlike the guard-box top).
+    // builder, preserving the authored operators.
     if (opts.defExpr) {
       const entry = opts.defExpr(lib, name);
       if (entry?.hasDefinedAs && entry.body) {
@@ -388,15 +376,11 @@ export function buildQuestionnaire(
         // representation path; a criterion is a guard, not a representation-disjunction).
         const isSingleRef = cond.expr.op === "ref";
         if (node.unreachedReason === "preempted") {
-          // first:-preempted sibling → DIMMED terminal; case answer from conceptTruth (off-path). No recurse.
-          const wq = emitWhen(guardConcept, node, frameLib, depth, "when-preempted", "preempted", undefined);
-          // #224 i.4c: a COMPOUND preempted guard shows its per-atom case-feature box (informational — never
-          // evaluated, so no blocking). A single-ref preempted stays a flat row (pre-#224).
-          if (!isSingleRef) attachGuardStruct(wq, cond, frameLib);
+          // A supplied value does not make a skipped condition part of the selected route. No recurse.
           continue;
         }
         // REFACTOR:grounded (#320): a reached unknown is not an established false or a disposition.
-        if (node.unknown) {
+        if (node.unknown || (opts.inspectAttemptedRoute && node.evaluated && (node.invalidated || node.publicationErrors?.length))) {
           hasUnknown = true;
           const q = emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", undefined);
           q.answer = "unknown";
@@ -421,7 +405,8 @@ export function buildQuestionnaire(
           // reached-and-false → terminal (shows what fired); no recurse.
           const wq = emitWhen(guardConcept, node, frameLib, depth, "when-evaluated", "evaluated", false);
           // #224 i.4c: a COMPOUND failed guard shows WHICH atoms blocked it (per-atom box, blocking styling).
-          if (!isSingleRef) attachGuardStruct(wq, cond, frameLib);
+          if (isSingleRef) attachExpansion(wq, guardConcept, frameLib);
+          else attachGuardStruct(wq, cond, frameLib);
           continue;
         }
         continue; // unevaluated, non-preempted (unreached subtree under a terminal parent) → not on the surface
@@ -463,7 +448,7 @@ export function buildQuestionnaire(
     } else {
       const picked = produced.find((p) => p.label === sv.expected?.branch) ?? produced[0];
       activity = displayDetermination(picked.label);
-      note = `multiple produced; showing ${activity}`;
+      note = `multiple produced; showing ${activity}; ${produced.length} activities produced; questions include all reached conditions`;
     }
     const terminalKind = questions.length === 0 ? "empty" : "produced";
     if (sv.discardedUnknown) note = [note, "CRE capability limit: a reached legacy guard discarded unknown evidence; this is not complete menu or pause verification."].filter(Boolean).join("; ");

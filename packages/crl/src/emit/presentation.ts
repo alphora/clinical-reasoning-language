@@ -73,7 +73,12 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
       ? getRefName(scope.ref) === context.decision : context.criteria.has(getRefName(scope.ref))).map(() => p)) : [];
     const findings: PresentationDiagnostic[] = matches.length > 1 ? [{ kind: "presentation-overlap", severity: "error", libraryName: ast.library.name, filePath,
         message: `Concept "${name}" has overlapping presentation scopes in decision "${context!.decision}". Remove redundant scopes (for example a criterion already covered by its decision) so only one scoped presentation applies.`, location: matches[1].location }] : [];
-    return { wording: { ...fields(defaults), ...(matches.length === 1 ? fields(matches[0]) : {}) }, diagnostics: findings };
+    // REFACTOR:grounded (MV cards): retain the authored source of each merged field.
+    const scoped = matches.length === 1 ? matches[0] : undefined;
+    return { wording: { ...fields(defaults), ...fields(scoped) }, diagnostics: findings,
+      declaration: scoped ?? defaults,
+      fieldOwners: { questionText: scoped?.questionText !== undefined ? scoped : defaults,
+        questionDescription: scoped?.questionDescription !== undefined ? scoped : defaults } };
 
   };
   const resolve = (name: string, context?: PresentationContext): PresentationText => resolveOccurrence(name, context).wording;
