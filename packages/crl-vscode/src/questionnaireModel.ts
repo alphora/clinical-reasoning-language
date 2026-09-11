@@ -53,7 +53,7 @@ export type QExpr =
    *  per case (later occurrences are `reference`s), so a reused criterion in a later branch renders as a collapsed
    *  named row with its answer but no expandable body. When present the atoms live inside `body`, and a NESTED
    *  criterion wraps recursively. */
-  | { kind: "criterion"; name: string; answer: "yes" | "no" | "unknown"; blocking?: boolean; body?: QExpr };
+  | { kind: "criterion"; name: string; lib: string; answer: "yes" | "no" | "unknown"; blocking?: boolean; body?: QExpr };
 
 /** Only reached runtime conditions become question rows. */
 export type Reach = "evaluated";
@@ -296,6 +296,7 @@ export function buildQuestionnaire(
       const node: Extract<QExpr, { kind: "criterion" }> = {
         kind: "criterion",
         name: expr.criterion.name,
+        lib: expr.criterion.libraryName ?? frameLib ?? "",
         answer,
         ...(expr.body ? { body: buildStructural(expr.body, frameLib, branchFalse, underSatisfiedOr, negated) } : {}),
       };

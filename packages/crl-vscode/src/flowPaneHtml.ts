@@ -15,6 +15,7 @@
 // (closest('[data-reveal]')) resolve to one element.
 import { buildDefStruct, displayDetermination, topCriterion, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 import { projectFlowStructure, type ProjectedFlowNode } from "./flowProjection";
+import { definitionValueInputs } from "./routeCards";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
  *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
@@ -298,6 +299,7 @@ function buildLaid(
   let slot = 0;
   let maxDepth = 0;
   const outlineX = (whenLeft: number, indent: number): number => whenLeft + OUTLINE_BASE + indent * OUTLINE_INDENT;
+  const valueInputs = definitionValueInputs([...conceptMap.values()]);
 
   const conceptFields = (refKey: string | undefined): Pick<LaidNode, "conceptKey" | "conceptName" | "conceptLib" | "isSource"> => {
     if (refKey === undefined) return {};
@@ -312,7 +314,7 @@ function buildLaid(
   // the bottom of the branch-body band. Each visible row (op label / leaf / external / more) takes ONE compact row (DFS
   // pre-order: a header before its children) at an INDENT-based `absX`. `opPath` is the positional index path — the same
   // concept at two positions gets DISTINCT `leaf::` keys (no anchor/verdict collision). `topWhenKey` threads to every leaf.
-  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }): LaidNode => {
+  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }, inputSeen = new Set<string>()): LaidNode => {
     const base = { useDecision: false, outline: true as const, indent, absX: outlineX(whenLeft, indent), depth: 0, topWhenKey };
     const take = (): number => {
       const y = cursor.y;
@@ -343,6 +345,7 @@ function buildLaid(
       case "leaf": {
         const y = take();
         const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, indent + 1, `${opPath}.c`, cursor)] : [];
+        children.push(...buildInputs(s.lib, s.name, whenLeft, topWhenKey, indent + 1, `${opPath}.inputs`, cursor, inputSeen));
         // ⭐ #189: a concept with `value from:` options is a CODED QUESTION. Expanding it shows the answers,
         // POSITION-keyed like a criterion and default-COLLAPSED, so a wide option set never bloats the tree
         // until a reviewer asks for it. Reuses the criterion toggle channel with its own key prefix.
@@ -413,6 +416,18 @@ function buildLaid(
         };
       }
     }
+  };
+
+  // Value helpers have data dependencies, not Boolean operands. Keep those inputs
+  // addressable at their own occurrence so their question never migrates to the helper.
+  const buildInputs = (lib: string, name: string, left: number, whenKey: string, indent: number, path: string, cursor: {y:number}, seen = new Set<string>()): LaidNode[] => {
+    const key = JSON.stringify([lib,name]);
+    if (seen.has(key)) return [];
+    const inputs = valueInputs(lib,name);
+    if (!inputs.length) return [];
+    const y = cursor.y; cursor.y += OUTLINE_ADVANCE;
+    const children = inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+1, `${path}.${i}`, cursor, new Set([...seen,key])));
+    return [{nodeKey:outlineKey(whenKey,path,"inputs"),kind:"leaf",useDecision:false,outline:true,outlineRow:"op",indent,absX:outlineX(left,indent),depth:0,topWhenKey:whenKey,label:"input",full:"Input to this condition",y,children}];
   };
 
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
@@ -516,6 +531,11 @@ function buildLaid(
         outlineRoots.push(buildOutline(wrapped, whenLeft, n.nodeKey, 0, "0", cursor));
         slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling doesn't overlap it
       }
+    }
+    if (!outlineRoots.length && cf.conceptName && cf.conceptLib) {
+      const cursor = {y:nodeY + (NODE_H * 1.5) / ROW};
+      outlineRoots.push(...buildInputs(cf.conceptLib,cf.conceptName,PAD+depth*COL,n.nodeKey,0,"inputs",cursor));
+      if (outlineRoots.length) slot = Math.max(slot,cursor.y);
     }
     // ⭐⭐ #189 — THE CANONICAL SHAPE, which BOTH branches above decline.
     //
@@ -936,6 +956,12 @@ export function renderFlowPane(
   for (const [i, n] of all.entries()) {
     const id = `${prefix}flow${i}`;
     const metadata = ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
+      ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
+      (n.criterionCollapse ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.criterionCollapse.lib,n.criterionCollapse.name]))}"` : "") +
+      (n.critRow ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.critRow.lib,n.critRow.name]))}"` : "") +
+      (n.isSource && n.conceptName && n.conceptLib ? ` data-flow-question="${escapeHtml(JSON.stringify([n.conceptLib,n.conceptName]))}"` : "") +
+      (n.criterionCollapse?.collapsed ? ` data-flow-hidden-criterion="${escapeHtml(JSON.stringify([n.criterionCollapse.lib,n.criterionCollapse.name]))}"` : "") +
+      (n.critRow?.collapsed ? ` data-flow-hidden-criterion="${escapeHtml(JSON.stringify([n.critRow.lib,n.critRow.name]))}"` : "") +
       (n.outline ? ` data-flow-outline="1"` : "") +
       (n.delegatedDecisionKey ? ` data-flow-target="${escapeHtml(n.delegatedDecisionKey)}"` : "");
     body = body.replace(`<g id="${escapeHtml(id)}"`, `<g id="${escapeHtml(id)}"${metadata}`);
@@ -1005,26 +1031,20 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
   if (mode !== "medical-validation") return "";
   const chip = (cls: string, label: string, gap: boolean): string =>
     `<span class="fc-lg${gap ? " fc-lg-gap" : ""}"><i class="fc-sw ${cls}" aria-hidden="true"></i>${label}</span>`;
-  return (
-    `<div class="fc-legend" role="group" aria-label="Tree color key: green fill Pass, red fill Fail, yellow fill Pending, purple border Inferred, blue ring Selected path, green connector Condition true, red connector Condition false, question mark Unanswered">` +
-    chip("fc-sw-pass", "Pass", false) +
-    chip("fc-sw-fail", "Fail", false) +
-    chip("fc-sw-pending", "Pending", false) +
-    chip("fc-sw-inferred", "Inferred", true) + // fc-lg-gap → 3 visual concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path]
-    chip("fc-sw-ring", "Selected path", true) +
-    `<span class="fc-lg fc-lg-gap"><i class="fc-sw fc-sw-true" aria-hidden="true"></i>Condition true</span>` +
-    `<span class="fc-lg"><i class="fc-sw fc-sw-false" aria-hidden="true"></i>Condition false</span><span class="fc-lg">? Unanswered</span>` +
-    `</div>`
-  );
+  return `<div class="fc-legend" role="group" aria-label="Tree color key">` +
+    `<span class="fc-legend-group"><b>Review</b>`+chip("fc-sw-pass","Pass",false)+chip("fc-sw-fail","Fail",false)+chip("fc-sw-pending","Pending",false)+`</span>`+
+    `<span class="fc-legend-group"><b>Condition</b>`+chip("fc-sw-true","True",false)+chip("fc-sw-false","False",false)+`<span class="fc-lg">? Unanswered</span></span>`+
+    `<span class="fc-legend-group">`+chip("fc-sw-inferred","Inferred",false)+chip("fc-sw-ring","Selected path",false)+`</span></div>`;
+
 }
 
 export const FLOW_STYLE =
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pin-available>.flow-pin,.flow-pinned>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
-  `.fc-sw-true{border:2px solid var(--vscode-testing-iconPassed,#3fb950);border-radius:50%}.fc-sw-false{border:2px solid var(--vscode-editorError-foreground,#f14c4c);border-radius:50%}` +
+  `.fc-legend .fc-sw.fc-sw-true,.fc-legend .fc-sw.fc-sw-false{width:16px;height:2px;background:#fff;border:0;box-shadow:0 0 3px 1px #3fb950}.fc-legend .fc-sw.fc-sw-false{box-shadow:0 0 3px 1px #f14c4c}` +
   `.flow-fallback{display:none}.flow-truth-unknown,.flow-false-stop{display:none;pointer-events:none}` +
-  `.flow-edge.flow-condition-true{stroke:var(--vscode-testing-iconPassed,#3fb950)}` +
-  `.flow-edge.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:var(--vscode-editorError-foreground,#f14c4c)}` +
+  `.flow-edge.flow-condition-true{stroke:#fff;filter:drop-shadow(0 0 1.5px #3fb950) drop-shadow(0 0 2px #3fb950)}` +
+  `.flow-edge.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `.flow-condition-false>.flow-false-stop{display:inline;fill:none;stroke-width:1.75;vector-effect:non-scaling-stroke}` +
   `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-charts-yellow,#d29922);font-weight:bold}` +
   `.flow-wrap{display:inline-block;min-width:100%}` +
@@ -1232,7 +1252,7 @@ export const FLOW_STYLE =
   // are a FILL at FULL opacity (the tree wash is `.2/.16` — invisible at 9px; the key decodes HUE, deliberately not alpha);
   // inferred/ring chips are a BORDER (mirroring the tree's stroke). Muted via the LABEL `color` only (NOT parent `opacity`,
   // which would fade the chips too). `fc-lg-gap` splits the row into 3 concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path].
-  `.fc-legend{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin-left:8px;font-size:.9em;color:var(--vscode-descriptionForeground,#8c8c8c)}` +
+  `.fc-legend{display:flex;flex-wrap:wrap;gap:8px 20px;padding:8px 0;font-size:11px;color:var(--vscode-descriptionForeground,#8c8c8c)}.fc-legend-group{display:inline-flex;gap:10px;align-items:center}.fc-legend-group b{font-weight:500;opacity:.7;margin-right:2px}` +
   `.fc-legend .fc-lg{display:inline-flex;align-items:center}` +
   `.fc-legend .fc-lg-gap{margin-left:8px}` +
   `.fc-legend .fc-sw{display:inline-block;width:9px;height:9px;margin-right:3px;border-radius:2px;box-sizing:border-box}` +

@@ -131,3 +131,26 @@ test('question eligibility and raw values do not depend on a presentation target
  const built=buildRouteCards(q,sv,id=>id,()=>undefined,()=>[],()=>[],(lib,name)=>name==='BMI');
  assert.equal(built.cards.length,1);assert.equal(built.cards[0].value,'31.5 kg/m2');assert.equal(built.cards[0].text,'BMI');assert.equal(built.cards[0].editable,false);
 });
+
+test('cards retain criterion identity separately from wording scope and question library',()=>{
+  const q={questions:[{nodeId:'w',conceptName:'Guard',libraryName:'L',answer:'yes',isInferred:true,expansion:{kind:'criterion',lib:'CriteriaLibrary',name:'Check',body:{kind:'leaf',lib:'QuestionLibrary',name:'Q',answer:'yes'}}}]};
+  const cards=buildRouteCards(q,{},()=> 'when-key',()=>undefined,()=>[],()=>[],(lib,name)=>name==='Q').cards;
+  assert.equal(cards.length,1);assert.equal(cards[0].ownerKey,'when-key');
+  assert.deepEqual(cards[0].criteria,[{lib:'CriteriaLibrary',name:'Check'}]);
+  assert.equal(cards[0].library,'QuestionLibrary');
+});
+
+test('shared question content retains every collapsed criterion ancestry',()=>{
+ const leaf={kind:'leaf',lib:'L',name:'Q',answer:'yes'};
+ const q={questions:[{nodeId:'w',conceptName:'Guard',libraryName:'L',answer:'yes',isInferred:true,expansion:{kind:'and',operands:[leaf,{kind:'criterion',lib:'L',name:'C1',body:leaf},{kind:'criterion',lib:'L',name:'C2',body:leaf}]}}]};
+ const cards=buildRouteCards(q,{},()=> 'when-key',()=>undefined,()=>[],()=>[],(lib,name)=>name==='Q').cards;
+ assert.equal(cards.length,1);assert.deepEqual(cards[0].criterionPaths,[[],[{lib:'L',name:'C1'}],[{lib:'L',name:'C2'}]]);
+});
+
+test('distinct criterion presentations remain separate even for the same input question',()=>{
+ const leaf={kind:'leaf',lib:'L',name:'Q',answer:'yes'};
+ const q={questions:[{nodeId:'w',conceptName:'Guard',libraryName:'L',answer:'yes',isInferred:true,expansion:{kind:'and',operands:[{kind:'criterion',lib:'L',name:'C1',body:leaf},{kind:'criterion',lib:'L',name:'C2',body:leaf}]}}]};
+ const built=buildRouteCards(q,{},()=> 'when-key',(lib,name,id,criteria)=>name==='Q'?{questionText:criteria[0]+' question?',questionDescription:'',context:{decision:'D',criteria}}:undefined,()=>[],()=>[],(lib,name)=>name==='Q');
+ assert.equal(built.cards.length,2);assert.deepEqual(built.cards.map(c=>c.text),['C1 question?','C2 question?']);
+ assert.equal(built.targets.size,2);
+});

@@ -698,7 +698,7 @@ check("#218 legend: MV mode renders exactly the operator's 3 concepts (verdict P
     assert.ok(mv.includes(`class="fc-sw ${cls}" aria-hidden="true"></i>${label}`), `${label} chip present + swatch aria-hidden`);
   assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
   // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
-  assert.equal((mv.match(/fc-lg-gap/g) || []).length, 3, "review, selection and condition outcomes have distinct legend groups");
+  assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 3, "review, selection and condition outcomes have distinct legend groups");
   assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
 });
 check("#218 legend: swatch tokens are the SAME shared consts as the paint — key can't drift from the tree (extracted-equality)", () => {
@@ -1158,4 +1158,22 @@ check("#189: a reference-terminology question points at its value set and offers
     Object.values(rr.reveals).filter((v) => v && "criterionToggle" in v).length, 0,
     "a chevron would promise a list we do not have",
   );
+});
+
+check("supporting coded inputs get their own question occurrence under direct and collapsed guards",()=>{
+  const concepts=[concept('c:H','Helper',{definitionKind:'definition-is',definitionRefs:['c:Q']}),concept('c:Q','Question',{hasLocalCode:true})];
+  const tree=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:H','when','when Helper',['c:H'],[])]}];
+  const direct=renderFlowPane(tree,{concepts});
+  assert.match(direct.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
+  assert.match(direct.html,/>INPUT</);
+  const body={kind:'criterion',name:'Check',lib:'Pol',bodyHash:'hash',operand:{kind:'leaf',nodeKey:'c:H',lib:'Pol',name:'Helper',isSource:false}};
+  const opts={concepts,guardOutlines:new Map([['w:H',{expr:body}]])};
+  const collapsed=renderFlowPane(tree,opts);
+  assert.match(collapsed.html,/data-flow-hidden-criterion="\[&quot;Pol&quot;,&quot;Check&quot;\]"/);
+  assert.ok(!collapsed.html.includes('data-flow-question='));
+  const expanded=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H'])});
+  assert.match(expanded.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
+  const options=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H']),answerOptionsByConcept:new Map([['c:Q',ANSWERS]])});
+  assert.match(options.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
+  assert.equal(optRows(options.html),0,'collapsed answer options do not hide the question');
 });
