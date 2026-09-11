@@ -77,7 +77,7 @@ test('an available value cannot disguise an invalidated unknown determination',(
     tree:[{nodeId:'w',kind:'when',evaluated:true,invalidated:true,condition:{satisfied:true,expr:{op:'ref',concept:{name:'Complaint',libraryName:'L'},satisfied:true}},children:[]}]};
   const q=buildRouteQuestionnaire(sv,{nodeIds:['w'],nodeKeys:['key:w'],gaps:[],terminalKind:'error'},()=>['boolean'],'L');
   assert.equal(q.questions[0].answer,'unknown');
-  const card=buildRouteCards(q,sv,()=> 'node',()=>undefined).cards[0];
+  const card=buildRouteCards(q,sv,()=> 'node',()=>({questionText:'Complaint?',questionDescription:'',editable:false})).cards[0];
   assert.equal(card.determination,'Unknown'); assert.match(card.value,/Determination: Unknown/); assert.match(card.value,/Available value: Yes/);
 });
 test('pending and malformed MV patches prevent completion, explicit dispositions clear the gate',()=>{
@@ -105,7 +105,9 @@ test('Bleph route includes coded supporting answers behind qualification helpers
   const route=executionRoutes(sv,cm.crlStructure)[0];
   const key=(lib,name)=>nodeKey(conceptDeclRef(lib,name)), concepts=new Map(cm.conceptLayer.map(c=>[c.nodeKey,c]));
   const q=buildRouteQuestionnaire(sv,route,(lib,name)=>concepts.get(key(lib,name))?.valueTypes??[],sv.decision.libraryName,{conceptShape:(lib,name)=>cm.conceptShape.get(key(lib,name)),defExpr:(lib,name)=>cm.defExpr.get(key(lib,name))});
-  const built=buildRouteCards(q,sv,()=> 'owner',()=>undefined,(lib,name)=>concepts.get(key(lib,name))?.answerOptions??[],definitionValueInputs(cm.conceptLayer));
+  const built=buildRouteCards(q,sv,()=> 'owner',()=>undefined,(lib,name)=>concepts.get(key(lib,name))?.answerOptions??[],definitionValueInputs(cm.conceptLayer),(lib,name)=>!!concepts.get(key(lib,name))?.hasLocalCode);
+  assert.ok(built.cards.every(c=>concepts.get(key(c.library,c.concept))?.hasLocalCode),'only answerable Case Features');
+  assert.equal(new Set(built.cards.map(c=>c.library+':'+c.concept)).size,built.cards.length,'no duplicate question on one owner');
   for(const name of ['Functional Or Reconstructive Surgical Indication','Documented Patient Complaint','Photographic Demonstration Submitted','Visual Field Demonstration Submitted']) {
     const card=built.cards.find(c=>c.concept===name);assert.ok(card,name);assert.ok(card.value.length);assert.notEqual(card.value,'Determination: True');assert.equal(card.determination,'');
   }
@@ -121,4 +123,11 @@ test('a coded inferred question retains its computed Quantity answer',()=>{
   const q={questions:[{nodeId:'w',conceptName:'BMI',libraryName:'L',answer:'yes',isInferred:true}]};
   const target={questionText:'What is the BMI?',questionDescription:'',editable:false};
   const card=buildRouteCards(q,sv,()=> 'node',()=>target).cards[0];assert.equal(card.value,'31.5 kg/m2');
+});
+
+test('question eligibility and raw values do not depend on a presentation target',()=>{
+ const sv={decision:{libraryName:'L'},conceptValues:[{libraryName:'L',name:'BMI',answerValue:{type:'Quantity',value:{value:31.5,unit:'kg/m2'}}}]};
+ const q={questions:[{nodeId:'w',conceptName:'BMI',libraryName:'L',answer:'yes',isInferred:true},{nodeId:'composite',conceptName:'Both',libraryName:'L',answer:'yes',isInferred:true}]};
+ const built=buildRouteCards(q,sv,id=>id,()=>undefined,()=>[],()=>[],(lib,name)=>name==='BMI');
+ assert.equal(built.cards.length,1);assert.equal(built.cards[0].value,'31.5 kg/m2');assert.equal(built.cards[0].text,'BMI');assert.equal(built.cards[0].editable,false);
 });

@@ -88,7 +88,7 @@ check("node shapes by kind (class counts)", () => {
   assert.equal(count("flow-when"), 3); // A, B, Z
   assert.equal(count("flow-activity"), 3); // X, Y, Q (recommend)
   assert.equal(count("flow-use"), 1); // D2 (use-decision)
-  assert.equal(count("flow-otherwise"), 1);
+  assert.equal(count("flow-fallback"), 1);
 });
 
 check("determination recommend leaf shows the KEY, not the dotted <category>.<key> (MV Tree is non-technical)", () => {
@@ -108,7 +108,7 @@ check("determination recommend leaf shows the KEY, not the dotted <category>.<ke
   const rr = renderFlowPane(struct, {});
   assert.match(rr.html, />Unmet</, "leaf renders the key 'Unmet'");
   assert.doesNotMatch(rr.html, /not-certify\.Unmet/, "no dotted <category>.<key> anywhere");
-  assert.match(rr.html, />No</, "fallback is a selectable No connector label");
+  assert.doesNotMatch(rr.html, />No</, "fallback identity has no visible label");
 });
 
 check("emits a sized <svg> with numeric intrinsic width/height (scrolls, not 100%)", () => {
@@ -271,10 +271,10 @@ check("deterministic: two renders of the same input are byte-identical", () => {
 });
 
 check("LAYOUT INVARIANT: no two nodes at the same depth (x) have overlapping y-boxes", () => {
-  const rects = [...r.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({
+  const rects = [...r.html.matchAll(/<g id="[^"]+"[^>]*><title>[^<]*<\/title><rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({
     x: +m[1], y: +m[2], h: +m[4],
   }));
-  assert.ok(rects.filter((rc) => rc.h === 44).length === STRUCT_KEYS.length, "one node rect (h=NODE_H=44) per structure node (a guard tab adds a shorter pill, excluded here)");
+  assert.ok(rects.filter((rc) => rc.h === 44).length === STRUCT_KEYS.length - 1, "one node rect per visible structure node; otherwise is only an identity");
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) {
@@ -308,10 +308,10 @@ check("INVARIANT: flow anchors cover EVERY structure nodeKey (the cockpit reuses
 });
 
 check("GOLDEN coords pin COL/ROW/midpoint/rounding (a uniform shift/scale would pass relative-only checks)", () => {
-  // d:D is the first node (flow0): depth 0 → x=14; its 5 branches occupy slots 0..4 → midpoint y=2 → round(14+2*58)=130 (ROW=58).
-  assert.match(r.html, /<g id="g1_flow0"[^>]* class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="130"/);
-  // a:X is depth 2 (decision→when→action), slot 0 → x=14+2*220=454, y=round(14+0)=14; box height NODE_H=44 (#208).
-  assert.ok(r.html.includes('<rect x="454" y="14" width="168" height="44"'), "depth-2 leaf at the expected column/row");
+  // d:D is the first node (flow0): depth 0 → x=32; its 5 branches occupy slots 0..4 → midpoint y=2 → round(32+2*58)=148 (ROW=58).
+  assert.match(r.html, /<g id="g1_flow0"[^>]* class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="32" y="148"/);
+  // a:X is depth 2 (decision→when→action), slot 0 → x=32+2*220=472, y=round(32+0)=32; box height NODE_H=44 (#208).
+  assert.ok(r.html.includes('<rect x="472" y="32" width="168" height="44"'), "depth-2 leaf at the expected column/row");
 });
 
 check("nested when-children (when → when → action) lay out without same-depth overlap", () => {
@@ -325,7 +325,7 @@ check("nested when-children (when → when → action) lay out without same-dept
       node("nq", "action", "Q", ["act:Q"], [], { actionKind: "recommend-activity" }),
     ],
   }], { concepts });
-  const rects = [...nested.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] })).filter((rc) => rc.w >= 100); // NODE rects only (excl. the start-node count-badge pill, w=44)
+  const rects = [...nested.html.matchAll(/<g id="[^"]+"[^>]*><title>[^<]*<\/title><rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] })).filter((rc) => rc.w >= 100); // NODE rects only (excl. the start-node count-badge pill, w=44)
   assert.equal(rects.length, 6); // d:N, nw1, nq, nw2, nx, ny; No is a compact connector badge
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
@@ -425,7 +425,8 @@ check("Option-C: a nested composite operand indents DEEPER + rows never overlap 
   const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g4_", defExpr: defExprOf(map) });
   const leafX = (name) => +rr.html.match(new RegExp(`<rect x="(\\d+)"[^>]*/><text[^>]*>${name}</text>`))[1];
   assert.ok(leafX("La") > leafX("L"), "the nested operand La indents DEEPER than its parent leaf L");
-  const rects = [...rr.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], h: +m[4] }));
+  const rects = [...rr.html.matchAll(/<g id="[^"]+"[^>]*><title>[^<]*<\/title><rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], h: +m[4] }));
+  assert.ok(rects.filter(r=>r.h<44).length>=2,"nested outline bodies participate in overlap check");
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) { col.sort((a, b) => a.y - b.y); for (let i = 1; i < col.length; i++) assert.ok(col[i].y >= col[i - 1].y + col[i - 1].h, `overlap at x=${col[i].x}`); }
@@ -637,8 +638,8 @@ check("Todo 3b: a sub-question looks like a main question — SOLID grey (source
   // the grey-hide + thicken sit BEFORE the overlay stroke channels (so this-node/failed-criterion still win the stroke).
   assert.ok(FLOW_STYLE.indexOf(".flow-greyborder.current>rect") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"), "the grey-hide is ordered before .this-node (overlay wins on a grey on-path node that's also the focused question)");
   // connectors thicker (hard to see on Mac).
-  assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:3;vector-effect:non-scaling-stroke\}/, "control-flow edge remains legible when zoomed");
-  assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:3;stroke-dasharray:4 4;vector-effect:non-scaling-stroke\}/, "explanation connectors retain the same legible width");
+  assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:1.75;vector-effect:non-scaling-stroke\}/, "control-flow edge remains legible when zoomed");
+  assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:1.25;stroke-dasharray:4 4;vector-effect:non-scaling-stroke\}/, "explanation connectors are lighter than solid routes");
 });
 
 // ── #208: 2-line label wrapping (fixes truncation collisions) ──

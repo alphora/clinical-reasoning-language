@@ -2443,7 +2443,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const foreign = isAbsolute(ownerPath) || ownerPath === ".." || ownerPath.startsWith(".." + sep);
       const dirty = vscode.workspace.textDocuments.some(d => d.uri.fsPath === target.filePath && d.isDirty);
       return { ...target, editable: !foreign && !dirty, readOnlyReason: foreign ? "Wording belongs to an imported library. Its CRL owner must propose the change." : dirty ? "Save or revert the unsaved CRL edits, then re-pin to propose wording." : undefined };
-    }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer));
+    }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer), (lib,name) => !!crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.hasLocalCode);
     const leafMarks = leafBucketsFromQuestionnaire(q.questions, resolveKey, sv.conceptTruth, view.leafConcepts);
     const selectedIds = new Set(route.nodeIds);
     const marks = { yesKeys: leafMarks.yesKeys, noKeys: leafMarks.noKeys,
@@ -5834,7 +5834,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='clearLeaves'){clrLeaf();for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');}` +
   `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();currentRouteKeys=m.routeKeys||[];currentRouteLabel=m.routeLabel||'';currentRouteCase=m.routeCaseId||'';currentRouteId=m.routeId||'';applyFlowPin();if(pinnedFlowKey&&m.pinnedMarks)Object.assign(m,m.pinnedMarks);` +
   `for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');for(const id of (m.pinLeafIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-pin-available');}` +
-  `for(const c of (m.conditions||[])){if(!['true','false','unknown'].includes(c.result))continue;for(const id of c.ids){const el=document.getElementById(id);if(el)el.classList.add('flow-condition-'+c.result);}}` +
+  `for(const c of (m.conditions||[])){if(!['true','false','unknown'].includes(c.result))continue;for(const id of c.ids){const el=document.getElementById(id);if(el){el.classList.add('flow-condition-'+c.result);for(const edge of root.querySelectorAll('.flow-edge[data-flow-condition]'))if(edge.dataset.flowCondition===el.dataset.flowKey&&edge.dataset.flowOutcome===(c.result==='true'?'Yes':c.result==='false'?'No':undefined))edge.classList.add('flow-condition-'+c.result);}}}` +
   `for(const id of (m.yesIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-yes');}` +
   `for(const id of (m.noIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-no');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.

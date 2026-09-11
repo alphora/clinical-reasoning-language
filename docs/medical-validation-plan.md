@@ -20,10 +20,10 @@ refreshes those panes. A leaf pin controls tree focus independently of selection
 ## Pinned question cards
 
 Pinning establishes the inspected route. Walk its nodes to construct read-only
-question cards with authored presentation text and CEL-evaluated values. Do not
+question cards only for answerable Case Features, with authored presentation text and CEL-evaluated values. Collections and composite/calculated conditions remain nodes; traverse their answerable inputs without creating a card for the condition itself. Do not
 construct a whole-case questionnaire and subsequently filter its questions.
-Cards normally attach above their owning condition nodes. A layout toggle moves
-those same cards into a vertical column above the branch, within the same canvas,
+Cards directly cap their owning nodes, sharing their width. Reserve space by relaying out the pinned display graph; do not float cards in a separate band. Descriptions are collapsible and initially collapsed. A layout toggle moves
+those same cards into one compact numbered questionnaire above the branch, within the same canvas,
 retaining connector lines to their owning nodes. The toggle changes layout only.
 Unpin removes cards and restores the full tree. Pin snapshots survive ordinary
 selection changes with their case/route identified, and clear on model rebuild.
@@ -181,7 +181,7 @@ Complete and review the partial source edits already present:
   fallback. Without a fallback it produces no invented leaf. Preserve parallel
   `all`/`any` evaluation and action-guard explanations; an action guard is not
   silently redrawn as a first-block fallback.
-- Show green/red halos for evaluated true/false conditions, with a distinct unknown
+- Show green/red connectors for evaluated true/false conditions, with a distinct unknown
   indication. A supplied value alone is not proof that a condition was evaluated.
   Keep path selection and medical-review verdict styling distinguishable.
 - Make solid and dashed connectors consistently thicker and visible in light and
@@ -281,3 +281,7 @@ records. The native/external reviewers advise; operator intent above governs.
 ## Presentation patch ownership
 
 Card text and descriptions can be edited as MV-scoped proposals. Save never modifies CRL directly. The owning KE pulls the proposal, applies it in CRL scope, and re-emits CQL/FHIR and results. See [the patch workflow](mv-presentation-patches.md). This supersedes the earlier direct-edit suggestion.
+
+Operator visual refinement: connector widths are 1.75px solid and 1.25px dashed. Remove visible Yes/No labels and otherwise boxes; fallback destinations share the true siblings' column. Keep fallback identities for route/review mapping. Pin sits outside upper-right; unanswered marker remains exposed at the left. A false condition without a continuation gets a short terminal red connector, never an invented activity.
+
+Refinement checks: 274 focused tests pass. Browser Bleph has 11 answerable cards; RX uc-met has four (the calculated Not Used Concurrently helper is a tree node, not an extra question). Attached/expanded cards do not overlap nodes. Detached rows are contiguous with one connector per question. Unpin restores original transforms, body rectangles and paths exactly. Native review converged; external plan timeout and retry internal error produced no findings. These remain development-host checks, not an installed release.

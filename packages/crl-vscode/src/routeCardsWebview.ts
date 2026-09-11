@@ -1,9 +1,14 @@
 /// <reference lib="dom" />
-// REFACTOR:grounded: both arrangements render one host-constructed pinned snapshot.
+// REFACTOR:grounded: operator mockups govern cap geometry and a compact detached questionnaire; data remains one pinned snapshot.
 // Kept self-contained so the exact browser controller can be exercised in DOM tests.
 export function installRouteCards(root: HTMLElement, api: { postMessage(m: unknown): void }, generation: () => number, onLayout: () => void = () => {}) {
   let snapshot: any, layout = "attached", layer: SVGGElement | undefined, originalBox: string | null = null;
   let toolbar: HTMLDivElement | undefined;
+  let restore: (() => void)[] = [];
+  const set = (el: Element, name: string, value: string | number) => {
+    const before = el.getAttribute(name); restore.push(() => before === null ? el.removeAttribute(name) : el.setAttribute(name, before));
+    el.setAttribute(name, String(value));
+  };
   const ns = "http://www.w3.org/2000/svg";
   const svgEl = (tag: string, attrs: Record<string, string | number>) => {
     const el = document.createElementNS(ns, tag);
@@ -11,6 +16,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     return el;
   };
   function clear() {
+    for (const undo of restore.reverse()) undo(); restore = [];
     layer?.remove(); layer = undefined; toolbar?.remove(); toolbar = undefined;
     const svg = root.querySelector<SVGSVGElement>(".flow-svg");
     if (svg && originalBox) { svg.setAttribute("viewBox", originalBox); const b = originalBox.split(" ").map(Number); svg.setAttribute("width", String(b[2])); svg.setAttribute("height", String(b[3])); }
@@ -31,25 +37,39 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     root.prepend(toolbar);
     layer = svgEl("g", { class: "route-cards" }) as SVGGElement; svg.append(layer);
     const nodes = Array.from(root.querySelectorAll<SVGGElement>("[data-flow-key]"));
-    const visibleBoxes = nodes.filter(n => getComputedStyle(n).display !== "none").map(n => n.querySelector("rect")?.getBBox()).filter((b): b is DOMRect => !!b);
-    const cardBandBottom = Math.min(0, ...visibleBoxes.map(b => b.y)) - 28;
-    const placements: { card: any; box: DOMRect; x: number; y: number; height: number; form: HTMLDivElement; fo: Element }[] = [];
-    let columnY = -32, minY = 0, minX = 0, maxX = Number(svg.getAttribute("width")), stacks = new Map<string, number>();
+    const visible = nodes.filter(n => getComputedStyle(n).display !== "none");
+    const base = new Map(visible.map(n => [n, n.querySelector<SVGRectElement>(":scope > rect")?.getBBox() ?? n.getBBox()]));
+    const byKey = new Map(nodes.map(n => [n.dataset.flowKey!, n]));
+    const primary = visible.filter(n => !n.dataset.flowOutline && base.get(n)!.width > 0);
+    const primaryOwner = (n: SVGGElement): SVGGElement | undefined => {
+      const seen = new Set<SVGGElement>();
+      while (!primary.includes(n)) { if (seen.has(n)) return; seen.add(n); const parent=byKey.get(n.dataset.flowParent!); if (!parent) return; n=parent; }
+      return n;
+    };
+    const placements: { card: any; owner: SVGGElement; height: number; form: HTMLDivElement; fo: Element }[] = [];
+    const cardWidth = layout === "column" ? 560 : 320;
+    const panel = document.createElement("div"); panel.className = "route-questionnaire";
+    let panelFo: Element | undefined;
+    if (layout === "column") { panelFo=svgEl("foreignObject", {width:cardWidth, height:20000}); panelFo.append(panel); layer.append(panelFo); }
     // DOM textContent for every authored string; no authored HTML enters the canvas.
-    for (const card of snapshot.cards) {
+    for (const [index, card] of snapshot.cards.entries()) {
       const owner = nodes.find(n => n.dataset.flowKey === card.ownerKey);
       if (!owner) continue;
-      const box = owner.querySelector("rect")?.getBBox(); if (!box) continue;
-      const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id;
-      const caption = document.createElement("div"); caption.className = "route-card-caption"; caption.textContent = card.explanation ? "Supporting value" : "Condition"; form.append(caption);
+      if (!base.has(owner)) continue;
+      const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id; form.style.width = cardWidth + "px";
+      const caption = document.createElement("div"); caption.className = "route-card-caption"; caption.textContent = String(index + 1); form.append(caption);
       const text = document.createElement("div"); text.className = "route-card-question"; text.textContent = card.text; form.append(text);
-      if (card.description) { const desc = document.createElement("div"); desc.className = "route-card-description"; desc.textContent = card.description; form.append(desc); }
-      const value = document.createElement("div"); value.className = "route-card-value"; value.textContent = card.value; form.append(value);
+      if (card.description) {
+        const toggle=document.createElement("button"); toggle.className="route-description-toggle"; toggle.textContent="Description"; toggle.setAttribute("aria-expanded", String(!!card.descriptionOpen));
+        toggle.onclick=()=>{card.descriptionOpen=!card.descriptionOpen;render();root.querySelector<HTMLButtonElement>('[data-card-id="'+card.id+'"] .route-description-toggle')?.focus();}; form.append(toggle);
+        if (card.descriptionOpen) { const desc=document.createElement("div");desc.className="route-card-description";desc.textContent=card.description;form.append(desc); }
+      }
+      const value = document.createElement("div"); value.className = "route-card-value"; value.textContent = /^(Determination:|Not answered)/.test(card.value) ? card.value : "Answer: " + card.value; form.insertBefore(value, form.querySelector(".route-description-toggle"));
       const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.proposal ? "Proposed wording saved — awaiting CRL owner and re-emit" : ""; form.append(status);
-      const go = document.createElement("button"); go.textContent = "Show source"; go.onclick = () => api.postMessage({ type: "routeCardSource", gen: generation(), token: snapshot.token, key: card.id }); form.append(go);
+      const go = document.createElement("button"); go.textContent = "Show source"; go.onclick = () => api.postMessage({ type: "routeCardSource", gen: generation(), token: snapshot.token, key: card.id }); const actions=document.createElement("div"); actions.className="route-card-actions";form.append(actions);actions.append(go);
       if (card.readOnlyReason) { const reason = document.createElement("p"); reason.textContent = card.readOnlyReason; form.append(reason); }
       if (card.editable) {
-        const edit = document.createElement("button"); edit.textContent = "Propose wording…"; form.append(edit);
+        const edit = document.createElement("button"); edit.textContent = "Propose wording…"; actions.append(edit);
         const editor = document.createElement("div"); editor.hidden = true;
         const scope = document.createElement("p"); scope.textContent = "MV proposal only. Scope: " + card.scopeLabel; editor.append(scope);
         const input = document.createElement("textarea"), desc = document.createElement("textarea");
@@ -65,34 +85,73 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         editor.hidden = !card.editing;
       }
       form.addEventListener("click", e => e.stopPropagation()); form.addEventListener("keydown", e => e.stopPropagation());
-      const fo = svgEl("foreignObject", { width: 200, height: 1000, x: box.x, y: -1000 }); fo.append(form); layer.append(fo);
-      const height = Math.ceil(form.getBoundingClientRect().height / (svg.getScreenCTM()?.d || 1)) + 8;
-      const x = layout === "column" ? 24 : box.x - 16;
-      const y = layout === "column" ? columnY - height : Math.min(cardBandBottom, stacks.get(card.ownerKey) ?? Infinity) - height;
-      columnY = y - 16; stacks.set(card.ownerKey, y - 16);
-      placements.push({ card, box, x, y, height, form, fo });
+      const fo = layout === "column" ? panelFo! : svgEl("foreignObject", { width:cardWidth, height:20000 });
+      if (layout === "column") panel.append(form); else { fo.append(form); layer.append(fo); }
+      const height = Math.ceil(form.offsetHeight);
+      placements.push({card, owner, height, form, fo});
     }
-    if (layout === "column") { let y = -placements.reduce((n,p) => n+p.height+16, 32); for (const p of placements) { p.y=y; y+=p.height+16; } }
-    // Attached cards on close adjacent nodes occupy separate vertical tiers to avoid overlap.
-    const placed: typeof placements = [];
-    for (const p of placements) {
-      if (layout === "attached") { let collision; do { collision = placed.find(other => p.x < other.x + 216 && p.x + 216 > other.x && p.y < other.y + other.height + 16 && p.y + p.height + 16 > other.y); if (collision) p.y = collision.y-p.height-16; } while(collision); }
-      p.fo.setAttribute("x", String(p.x)); p.fo.setAttribute("y", String(p.y)); p.fo.setAttribute("height", String(p.height));
-      const line = svgEl("path", { d: `M ${p.x + 100} ${p.y + p.height} L ${p.box.x + p.box.width / 2} ${p.box.y}`, class: "route-card-connector" });
-      layer.insertBefore(line, layer.firstChild); placed.push(p);
-      minY = Math.min(minY, p.y - 16); minX = Math.min(minX, p.x - 16); maxX = Math.max(maxX, p.x + 216);
+    // REFACTOR:grounded: reserve caps and outline extents in each graph column. Existing edges, never array order, define topology.
+    const stackHeight = (n: SVGGElement) => placements.filter(p=>p.owner===n).reduce((h,p)=>h+p.height,0);
+    const panelHeight=layout==="column" ? Math.ceil(panel.offsetHeight) : 0;
+    const columns=[...new Set(primary.map(n=>base.get(n)!.x))].sort((a,b)=>a-b);
+    const positions=new Map<SVGGElement,{x:number;y:number;width:number;height:number}>();
+    let right=40, bottom=40;
+    for (const col of columns) {
+      const members=primary.filter(n=>base.get(n)!.x===col).sort((a,b)=>base.get(a)!.y-base.get(b)!.y);
+      let cursor=40+panelHeight+(layout==="column"?100:0), extent=320;
+      for (const n of members) {
+        const box=base.get(n)!, cap=layout==="attached"?stackHeight(n):0;
+        const y=cursor+cap, width=320;
+        positions.set(n,{x:right,y,width,height:box.height});
+        let groupBottom=y+box.height;
+        for (const child of visible.filter(c=>c!==n&&primaryOwner(c)===n)) {
+          const b=base.get(child)!;
+          positions.set(child,{x:right+b.x-box.x,y:y+b.y-box.y,width:b.width,height:b.height});
+          groupBottom=Math.max(groupBottom,y+b.y-box.y+b.height);
+          extent=Math.max(extent,b.x-box.x+b.width);
+        }
+        cursor=groupBottom+60; bottom=Math.max(bottom,groupBottom+40);
+      }
+      right+=extent+100;
     }
-    const b = (originalBox ?? "0 0 1000 800").split(" ").map(Number);
-    svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${b[3]-minY}`); svg.setAttribute("width", String(maxX-minX)); svg.setAttribute("height", String(b[3]-minY));
+    for (const [n,pos] of positions) {
+      const b=base.get(n)!; set(n,"transform",`translate(${pos.x-b.x} ${pos.y-b.y})`);
+      if (!n.dataset.flowOutline) {
+        const rect=n.querySelector<SVGRectElement>(":scope > rect");if(rect)set(rect,"width",pos.width);
+        for(const ring of Array.from(n.querySelectorAll<SVGRectElement>(":scope > .flow-ring > rect")))set(ring,"width",pos.width+(Number(ring.getAttribute("width"))-b.width));
+        for(const text of Array.from(n.querySelectorAll<SVGTextElement>(":scope > text[text-anchor=middle]"))){set(text,"x",b.x+pos.width/2);for(const t of Array.from(text.querySelectorAll("tspan[x]")))set(t,"x",b.x+pos.width/2);}
+        for(const adornment of Array.from(n.querySelectorAll(":scope > .flow-pin,:scope > .flow-false-stop")))set(adornment,"transform",`translate(${pos.width-b.width} 0)`);
+      }
+    }
+    for(const edge of Array.from(root.querySelectorAll<SVGPathElement>("path[data-flow-from]"))) {
+      const a=positions.get(byKey.get(edge.dataset.flowFrom!)!), b=positions.get(byKey.get(edge.dataset.flowTo!)!); if(!a||!b)continue;
+      const x=a.x+a.width,y=a.y+a.height/2,ex=b.x,ey=b.y+b.height/2,m=(x+ex)/2;
+      set(edge,"d",edge.classList.contains("flow-def-edge") ? `M${a.x+10} ${y} V${ey} H${ex}` : `M${x} ${y} C${m} ${y} ${m} ${ey} ${ex} ${ey}`);
+    }
+    if(layout==="column") {
+      const x=Math.max(40,(right-100-cardWidth)/2); panelFo!.setAttribute("x",String(x)); panelFo!.setAttribute("y","20");panelFo!.setAttribute("height",String(panelHeight));
+      let y=20;
+      for(const p of placements) { const box=positions.get(p.owner);if(!box)continue;
+        const line=svgEl("path",{d:`M${x+cardWidth} ${y+p.height/2} L${box.x+box.width/2} ${box.y}`,class:"route-card-connector"});layer.insertBefore(line,layer.firstChild);y+=p.height;
+      }
+      right=Math.max(right,x+cardWidth+40);
+    } else {
+      const used=new Map<SVGGElement,number>();
+      for(const p of placements) {const box=positions.get(p.owner);if(!box)continue;
+        const y=box.y-stackHeight(p.owner)+(used.get(p.owner)??0);used.set(p.owner,(used.get(p.owner)??0)+p.height);
+        p.fo.setAttribute("x",String(box.x));p.fo.setAttribute("y",String(y));p.fo.setAttribute("height",String(p.height));
+      }
+    }
+    svg.setAttribute("viewBox",`0 0 ${right} ${bottom}`);svg.setAttribute("width",String(right));svg.setAttribute("height",String(bottom));
     onLayout();
   }
   return {
     show(value: any) { if (snapshot?.token === value.token) for (const card of value.cards) {
       const previous = snapshot.cards.find((c: any) => c.id === card.id);
-      if (previous) Object.assign(card, { editing: previous.editing, draftText: previous.draftText, draftDescription: previous.draftDescription, proposal: previous.proposal });
+      if (previous) Object.assign(card, { editing: previous.editing, draftText: previous.draftText, draftDescription: previous.draftDescription, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen });
     } snapshot = value; render(); },
     reset() { snapshot = undefined; clear(); },
-    rebind() { originalBox = null; layer = undefined; toolbar?.remove(); render(); },
+    rebind() { restore = []; originalBox = null; layer = undefined; toolbar?.remove(); render(); },
     result(message: any) { if (!snapshot || message.token !== snapshot.token) return; const card = snapshot.cards.find((c: any) => c.id === message.key); if (!card) return;
       card.proposal = message.ok; if (message.ok) card.editing = false; render();
       const status = root.querySelector<HTMLElement>('[data-card-id="'+card.id+'"] .route-card-status'); if (status) status.textContent = message.message; },
@@ -101,12 +160,17 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
 
 export const ROUTE_CARD_STYLE = `
 .route-card-toolbar { display:flex; flex-wrap:wrap; gap:8px; padding:8px; align-items:center; }
-.route-card { box-sizing:border-box; width:200px; padding:12px; border:2px solid var(--vscode-focusBorder,#3794ff); border-radius:8px; background:var(--vscode-editor-background,#202020); color:var(--vscode-editor-foreground,#ddd); font:13px/1.45 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
-.route-card-caption { font-size:11px; opacity:.8; } .route-card-question { font-weight:600; white-space:pre-wrap; }
-.route-card-description { margin-top:5px; white-space:pre-wrap; } .route-card-value { margin:8px 0; font-weight:bold; }
+.route-card { box-sizing:border-box; padding:10px 12px; border:1px solid var(--vscode-focusBorder,#3794ff); background:var(--vscode-editor-background,#202020); color:var(--vscode-editor-foreground,#ddd); font:14px/1.4 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
+.route-card-caption { float:left; margin:2px 8px 0 0; font-size:11px; opacity:.75; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; padding:0 4px; }
+.route-card-question { font-weight:600; white-space:pre-wrap; }
+.route-card-description { margin:6px 0; white-space:pre-wrap; } .route-card-value { margin:6px 0; }
 .route-card-status { font-size:12px; color:var(--vscode-editorWarning-foreground,#cca700); }
-.route-card button,.route-card-toolbar button { cursor:pointer; margin:3px; padding:4px 6px; border:1px solid var(--vscode-button-border,transparent); background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-button-secondaryForeground,#eee); border-radius:3px; }
+.route-card button,.route-card-toolbar button { cursor:pointer; padding:2px 5px; border:1px solid var(--vscode-button-border,transparent); background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-button-secondaryForeground,#eee); border-radius:3px; }
+.route-card-actions { display:flex; gap:8px; margin-top:4px; } .route-card-actions button,.route-description-toggle { font-size:11px; }
+.route-description-toggle { margin-top:5px; } .route-description-toggle[aria-expanded=false]::before { content:'▸ '; } .route-description-toggle[aria-expanded=true]::before { content:'▾ '; }
+.route-questionnaire .route-card { padding:7px 10px; font-size:13px; } .route-questionnaire .route-card-question { display:inline; } .route-questionnaire .route-card-value { display:inline-block; margin:0 0 0 8px; font-size:12px; } .route-questionnaire .route-description-toggle { display:block; } .route-questionnaire .route-card-actions { margin-top:2px; }
+.route-questionnaire { width:560px; border-radius:6px; overflow:hidden; } .route-questionnaire .route-card { border-bottom:0; } .route-questionnaire .route-card:last-child { border-bottom:1px solid var(--vscode-focusBorder,#3794ff); }
 .route-card-note { flex-basis:100%; color:var(--vscode-editorWarning-foreground,#cca700); }
-.route-card textarea { box-sizing:border-box; width:100%; min-height:64px; resize:vertical; background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
-.route-card-connector { fill:none; stroke:var(--vscode-focusBorder,#3794ff); stroke-width:2.5; pointer-events:none; }
+.route-card textarea { box-sizing:border-box; width:100%; min-height:64px; resize:none; background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
+.route-card-connector { fill:none; stroke:var(--vscode-descriptionForeground,#8c8c8c); stroke-width:1; pointer-events:none; vector-effect:non-scaling-stroke; }
 `;

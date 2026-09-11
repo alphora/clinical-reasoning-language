@@ -1,4 +1,4 @@
-// REFACTOR:grounded: terminal pins and condition halos implement the selected-route MV design.
+// REFACTOR:grounded: connector truth, transparent fallbacks and upper-right pins follow the operator mockups.
 // CRL FLOW pane RENDERER (vscode-free, unit-tested) — the graphical decision-tree flowchart (T2, disc 132).
 // Renders CrlDecisionStructure[] as an SVG forest: each decision root branches through its when/otherwise/action sub-nodes;
 // a composite `when` hangs its `defined as` operator OUTLINE below it, and recommend targets are determination boxes.
@@ -184,7 +184,7 @@ const NODE_W = 168;
 const NODE_H = 44; // #208: sized for up to TWO wrapped lines (uniform → exact centering + a mechanical golden scale)
 const H_GAP = 52; // horizontal gap between depth columns
 const V_GAP = 14; // vertical gap between slot rows
-const PAD = 14; // outer padding
+const PAD = 32; // REFACTOR:grounded: reserve the upper-right pin and unanswered marker outside node bodies
 const FOREST_GAP = 1.4; // extra slot rows between successive decision trees
 const ROW = NODE_H + V_GAP; // one slot's pixel height
 const COL = NODE_W + H_GAP; // one depth's pixel width
@@ -417,7 +417,7 @@ function buildLaid(
 
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
     maxDepth = Math.max(maxDepth, depth);
-    const structureChildren = n.children.map((c) => layoutNode(c, depth + 1));
+    const structureChildren = n.children.map((c) => layoutNode(c, depth + (n.kind === "otherwise" ? 0 : 1)));
     // when → gating concept = refKeys[0]; action → guard concept = refKeys[1] when present. refKeysOf emits exactly
     // [target] or [target, guardConcept] for an action, so the guard is at index 1 (NOT "the last" — reading [1] makes an
     // unexpected 3-element array fail loudly rather than silently mis-peeking). Either ref may be unresolved (refKeys are
@@ -688,9 +688,10 @@ export function renderFlowPane(
   // Edges first (so node boxes paint over them). Edges are pure <path> — NEVER reveal targets.
   let body = "";
   for (const n of all) {
+    if (n.kind === "otherwise") continue;
     const px = left(n) + nodeW(n);
     const py = midY(n);
-    for (const c of n.children) {
+    for (const c of n.children.flatMap(c => c.kind === "otherwise" ? c.children.map(child => ({ ...child, incomingOutcome: "No" as const })) : [c])) {
       if (c.outline) {
         // #187 Option-C: an OUTLINE connector is a dashed grey `.flow-def-edge` ELBOW (a vertical spine down from the
         // parent + a horizontal run to the child's left) — NOT the horizontal control-flow Bézier. The spine sits just
@@ -701,10 +702,8 @@ export function renderFlowPane(
         const ex = left(c);
         const ey = midY(c);
         const mx = Math.round((px + ex) / 2);
-        body += `<path class="flow-edge" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
-        if (c.incomingOutcome && c.kind !== "otherwise") {
-          body += `<text class="flow-outcome-label" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" x="${mx}" y="${Math.round((py + ey) / 2) - 7}">${c.incomingOutcome}</text>`;
-        }
+        body += `<path class="flow-edge" data-flow-outcome="${c.incomingOutcome ?? ""}" data-flow-condition="${n.kind === "when" ? escapeHtml(n.nodeKey) : ""}" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
+
       }
     }
   }
@@ -720,13 +719,10 @@ export function renderFlowPane(
     // an operator / top-OR / external / more row is RENDER-ONLY (no anchor, no reveal — a click resolves to nothing).
     const addressable = !n.outline || n.outlineRow === "leaf";
     if (addressable) anchors[n.nodeKey] = { scrollTo: gid, segmentIds: [gid] };
-    if (n.kind === "otherwise" && n.label === "No") {
-      // The small connector label retains the old fallback identity and its review
-      // controls. It is not a second condition or a new clinical activity.
+    if (n.kind === "otherwise") {
+      // REFACTOR:grounded: retain identity for review/route lookup, without a visible node or layout column.
       reveals[key] = { nodeKey: n.nodeKey };
-      body += `<g id="${escapeHtml(gid)}" class="flow-row flow-fallback" data-reveal="${escapeHtml(key)}">` +
-        `<title>No — preceding conditions were false</title><rect x="${x}" y="${y + 14}" width="42" height="24" rx="5"/>` +
-        `<text x="${x + 12}" y="${y + 30}">No</text>` + flowRing(x, y + 14, 42, 24, 2.5, 7) + `</g>`;
+      body += `<g id="${escapeHtml(gid)}" class="flow-row flow-fallback" data-reveal="${escapeHtml(key)}" aria-hidden="true"></g>`;
       continue;
     }
 
@@ -922,7 +918,8 @@ export function renderFlowPane(
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
       (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
-      (n.kind === "when" ? `<g class="flow-truth-ring"><rect x="${x - 4.7}" y="${y - 4.7}" width="${NODE_W + 9.4}" height="${NODE_H + 9.4}" rx="10"/></g><text class="flow-truth-unknown" x="${x + NODE_W - 12}" y="${y - 8}"><title>Not answered — evaluation paused here</title>?</text>` : "") +
+      (n.kind === "when" ? `<text class="flow-truth-unknown" x="${x - 14}" y="${y + 16}"><title>Not answered — evaluation paused here</title>?</text>` +
+        (!n.children.some(c => c.incomingOutcome === "No") ? `<path class="flow-false-stop" d="M${x + NODE_W} ${y + NODE_H / 2} h24 m0 -4 v8"><title>Condition false — this branch stops here</title></path>` : "") : "") +
       guardTab +
       critToggleMarkup +
       critVerdictMarkup +
@@ -930,7 +927,7 @@ export function renderFlowPane(
       allPassBadge +
       flagBadgeMarkup +
       startFlagMarkup +
-      (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + 4}" y="${y + 4}" width="22" height="22" rx="4"/><path d="M${x + 10} ${y + 9} h10 l-2 6 l3 3 h-12 l3-3 z M${x + 15} ${y + 18} v5"/></g>` : "") +
+      (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + NODE_W + 6}" y="${y - 18}" width="22" height="22" rx="4"/><path d="M${x + NODE_W + 12} ${y - 13} h10 l-2 6 l3 3 h-12 l3-3 z M${x + NODE_W + 17} ${y - 4} v5"/></g>` : "") +
       `</g>`;
   }
 
@@ -1009,7 +1006,7 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
   const chip = (cls: string, label: string, gap: boolean): string =>
     `<span class="fc-lg${gap ? " fc-lg-gap" : ""}"><i class="fc-sw ${cls}" aria-hidden="true"></i>${label}</span>`;
   return (
-    `<div class="fc-legend" role="group" aria-label="Tree color key: green fill Pass, red fill Fail, yellow fill Pending, purple border Inferred, blue ring Selected path, green halo Condition true, red halo Condition false, question mark Unanswered">` +
+    `<div class="fc-legend" role="group" aria-label="Tree color key: green fill Pass, red fill Fail, yellow fill Pending, purple border Inferred, blue ring Selected path, green connector Condition true, red connector Condition false, question mark Unanswered">` +
     chip("fc-sw-pass", "Pass", false) +
     chip("fc-sw-fail", "Fail", false) +
     chip("fc-sw-pending", "Pending", false) +
@@ -1025,12 +1022,10 @@ export const FLOW_STYLE =
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pin-available>.flow-pin,.flow-pinned>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
   `.fc-sw-true{border:2px solid var(--vscode-testing-iconPassed,#3fb950);border-radius:50%}.fc-sw-false{border:2px solid var(--vscode-editorError-foreground,#f14c4c);border-radius:50%}` +
-  `.flow-outcome-label{fill:var(--vscode-foreground,#cccccc);font-size:12px;text-anchor:middle;paint-order:stroke;stroke:var(--vscode-editor-background,#1e1e1e);stroke-width:4;stroke-linejoin:round}` +
-  `.flow-truth-ring,.flow-truth-unknown{display:none;pointer-events:none}` +
-  `.flow-truth-ring>rect{fill:none;stroke-width:2.5}` +
-  `.flow-condition-true>.flow-truth-ring,.flow-condition-false>.flow-truth-ring{display:inline}` +
-  `.flow-condition-true>.flow-truth-ring>rect{stroke:var(--vscode-testing-iconPassed,#3fb950)}` +
-  `.flow-condition-false>.flow-truth-ring>rect{stroke:var(--vscode-editorError-foreground,#f14c4c)}` +
+  `.flow-fallback{display:none}.flow-truth-unknown,.flow-false-stop{display:none;pointer-events:none}` +
+  `.flow-edge.flow-condition-true{stroke:var(--vscode-testing-iconPassed,#3fb950)}` +
+  `.flow-edge.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:var(--vscode-editorError-foreground,#f14c4c)}` +
+  `.flow-condition-false>.flow-false-stop{display:inline;fill:none;stroke-width:1.75;vector-effect:non-scaling-stroke}` +
   `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-charts-yellow,#d29922);font-weight:bold}` +
   `.flow-wrap{display:inline-block;min-width:100%}` +
   // `cursor:grab` = the grab-drag pan affordance on the tree background (a `.flow-row` overrides it with `pointer`, so nodes
@@ -1069,10 +1064,10 @@ export const FLOW_STYLE =
   `.flow-crit-chevron{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
   `.flow-crit-toggle:hover .flow-crit-hit{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
   `.flow-crit-toggle:hover .flow-crit-chevron{fill:var(--vscode-foreground,#cccccc)}` +
-  `.flow-edge{fill:none;stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:3;vector-effect:non-scaling-stroke}` +
+  `.flow-edge{fill:none;stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.75;vector-effect:non-scaling-stroke}` +
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
   // Slightly THICKER + less faint so the connector reads on Mac (operator feedback).
-  `.flow-def-edge{fill:none;stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:3;stroke-dasharray:4 4;vector-effect:non-scaling-stroke}` +
+  `.flow-def-edge{fill:none;stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.25;stroke-dasharray:4 4;vector-effect:non-scaling-stroke}` +
   // an outline operand SUB-QUESTION looks EXACTLY like a main `when` question: a SOLID border — GREY (has a local `code is`)
   // / PURPLE (inferred, decomposes into its own sub-questions recursively). On-path → the blue ring, same as a main node.
   // (Solid, not the Todo-2 dashed chip: the indent + smaller box + dashed spine already distinguish it from a decision box.)

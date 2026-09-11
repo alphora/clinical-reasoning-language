@@ -20,8 +20,8 @@ export function projectFlowBranches(nodes: CrlStructureNode[], qualifier?: "firs
   for (let i = projected.length - 1; i >= 0; i--) {
     const node = projected[i];
     if (node.kind === "otherwise") {
-      // Keep the fallback identity as a compact No connector label: selection and
-      // existing per-occurrence review verdicts must remain addressable.
+      // REFACTOR:grounded: preserve the fallback identity for routes/reviews; the renderer
+      // hides its box and draws the false connector directly to its children.
       node.label = "No";
     } else if (next) {
       node.children.push({ ...next, incomingOutcome: "No" });

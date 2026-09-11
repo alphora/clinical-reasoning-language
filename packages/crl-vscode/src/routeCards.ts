@@ -35,8 +35,9 @@ export function definitionValueInputs(concepts: CrlConceptNode[]) {
 export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor: (id: string) => string | undefined,
   wording: (lib: string, name: string, nodeId: string, criteria: string[]) => WordingTarget | undefined,
   optionsFor: (lib: string, name: string) => { code: string; display: string }[] = () => [],
-  valueInputs: (lib: string, name: string) => CrlConceptNode[] = () => []) {
-  const cards: RouteCard[] = [], targets = new Map<string, WordingTarget>();
+  valueInputs: (lib: string, name: string) => CrlConceptNode[] = () => [],
+  questionEnabled?: (lib: string, name: string) => boolean) {
+  const cards: RouteCard[] = [], targets = new Map<string, WordingTarget>(), emitted = new Set<string>();
   const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: string[], explanation: boolean, valueOnly = false, seen = new Set<string>()) => {
     const identity = JSON.stringify([lib,name]);
     if (seen.has(identity)) return;
@@ -44,20 +45,26 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     const ownerKey = keyFor(nodeId);
     if (!ownerKey) return;
     const target = wording(lib, name, nodeId, criteria);
+    const answerable = questionEnabled ? questionEnabled(lib,name) : !!target;
     const evidence = sv.conceptValues?.find(r => r.libraryName === lib && r.name === name);
     const raw = formatAnswer(evidence?.answerValue, optionsFor(lib, name));
     const determination = valueOnly ? "" : answer === "yes" ? "True" : answer === "no" ? "False" : "Unknown";
     let value: string;
     if (valueOnly) value = raw ?? "Not answered";
     else if (answer !== "yes" && answer !== "no") value = `Determination: Unknown${raw ? " · Available value: " + raw : ""}`;
-    else if (target && raw !== undefined) value = raw;
+    else if (answerable && raw !== undefined) value = raw;
     else if (inferred || !target) value = `Determination: ${determination}`;
     else value = raw ?? (answer === "yes" ? "Yes" : "No");
+    // REFACTOR:grounded: conditions are tree nodes; only answer-enabled Case Features get cards.
+    const occurrence = JSON.stringify([ownerKey,lib,name]);
+    if (answerable && !emitted.has(occurrence)) {
+    emitted.add(occurrence);
     const id = `card-${cards.length}`;
     cards.push({ id, ownerKey, concept: name, library: lib, text: target?.questionText ?? name,
       description: target?.questionDescription ?? "", value,
       determination, explanation, editable: !!target && target.editable !== false, ...(target ? { scopeLabel: target.scopeLabel, readOnlyReason: target.readOnlyReason } : {}) });
     if (target && target.editable !== false) targets.set(id, target);
+    }
     for (const dependency of valueInputs(lib,name)) {
       const truth = sv.conceptTruth?.find(r => r.libraryName === dependency.lib && r.name === dependency.name)?.satisfied;
       add(nodeId,dependency.name,dependency.lib,truth === true ? "yes" : truth === false ? "no" : "unknown", !!dependency.definitionKind, criteria, true, dependency.hasLocalCode, seen);
