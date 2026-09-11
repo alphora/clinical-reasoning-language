@@ -142,6 +142,7 @@ import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnai
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
 import { definitionValueInputs, buildRouteCards } from "./routeCards";
 import { installRouteCards, ROUTE_CARD_STYLE } from "./routeCardsWebview";
+import { installFlowLeafNavigation } from "./flowLeafNavigation";
 import { graphWordingSources, resolveWordingTarget, createPresentationProposal, savePresentationProposal, pendingPresentationProposals, type WordingTarget } from "./presentationProposal";
 import { conditionTruthKeys } from "./flowProjection";
 import { executionRoutes, routeScenario, buildRouteQuestionnaire, type ExecutionRoute } from "./executionRoutes";
@@ -2548,6 +2549,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void openFlagList(); // #203 Todo 4: the tree-chrome flag badge / START-node count pill → the WHOLE-policy review-flag list (MV)
     } else if (msg.type === "nodeFlags" && typeof msg.gid === "string") {
       void openNodeFlags(msg.gid); // Todo 2 (disc 356): a PER-NODE ⚑ badge → the drawer/list filtered to THIS node (gid re-validated against flagsByGid)
+    } else if (msg.type === "nodeFlagAction" && typeof msg.gid === "string" && typeof msg.key === "string" && msg.gen === v.gen && pane === "tree") {
+      void nodeFlagAction(msg.key, msg.gid, v.gen);
     } else if (msg.type === "questionNav" && (msg.dir === "prev" || msg.dir === "next")) {
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
@@ -3696,6 +3699,27 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (!(await guardDrawerDiscard())) return; // Todo 3/5: a new create drawer would abandon an in-progress edit OR the grid's picks — confirm first
       openFlagDrawer({ target: pick.choice });
     }
+  }
+
+  /** Resolve grey/yellow badge actions from the current tree, never the selected case's anchor. */
+  async function nodeFlagAction(revealKey: string, gid: string, generation: number): Promise<void> {
+    const tree = views.get("tree");
+    const hit = tree?.reveals[revealKey];
+    const ver = indexVersion, cel = currentCel;
+    const current = () => mode === "medical-validation" && views.get("tree") === tree && tree?.gen === generation && indexVersion === ver && currentCel === cel;
+    if (!current() || !tree || !hit || !tree.flaggableGids.includes(gid)) return;
+    if ((flagsByGid.get(gid)?.length ?? 0) > 0) return openNodeFlags(gid);
+    const choices = flagTargetChoices(hit);
+    if (!choices.length) return flagNote("no flag target on this node");
+    const choice = choices.length === 1 ? choices[0] : (await vscode.window.showQuickPick(
+      choices.map(target => ({ label: `$(flag) ${target.label}`, target })),
+      { placeHolder: "What should this flag apply to?" },
+    ))?.target;
+    if (!choice || !current()) return;
+    if (!(await guardDrawerDiscard()) || !current()) return;
+    // A watcher may have loaded a new flag while the chooser or discard prompt was open.
+    if ((flagsByGid.get(gid)?.length ?? 0) > 0) return openNodeFlags(gid);
+    openFlagDrawer({ target: choice });
   }
 
   /** Post the current `flagDraft` to the tree pane's dedicated `#flagDrawer` region (or an EMPTY region to clear it). The
@@ -5719,6 +5743,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
   `let pinnedFlowKey='',pinnedRouteKeys=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,applyZoom);` +
+  `const leafNavigation=(${installFlowLeafNavigation.toString()})(root);` +
   `const applyFlowPin=()=>{const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;if(!pinnedFlowKey)return;const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');};` +
   `const toggleFlowPin=k=>{if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();}else{if(!currentRouteKeys.includes(k))return;v.postMessage({type:'pinRoute',gen,caseId:currentRouteCase,routeId:currentRouteId});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
@@ -5731,7 +5756,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();` +
+  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();leafNavigation.rebind();` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
@@ -5948,7 +5973,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const fb=e.target.closest&&e.target.closest('[data-mv-flag-badge]');` +
   // Todo 2 (disc 356): a PER-NODE badge carries data-node-flag-gid (read off the MATCHED badge <g>, NOT a second closest — the
   // start pill is its SIBLING in the same row) → node-filtered; the start-count pill has none → the whole-policy list.
-  `if(fb){e.preventDefault();e.stopPropagation();var nfg=fb.getAttribute('data-node-flag-gid');if(nfg)v.postMessage({type:'nodeFlags',gid:nfg});else v.postMessage({type:'mvFlags'});return;}` +
+  `if(fb){e.preventDefault();e.stopPropagation();var nfg=fb.getAttribute('data-node-flag-gid');var owner=fb.closest('[data-reveal]');if(nfg&&owner)v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),gen});else v.postMessage({type:'mvFlags'});return;}` +
   // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
   `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
   `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +
@@ -5960,7 +5985,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',key:ct.getAttribute('data-toggle-crit')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
-  `document.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(!fp)return;e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);});` +
+  `document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.shiftKey||(e.key!=='Enter'&&e.key!==' '))return;const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(!fp)return;e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);});` +
   // #217: RIGHT-CLICK a flow node → the host opens a verdict quick-pick for the case(s) whose fired path runs through it.
   // Gate: MV mode (live `data-mode`) + inside `.flow-svg` (the FLOW/tree pane ONLY — the script is shared by every pane, so
   // without this we'd `preventDefault` the native menu in source/cel/worklist too) + a `.flow-row[data-reveal]` (a rendered

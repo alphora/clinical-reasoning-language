@@ -27,14 +27,10 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const svg = root.querySelector<SVGSVGElement>(".flow-svg");
     if (!snapshot || !svg) return;
     originalBox = svg.getAttribute("viewBox");
-    toolbar = document.createElement("div"); toolbar.className = "route-card-toolbar";
-    toolbar.title = snapshot.label;
-    for (const [key, name] of [["attached", "Attached"], ["column", "Questionnaire"]]) {
-      const b = document.createElement("button"); b.textContent = name; b.setAttribute("aria-pressed", String(layout === key));
-      b.onclick = () => { layout = key; render(); }; toolbar.append(b);
+    if (snapshot.note) {
+      toolbar = document.createElement("div"); toolbar.className = "route-card-note";
+      toolbar.setAttribute("role", "status"); toolbar.textContent = snapshot.note; root.prepend(toolbar);
     }
-    if (snapshot.note) { const note = document.createElement("div"); note.className = "route-card-note"; note.setAttribute("role", "status"); note.textContent = snapshot.note; toolbar.append(note); }
-    root.prepend(toolbar);
     layer = svgEl("g", { class: "route-cards" }) as SVGGElement; svg.append(layer);
     const nodes = Array.from(root.querySelectorAll<SVGGElement>("[data-flow-key]"));
     const visible = nodes.filter(n => getComputedStyle(n).display !== "none");
@@ -120,7 +116,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const descendants=(n:SVGGElement)=>visible.filter(c=>c!==n&&primaryOwner(c)===n).sort((a,b)=>base.get(a)!.y-base.get(b)!.y);
     const widths=groups.map(group=>Math.max(260,...group.flatMap(n=>descendants(n).map(c=>base.get(c)!.x-base.get(n)!.x+260))));
     let right=40+widths.reduce((a,b)=>a+b+90,0),bottom=40;
-    let cursor=40;
+    let cursor=40+(layout==="column"?panelHeight+60:0);
     for(let row=0;row<Math.max(0,...groups.map(g=>g.length));row++) {
       const y=cursor; let rowBottom=y;
       for(const [ci,group] of groups.entries()) {
@@ -144,6 +140,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         for(const ring of Array.from(n.querySelectorAll<SVGRectElement>(":scope > .flow-ring > rect")))set(ring,"width",pos.width+(Number(ring.getAttribute("width"))-b.width));
         for(const text of Array.from(n.querySelectorAll<SVGTextElement>(":scope > text[text-anchor=middle]"))){set(text,"x",b.x+pos.width/2);for(const t of Array.from(text.querySelectorAll("tspan[x]")))set(t,"x",b.x+pos.width/2);}
         for(const adornment of Array.from(n.querySelectorAll(":scope > .flow-pin,:scope > .flow-false-stop")))set(adornment,"transform",`translate(${pos.width-b.width} 0)`);
+        if(!n.hasAttribute("data-flow-outcome-leaf"))for(const badge of Array.from(n.querySelectorAll(":scope > .flow-flag-badge")))set(badge,"transform",`translate(${pos.width-b.width} 0)`);
       }
     }
     for(const edge of Array.from(root.querySelectorAll<SVGPathElement>("path[data-flow-from]"))) {
@@ -154,9 +151,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       set(edge,"d",edge.classList.contains("flow-def-edge") ? `M${a.x} ${y} H${Math.min(a.x,b.x)-12} V${ey} H${ex}` : `M${x} ${y} C${m} ${y} ${m} ${ey} ${ex} ${ey}`);
     }
     if(layout==="column") {
-      const x=Math.max(40,(right-100-cardWidth)/2),y=bottom+20;
+      const x=Math.max(40,(right-100-cardWidth)/2),y=20;
       panelFo!.setAttribute("x",String(x)); panelFo!.setAttribute("y",String(y));panelFo!.setAttribute("height",String(panelHeight));
-      bottom=y+panelHeight+20;
       right=Math.max(right,x+cardWidth+40);
     } else {
       const used=new Map<SVGGElement,number>();
@@ -168,13 +164,29 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const badge=(owner:SVGGElement,label:string,title:string)=>{
       const box=positions.get(owner);if(!box)return;
       const g=svgEl("g",{class:"route-question-badge",role:"img","aria-label":title});const t=svgEl("title",{});t.textContent=title;g.append(t);
-      const width=Math.max(24,label.length*7+12),x=box.x+box.width-width,y=box.y-10;
+      const width=Math.max(24,label.length*7+12),x=box.x+box.width-width-3,y=box.y-10;
       g.append(svgEl("rect",{x,y,width,height:19,rx:8}));const text=svgEl("text",{x:x+width/2,y:y+13,"text-anchor":"middle"});text.textContent=label;g.append(text);layer!.append(g);
     };
-    if(layout==="column")for(const owner of new Set(placements.map(p=>p.owner))) {
-      const numbers=[...new Set(placements.filter(p=>p.owner===owner).map(p=>p.card.number))];badge(owner,numbers.join(","),"Question "+numbers.join(", "));
+    for(const owner of new Set(placements.map(p=>p.owner))) {
+      const answers=[...new Set(placements.filter(p=>p.owner===owner).map(p=>String(p.card.number)+(/^(Yes|No)$/.test(p.card.value)?" "+p.card.value:"")))];
+      badge(owner,answers.join(", "),"Question "+answers.join(", "));
     }
     for(const [owner,numbers] of hidden)badge(owner,"? "+numbers.length,"Hidden questions: "+numbers.join(", ")+". Expand this condition to show them.");
+    const pinned = root.querySelector<SVGGElement>(".flow-pinned") ?? byKey.get(snapshot.pinKey);
+    const pinBox = pinned && positions.get(pinned);
+    if (pinBox) {
+      const x=pinBox.x+pinBox.width+6,y=pinBox.y+10;
+      const label=layout==="attached"?"Show questionnaire":"Attach questions to nodes";
+      const toggle=svgEl("g",{class:"route-layout-toggle",role:"button",tabindex:0,"aria-label":label,"aria-pressed":String(layout==="column")});
+      const title=svgEl("title",{});title.textContent=label;toggle.append(title);
+      toggle.append(svgEl("rect",{x,y,width:22,height:22,rx:4}));
+      const drawing=layout==="attached"?"M5 6 H7 M10 6 H17 M5 11 H7 M10 11 H17 M5 16 H7 M10 16 H17":"M5 4 H17 V10 H5 Z M5 14 H17 M5 18 H14";
+      toggle.append(svgEl("path",{d:drawing,transform:`translate(${x} ${y})`}));
+      const change=()=>{layout=layout==="attached"?"column":"attached";render();root.querySelector<SVGElement>(".route-layout-toggle")?.focus();};
+      toggle.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();change();});
+      toggle.addEventListener("keydown",e=>{const k=e as KeyboardEvent;if(k.shiftKey||k.ctrlKey||k.altKey||k.metaKey)return;if(k.key==="Enter"||k.key===" "){e.preventDefault();e.stopPropagation();change();}});
+      layer!.append(toggle);right=Math.max(right,x+22+20);bottom=Math.max(bottom,y+22+20);
+    }
     svg.setAttribute("viewBox",`0 0 ${right} ${bottom}`);svg.setAttribute("width",String(right));svg.setAttribute("height",String(bottom));
     onLayout();
   }
@@ -192,19 +204,18 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
 }
 
 export const ROUTE_CARD_STYLE = `
-.route-card-toolbar { display:flex; flex-wrap:wrap; gap:6px; padding:6px 0; align-items:center; }
 .route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; background:transparent; color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
 .route-card-caption { display:inline-block; vertical-align:baseline; margin:0 6px 0 0; padding:0 4px; font-size:10px; line-height:1.1; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; color:var(--vscode-descriptionForeground,#aaa); }
 .route-card-question { display:inline; font-weight:600; white-space:pre-wrap; }
 .route-card-description { margin:5px 0; white-space:pre-wrap; opacity:.9; } .route-card-value { display:inline-block; box-sizing:border-box; max-width:100%; margin:2px 0 0 6px; padding:1px 5px; border:1px solid var(--vscode-focusBorder,#3794ff); border-radius:3px; background:var(--vscode-editor-selectionBackground,#264f78); color:var(--vscode-editor-foreground,#ddd); vertical-align:baseline; white-space:pre-wrap; }
 .route-card-status { font-size:11px; color:var(--vscode-editorWarning-foreground,#cca700); }
-.route-card button,.route-card-toolbar button { cursor:pointer; padding:2px 5px; border:1px solid var(--vscode-button-border,transparent); background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-button-secondaryForeground,#eee); border-radius:3px; }
-.route-card-toolbar button[aria-pressed=true] { background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff); }
+.route-card button { cursor:pointer; padding:2px 5px; border:1px solid var(--vscode-button-border,transparent); background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-button-secondaryForeground,#eee); border-radius:3px; }
 .route-card button.route-card-edit { position:absolute; top:4px;right:3px; background:transparent; padding:3px;display:flex; }
 .route-description-toggle { display:block; margin-top:4px; font-size:10px; } .route-description-toggle[aria-expanded=false]::before { content:'▸ '; } .route-description-toggle[aria-expanded=true]::before { content:'▾ '; }
 .route-questionnaire .route-card { padding:5px 28px 5px 8px; }
 .route-questionnaire { box-sizing:border-box; width:480px; border:1px solid var(--vscode-focusBorder,#3794ff); border-radius:4px; padding:4px; background:transparent; }
 .route-card-note { flex-basis:100%; color:var(--vscode-editorWarning-foreground,#cca700); }
 .route-card label { display:block; margin:6px 0; } .route-card textarea { display:block;box-sizing:border-box; width:100%; min-height:64px; resize:none; background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
+.route-layout-toggle {cursor:pointer;} .route-layout-toggle rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);} .route-layout-toggle path {fill:none;stroke:var(--vscode-foreground,#ddd);stroke-width:1.5;pointer-events:none;} .route-layout-toggle[aria-pressed=true] rect,.route-layout-toggle:focus-visible rect {stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2;}
 .route-question-badge { pointer-events:none; } .route-question-badge rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-focusBorder,#3794ff);stroke-width:1;} .route-question-badge text {fill:var(--vscode-foreground,#ddd);font:11px sans-serif;}
 `;

@@ -112,7 +112,7 @@ check("determination recommend leaf shows the KEY, not the dotted <category>.<ke
 });
 
 check("emits a sized <svg> with numeric intrinsic width/height (scrolls, not 100%)", () => {
-  const m = r.html.match(/<svg class="flow-svg" width="(\d+)" height="(\d+)" viewBox="0 0 \1 \2"/);
+  const m = r.html.match(/<svg class="flow-svg"[^>]* width="(\d+)" height="(\d+)" viewBox="0 0 \1 \2"/);
   assert.ok(m, "svg with matching width/height/viewBox");
   assert.ok(Number(m[1]) > 0 && Number(m[2]) > 0);
 });
@@ -730,8 +730,8 @@ check("#203 Slice A + GAP 3: flaggableGids = decision root + resolved `when`s + 
   for (const k of ["a:D2", "o", "w:Z"]) assert.ok(!flaggable.has(gidOf(k)), `${k} should NOT be flaggable (use-decision / otherwise / unresolved)`);
   assert.equal(r.flaggableGids.length, 6);
 });
-check("#203 Slice A + GAP 3: renders a HIDDEN, clickable ⚑ flag badge on each flaggable node (incl. leaves); CSS toggles on .has-flag", () => {
-  assert.equal((r.html.match(/class="flow-flag-badge"/g) || []).length, 6); // d:D, w:A, w:B, a:X, a:Y, a:Q
+check("#203 Slice A + GAP 3: renders a grey creation flag on flaggable nodes; existing flags turn yellow", () => {
+  assert.equal((r.html.match(/class="flow-flag-badge flow-flag-create"/g) || []).length, 6); // d:D, w:A, w:B, a:X, a:Y, a:Q
   assert.match(r.html, /data-mv-flag-badge="1"/);
   assert.match(r.html, /class="flow-flag-glyph"[^>]*>⚑</);
   assert.match(FLOW_STYLE, /\.flow-flag-badge\{display:none;/); // hidden by default
@@ -739,7 +739,7 @@ check("#203 Slice A + GAP 3: renders a HIDDEN, clickable ⚑ flag badge on each 
 });
 check("Todo 2 (disc 356): each per-node ⚑ carries data-node-flag-gid == its enclosing row id (the node-filter token); the START pill has none", () => {
   // every per-node badge's gid is a REAL row id (so the host's flagsByGid lookup can resolve it)
-  const badges = [...r.html.matchAll(/<g class="flow-flag-badge" data-mv-flag-badge="1" data-node-flag-gid="([^"]+)">/g)].map((m) => m[1]);
+  const badges = [...r.html.matchAll(/<g class="flow-flag-badge flow-flag-create" data-mv-flag-badge="1" data-node-flag-gid="([^"]+)"[^>]*>/g)].map((m) => m[1]);
   assert.equal(badges.length, 6, "all six per-node badges carry a node-flag gid");
   for (const gid of badges) assert.ok(r.html.includes(`<g id="${gid}"`), `badge gid ${gid} matches a rendered row id`);
   // the per-node gids ARE the flaggable row gids
@@ -1176,4 +1176,12 @@ check("supporting coded inputs get their own question occurrence under direct an
   const options=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H']),answerOptionsByConcept:new Map([['c:Q',ANSWERS]])});
   assert.match(options.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
   assert.equal(optRows(options.html),0,'collapsed answer options do not hide the question');
+});
+
+check('keyboard navigation identifies outcome tips, not delegated decisions or question operands',()=>{
+ const r=renderFlowPane(structure,{concepts});
+ assert.equal((r.html.match(/data-flow-outcome-leaf="1"/g)||[]).length,collectDispositionLeafKeys(structure).size);
+ assert.match(r.html,/class="flow-svg" tabindex="0"/);
+ assert.match(r.html,/branch nodes while pinned/);
+ assert.match(r.html,/data-flow-navigation-node="1" tabindex="-1" role="button"/);
 });

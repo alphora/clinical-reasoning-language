@@ -718,7 +718,7 @@ check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-revea
   const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
   assert.ok(badgeAt > 0 && badgeAt < revealAt, "badge intercept comes before the data-reveal click routing");
   // Todo 2 (disc 356): read data-node-flag-gid off the MATCHED badge element (fb) — present → nodeFlags(gid), absent → mvFlags
-  assert.match(SCRIPT, /var nfg=fb\.getAttribute\('data-node-flag-gid'\);if\(nfg\)v\.postMessage\(\{type:'nodeFlags',gid:nfg\}\);else v\.postMessage\(\{type:'mvFlags'\}\);return;/);
+  assert.ok(SCRIPT.includes("v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),gen})"));
 });
 check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is intercepted BEFORE [data-reveal] and posts toggleCriterion", () => {
   assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\)/);
@@ -1488,7 +1488,7 @@ check("node-filter: the per-node message routes to openNodeFlags(gid); the start
   assert.match(COCKPIT_SRC, /else if \(msg\.type === "mvFlags"\) \{\s*\n\s*void openFlagList\(\);/);
   assert.match(COCKPIT_SRC, /gid\?: string;/, "the incoming-message type carries an optional gid");
   // the webview reads data-node-flag-gid off the MATCHED badge (per-node → nodeFlags, start pill → mvFlags)
-  assert.match(SCRIPT, /var nfg=fb\.getAttribute\('data-node-flag-gid'\);if\(nfg\)v\.postMessage\(\{type:'nodeFlags',gid:nfg\}\);else v\.postMessage\(\{type:'mvFlags'\}\);/);
+  assert.ok(SCRIPT.includes("v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),gen})"));
 });
 
 // ── Todo 2.5 (disc 359) — drawer UX revision: gold node-link, toggle, picker glyph color ──────────────────────────────

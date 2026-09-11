@@ -765,7 +765,7 @@ export function renderFlowPane(
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
         critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
-        flagBadge(x + OUTLINE_NODE_W - 27, y + 11, gid) +
+        flagBadge(x + OUTLINE_NODE_W - 27, y + 11, gid, false) +
         `</g>`;
       continue;
     }
@@ -932,7 +932,7 @@ export function renderFlowPane(
     const critFlagMarkup = critC ? flagBadge(x + NODE_W - 30, y + 13, gid) : "";
     if (critC) flaggableGids.push(gid);
     body +=
-      `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
+      `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"${isLeafEnd ? ` data-flow-outcome-leaf="1"` : ""}>` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
@@ -956,6 +956,7 @@ export function renderFlowPane(
   for (const [i, n] of all.entries()) {
     const id = `${prefix}flow${i}`;
     const metadata = ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
+      (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit") ? ` data-flow-navigation-node="1" tabindex="-1" role="button" aria-label="${escapeHtml(n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
       (n.criterionCollapse ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.criterionCollapse.lib,n.criterionCollapse.name]))}"` : "") +
       (n.critRow ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.critRow.lib,n.critRow.name]))}"` : "") +
@@ -968,7 +969,7 @@ export function renderFlowPane(
   }
 
   const svg =
-    `<svg class="flow-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
+    `<svg class="flow-svg" tabindex="0" aria-label="Decision tree. Tab moves between outcome leaves, or branch nodes while pinned; Enter toggles the pin; Enter activates focused controls; Ctrl+F opens a review flag; Escape returns to controls." width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
     `</svg>`;
   // A floating zoom control (fixed to the pane corner). The zoom LEVEL is webview-local state re-applied after every
@@ -992,8 +993,8 @@ export function renderFlowPane(
 // webview posts `{nodeFlags, gid}` so the host filters to THIS node's flags. CRITICAL that it's on the badge, not the row: on
 // the start node the per-node ⚑ and the start-count pill are SIBLINGS in one row `<g>`, so a row-level attribute would make a
 // start-pill click resolve it too and break "root → full list". The START pill (startFlagBadge) has NO gid → still `mvFlags`.
-const flagBadge = (bx: number, by: number, gid: string): string =>
-  `<g class="flow-flag-badge" data-mv-flag-badge="1" data-node-flag-gid="${escapeHtml(gid)}"><title>review flag(s) on this node — click to review</title>` +
+const flagBadge = (bx: number, by: number, gid: string, canCreate = true): string =>
+  `<g class="flow-flag-badge${canCreate ? " flow-flag-create" : ""}" data-mv-flag-badge="1" data-node-flag-gid="${escapeHtml(gid)}" role="button" tabindex="0" aria-label="Review flag"><title>${canCreate ? "Add or open review flag" : "Open review flags"}</title>` +
   `<circle cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text></g>`;
 
 // The start-node COUNT badge — a copy of the tree chrome (`⚑ N open flags`) pinned to the primary/start node: a pill with
@@ -1039,11 +1040,12 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 }
 
 export const FLOW_STYLE =
+  `[data-flow-navigation-node]:focus-visible>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2}.flow-svg:focus{outline:none}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pin-available>.flow-pin,.flow-pinned>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
-  `.fc-legend .fc-sw.fc-sw-true,.fc-legend .fc-sw.fc-sw-false{width:16px;height:2px;background:#fff;border:0;box-shadow:0 0 3px 1px #3fb950}.fc-legend .fc-sw.fc-sw-false{box-shadow:0 0 3px 1px #f14c4c}` +
+  `.fc-legend .fc-sw.fc-sw-true,.fc-legend .fc-sw.fc-sw-false{width:16px;height:2px;background:#fff;border:0;box-shadow:0 0 3px 1px #00e676}.fc-legend .fc-sw.fc-sw-false{box-shadow:0 0 3px 1px #f14c4c}` +
   `.flow-fallback{display:none}.flow-truth-unknown,.flow-false-stop{display:none;pointer-events:none}` +
-  `.flow-edge.flow-condition-true{stroke:#fff;filter:drop-shadow(0 0 1.5px #3fb950) drop-shadow(0 0 2px #3fb950)}` +
+  `.flow-edge.flow-condition-true{stroke:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}` +
   `.flow-edge.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `.flow-condition-false>.flow-false-stop{display:inline;fill:none;stroke-width:1.75;vector-effect:non-scaling-stroke}` +
   `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-charts-yellow,#d29922);font-weight:bold}` +
@@ -1214,8 +1216,11 @@ export const FLOW_STYLE =
   // CLICKABLE (`pointer-events:auto`) and carries `data-mv-flag-badge` — the webview intercepts it BEFORE the row's
   // `data-reveal` and opens the flag list. Amber circle (the open-flag color, matching `.mv-flags-open`) + a dark ⚑ glyph.
   `.flow-flag-badge{display:none;cursor:pointer;pointer-events:auto}` +
+  `body[data-mode="medical-validation"] .flow-flag-create{display:inline}` +
   `.flow-row.has-flag .flow-flag-badge{display:inline}` +
-  `.flow-flag-badge>circle{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700));stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.flow-flag-badge>circle{fill:var(--vscode-descriptionForeground,#999);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.has-flag .flow-flag-badge>circle{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700))}` +
+  `.flow-flag-badge:focus-visible>circle{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5}` +
   `.flow-flag-glyph{fill:#1e1e1e;font-size:9px;font-weight:bold;text-anchor:middle;pointer-events:none}` +
   // The start-node COUNT badge (chrome mirror). HIDDEN; shown when the host toggles `.has-startflag` on the start row +
   // sets `.flow-startflag-text`. Amber pill (open) — the host recolors the text/pill semantics via the count it posts.
