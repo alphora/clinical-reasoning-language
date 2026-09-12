@@ -350,8 +350,8 @@ describe("value from — instantiated vs reference terminology", () => {
   // ⚠ THE CASE THAT WAS WRONG. `system is` + `code is` means WE KNOW THE ANSWERS.
   it("an INSTANTIATED terminology's codes ARE the concept's answers", () => {
     expect(by.get("Instantiated Q")?.answerOptions).toEqual([
-      { code: "15822", display: "First offered service" },
-      { code: "15823", display: "Second offered service" },
+      { system: "http://www.ama-assn.org/go/cpt", code: "15822", display: "First offered service" },
+      { system: "http://www.ama-assn.org/go/cpt", code: "15823", display: "Second offered service" },
     ]);
     expect(by.get("Instantiated Q")?.answersFromTerminology).toBeUndefined();
   });

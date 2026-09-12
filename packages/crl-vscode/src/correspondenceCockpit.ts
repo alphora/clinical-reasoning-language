@@ -144,6 +144,8 @@ import { definitionValueInputs, buildRouteCards } from "./routeCards";
 import { installRouteCards, ROUTE_CARD_STYLE } from "./routeCardsWebview";
 import { alignFlowConnectorBorders } from "./flowConnectorBorders";
 import { installFlowKeyboardActions } from "./flowKeyboardActions";
+import { installFlowDisclosureFocus } from "./flowDisclosureFocus";
+import { installFlowComponentContainers } from "./flowComponentContainers";
 import { graphWordingSources, resolveWordingTarget, createPresentationProposal, savePresentationProposal, pendingPresentationProposals, type WordingTarget } from "./presentationProposal";
 import { conditionTruthKeys } from "./flowProjection";
 import { executionRoutes, routeScenario, buildRouteQuestionnaire, type ExecutionRoute } from "./executionRoutes";
@@ -2425,8 +2427,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   // REFACTOR:grounded: the host owns pin identity and proposal targets; webview never supplies paths.
   let wordingSources = new Map<string, { filePath: string; source: string }>();
+  let disclosureFocus: { gen: number; token: string } | undefined;
   let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; payload: any; targets: Map<string, WordingTarget> } | undefined;
-  function pinCards(caseId: string, routeId: string): void {
+  function pinCards(caseId: string, routeId: string, focusRequest?: string): void {
     const view = views.get("tree"), sv = scenarioByCaseId.get(caseId);
     const route = routesForCase(caseId).find(r => r.terminalId === routeId);
     if (!view || !sv || !route || mode !== "medical-validation") return;
@@ -2445,7 +2448,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const foreign = isAbsolute(ownerPath) || ownerPath === ".." || ownerPath.startsWith(".." + sep);
       const dirty = vscode.workspace.textDocuments.some(d => d.uri.fsPath === target.filePath && d.isDirty);
       return { ...target, editable: !foreign && !dirty, readOnlyReason: foreign ? "Wording belongs to an imported library. Its CRL owner must propose the change." : dirty ? "Save or revert the unsaved CRL edits, then re-pin to propose wording." : undefined };
-    }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer), (lib,name) => !!crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.hasLocalCode);
+    }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer), (lib,name) => !!crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.hasLocalCode, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answersFromTerminology);
     const leafMarks = leafBucketsFromQuestionnaire(q.questions, resolveKey, sv.conceptTruth, view.leafConcepts);
     const selectedIds = new Set(route.nodeIds);
     const marks = { yesKeys: leafMarks.yesKeys, noKeys: leafMarks.noKeys,
@@ -2454,7 +2457,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const payload = { token, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
       pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
     pinnedCards = { token, epoch: indexVersion, caseId, routeId, payload, targets: built.targets };
-    void view.panel.webview.postMessage({ type: "routeCards", gen: view.gen, ...payload });
+    void view.panel.webview.postMessage({ type: "routeCards", gen: view.gen, ...payload, focusRequest });
     driveLeafMarks();
   }
   function hasPendingWording(): boolean { const src = currentCel && findPolicySrc(currentCel); if (!src) return false; const p = pendingPresentationProposals(src); return !!(p.pending || p.unreadable); }
@@ -2485,7 +2488,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const v = views.get(pane);
     if (!v) return;
     if (pane === "tree" && msg.gen === v.gen) {
-      if (msg.type === "pinRoute" && typeof msg.caseId === "string" && typeof msg.routeId === "string") { pinCards(msg.caseId, msg.routeId); return; }
+      if (msg.type === "pinRoute" && typeof msg.caseId === "string" && typeof msg.routeId === "string") { pinCards(msg.caseId, msg.routeId, typeof msg.token === "string" ? msg.token : undefined); return; }
       if (msg.type === "unpinRoute") { pinnedCards = undefined; driveLeafMarks(); return; }
       if (msg.type === "routeCardProposal") { proposeCard(msg); return; }
       if (msg.type === "routeCardSource" && pinnedCards && pinnedCards.token === msg.token && pinnedCards.epoch === indexVersion) {
@@ -2540,6 +2543,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (pane === "tree" || pane === "crl" || pane === "source") {
         driveDiverters();
       }
+      if (pane === "tree" && disclosureFocus?.gen === v.gen) {
+        void v.panel.webview.postMessage({ type: "disclosureFocus", gen: v.gen, token: disclosureFocus.token });
+        disclosureFocus = undefined;
+      }
     } else if (msg.type === "diverterToggle" && (msg.on === "1" || msg.on === "0")) {
       applyShowDetails(msg.on === "1"); // disc 164: the tree-pane diverter on/off toggle (MV)
     } else if (msg.type === "fcMode" && (msg.mode === "blocking" || msg.mode === "all")) {
@@ -2558,15 +2565,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
     } else if (msg.type === "nodeVerdictMenu" && typeof msg.key === "string") {
       void nodeMenu(msg.key); // #217 + #203 Todo 4b Slice B: right-click a flow node (MV) — combined menu (verdict / add-flag); a non-flaggable node routes straight to the verdict pick
-    } else if (msg.type === "toggleCriterion" && typeof msg.key === "string") {
+    } else if (msg.type === "toggleCriterion" && typeof msg.key === "string" && pane === "tree" && msg.gen === v.gen) {
       // #224 ii.3 Slice 2: the criterion `▸`/`▾` disclosure. Resolve the opaque reveal key → the collapse key (trusted
       // lookup, never a webview-supplied path), then flip its state + re-render the tree (layout change). #233 Todo 2a:
       // a ROOT criterion resolves to its `when` nodeKey; a NON-ROOT criterion box resolves to `{criterionToggle: posKey}`.
       // Both flip a string in `expandedGuardWhens` (disjoint keyspaces — a JSON-array nodeKey vs a `leaf::` position key,
       // the latter TAGGED: `"crit"` for a criterion body, `"opts"` for a #189 coded question's answer options).
       const hit = v.reveals[msg.key];
-      if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey);
-      else if (hit && isCriterionToggleHit(hit)) toggleCriterionExpand(hit.criterionToggle);
+      if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey, msg.token);
+      else if (hit && isCriterionToggleHit(hit)) toggleCriterionExpand(hit.criterionToggle, msg.token);
     } else if (msg.type === "snapshotDom" && pane === "tree" && typeof msg.token === "string") {
       // #(tree-snapshot) Todo 2 — the tree webview's reply to `requestSnapshot` (only the TREE pane is a valid source). The
       // coordinator ignores a stale/late token; the payload is COERCED to string here + fully screened in captureTreeDom.
@@ -4800,10 +4807,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  key (`{criterionToggle}`); both live in the one `expandedGuardWhens` set (disjoint keyspaces). Mirrors
    *  `applyShowKeys`'s tail: the tree ack re-drives every overlay, and re-dispatching the selection restores the
    *  highlight the innerHTML swap dropped. Ephemeral: `expandedGuardWhens` is not persisted. */
-  function toggleCriterionExpand(collapseKey: string): void {
+  function toggleCriterionExpand(collapseKey: string, focusToken?: unknown): void {
     if (expandedGuardWhens.has(collapseKey)) expandedGuardWhens.delete(collapseKey);
     else expandedGuardWhens.add(collapseKey);
     renderPane("tree");
+    const view = views.get("tree");
+    disclosureFocus = view && typeof focusToken === "string" ? { gen: view.gen, token: focusToken } : undefined;
     if (state.selection) dispatch({ type: "select", selection: state.selection });
   }
 
@@ -5743,11 +5752,15 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // focused — the this-node/diverter lifecycle, driven by focusedScenario — NOT the case-independent done-overlay one.)
   `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
   `let pinnedFlowKey='',pinnedRouteKeys=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
-  `const alignBorders=()=>(${alignFlowConnectorBorders.toString()})(root);` +
+  // REFACTOR:grounded: component geometry follows live cards, collapse and zoom without changing route identities.
+  `const componentUi=(${installFlowComponentContainers.toString()})(root);` +
+  `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();};` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
   `(${installFlowKeyboardActions.toString()})(root);` +
+  `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root,()=>gen);` +
   `const applyFlowPin=()=>{const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;if(!pinnedFlowKey)return;const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');};` +
-  `const toggleFlowPin=k=>{if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();}else{if(!currentRouteKeys.includes(k))return;v.postMessage({type:'pinRoute',gen,caseId:currentRouteCase,routeId:currentRouteId});}};` +
+  `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
+  `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{if(!currentRouteKeys.includes(k))return;pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinRoute',gen,caseId:currentRouteCase,routeId:currentRouteId,token:pendingPinFocus});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
   // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
@@ -5758,7 +5771,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();` +
+  `pendingPinFocus='';pinFocusVersion++;gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
@@ -5856,7 +5869,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='routeCards'){if(m.gen!==gen)return;pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();}` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(pendingPinFocus&&m.focusRequest===pendingPinFocus){focusPinLeaf(m.pinKey);pendingPinFocus='';}}` +
+  `else if(m.type==='disclosureFocus'){if(m.gen===gen)disclosureUi.restore(m.token);}` +
   `else if(m.type==='routeCardProposalResult'){if(m.gen===gen)routeCardUi.result(m);}` +
   `else if(m.type==='clearLeaves'){clrLeaf();for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');}` +
   `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();currentRouteKeys=m.routeKeys||[];currentRouteLabel=m.routeLabel||'';currentRouteCase=m.routeCaseId||'';currentRouteId=m.routeId||'';applyFlowPin();if(pinnedFlowKey&&m.pinnedMarks)Object.assign(m,m.pinnedMarks);` +
@@ -5984,7 +5998,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // nodeKey OR a NON-ROOT criterion's `{criterionToggle}` position key, then flips collapse + re-renders.
   `const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(fp){e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);return;}` +
   `const ct=e.target.closest&&e.target.closest('[data-toggle-crit]');` +
-  `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',key:ct.getAttribute('data-toggle-crit')});return;}` +
+  `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',gen,key:ct.getAttribute('data-toggle-crit'),token:disclosureUi.capture(ct)});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
   `document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.shiftKey||(e.key!=='Enter'&&e.key!==' '))return;const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(!fp)return;e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);});` +

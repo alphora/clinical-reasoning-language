@@ -9,8 +9,10 @@ export interface RouteCard {
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
   criteria: { lib: string; name: string }[];
   criterionPaths: { lib: string; name: string }[][];
+  answerChoices: { system?: string; code: string; display: string; selected: boolean }[];
+  choicesFrom?: string;
 }
-export function formatAnswer(value: { type: string; value: unknown } | undefined, options: { code: string; display: string }[] = []): string | undefined {
+export function formatAnswer(value: { type: string; value: unknown } | undefined, options: { system?: string; code: string; display: string }[] = []): string | undefined {
   if (!value) return undefined;
   const v = value.value;
   if (typeof v === "boolean") return v ? "Yes" : "No";
@@ -36,9 +38,10 @@ export function definitionValueInputs(concepts: CrlConceptNode[]) {
 
 export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor: (id: string) => string | undefined,
   wording: (lib: string, name: string, nodeId: string, criteria: string[]) => WordingTarget | undefined,
-  optionsFor: (lib: string, name: string) => { code: string; display: string }[] = () => [],
+  optionsFor: (lib: string, name: string) => { system?: string; code: string; display: string }[] = () => [],
   valueInputs: (lib: string, name: string) => CrlConceptNode[] = () => [],
-  questionEnabled?: (lib: string, name: string) => boolean) {
+  questionEnabled?: (lib: string, name: string) => boolean,
+  choicesFromFor: (lib: string, name: string) => string | undefined = () => undefined) {
   const cards: RouteCard[] = [], targets = new Map<string, WordingTarget>(), emitted = new Map<string, RouteCard>();
   const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: {lib: string; name: string}[], explanation: boolean, valueOnly = false, seen = new Set<string>()) => {
     const identity = JSON.stringify([lib,name]);
@@ -49,7 +52,10 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     const target = wording(lib, name, nodeId, criteria.map(c => c.name));
     const answerable = questionEnabled ? questionEnabled(lib,name) : !!target;
     const evidence = sv.conceptValues?.find(r => r.libraryName === lib && r.name === name);
-    const raw = formatAnswer(evidence?.answerValue, optionsFor(lib, name));
+    const options = optionsFor(lib, name);
+    const raw = formatAnswer(evidence?.answerValue, options);
+    const coded = evidence?.answerValue?.type === "CodeableConcept" ? evidence.answerValue.value as {coding?: {system?: string; code?: string}[]} : undefined;
+    const selectedCodes = new Set(Array.isArray(coded?.coding) ? coded.coding.filter(c=>c.system).map(c=>JSON.stringify([c.system,c.code])) : []);
     const determination = valueOnly ? "" : answer === "yes" ? "True" : answer === "no" ? "False" : "Unknown";
     let value: string;
     if (valueOnly) value = raw ?? "Not answered";
@@ -63,6 +69,8 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     const id = `card-${cards.length}`;
     cards.push({ id, ownerKey, concept: name, library: lib, text: target?.questionText ?? name,
       description: target?.questionDescription ?? "", value,
+      answerChoices: options.map(o=>({...o, selected: !!o.system && selectedCodes.has(JSON.stringify([o.system,o.code]))})),
+      choicesFrom: choicesFromFor(lib,name),
       determination, explanation, criteria, criterionPaths: [criteria], editable: !!target && target.editable !== false, ...(target ? { scopeLabel: target.scopeLabel, readOnlyReason: target.readOnlyReason } : {}) });
     emitted.set(occurrence,cards[cards.length-1]);
     if (target && target.editable !== false) targets.set(id, target);

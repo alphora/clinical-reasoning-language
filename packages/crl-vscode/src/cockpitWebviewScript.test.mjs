@@ -48,6 +48,24 @@ function handlerBody(type) {
   return SCRIPT.slice(start, i - 1);
 }
 
+check('pin focus follows the matching response and unpin retains the leaf; stale frames cannot steal focus',()=>{
+  const section=SCRIPT.slice(SCRIPT.indexOf("let pendingPinFocus="),SCRIPT.indexOf("window.addEventListener('message'"));
+  const frames=[],messages=[],events=[];
+  const leaf={dataset:{flowKey:'leaf'},setAttribute(){},focus(){events.push('focus');},scrollIntoView(){events.push('scroll');}};
+  const root={querySelectorAll:()=>[leaf]};
+  const ui=new Function('root','requestAnimationFrame','v',`
+    let gen=1,pinnedFlowKey='',pinnedRouteKeys=[],pinnedRouteLabel='',currentRouteKeys=['leaf'],currentRouteCase='case',currentRouteId='route';
+    const routeCardUi={reset(){},show(){}},applyFlowPin=()=>{},applyZoom=()=>{};
+    ${section}
+    return {toggle:toggleFlowPin,receive:m=>{${handlerBody('routeCards')}},invalidate:()=>{pendingPinFocus='';pinFocusVersion++;gen++;}};
+  `)(root,fn=>frames.push(fn),{postMessage:m=>messages.push(m)});
+  ui.toggle('leaf');const request=messages.at(-1);
+  ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:'old'});assert.equal(frames.length,0);
+  ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:request.token});frames.shift()();assert.deepEqual(events,['focus','scroll']);
+  ui.toggle('leaf');assert.equal(messages.at(-1).type,'unpinRoute');frames.shift()();assert.equal(events.length,4);
+  ui.toggle('leaf');ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:messages.at(-1).token});ui.invalidate();frames.shift()();assert.equal(events.length,4);
+});
+
 // Extract the root 'click' listener body (brace-matched) — the delegated handler where the note controls live.
 function handlerClick() {
   const marker = "root.addEventListener('click',(e)=>{";
@@ -726,7 +744,7 @@ check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is in
   const toggleAt = SCRIPT.indexOf("data-toggle-crit");
   const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
   assert.ok(toggleAt > 0 && toggleAt < revealAt, "chevron intercept comes before the data-reveal click routing");
-  assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\);.*postMessage\(\{type:'toggleCriterion',key:[^}]*\}\);return;/s);
+  assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\);.*postMessage\(\{type:'toggleCriterion',gen,key:[^}]*token:disclosureUi.capture\(ct\)\}\);return;/s);
 });
 
 // ── #224 ii.3 Slice 2b: model-level criterion verdict chips (webview + host) ──────────────────────

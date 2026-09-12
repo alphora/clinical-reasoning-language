@@ -396,8 +396,9 @@ function buildLaid(
         };
       }
       case "criterion": {
-        // #233 Todo 2a: a NON-ROOT criterion reference — a NAMED collapsible boundary row (mirroring the questionnaire's
-        // named criterion box). A ROOT criterion never reaches here (it is absorbed into the `when` box via
+        // REFACTOR:grounded: reusable criterion identity has a compact component tab, not a named condition box.
+        // A NON-ROOT criterion reference remains a collapsible component boundary.
+        // A ROOT criterion never reaches here (its identity is carried by the `when` tab via
         // `criterionCollapse` — the outline-hanging branch unwraps a root criterion to its `.operand`). Collapse is
         // POSITION-keyed (`posKey = (whenKey,opPath)`) + INDEPENDENT (a criterion nested inside a just-expanded parent
         // appears collapsed), default COLLAPSED. `bodyConcepts` = the addressable leaf identities inside the body (the
@@ -408,6 +409,7 @@ function buildLaid(
         const bodyConcepts: { lib: string; name: string }[] = [];
         collectLeafIdentities(s.operand, bodyConcepts);
         const children = collapsed ? [] : [buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.b`, cursor)];
+        if (!collapsed) cursor.y += 12 / ROW; // cursor uses slots; reserve 12 pixels for the closing border
         return {
           ...base, nodeKey: posKey, kind: "leaf", outlineRow: "crit",
           label: s.name, full: `${s.name} — criterion "${s.lib}"`,
@@ -699,11 +701,18 @@ export function renderFlowPane(
   // EXTENT-based width — the outline's indent-based x is decoupled from the depth grid (`maxDepth` is NOT bumped for
   // outline rows), so width MUST come from the actual right edge of EVERY node (boxes + labels + stubs), not `maxDepth*COL`.
   const rightEdge = all.reduce((m, n) => Math.max(m, left(n) + nodeW(n)), PAD + maxDepth * COL + NODE_W);
-  const width = Math.ceil(rightEdge + PAD);
+  // REFACTOR:grounded: nested component frames extend beyond their last descendant.
+  const componentDepth = (n: LaidNode, depth = 0): number => {
+    const component = n.criterionCollapse ?? n.critRow;
+    const here = depth + (component && !component.collapsed ? 1 : 0);
+    return Math.max(here,...n.children.map(c=>componentDepth(c,here)));
+  };
+  const frameDepth = Math.max(0,...roots.map(n=>componentDepth(n)));
+  const width = Math.ceil(rightEdge + PAD + frameDepth * 8);
   // EXTENT-based height (#208) — the bottommost box may be a taller NODE_H or a shorter outline OUTLINE_H at a fractional
   // `y`, and the on-path RING extends ~3px beyond the box, so take the true max bottom + a ring margin, not `maxY*ROW+NODE_H`.
   const bottomEdge = all.reduce((m, n) => Math.max(m, top(n) + nodeH(n)), PAD + NODE_H);
-  const height = Math.ceil(bottomEdge + 4 + PAD);
+  const height = Math.ceil(bottomEdge + 4 + PAD + frameDepth * 12);
 
   // Edges first (so node boxes paint over them). Edges are pure <path> — NEVER reveal targets.
   let body = "";
@@ -746,7 +755,7 @@ export function renderFlowPane(
       continue;
     }
 
-    // #233 Todo 2a/2b: a NON-ROOT criterion boundary — a NAMED collapsible box. TWO channels: a ▸/▾ chevron
+    // REFACTOR:grounded: a NON-ROOT criterion is a reusable component tab. TWO preserved channels: a ▸/▾ chevron
     // (`data-toggle-crit` → `{criterionToggle: posKey}` → `toggleCriterionExpand`), and the box BODY (`data-reveal` →
     // `{criterionOccurrence}` carrying the criterion identity + canonical bodyHash → RIGHT-click opens the model-level
     // criterion-encoding menu; LEFT-click is inert, diverted host-side). #233 Todo 2b: the hidden model-level verdict CHIP
@@ -762,7 +771,7 @@ export function renderFlowPane(
       body +=
         `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
+        labelMarkup("Component", x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
         critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
         flagBadge(x + OUTLINE_NODE_W - 10, y + OUTLINE_H - 10, gid, false) +
@@ -841,7 +850,7 @@ export function renderFlowPane(
         // per line out of OUTLINE_LABEL_MAX = 20, so every coded question wrapped to two 8-char fragments.
         // The crit-row precedent above reserves 5 chars for a 20px gutter; 12px is ~2 chars at ~5.9px/char.
         labelMarkup(n.label, x + (optRow ? 12 : 0), y, OUTLINE_H, OUTLINE_LABEL_MAX - (optRow ? 2 : 0), 9) +
-        (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey, `${optRow.count} answer options`) : "") +
+        (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey, `${optRow.count} answer options`).replace('<g ', '<g data-flow-choices-toggle="1" ') : "") +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
         (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 10, y + OUTLINE_H - 10, gid) : "") +
         `</g>`;
@@ -934,7 +943,7 @@ export function renderFlowPane(
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
-      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(n.label, x, y, NODE_H, labelMax, labelDx)) +
+      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(critC ? "Component" : n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       (n.kind === "when" ? `<text class="flow-truth-unknown" x="${x - 14}" y="${y + 16}"><title>Not answered — evaluation paused here</title>?</text>` +
         (!n.children.some(c => c.incomingOutcome === "No") ? `<path class="flow-false-stop" d="M${x + NODE_W} ${y + NODE_H / 2} h24 m0 -4 v8"><title>Condition false — this branch stops here</title></path>` : "") : "") +
@@ -954,8 +963,10 @@ export function renderFlowPane(
   for (const [i, n] of all.entries()) {
     const id = `${prefix}flow${i}`;
     const metadata = ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
+      (n.outlineRow === "option" ? ' data-flow-decoration="choices"' : n.outlineRow === "op" && n.label === "input" ? ' data-flow-decoration="input"' : '') +
       (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit") ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
+      (n.criterionCollapse || n.critRow ? ` data-flow-component="${(n.criterionCollapse ?? n.critRow)!.collapsed ? "collapsed" : "expanded"}"` : "") +
       (n.criterionCollapse ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.criterionCollapse.lib,n.criterionCollapse.name]))}"` : "") +
       (n.critRow ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.critRow.lib,n.critRow.name]))}"` : "") +
       (n.isSource && n.conceptName && n.conceptLib ? ` data-flow-question="${escapeHtml(JSON.stringify([n.conceptLib,n.conceptName]))}"` : "") +
@@ -1057,6 +1068,11 @@ export const FLOW_STYLE =
   // off-path purple a touch heavier). On-path still wins — the `.flow-row.current/flow-leaf-yes>rect` thicken rules (2.5/2)
   // are EQUAL specificity ((0,2,1)) but sit LATER in the sheet, so a ringed inferred node overrides this 1.4.
   `.flow-when.flow-inferred>rect{stroke:${TOK_INFERRED};stroke-width:1.4}` +
+  // REFACTOR:grounded: the component tab identifies reusable structure; truth stays on internal logic.
+  `.flow-component-frames>rect{fill:rgba(160,160,160,.025);stroke:rgba(160,160,160,.45);stroke-width:1;vector-effect:non-scaling-stroke}` +
+  `[data-flow-component]>rect{fill:transparent!important;stroke:rgba(160,160,160,.45)!important;stroke-width:1!important}` +
+  `[data-flow-component="expanded"]>rect{stroke:transparent!important}` +
+  `[data-flow-component]>text{font-size:10px;fill:var(--vscode-descriptionForeground,#aaa)}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
   // A recommend TARGET. #210: ALL recommend activities (incl. determinations) → neutral grey, the SAME as an ordinary
   // activity (the certify→green / not-certify+pended→gold borders were removed — they made the viewer PA-specific). A

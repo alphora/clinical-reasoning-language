@@ -755,6 +755,7 @@ check("tree zoom: renders a floating − / reset / + control (the % is filled in
 });
 
 
+// REFACTOR:grounded: component labels hide criterion names but preserve technical identity and behavior.
 // ── #224 ii.3 Todo 3: a criterion-bearing `when` hangs its GUARD OUTLINE (criterion body), keyed by nodeKey ──
 // #233 Todo 2b: the guardOutlines map VALUE is just `{ expr }` (`soleCriterion` RETIRED). A SOLE-criterion `when` has
 // `expr` = a `criterion` node (`gout(expr, name)` wraps it); the sole identity is DERIVED via `topCriterion(expr)`.
@@ -770,7 +771,27 @@ const gcrit = (name, operand, { elided = false } = {}) => ({ kind: "criterion", 
 const goutC = (critExpr) => ({ expr: critExpr });
 const gout = (expr, name) => (name ? goutC(gcrit(name, expr)) : { expr });
 
-check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the box keeps the CRITERION name + a ▾ chevron", () => {
+// REFACTOR:grounded: actual renderer uses slot coordinates; component padding must remain pixel-sized.
+check('component closing padding is compact and deeply nested frames fit the canvas',()=>{
+  const structure=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:deep','when','Rule',[],[])]}];
+  const siblingExpr=gand(gcrit('One',gleaf('A','c:A')),gcrit('Two',gleaf('B','c:B')));
+  const siblingOpts={concepts:[],revealPrefix:'pad_',guardOutlines:new Map([['w:deep',gout(siblingExpr)]])};
+  const folded=renderFlowPane(structure,siblingOpts);
+  const expandedGuardWhens=new Set(Object.values(folded.reveals).filter(r=>r.criterionToggle).map(r=>r.criterionToggle));
+  const siblings=renderFlowPane(structure,{...siblingOpts,expandedGuardWhens});
+  const y=gid=>Number(siblings.html.match(new RegExp('<g id="'+gid+'"[^>]*>[\\s\\S]*?<rect[^>]* y="([0-9.]+)"'))[1]);
+  const gap=y(siblings.criterionOccurrences[1].gid)-y(siblings.criterionOccurrences[0].gid);
+  assert.ok(gap>60&&gap<160,'12px closing padding, not 12 whole rows: '+gap);
+  let expr=gleaf('A','c:A');for(let i=0;i<5;i++)expr=gcrit('Level'+i,expr);
+  const opts={concepts:[],revealPrefix:'deep_',guardOutlines:new Map([['w:deep',goutC(expr)]]),expandedGuardWhens:new Set(['w:deep'])};
+  let rendered;for(let i=0;i<6;i++){rendered=renderFlowPane(structure,opts);for(const r of Object.values(rendered.reveals))if(r.criterionToggle)opts.expandedGuardWhens.add(r.criterionToggle);}
+  const height=Number(rendered.html.match(/viewBox="0 0 [0-9.]+ ([0-9.]+)"/)[1]);
+  const bottom=Math.max(...[...rendered.html.matchAll(/<rect\b([^>]*)>/g)].map(m=>Number(m[1].match(/ y="([0-9.]+)"/)?.[1]??0)+Number(m[1].match(/ height="([0-9.]+)"/)?.[1]??0)));
+  assert.ok(height-bottom>=60,'canvas reserves five nested closing borders');
+  assert.equal((rendered.html.match(/data-flow-component="expanded"/g)||[]).length,5);
+});
+
+check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the component hides the name and keeps a ▾ chevron", () => {
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:crit", "when", "when Elig", ["c:A", "c:B"], [node("a:X", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
   ] }];
@@ -780,9 +801,9 @@ check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the box
   // Expanded → the body is visible: an ALL OF row over two leaf rows.
   assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard body");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the two criterion-body leaves render when expanded");
-  // The when box shows the CRITERION name (not a masqueraded operand), neutral grey, + a ▾ (collapse) chevron.
+  // Component tab hides the name; its technical title and collapse control remain.
   assert.match(rr.html, /<g id="[^"]*"[^>]* class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "neutral grey when box, titled with the criterion name");
-  assert.ok(/<text[^>]*>Elig<\/text>/.test(rr.html), "the when box label is the criterion name Elig");
+  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "visible tab says Component");
   assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>collapse criterion body</.test(rr.html), "an expanded criterion carries a ▾ collapse chevron");
   assert.ok(Object.entries(rr.leafConcepts).every(([, v]) => v.topWhenKey === "w:crit"), "body leaves inherit topWhenKey = the criterion when");
 });
@@ -797,7 +818,7 @@ check("Todo 3 Slice 2: a single-criterion when defaults to COLLAPSED — a ▸ c
   assert.equal(leafRowsOf(rr.html).length, 0, "collapsed ⇒ NO body leaves rendered");
   assert.ok(!/ALL OF/.test(rr.html), "collapsed ⇒ no operator rows");
   assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>expand criterion body</.test(rr.html), "a collapsed criterion carries a ▸ expand chevron with a toggle key");
-  assert.ok(/<text[^>]*>Elig<\/text>/.test(rr.html), "the collapsed box still names the criterion");
+  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "collapsed tab says Component");
 });
 
 check("Todo 3 Slice 2: a compound-with-criterion guard (no soleCriterion) is NOT collapsible — always expanded, no chevron", () => {
@@ -823,8 +844,8 @@ check("Todo 3 [critical 1]: a SOLE-REF criterion does NOT masquerade as its body
   // Only the GUARD outline's leaves — B's defined-as leaves (L1/L2) are suppressed (no double-hang).
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["P", "Q"], "only the guard-body leaves render; B's own composite is suppressed");
   assert.ok(!/>L1<|>L2</.test(rr.html), "B's defined-as leaves do NOT appear (precedence: guard outline wins)");
-  // No masquerade: the box is titled/labeled with the criterion name, neutral grey (NOT concept B, NOT inferred-purple).
-  assert.ok(/<text[^>]*>Elig<\/text>/.test(rr.html), "label is the criterion name, not the body concept B");
+  // Component retains its technical title without masquerading as body concept B.
+  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "component does not impersonate body concept B");
   assert.ok(!/flow-when flow-inferred/.test(rr.html), "the criterion when is NOT painted purple-inferred from concept B");
 });
 
@@ -949,12 +970,12 @@ check("#233 Todo 2a ROOT-ABSORPTION: a SOLE criterion is absorbed into the `when
   // EXPANDED: the when box carries the criterion name + a ▾ chevron; the body leaves hang; NO separate crit-row for the root.
   const e = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: gouts, expandedGuardWhens: new Set(["w:crit"]) });
   assert.match(e.html, /class="flow-row flow-when flow-greyborder"[^>]*><title>Elig/, "the root criterion is the when box (named Elig), not a crit-row");
-  assert.ok(/<text[^>]*>Elig<\/text>/.test(e.html) && /data-toggle-crit="[^"]*"><title>collapse criterion body</.test(e.html), "when box named Elig + a ▾ chevron");
+  assert.ok(/<text[^>]*>Component<\/text>/.test(e.html) && /data-toggle-crit="[^"]*"><title>collapse criterion body</.test(e.html), "when box named Elig + a ▾ chevron");
   assert.deepEqual(leafRowsOf(e.html).map((l) => l.label).sort(), ["A", "B"], "the body leaves hang below the when box");
   assert.ok(!/flow-crit-row/.test(e.html), "the ROOT criterion draws NO crit-row (absorbed into the when box)");
   // COLLAPSED (default): the when box keeps the name + a ▸ chevron; no body, no crit-row.
   const c = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: gouts });
-  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c.html) && /<text[^>]*>Elig<\/text>/.test(c.html), "collapsed: named ▸ when box");
+  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c.html) && /<text[^>]*>Component<\/text>/.test(c.html), "collapsed: named ▸ when box");
   assert.equal(leafRowsOf(c.html).length, 0, "collapsed: no body leaves");
   assert.ok(!/flow-crit-row/.test(c.html), "collapsed root criterion draws no crit-row");
 });
@@ -976,7 +997,7 @@ check("#233 Todo 2a: a NON-ROOT criterion conjunct (`when A and CritC`) draws Cr
   const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]); // compound root → NO soleCriterion → CritC is non-root
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "nr_", guardOutlines: gouts });
   assert.ok(/class="flow-outline flow-crit-row"/.test(rr.html), "CritC draws a named crit-row box");
-  assert.ok(/<text[^>]*>CritC<\/text>/.test(rr.html), "the crit-row is labelled with the criterion name");
+  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "component name is hidden from visible text");
   assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(rr.html), "collapsed by default → a ▸ expand chevron");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A"], "the criterion body leaf B is HIDDEN while collapsed; only the plain conjunct A renders as a leaf");
   assert.equal(rr.criterionOccurrences.length, 1, "one occurrence for the non-root criterion");
@@ -1042,7 +1063,7 @@ check("#233 Todo 2a: nested criterion independence — a criterion INSIDE anothe
   //    (recursing THROUGH Child while folded) so a flag on B is visible on the collapsed Parent box.
   const c0 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n0_", guardOutlines: gouts });
   assert.equal((c0.html.match(/flow-crit-row/g) || []).length, 1, "collapsed: exactly ONE crit-row (Parent); Child is hidden inside the folded body");
-  assert.ok(/<text[^>]*>Parent<\/text>/.test(c0.html) && !/<text[^>]*>Child<\/text>/.test(c0.html), "Parent named, Child not yet rendered");
+  assert.ok(/<title>Parent[^<]*<\/title>/.test(c0.html) && !/<text[^>]*>Child<\/text>/.test(c0.html), "Parent technical identity retained, Child not rendered");
   assert.deepEqual(c0.criterionOccurrences.map((o) => o.name), ["Parent"], "one occurrence: Parent");
   assert.deepEqual(c0.criterionOccurrences[0].bodyConcepts.map((c) => `${c.lib}:${c.name}`).sort(), ["Pol:B", "Pol:P"], "Parent's rollup recurses THROUGH the folded Child → P + B");
   assert.deepEqual(leafRowsOf(c0.html).map((l) => l.label).sort(), ["A"], "no body leaves rendered while all folded (only the plain conjunct A)");
@@ -1050,7 +1071,7 @@ check("#233 Todo 2a: nested criterion independence — a criterion INSIDE anothe
   const parentKey = Object.values(c0.reveals).find((h) => "criterionToggle" in h).criterionToggle;
   const c1 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n1_", guardOutlines: gouts, expandedGuardWhens: new Set([parentKey]) });
   assert.equal((c1.html.match(/flow-crit-row/g) || []).length, 2, "Parent expanded → Parent + Child rows");
-  assert.ok(/<text[^>]*>Child<\/text>/.test(c1.html), "Child now renders its own named row");
+  assert.ok(/<title>Child[^<]*<\/title>/.test(c1.html), "Child technical identity now renders");
   assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c1.html), "Child defaults to COLLAPSED (▸) inside the just-expanded Parent — independent, position-keyed");
   assert.deepEqual(leafRowsOf(c1.html).map((l) => l.label).sort(), ["A", "P"], "Parent's own leaf P shows; Child's leaf B stays hidden (Child folded)");
   assert.deepEqual(c1.criterionOccurrences.map((o) => o.name).sort(), ["Child", "Parent"], "two occurrences now: Parent + Child");

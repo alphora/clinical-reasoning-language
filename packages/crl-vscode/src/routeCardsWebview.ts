@@ -3,6 +3,7 @@
 // Kept self-contained so the exact browser controller can be exercised in DOM tests.
 export function installRouteCards(root: HTMLElement, api: { postMessage(m: unknown): void }, generation: () => number, onLayout: () => void = () => {}) {
   let snapshot: any, layout = "attached", layer: SVGGElement | undefined, originalBox: string | null = null;
+  let questionsVisible = true;
   let toolbar: HTMLDivElement | undefined;
   let restore: (() => void)[] = [];
   const set = (el: Element, name: string, value: string | number) => {
@@ -15,6 +16,18 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     for (const [k, val] of Object.entries(attrs)) el.setAttribute(k, String(val));
     return el;
   };
+  function rerenderAtControl(control: HTMLElement, cardId: string, ownerKey: string, selector: string) {
+    const before = control.getBoundingClientRect();
+    render();
+    const form = Array.from(root.querySelectorAll<HTMLElement>('.route-card')).find(n => n.dataset.cardId === cardId && n.dataset.ownerKey === ownerKey);
+    const replacement = form?.querySelector<HTMLElement>(selector);
+    if (!replacement) return;
+    replacement.focus({ preventScroll: true });
+    const after = replacement.getBoundingClientRect();
+    const scroller = root.ownerDocument.scrollingElement ?? root.ownerDocument.documentElement;
+    scroller.scrollLeft += after.left - before.left;
+    scroller.scrollTop += after.top - before.top;
+  }
   function clear() {
     for (const undo of restore.reverse()) undo(); restore = [];
     layer?.remove(); layer = undefined; toolbar?.remove(); toolbar = undefined;
@@ -27,15 +40,27 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const svg = root.querySelector<SVGSVGElement>(".flow-svg");
     if (!snapshot || !svg) return;
     originalBox = svg.getAttribute("viewBox");
-    if (snapshot.note) {
-      toolbar = document.createElement("div"); toolbar.className = "route-card-note";
-      toolbar.setAttribute("role", "status"); toolbar.textContent = snapshot.note; root.prepend(toolbar);
-    }
+    toolbar = document.createElement("div");toolbar.className="route-card-toolbar";
+    const visibility=document.createElement("button");visibility.className="route-questions-toggle";visibility.textContent="Questions";visibility.title=questionsVisible?"Hide questions":"Show questions";visibility.setAttribute("aria-pressed",String(questionsVisible));
+    visibility.onclick=()=>{questionsVisible=!questionsVisible;render();root.querySelector<HTMLButtonElement>('.route-questions-toggle')?.focus();};toolbar.append(visibility);
+    if(snapshot.note){const note=document.createElement("span");note.className="route-card-note";note.setAttribute("role","status");note.textContent=snapshot.note;toolbar.append(note);}
+    root.prepend(toolbar);
     layer = svgEl("g", { class: "route-cards" }) as SVGGElement; svg.append(layer);
     const nodes = Array.from(root.querySelectorAll<SVGGElement>("[data-flow-key]"));
+    const byKey = new Map(nodes.map(n => [n.dataset.flowKey!, n]));
+    const hide = (el: Element) => set(el,"display","none");
+    // Choices belong to question cards. INPUT is a display-only grouping; preserve its actual dependency edge.
+    const elided = new Set(nodes.filter(n=>n.dataset.flowDecoration));
+    for(const n of elided)hide(n);
+    for(const toggle of Array.from(root.querySelectorAll('[data-flow-choices-toggle]')))hide(toggle);
+    for(const edge of Array.from(root.querySelectorAll<SVGPathElement>('path[data-flow-from]'))){
+      if(elided.has(byKey.get(edge.dataset.flowTo!)!)){hide(edge);continue;}
+      let from=byKey.get(edge.dataset.flowFrom!);const seen=new Set<SVGGElement>();
+      while(from&&elided.has(from)&&!seen.has(from)){seen.add(from);from=byKey.get(from.dataset.flowParent!);}
+      if(from)set(edge,"data-flow-from",from.dataset.flowKey!);
+    }
     const visible = nodes.filter(n => getComputedStyle(n).display !== "none");
     const base = new Map(visible.map(n => [n, n.querySelector<SVGRectElement>(":scope > rect")?.getBBox() ?? n.getBBox()]));
-    const byKey = new Map(nodes.map(n => [n.dataset.flowKey!, n]));
     const criterionPath = (n: SVGGElement) => {
       const path: string[] = [],seen=new Set<SVGGElement>();
       let current: SVGGElement | undefined=n;
@@ -53,9 +78,9 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const hidden = new Map<SVGGElement, number[]>();
     const panel = document.createElement("div"); panel.className = "route-questionnaire";
     let panelFo: Element | undefined;
-    if (layout === "column") { panelFo=svgEl("foreignObject", {width:cardWidth, height:20000}); panelFo.append(panel); layer.append(panelFo); }
+    if (questionsVisible && layout === "column") { panelFo=svgEl("foreignObject", {width:cardWidth, height:20000}); panelFo.append(panel); layer.append(panelFo); }
     // DOM textContent for every authored string; no authored HTML enters the canvas.
-    for (const [index, card] of snapshot.cards.entries()) {
+    for (const [index, card] of (questionsVisible ? snapshot.cards : []).entries()) {
       const identity = JSON.stringify([card.library,card.concept]);
       const paths=(card.criterionPaths ?? [card.criteria ?? []]).map((p:any[])=>p.map(c=>JSON.stringify([c.lib,c.name])));
       const owners = visible.filter(n => n.dataset.flowWhen === card.ownerKey && n.dataset.flowQuestion === identity && paths.some((p:string[])=>JSON.stringify(p)===JSON.stringify(criterionPath(n))));
@@ -69,15 +94,25 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       for (const owner of owners) {
       const shared = layout === "column" ? placements.find(p=>p.card.id===card.id) : undefined;
       if (shared) { placements.push({...shared,owner}); continue; }
-      const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id; form.style.width = layout === "column" ? "100%" : cardWidth + "px";
+      const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id; form.dataset.ownerKey = owner.dataset.flowKey!; form.style.width = layout === "column" ? "100%" : cardWidth + "px";
       const caption = document.createElement("div"); caption.className = "route-card-caption"; caption.textContent = String(index + 1); form.append(caption);
       const text = document.createElement("div"); text.className = "route-card-question"; text.textContent = card.text; form.append(text);
       if (card.description) {
         const toggle=document.createElement("button"); toggle.className="route-description-toggle"; toggle.textContent="Description"; toggle.setAttribute("aria-expanded", String(!!card.descriptionOpen));
-        toggle.onclick=()=>{card.descriptionOpen=!card.descriptionOpen;render();root.querySelector<HTMLButtonElement>('[data-card-id="'+card.id+'"] .route-description-toggle')?.focus();}; form.append(toggle);
+        toggle.onclick=()=>{card.descriptionOpen=!card.descriptionOpen;rerenderAtControl(toggle,card.id,owner.dataset.flowKey!,'.route-description-toggle');}; form.append(toggle);
         if (card.descriptionOpen) { const desc=document.createElement("div");desc.className="route-card-description";desc.textContent=card.description;form.append(desc); }
       }
       const value = document.createElement("div"); value.className = "route-card-value"; value.textContent = card.value; value.setAttribute("aria-label", "Answer: " + card.value); form.insertBefore(value, form.querySelector(".route-description-toggle"));
+      if(card.answerChoices?.length || card.choicesFrom){
+        const toggle=document.createElement("button");toggle.className="route-choices-toggle";toggle.textContent="Answer choices"+(card.answerChoices?.length ? " ("+card.answerChoices.length+")" : "");toggle.setAttribute("aria-expanded",String(!!card.choicesOpen));
+        toggle.onclick=()=>{card.choicesOpen=!card.choicesOpen;rerenderAtControl(toggle,card.id,owner.dataset.flowKey!,'.route-choices-toggle');};form.append(toggle);
+        if(card.choicesOpen){
+          const list=document.createElement("ul");list.className="route-answer-choices";
+          for(const choice of card.answerChoices ?? []){const row=document.createElement("li");row.textContent=choice.display;if(choice.selected){row.className="is-selected";const mark=document.createElement("span");mark.className="route-choice-selected";mark.textContent="Selected";row.append(mark);}list.append(row);}
+          if(!card.answerChoices?.length){const row=document.createElement("li");row.textContent="Choices from "+card.choicesFrom;list.append(row);}
+          form.append(list);
+        }
+      }
       const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.proposal ? "Saved for KE review" : ""; form.append(status);
       if (card.readOnlyReason) { const reason = document.createElement("p"); reason.textContent = card.readOnlyReason; form.append(reason); }
       if (card.editable) {
@@ -85,7 +120,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         const pencil = svgEl("svg",{viewBox:"0 0 24 24",width:14,height:14,"aria-hidden":"true"});
         pencil.append(svgEl("path",{d:"M4 16 L16 4 L20 8 L8 20 L4 20 Z M13 7 L17 11",fill:"none",stroke:"currentColor","stroke-width":1.7})); edit.append(pencil);form.append(edit);
         const editor = document.createElement("div"); editor.className="route-card-editor"; editor.hidden = true;
-        const scope = document.createElement("p"); scope.textContent = "Saved for the KE to apply. Applies to: " + card.scopeLabel; editor.append(scope);
+        const scope = document.createElement("p"); scope.textContent = "Edit Question:"; editor.append(scope);
         const input = document.createElement("textarea"), desc = document.createElement("textarea");
         input.setAttribute("aria-label", "Question text"); desc.setAttribute("aria-label", "Question description");
         input.value = card.draftText ?? card.text; desc.value = card.draftDescription ?? card.description;
@@ -114,9 +149,15 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const positions=new Map<SVGGElement,{x:number;y:number;width:number;height:number}>();
     const groups=columns.map(col=>primary.filter(n=>base.get(n)!.x===col).sort((a,b)=>base.get(a)!.y-base.get(b)!.y));
     const descendants=(n:SVGGElement)=>visible.filter(c=>c!==n&&primaryOwner(c)===n).sort((a,b)=>base.get(a)!.y-base.get(b)!.y);
-    const widths=groups.map(group=>Math.max(260,...group.flatMap(n=>descendants(n).map(c=>base.get(c)!.x-base.get(n)!.x+260))));
+    // REFACTOR:grounded: nested reusable components need distinct closing borders and sibling clearance.
+    const componentsOf=(n:SVGGElement)=>{
+      const result:SVGGElement[]=[],seen=new Set<SVGGElement>();let current:SVGGElement|undefined=n;
+      while(current&&!seen.has(current)){seen.add(current);if(current.dataset.flowComponent==='expanded')result.push(current);current=byKey.get(current.dataset.flowParent!);}
+      return result;
+    };
+    const widths=groups.map(group=>Math.max(260,...group.flatMap(n=>descendants(n).map(c=>base.get(c)!.x-base.get(n)!.x+260+componentsOf(c).length*12))));
     let right=40+widths.reduce((a,b)=>a+b+90,0),bottom=40;
-    let cursor=40+(layout==="column"?panelHeight+60:0);
+    let cursor=40+(questionsVisible && layout==="column"?panelHeight+60:0);
     for(let row=0;row<Math.max(0,...groups.map(g=>g.length));row++) {
       const y=cursor; let rowBottom=y;
       for(const [ci,group] of groups.entries()) {
@@ -124,10 +165,13 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         const box=base.get(n)!,x=40+widths.slice(0,ci).reduce((a,b)=>a+b+90,0);
         positions.set(n,{x,y,width:260,height:box.height});
         let childCursor=y+box.height+(layout==="attached"?stackHeight(n):0)+24;
-        for(const child of descendants(n)) {
+        const children=descendants(n);
+        for(const [index,child] of children.entries()) {
           const b=base.get(child)!,h=layout==="attached"?stackHeight(child):0;
           positions.set(child,{x:x+b.x-box.x,y:childCursor,width:child.dataset.flowQuestion?260:b.width,height:b.height});
           childCursor+=b.height+h+18;
+          const next=children[index+1],nextComponents=next?componentsOf(next):[];
+          childCursor+=componentsOf(child).filter(c=>!nextComponents.includes(c)).length*12;
         }
         rowBottom=Math.max(rowBottom,childCursor);
       }
@@ -150,7 +194,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       // node never have a connector running through their text.
       set(edge,"d",edge.classList.contains("flow-def-edge") ? `M${a.x} ${y} H${Math.min(a.x,b.x)-12} V${ey} H${ex}` : `M${x} ${y} C${m} ${y} ${m} ${ey} ${ex} ${ey}`);
     }
-    if(layout==="column") {
+    if(panelFo) {
       const x=Math.max(40,(right-100-cardWidth)/2),y=20;
       panelFo!.setAttribute("x",String(x)); panelFo!.setAttribute("y",String(y));panelFo!.setAttribute("height",String(panelHeight));
       right=Math.max(right,x+cardWidth+40);
@@ -167,14 +211,14 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const width=Math.max(24,label.length*7+12),x=box.x+box.width-width-3,y=box.y-10;
       g.append(svgEl("rect",{x,y,width,height:19,rx:8}));const text=svgEl("text",{x:x+width/2,y:y+13,"text-anchor":"middle"});text.textContent=label;g.append(text);layer!.append(g);
     };
-    for(const owner of new Set(placements.map(p=>p.owner))) {
-      const answers=[...new Set(placements.filter(p=>p.owner===owner).map(p=>String(p.card.number)+(/^(Yes|No)$/.test(p.card.value)?" "+p.card.value:"")))];
+    for(const owner of new Set(layout==="column"?placements.map(p=>p.owner):[])) {
+      const answers=[...new Set(placements.filter(p=>p.owner===owner).map(p=>"#"+String(p.card.number)+(/^(Yes|No)$/.test(p.card.value)?" "+p.card.value:"")))];
       badge(owner,answers.join(", "),"Question "+answers.join(", "));
     }
     for(const [owner,numbers] of hidden)badge(owner,"? "+numbers.length,"Hidden questions: "+numbers.join(", ")+". Expand this condition to show them.");
     const pinned = root.querySelector<SVGGElement>(".flow-pinned") ?? byKey.get(snapshot.pinKey);
     const pinBox = pinned && positions.get(pinned);
-    if (pinBox) {
+    if (questionsVisible && pinBox) {
       const x=pinBox.x+pinBox.width+6,y=pinBox.y+10;
       const label=layout==="attached"?"Show questionnaire":"Attach questions to nodes";
       const toggle=svgEl("g",{class:"route-layout-toggle",role:"button",tabindex:0,"aria-label":label,"aria-pressed":String(layout==="column")});
@@ -193,7 +237,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
   return {
     show(value: any) { if (snapshot?.token === value.token) for (const card of value.cards) {
       const previous = snapshot.cards.find((c: any) => c.id === card.id);
-      if (previous) Object.assign(card, { editing: previous.editing, editingOwner: previous.editingOwner, draftText: previous.draftText, draftDescription: previous.draftDescription, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen });
+      if (previous) Object.assign(card, { editing: previous.editing, editingOwner: previous.editingOwner, draftText: previous.draftText, draftDescription: previous.draftDescription, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen, choicesOpen: previous.choicesOpen });
     } snapshot = value; render(); },
     reset() { snapshot = undefined; clear(); },
     rebind() { restore = []; originalBox = null; layer = undefined; toolbar?.remove(); render(); },
@@ -204,9 +248,10 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
 }
 
 export const ROUTE_CARD_STYLE = `
-.route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; border-radius:3px; background:rgba(180,180,180,.10); color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
-.route-card-caption { display:inline-block; vertical-align:baseline; margin:0 6px 0 0; padding:0 4px; font-size:10px; line-height:1.1; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; color:var(--vscode-descriptionForeground,#aaa); }
+.route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; border-radius:3px; background:rgba(180,180,180,.15); color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
+.route-card-caption { display:inline-block; vertical-align:baseline; margin:0 6px 0 0; padding:0 4px; font-size:10px; line-height:1.1; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-descriptionForeground,#aaa); }
 .route-card-question { display:inline; font-weight:600; white-space:pre-wrap; }
+.route-card .route-choices-toggle {display:block;margin-top:5px;} .route-answer-choices {margin:6px 0 0;padding-left:16px;white-space:pre-wrap;} .route-answer-choices li {margin:5px 0;} .route-choice-selected {display:inline-block;margin-left:6px;font-size:10px;font-weight:600;color:var(--vscode-textLink-foreground,#75beff);}
 .route-card-description { margin:5px 0; white-space:pre-wrap; opacity:.9; } .route-card-value { display:inline-block; box-sizing:border-box; max-width:100%; margin:2px 0 0 6px; padding:1px 5px; border:1px solid var(--vscode-focusBorder,#3794ff); border-radius:3px; background:var(--vscode-editor-selectionBackground,#264f78); color:var(--vscode-editor-foreground,#ddd); vertical-align:baseline; white-space:pre-wrap; }
 .route-card-status { font-size:11px; color:var(--vscode-editorWarning-foreground,#cca700); }
 .route-card button { cursor:pointer; padding:2px 5px; border:1px solid var(--vscode-button-border,transparent); background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-button-secondaryForeground,#eee); border-radius:3px; }
@@ -214,7 +259,9 @@ export const ROUTE_CARD_STYLE = `
 .route-description-toggle { display:block; margin-top:4px; font-size:10px; } .route-description-toggle[aria-expanded=false]::before { content:'▸ '; } .route-description-toggle[aria-expanded=true]::before { content:'▾ '; }
 .route-questionnaire .route-card { padding:5px 28px 5px 8px; }
 .route-questionnaire { box-sizing:border-box; width:480px; border:1px solid var(--vscode-focusBorder,#3794ff); border-radius:4px; padding:4px; background:transparent; }
+.route-questionnaire .route-card + .route-card { margin-top:8px; }
 .route-card-note { flex-basis:100%; color:var(--vscode-editorWarning-foreground,#cca700); }
+.route-card-toolbar {display:flex;align-items:center;gap:8px;margin:6px 0;} .route-questions-toggle {cursor:pointer;background:var(--vscode-button-secondaryBackground,#333);color:var(--vscode-button-secondaryForeground,#eee);border:1px solid transparent;border-radius:3px;padding:3px 7px;} .route-questions-toggle[aria-pressed=true] {border-color:var(--vscode-focusBorder,#3794ff);}
 .route-card label { display:block; margin:6px 0; } .route-card textarea { display:block;box-sizing:border-box; width:100%; min-height:64px; resize:none; background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
 .route-layout-toggle {cursor:pointer;} .route-layout-toggle rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);} .route-layout-toggle path {fill:none;stroke:var(--vscode-foreground,#ddd);stroke-width:1.5;pointer-events:none;} .route-layout-toggle[aria-pressed=true] rect,.route-layout-toggle:focus-visible rect {stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2;}
 .route-question-badge { pointer-events:none; } .route-question-badge rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-focusBorder,#3794ff);stroke-width:1;} .route-question-badge text {fill:var(--vscode-foreground,#ddd);font:11px sans-serif;}

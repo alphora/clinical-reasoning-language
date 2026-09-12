@@ -49,7 +49,7 @@ export interface CrlConceptNode {
    * those are one case and not two. A concept whose `value from` names a pure REFERENCE terminology
    * gets `answersFromTerminology` instead; one whose reference does not resolve gets neither.
    */
-  answerOptions?: { code: string; display: string }[];
+  answerOptions?: { system?: string; code: string; display: string }[];
   /**
    * The terminology NAME whose members are this concept's answers, when we cannot know them — a pure
    * `valueset is <url>` reference, resolved at deployment.
@@ -120,7 +120,7 @@ function answerFields(
   c: Concept,
   lib: string,
   libs: Map<string, LibInfo>,
-): { answerOptions?: { code: string; display: string }[]; answersFromTerminology?: string } {
+): { answerOptions?: { system?: string; code: string; display: string }[]; answersFromTerminology?: string } {
   const vf = c.valueFrom;
   if (!vf) return {};
   const targetLib = getRefLibrary(vf.terminologyName) ?? lib;
@@ -133,7 +133,7 @@ function answerFields(
   // always did rather than asserting an answer set we cannot stand behind.
   if (!decl) return {};
   const resolved = readFiniteAnswerMembers(decl.node as Terminology);
-  if (resolved.kind === "resolved") return { answerOptions: resolved.members.map(({ code, display }) => ({ code, display })) };
+  if (resolved.kind === "resolved") return { answerOptions: resolved.members.map(({ system, code, display }) => ({ system, code, display })) };
   return { answersFromTerminology: name };
 }
 
@@ -229,7 +229,7 @@ export function buildCrlConceptLayer(
  */
 export function answerOptionsForDisplay(
   nodes: readonly CrlConceptNode[],
-): Map<string, { code: string; display: string }[]> {
+): Map<string, { system?: string; code: string; display: string }[]> {
   return oneHop(nodes, (n) => (n.answerOptions?.length ? n.answerOptions : undefined));
 }
 

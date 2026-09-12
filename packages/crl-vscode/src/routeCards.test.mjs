@@ -33,11 +33,18 @@ test('missing presentation creates a validated default proposal, without accepti
   assert.equal(resolveWordingTarget('x.crl',base.replace('- code is `complaint`.',''),'Complaint'),undefined);
 });
 test('cards show a coded selected answer rather than qualification Boolean, without rewriting the case',()=>{
-  const sv={decision:{libraryName:'L'},conceptTruth:[],conceptValues:[{libraryName:'L',name:'Complaint',answerValue:{type:'CodeableConcept',value:{coding:[{code:'visual',display:'Visual interference'}]}}}]};
+  const sv={decision:{libraryName:'L'},conceptTruth:[],conceptValues:[{libraryName:'L',name:'Complaint',answerValue:{type:'CodeableConcept',value:{coding:[{system:'urn:complaints',code:'visual',display:'Visual interference'}]}}}]};
   const before=JSON.stringify(sv);
   const q={questions:[{nodeId:'w',conceptName:'Complaint',libraryName:'L',answer:'yes',isInferred:false}]};
-  const {cards}=buildRouteCards(q,sv,()=> 'node',()=>({questionText:'Complaint?',questionDescription:'',editable:false}));
+  const {cards}=buildRouteCards(q,sv,()=> 'node',()=>({questionText:'Complaint?',questionDescription:'',editable:false}),()=>[{system:'urn:complaints',code:'visual',display:'Full visual interference wording'},{code:'none',display:'None'}]);
   assert.equal(cards[0].value,'Visual interference'); assert.equal(cards[0].determination,'True'); assert.equal(JSON.stringify(sv),before);
+  assert.deepEqual(cards[0].answerChoices,[{system:'urn:complaints',code:'visual',display:'Full visual interference wording',selected:true},{code:'none',display:'None',selected:false}]);
+  const ambiguous=buildRouteCards(q,sv,()=> 'node',()=>({editable:false}),()=>[{code:'visual',display:'One'},{code:'visual',display:'Two'}]).cards[0];
+  assert.ok(ambiguous.answerChoices.every(c=>!c.selected));
+  const otherSystem=buildRouteCards(q,sv,()=> 'node',()=>({editable:false}),()=>[{system:'urn:other',code:'visual',display:'Other system'}]).cards[0];
+  assert.equal(otherSystem.answerChoices[0].selected,false);
+  const reference=buildRouteCards(q,sv,()=> 'node',()=>({editable:false}),()=>[],()=>[],undefined,()=> 'Complaint choices').cards[0];
+  assert.equal(reference.choicesFrom,'Complaint choices');assert.deepEqual(reference.answerChoices,[]);
   assert.equal(formatAnswer({type:'Quantity',value:{value:25,unit:'kg/m2'}}),'25 kg/m2');
 });
 test('scoped text and inherited description retain different owners in the patch',()=>{
@@ -108,6 +115,7 @@ test('Bleph route includes coded supporting answers behind qualification helpers
   const built=buildRouteCards(q,sv,()=> 'owner',()=>undefined,(lib,name)=>concepts.get(key(lib,name))?.answerOptions??[],definitionValueInputs(cm.conceptLayer),(lib,name)=>!!concepts.get(key(lib,name))?.hasLocalCode);
   assert.ok(built.cards.every(c=>concepts.get(key(c.library,c.concept))?.hasLocalCode),'only answerable Case Features');
   assert.equal(new Set(built.cards.map(c=>c.library+':'+c.concept)).size,built.cards.length,'no duplicate question on one owner');
+  assert.equal(built.cards.find(c=>c.concept==='Photographic Demonstration Submitted').answerChoices.length,5);
   for(const name of ['Functional Or Reconstructive Surgical Indication','Documented Patient Complaint','Photographic Demonstration Submitted','Visual Field Demonstration Submitted']) {
     const card=built.cards.find(c=>c.concept===name);assert.ok(card,name);assert.ok(card.value.length);assert.notEqual(card.value,'Determination: True');assert.equal(card.determination,'');
   }
