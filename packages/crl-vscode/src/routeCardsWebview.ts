@@ -140,7 +140,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         for(const ring of Array.from(n.querySelectorAll<SVGRectElement>(":scope > .flow-ring > rect")))set(ring,"width",pos.width+(Number(ring.getAttribute("width"))-b.width));
         for(const text of Array.from(n.querySelectorAll<SVGTextElement>(":scope > text[text-anchor=middle]"))){set(text,"x",b.x+pos.width/2);for(const t of Array.from(text.querySelectorAll("tspan[x]")))set(t,"x",b.x+pos.width/2);}
         for(const adornment of Array.from(n.querySelectorAll(":scope > .flow-pin,:scope > .flow-false-stop")))set(adornment,"transform",`translate(${pos.width-b.width} 0)`);
-        if(!n.hasAttribute("data-flow-outcome-leaf"))for(const badge of Array.from(n.querySelectorAll(":scope > .flow-flag-badge")))set(badge,"transform",`translate(${pos.width-b.width} 0)`);
+        for(const badge of Array.from(n.querySelectorAll(":scope > .flow-flag-badge")))set(badge,"transform",`translate(${pos.width-b.width} 0)`);
       }
     }
     for(const edge of Array.from(root.querySelectorAll<SVGPathElement>("path[data-flow-from]"))) {
@@ -204,7 +204,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
 }
 
 export const ROUTE_CARD_STYLE = `
-.route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; background:transparent; color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
+.route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; border-radius:3px; background:rgba(180,180,180,.10); color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
 .route-card-caption { display:inline-block; vertical-align:baseline; margin:0 6px 0 0; padding:0 4px; font-size:10px; line-height:1.1; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; color:var(--vscode-descriptionForeground,#aaa); }
 .route-card-question { display:inline; font-weight:600; white-space:pre-wrap; }
 .route-card-description { margin:5px 0; white-space:pre-wrap; opacity:.9; } .route-card-value { display:inline-block; box-sizing:border-box; max-width:100%; margin:2px 0 0 6px; padding:1px 5px; border:1px solid var(--vscode-focusBorder,#3794ff); border-radius:3px; background:var(--vscode-editor-selectionBackground,#264f78); color:var(--vscode-editor-foreground,#ddd); vertical-align:baseline; white-space:pre-wrap; }

@@ -142,7 +142,8 @@ import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnai
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
 import { definitionValueInputs, buildRouteCards } from "./routeCards";
 import { installRouteCards, ROUTE_CARD_STYLE } from "./routeCardsWebview";
-import { installFlowLeafNavigation } from "./flowLeafNavigation";
+import { alignFlowConnectorBorders } from "./flowConnectorBorders";
+import { installFlowKeyboardActions } from "./flowKeyboardActions";
 import { graphWordingSources, resolveWordingTarget, createPresentationProposal, savePresentationProposal, pendingPresentationProposals, type WordingTarget } from "./presentationProposal";
 import { conditionTruthKeys } from "./flowProjection";
 import { executionRoutes, routeScenario, buildRouteQuestionnaire, type ExecutionRoute } from "./executionRoutes";
@@ -5742,8 +5743,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // focused — the this-node/diverter lifecycle, driven by focusedScenario — NOT the case-independent done-overlay one.)
   `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
   `let pinnedFlowKey='',pinnedRouteKeys=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
-  `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,applyZoom);` +
-  `const leafNavigation=(${installFlowLeafNavigation.toString()})(root);` +
+  `const alignBorders=()=>(${alignFlowConnectorBorders.toString()})(root);` +
+  `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
+  `(${installFlowKeyboardActions.toString()})(root);` +
   `const applyFlowPin=()=>{const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;if(!pinnedFlowKey)return;const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');};` +
   `const toggleFlowPin=k=>{if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();}else{if(!currentRouteKeys.includes(k))return;v.postMessage({type:'pinRoute',gen,caseId:currentRouteCase,routeId:currentRouteId});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
@@ -5756,7 +5758,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();leafNavigation.rebind();` +
+  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
@@ -5930,7 +5932,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // Todo 5 (impl-review [important]): the drawer is last in DOM + revealed preserveFocus, so a keyboard user would tab through
   // all chrome + the flowchart before reaching it. On a GRID inject, move focus to its first enabled control (parity with the
   // create drawer's autofocus). Scoped to the grid so the create/edit/action forms keep their own focus behavior (aff()).
-  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html){aff();var rg=fld.querySelector('[data-review-grid]');if(rg){var f0=rg.querySelector('.rvg-all,input[type=radio]:not([disabled])');if(f0&&f0.focus)f0.focus();}}}});` +
+  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html){aff();var rg=fld.querySelector('[data-review-grid]');if(rg){var f0=rg.querySelector('.rvg-all,input[type=radio]:not([disabled])');if(f0&&f0.focus)f0.focus();}}}alignBorders();});` +
   // #156 slice 4: a worklist review <select> sits INSIDE the .cel-case block (itself a data-reveal target). A CLICK on the
   // select must open the native dropdown WITHOUT selecting the case, so we stopPropagation (block the reveal) but do NOT
   // preventDefault (let the dropdown open). The state change rides the separate 'change' listener below. A DISABLED select

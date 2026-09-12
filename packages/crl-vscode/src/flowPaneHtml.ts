@@ -765,7 +765,7 @@ export function renderFlowPane(
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
         critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
-        flagBadge(x + OUTLINE_NODE_W - 27, y + 11, gid, false) +
+        flagBadge(x + OUTLINE_NODE_W - 10, y + OUTLINE_H - 10, gid, false) +
         `</g>`;
       continue;
     }
@@ -788,7 +788,7 @@ export function renderFlowPane(
       if (n.outlineRow === "op" || n.outlineRow === "topor") {
         const cls = n.outlineRow === "topor" ? "flow-topor" : "flow-op";
         body +=
-          `<g id="${escapeHtml(gid)}" class="flow-outline ${cls}">` +
+          `<g id="${escapeHtml(gid)}" class="flow-outline ${cls}${["ALL OF", "ANY OF"].includes(n.label.toUpperCase()) ? " flow-logic-label" : ""}">` +
           `<text x="${x}" y="${y + OUTLINE_H / 2 + 3}">${escapeHtml(n.label.toUpperCase())}</text></g>`;
       } else {
         const cls = n.outlineRow === "external" ? "flow-ext" : "flow-more";
@@ -843,7 +843,7 @@ export function renderFlowPane(
         labelMarkup(n.label, x + (optRow ? 12 : 0), y, OUTLINE_H, OUTLINE_LABEL_MAX - (optRow ? 2 : 0), 9) +
         (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey, `${optRow.count} answer options`) : "") +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
-        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 11, y + 11, gid) : "") +
+        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 10, y + OUTLINE_H - 10, gid) : "") +
         `</g>`;
       continue;
     }
@@ -905,9 +905,8 @@ export function renderFlowPane(
     const flaggable = n.kind === "decision" || isWhenConcept || isLeafEnd; // isLeafEnd = a recommend-activity leaf
     if (flaggable) flaggableGids.push(gid);
     if (isWhenConcept) conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
-    // Badge position: a LEAF mirrors its all-pass ✓ — ⚑ at LEFT-center, ✓ at right-center, label centered between (they
-    // no longer collide, GAP 3 / Claude I3); a decision stadium → left of its rounded end; a `when` rect → top-right.
-    const flagBadgeMarkup = flaggable ? flagBadge(isLeafEnd ? x + 13 : stadium ? x + NODE_W - 30 : x + NODE_W - 14, isLeafEnd ? y + NODE_H / 2 : y + 13, gid) : "";
+    // Per-node flags sit at the bottom-right, inset further for rounded outcomes.
+    const flagBadgeMarkup = flaggable ? flagBadge(x + NODE_W - (stadium ? 25 : 10), y + NODE_H - 10, gid) : "";
     // The PRIMARY/start node (first decision root) additionally carries the chrome-mirror COUNT badge — a pill showing the
     // total open-flag count (`⚑ N`), the catch-all click target (see driveFlagBadges). Pre-rendered hidden; the host sets
     // its text + `.has-startflag`. Sits at the top-right, straddling the node's top edge (within the PAD, no clip).
@@ -926,13 +925,12 @@ export function renderFlowPane(
     // per-occurrence via `.flow-row.crit-{pass,fail,pending,stale}` without re-render (the flagBadge/allPass idiom).
     if (critC) criterionOccurrences.push({ gid, lib: critC.lib, name: critC.name, collapsed: critC.collapsed, bodyConcepts: critC.bodyConcepts });
     const critVerdictMarkup = critC ? critVerdictChip(x + NODE_W - 13, y + 13) : "";
-    // #224 ii.3 Slice 2b-2: a criterion when carries a HIDDEN rollup ⚑ (left of the verdict chip). The host lights it
-    // (`.has-flag`) ONLY when the box is COLLAPSED and a body concept has an open flag (driveFlagBadges) — so a folded body's
-    // flag isn't invisible. `flaggableGids` includes the gid so the host's bulk-clear covers it (the flagBadge idiom).
-    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 30, y + 13, gid) : "";
+    // Bottom-right flag: grey creates an occurrence flag; yellow includes open flags rolled up from a collapsed body.
+    // `flaggableGids` includes the gid so the host's bulk-clear covers it.
+    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 10, y + NODE_H - 10, gid) : "";
     if (critC) flaggableGids.push(gid);
     body +=
-      `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"${isLeafEnd ? ` data-flow-outcome-leaf="1"` : ""}>` +
+      `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
@@ -956,7 +954,7 @@ export function renderFlowPane(
   for (const [i, n] of all.entries()) {
     const id = `${prefix}flow${i}`;
     const metadata = ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
-      (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit") ? ` data-flow-navigation-node="1" tabindex="-1" role="button" aria-label="${escapeHtml(n.label)}"` : "") +
+      (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit") ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
       (n.criterionCollapse ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.criterionCollapse.lib,n.criterionCollapse.name]))}"` : "") +
       (n.critRow ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.critRow.lib,n.critRow.name]))}"` : "") +
@@ -969,7 +967,7 @@ export function renderFlowPane(
   }
 
   const svg =
-    `<svg class="flow-svg" tabindex="0" aria-label="Decision tree. Tab moves between outcome leaves, or branch nodes while pinned; Enter toggles the pin; Enter activates focused controls; Ctrl+F opens a review flag; Escape returns to controls." width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
+    `<svg class="flow-svg" aria-label="Decision tree" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
     `</svg>`;
   // A floating zoom control (fixed to the pane corner). The zoom LEVEL is webview-local state re-applied after every
@@ -983,16 +981,8 @@ export function renderFlowPane(
   return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
 }
 
-// #203 Todo 4b Slice A — the hidden per-node flag badge: a ⚑ glyph grandchild `<g>`, shown when the host adds `.has-flag`
-// to the row (the `.flow-allpass-badge` idiom — pre-rendered + class-toggled so a flag change never re-renders `#root` and
-// clobbers the painted verdict/failed-criterion overlays). Clickable (`pointer-events:auto` + `data-mv-flag-badge`, the
-// webview intercepts it BEFORE the row's `data-reveal`). Top-RIGHT interior (clears the left label + the top guard-tab band;
-// leaves never carry both an all-pass ✓ [right-center] and a flag [top-right]).
-//
-// Todo 2 (disc 356): the per-node badge carries `data-node-flag-gid="${gid}"` on the badge `<g>` ITSELF (NOT the row) → the
-// webview posts `{nodeFlags, gid}` so the host filters to THIS node's flags. CRITICAL that it's on the badge, not the row: on
-// the start node the per-node ⚑ and the start-count pill are SIBLINGS in one row `<g>`, so a row-level attribute would make a
-// start-pill click resolve it too and break "root → full list". The START pill (startFlagBadge) has NO gid → still `mvFlags`.
+// Bottom-right per-node badge: grey creates a flag, yellow opens existing flags. Rollup-only badges remain hidden until
+// flagged. The gid belongs to the badge itself so the separate start-node count pill still opens the whole-policy list.
 const flagBadge = (bx: number, by: number, gid: string, canCreate = true): string =>
   `<g class="flow-flag-badge${canCreate ? " flow-flag-create" : ""}" data-mv-flag-badge="1" data-node-flag-gid="${escapeHtml(gid)}" role="button" tabindex="0" aria-label="Review flag"><title>${canCreate ? "Add or open review flag" : "Open review flags"}</title>` +
   `<circle cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text></g>`;
@@ -1040,7 +1030,7 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 }
 
 export const FLOW_STYLE =
-  `[data-flow-navigation-node]:focus-visible>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2}.flow-svg:focus{outline:none}` +
+  `[data-flow-key]:focus-visible>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pin-available>.flow-pin,.flow-pinned>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
   `.fc-legend .fc-sw.fc-sw-true,.fc-legend .fc-sw.fc-sw-false{width:16px;height:2px;background:#fff;border:0;box-shadow:0 0 3px 1px #00e676}.fc-legend .fc-sw.fc-sw-false{box-shadow:0 0 3px 1px #f14c4c}` +
@@ -1100,6 +1090,7 @@ export const FLOW_STYLE =
   // ANY OF / ALL OF tab; render-only (not clickable). An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
   `.flow-outline{cursor:default}` +
   `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
+  `.flow-logic-label>text{fill:var(--vscode-foreground,#ddd);font-size:13px;letter-spacing:.04em}` +
   `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
   `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
   // #189: an ANSWER OPTION row — a quiet, borderless chip under its coded question. Deliberately not a

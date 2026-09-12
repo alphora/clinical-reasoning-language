@@ -383,7 +383,7 @@ check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf ro
   const rr = renderFlowPane(structure, { concepts, revealPrefix: "g2_", defExpr: defExprOf(map) });
   const leafRows = leafRowsOf(rr.html);
   assert.deepEqual(leafRows.map((l) => l.label).sort(), ["L1", "L2"], "two leaf rows (L1, L2)");
-  assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "an ANY OF operator label row (or → any of)");
+  assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ANY OF</.test(rr.html), "an ANY OF operator label row (or → any of)");
   assert.ok(!/flow-topor/.test(rr.html), "an INFERRED composite (no code is) has NO top-OR row");
   assert.ok(/class="flow-def-edge"/.test(rr.html), "outline connectors use the distinct flow-def-edge, not flow-edge");
   assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-inferred"), "L2 (no code-is) → inferred (purple solid border)");
@@ -471,7 +471,7 @@ check("Option-C: an INFERRED single-operand body (bare-ref alias) is wrapped in 
   ] }];
   const map = { C: dentry("c:C", "C", dref("L", "c:L")) }; // C `defined as` L — a single bare ref
   const rr = renderFlowPane(struct2, { concepts: cs, defExpr: defExprOf(map) });
-  assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "a single-operand inferred body gets a synthetic ANY OF wrapper");
+  assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ANY OF</.test(rr.html), "a single-operand inferred body gets a synthetic ANY OF wrapper");
   assert.ok(leafRowsOf(rr.html).some((l) => l.label === "L"), "the wrapped leaf L renders under it");
   assert.ok(!/flow-topor/.test(rr.html), "still no top-OR (it's inferred)");
 });
@@ -513,7 +513,7 @@ check("Option-C: a SOURCE composite (has code is) gets a top-OR row; a NOT rende
   const map = { S: { nodeKey: "c:S", lib: "Pol", name: "S", hasCodeIs: true, leafEligible: false, isInferred: false, hasDefinedAs: true, body: dor(dref("L1", "c:L1"), dnot(dref("L2", "c:L2"))) } };
   const rr = renderFlowPane(struct, { concepts: cs, defExpr: defExprOf(map) });
   assert.ok(/class="flow-outline flow-topor"><text[^>]*>OR</.test(rr.html), "a SOURCE (both-rep) composite shows a top-OR row");
-  assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "with the ANY OF body below it");
+  assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ANY OF</.test(rr.html), "with the ANY OF body below it");
   assert.ok(/class="flow-outline flow-op"><text[^>]*>NOT</.test(rr.html), "a NOT operator row");
   assert.ok(leafRowsOf(rr.html).some((l) => l.label === "L2"), "the NOT's operand L2 is still rendered (never dropped)");
 });
@@ -778,7 +778,7 @@ check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the box
   const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
   const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g6_", guardOutlines, expandedGuardWhens: new Set(["w:crit"]) });
   // Expanded → the body is visible: an ALL OF row over two leaf rows.
-  assert.ok(/class="flow-outline flow-op"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard body");
+  assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard body");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the two criterion-body leaves render when expanded");
   // The when box shows the CRITERION name (not a masqueraded operand), neutral grey, + a ▾ (collapse) chevron.
   assert.match(rr.html, /<g id="[^"]*"[^>]* class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "neutral grey when box, titled with the criterion name");
@@ -847,7 +847,7 @@ check("#242: a plain compound guard (now IN guardOutlines) hangs an ALL OF outli
   const guardOutlines = new Map([["w:cmp", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")))]]);
   const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g9_", guardOutlines });
   // The compound decomposes: an ALL OF operator row over two distinct leaf rows (was: a single dead-end box).
-  assert.ok(/class="flow-outline flow-op"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard");
+  assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "both operands render as leaf rows");
   // The when box RETAINS its structure anchor (cross-pane join intact).
   assert.ok(rr.anchors["w:cmp"], "the compound when keeps its structure anchor");
@@ -1178,10 +1178,22 @@ check("supporting coded inputs get their own question occurrence under direct an
   assert.equal(optRows(options.html),0,'collapsed answer options do not hide the question');
 });
 
-check('keyboard navigation identifies outcome tips, not delegated decisions or question operands',()=>{
+check('tree leaves Tab navigation to the browser',()=>{
  const r=renderFlowPane(structure,{concepts});
- assert.equal((r.html.match(/data-flow-outcome-leaf="1"/g)||[]).length,collectDispositionLeafKeys(structure).size);
- assert.match(r.html,/class="flow-svg" tabindex="0"/);
- assert.match(r.html,/branch nodes while pinned/);
- assert.match(r.html,/data-flow-navigation-node="1" tabindex="-1" role="button"/);
+ assert.doesNotMatch(r.html,/data-flow-navigation-node|data-flow-outcome-leaf|Tab moves/);
+ assert.match(r.html,/class="flow-svg" aria-label="Decision tree"/);
+});
+check('per-node flags sit bottom-right and clear an outcome all-pass badge',()=>{
+ for(const gid of r.flaggableGids){
+  const start=r.html.indexOf(`<g id="${gid}"`),next=r.html.indexOf('<g id="',start+1),chunk=r.html.slice(start,next<0?undefined:next);
+  const rect=chunk.match(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="([\d.]+)"/);
+  const flag=chunk.match(/class="flow-flag-badge[^>]*>[\s\S]*?<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
+  assert.ok(rect&&flag);const [,x,y,w,h,rx]=rect.map(Number),[,fx,fy,fr]=flag.map(Number);
+  assert.equal(fy,y+h-10);assert.equal(fx,x+w-(rx>10?25:10));
+  const pass=chunk.match(/class="flow-allpass-badge"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
+  if(pass){const [,px,py,pr]=pass.map(Number);assert.ok(Math.hypot(fx-px,fy-py)>fr+pr+1,'flag and pass badge do not overlap');}
+ }
+});
+check('ALL OF and ANY OF operator captions use prominent text',()=>{
+ assert.match(FLOW_STYLE,/\.flow-logic-label>text\{fill:var\(--vscode-foreground,#ddd\);font-size:13px/);
 });
