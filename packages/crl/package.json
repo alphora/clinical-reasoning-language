@@ -17,6 +17,7 @@
     "crl-normalize-provenance": "dist/cli/run-normalize-provenance.js",
     "crl-check-fhir-ids": "dist/cli/run-check-fhir-ids.js",
     "crl-emit-results": "dist/cli/run-emit-results.js",
+    "crl-run-regression": "dist/cli/run-regression.js",
     "crl-mcp": "dist/cli/run-mcp-server.js"
   },
   "sideEffects": false,

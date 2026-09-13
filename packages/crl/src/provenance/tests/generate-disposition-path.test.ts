@@ -8,7 +8,7 @@
  * walking a distinct path) so the round-trip is honest against the SAME gate #170 ships. A separate `all:` multi-produced
  * fixture exercises the union-over-two-ancestor-chains path. Plus: byte-determinism + the additive default.
  */
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -19,6 +19,9 @@ import type { AnchorSourceMeta, CrlNodeRef, ProvenanceArtifact } from "../artifa
 import { generateProvenanceScaffold } from "../generate";
 import { generateProvenanceFiles } from "../generateFiles";
 import { validateProvenanceFiles } from "../validateFiles";
+import { buildCockpitModel, buildSuiteExecutionModel } from "../cockpitModel";
+import { checkCockpitCorrespondence } from "../correspondenceCheck";
+import { resolveCelSuite } from "../../cel/suite";
 
 const ANCHOR_META: AnchorSourceMeta = {
   path: "anchor.txt",
@@ -86,6 +89,49 @@ case "outer":
 - result is "D" is "Deny".`;
 
 const ANCHOR_TEXT = "anchor.\n";
+
+it.each(["mv/nested", "regression"])("scaffolds independent MV and %s files into shared and distinct disposition clusters", folder => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "provenance-suites-"));
+  try {
+    for (const dir of ["src/crl", "src/cel/mv", `src/cel/${folder}`, "src/provenance"]) mkdirSync(path.join(root, dir), { recursive: true });
+    writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "p", version: "1.0.0", crl: { canonicalBase: "http://example.org/p" } }));
+    writeFileSync(path.join(root, "src/crl/p.crl"), POLICY_CRL);
+    const mv = path.join(root, "src/cel/mv/examples.cel");
+    writeFileSync(mv, CEL.slice(0, CEL.indexOf('case "inner"')));
+    writeFileSync(path.join(root, `src/cel/${folder}/examples.cel`), CEL.replace('library "C".', 'library "Controls".').replaceAll('- id is "case-', '- id is "reg-'));
+    const anchor = path.join(root, "anchor.txt"), artifactPath = path.join(root, "src/provenance/p.json");
+    writeFileSync(anchor, ANCHOR_TEXT);
+    const generated = generateProvenanceFiles(mv, anchor, { clusterBy: "disposition-path", artifactCarrierPath: artifactPath });
+    const refs = generated.artifact.clusters.flatMap(c => c.cel);
+    expect(refs.map(r => [r.file, r.caseId]).sort()).toEqual([
+      ["src/cel/mv/examples.cel", "case-approve"],
+      [`src/cel/${folder}/examples.cel`, "reg-approve"],
+      [`src/cel/${folder}/examples.cel`, "reg-inner"],
+      [`src/cel/${folder}/examples.cel`, "reg-outer"],
+    ].sort());
+    const shared = generated.artifact.clusters.find(c => c.cel.some(r => r.caseId === "case-approve"))!;
+    expect(shared.cel.map(r => r.caseId).sort()).toEqual(["case-approve", "reg-approve"]);
+    expect(new Set(shared.crl.map(r => JSON.stringify(r))).size).toBe(shared.crl.length);
+    expect(generated.artifact.clusters.filter(c => c.cel.length)).toHaveLength(3);
+    writeFileSync(artifactPath, JSON.stringify(generated.artifact));
+    const checked = validateProvenanceFiles(artifactPath, mv, anchor, "final");
+    expect(checked.findings.filter(f => f.kind === "cockpit-correspondence")).toEqual([]);
+    expect(checked.findings.filter(f => /unresolved/.test(f.kind))).toEqual([]);
+    const selection = resolveCelSuite(root);
+    if (!selection.ok) throw new Error(JSON.stringify(selection));
+    const model = buildSuiteExecutionModel(selection.suite)!;
+    model.correspondence = buildCockpitModel(artifactPath, mv, anchor, "final").correspondence;
+    expect(checkCockpitCorrespondence(model)).toEqual([]);
+    if (folder === "regression") {
+      rmSync(mv);
+      const empty = validateProvenanceFiles(artifactPath, path.join(root, "src/cel/regression/examples.cel"), anchor, "final");
+      expect(empty.pass).toBe(false);
+      expect(empty.findings.some(f => f.kind === "cockpit-correspondence" && f.message.includes("No MV cases"))).toBe(true);
+      const worklist = validateProvenanceFiles(artifactPath, path.join(root, "src/cel/regression/examples.cel"), anchor, "worklist");
+      expect(worklist.findings.filter(f => f.kind === "cockpit-correspondence")).toEqual([]);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 interface Fixture {
   root: string;

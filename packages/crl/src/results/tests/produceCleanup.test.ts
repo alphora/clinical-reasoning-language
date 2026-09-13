@@ -23,23 +23,7 @@ vi.mock("node:fs", async (original) => {
   };
 });
 
-// Keep the producer's real manifest, scan, ownership and deletion sequence. Stub
-// compilation/runtime prerequisites: these tests do not claim native execution.
-vi.mock("../spawn", async (original) => ({
-  ...await original<typeof import("../spawn")>(),
-  verifyJar: () => ({ ok: true, hasLauncher: true, sha256: "test-sha" }),
-  resolveJava: () => ({ ok: true, javaExe: "unused-java", major: 21 }),
-}));
-vi.mock("../driver", () => ({ driverReady: () => ({ ok: true }) }));
-vi.mock("../../emit-two-lane", () => ({ emitCrlTwoLane: () => ({
-  success: true, cqlLibraries: [], fhir: { resources: [{ resource: {
-    resourceType: "PlanDefinition", id: "policy", type: { coding: [{ code: "workflow-definition" }] },
-  } }] },
-}) }));
-vi.mock("../../cel/imports", () => ({ resolveCelImports: () => ({ cel: { statements: [] } }) }));
-vi.mock("../../cel/emitter", () => ({ emitCelToFhir: () => ({}) }));
-vi.mock("../caseInput", () => ({ buildProducerInputs: () => ({ inputs: [] }), casesMissingFromEmit: () => [] }));
-
+// REFACTOR:grounded: an explicitly empty MV suite needs no engine.
 let root: string;
 const staleQ = `${RESULTS_ROOT}/patient/old/questionnaire/old.json`;
 const staleQr = `${RESULTS_ROOT}/patient/old/questionnaireresponse/old.json`;
@@ -47,6 +31,9 @@ const foreign = `${RESULTS_ROOT}/patient/old/observation/keep.json`;
 
 beforeEach(() => {
   root = mkdtempSync(path.join(tmpdir(), "crl-produce-cleanup-"));
+  mkdirSync(path.join(root, "src/cel/mv"), { recursive: true });
+  mkdirSync(path.join(root, "src/crl"), { recursive: true });
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "cleanup", version: "1.0.0" }));
   for (const relative of [staleQ, staleQr, foreign]) {
     const full = path.join(root, relative);
     mkdirSync(path.dirname(full), { recursive: true });
@@ -60,7 +47,7 @@ afterEach(() => {
 
 function produce(prune?: boolean) {
   const result = produceResults({
-    celPath: path.join(root, "suite.cel"), crlPath: path.join(root, "policy.crl"),
+    celPath: root, crlPath: path.join(root, "policy.crl"),
     outRoot: root, useCase: "prior-auth", crlVersion: "test", jarPath: "unused.jar", prune,
   });
   expect(result.ok).toBe(true);
@@ -89,13 +76,12 @@ describe("producer cleanup after committing an empty manifest", () => {
   });
 
   // @kit emitted-trees-are-ours:results-removal-failure
-  it("reports a failed deletion as orphaned while deleting the other owned file", () => {
-    files.refuseRemoval = path.join(root, staleQ);
+  it("reports a failed removal while pruning the other owned files", () => {
+    files.refuseRemoval = path.join(root, staleQr);
     const result = produce();
-    expect(result.pruned).toEqual([staleQr]);
-    expect(result.orphaned).toEqual([foreign, staleQ].sort());
-    expect(existsSync(path.join(root, staleQ))).toBe(true);
-    expect(existsSync(path.join(root, staleQr))).toBe(false);
-    expect(existsSync(path.join(root, foreign))).toBe(true);
+    expect(result.pruned).toEqual([staleQ]);
+    expect(result.orphaned).toEqual([staleQr, foreign].sort());
+    expect(existsSync(path.join(root, staleQr))).toBe(true);
+    expect(existsSync(path.join(root, staleQ))).toBe(false);
   });
 });

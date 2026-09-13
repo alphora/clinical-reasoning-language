@@ -5,7 +5,7 @@
 // naive structural check but FAILS the real crlRevealMaps resolution (crlAnchorsForUnits), proving the gate runs the
 // cockpit's OWN code, not a reimplementation.
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -18,7 +18,7 @@ import type {
 } from "../artifact";
 import { buildCockpitModel } from "../cockpitModel";
 import { checkCockpitCorrespondence } from "../correspondenceCheck";
-import { validateProvenanceFiles } from "../validateFiles";
+import { resolveProvenance, validateProvenanceFiles } from "../validateFiles";
 import { ATTRIBUTION_KINDS, WAIVER_KINDS } from "../validators";
 
 // ── the #170 minimal fixture: decision D in lib L ──────────────────────────────
@@ -201,6 +201,39 @@ const outerDenyOk = cluster("outer", [decRef("otherwise"), decRef("otherwise/act
 ]);
 
 describe("checkCockpitCorrespondence — #170 fixture table (via the FINAL gate)", () => {
+  it("resolves MV and regression references by source path while FINAL checks only MV cases", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-suites-"));
+    const put = (rel: string, text: string): string => { const p = path.join(dir, rel); mkdirSync(path.dirname(p), { recursive: true }); writeFileSync(p, text); return p; };
+    try {
+      put("package.json", JSON.stringify({ name: "p", version: "1.0.0", crl: { canonicalBase: "http://example.org/p" } }));
+      put("src/crl/p.crl", POLICY_CRL);
+      const mv = put("src/cel/mv/f.cel", CEL);
+      put("src/cel/regression/f.cel", CEL.replace('library "C".', 'library "Regression".').replaceAll('- id is "case-', '- id is "reg-'));
+      const clusters = JSON.parse(readFileSync(writeArtifact([approveOk, innerDenyOk, outerDenyOk]), "utf8")).clusters as Cluster[];
+      for (const c of clusters) for (const ref of c.cel) ref.file = "src/cel/mv/f.cel";
+      clusters.push({ ...cluster("engineering", [], []), cel: [{ ...celRef("reg-approve"), file: "src/cel/regression/f.cel" }] });
+      const art = put("src/provenance/p.json", JSON.stringify({ schemaVersion: "1.0", policyId: "L", policyVersion: "1", anchorSource: metaFor(ANCHOR_TEXT), items: [], ignoredRanges: [], clusters }));
+      const anchor = put("anchor.txt", ANCHOR_TEXT);
+      const resolved = resolveProvenance(art, mv, anchor, "final");
+      expect(resolved.frozenCaseIds.get("src/cel/regression/f.cel")?.has("reg-approve")).toBe(true);
+      expect(resolved.celGraphs?.has("f.cel")).toBe(false); // ambiguous basenames never alias
+      expect(validateProvenanceFiles(art, mv, anchor, "final").findings.filter(f => f.kind === "cockpit-correspondence")).toEqual([]);
+      const model = buildCockpitModel(art, mv, anchor, "worklist");
+      const engineering = model.correspondence.units.find(u => u.id === "engineering");
+      expect(engineering?.cel[0].location?.filePath).toBe(path.join(dir, "src/cel/regression/f.cel"));
+      // REFACTOR:grounded: conflicting engineering identities cannot light MV rows.
+      put("src/cel/regression/f.cel", CEL.replace('library "C".', 'library "Regression".'));
+      clusters[clusters.length - 1].cel[0].caseId = "case-approve";
+      const changedArtifact = JSON.parse(readFileSync(art, "utf8"));
+      changedArtifact.clusters = clusters;
+      writeFileSync(art, JSON.stringify(changedArtifact));
+      const conflict = resolveProvenance(art, mv, anchor, "final");
+      expect(conflict.frozenCaseIds.get("src/cel/mv/f.cel")?.has("case-approve")).toBe(true);
+      expect(conflict.celGraphs?.has("src/cel/regression/f.cel")).toBe(false);
+      const rejected = buildCockpitModel(art, mv, anchor, "worklist").correspondence.units.find(u => u.id === "engineering");
+      expect(rejected?.cel[0].unresolved).toContain("conflicting library or case IDs");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   it("approve-ok / inner-deny-ok / outer-deny-ok → no cockpit-correspondence finding (lit == path)", () => {
     const art = writeArtifact([approveOk, innerDenyOk, outerDenyOk]);
     expect(corrFindings(art)).toEqual([]);

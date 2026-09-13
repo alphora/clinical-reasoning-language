@@ -22,6 +22,8 @@ import { compartmentIdOf } from "./useCases";
 
 /** One case, ready for an engine driver. Everything an engine needs; nothing it has to re-derive. */
 export interface ProducerCaseInput {
+  sourceFile?: string;
+  caseId?: string;
   /** The authored case name — the join key. ⚠ Never a slug: two names can slug alike. */
   caseName: string;
   /** From the emitter. `patient/<compartmentId>`. */
@@ -39,6 +41,8 @@ export interface ProducerCaseInput {
 }
 
 export interface CaseInputDiagnostic {
+  sourceFile?: string;
+  caseId?: string;
   caseName: string;
   reason: "no-subject-patient";
   message: string;
@@ -65,6 +69,8 @@ export function buildProducerInputs(emit: EmitResult): {
     const patient = c.resources.find((r) => r.resourceType === "Patient");
     if (!patient) {
       diagnostics.push({
+        sourceFile: c.sourceFile,
+        caseId: c.caseId,
         caseName: c.caseName,
         reason: "no-subject-patient",
         message:
@@ -74,6 +80,8 @@ export function buildProducerInputs(emit: EmitResult): {
       continue;
     }
     inputs.push({
+      sourceFile: c.sourceFile,
+      caseId: c.caseId,
       caseName: c.caseName,
       compartmentDir: c.compartmentDir,
       compartmentId: compartmentIdOf(c.compartmentDir),

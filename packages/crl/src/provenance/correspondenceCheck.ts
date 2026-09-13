@@ -15,6 +15,7 @@
  * an explicit `unchecked` result — never silently skipped. A wholesale FAILED scenario render (no cases at all) is
  * itself reported `render-failed` so FINAL can never green-pass having verified nothing.
  */
+import { caseViewKey } from "../cre/viewModel";
 import type { CockpitModel } from "./cockpitModel";
 import type { ProvNodeRef } from "./indexer";
 import { buildCrlRevealMaps, crlAnchorsForUnits, unitsForCase } from "./revealMaps";
@@ -100,10 +101,11 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
   const results: CorrespondenceCheckResult[] = [];
   for (const sv of model.scenarios.scenarios) {
     const caseName = sv.case.name;
+    const identity = caseViewKey(sv.case);
 
     // A name shared by ≥2 scenarios in this render is ambiguous to join (the unfrozen-vs-frozen mis-join vector) →
     // unchecked, never mis-compared. Checked first: ambiguity dominates run state / decision shape.
-    if (duplicateScenarioNames.has(caseName)) {
+    if (duplicateScenarioNames.has(identity)) {
       results.push({ kind: "unchecked", caseName, reason: "case-name-collision" });
       continue;
     }
@@ -127,12 +129,12 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
     // a silent green), though the reason would be misattributed; in practice the covered decision always carries its lib.
     const lib = sv.decision.libraryName ?? "";
 
-    const caseId = model.caseIdByName[caseName];
+    const caseId = model.caseIdByName[identity];
     if (caseId === undefined) {
       results.push({
         kind: "unchecked",
         caseName,
-        reason: model.caseNameCollisions.includes(caseName)
+        reason: model.caseNameCollisions.includes(identity)
           ? "case-name-collision"
           : "unfrozen-case",
       });

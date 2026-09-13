@@ -12,6 +12,9 @@ export interface EmittedResource {
 
 /** Per-case grouping of emitted resources (all inside the one Patient compartment). */
 export interface EmittedCase {
+  // REFACTOR:grounded: aggregate suites retain the owning file and frozen review identity.
+  sourceFile?: string;
+  caseId?: string;
   /**
    * ⭐ THE CASE'S DIRECTORY, relative to the emit `outDir` — `patient/<compartmentId>`. This is the
    * ONLY thing that addresses a case on disk; a producer writes into it and a viewer reads from it.
@@ -48,6 +51,8 @@ export interface EmitDiagnostic {
 }
 
 export type EmitDiagnosticKind =
+  | import("../validator/types").CELValidationErrorKind
+  | "mv-off-path-data"
   | "publication-preparation-failed"
   | "publication-form-unsupported"
   | "publication-membership-no-negative-domain"

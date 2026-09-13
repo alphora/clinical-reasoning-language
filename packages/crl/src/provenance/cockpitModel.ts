@@ -18,6 +18,7 @@ import { collectLibs } from "./indexer";
 import { resolveProvenance, type ResolveProvenanceResult } from "./validateFiles";
 import type { ProvenanceValidationMode } from "./validators";
 import type { ResolvedCelGraph } from "../cel/imports/types";
+import { suiteCaseKey, type CelSuite } from "../cel/suite";
 
 export interface CockpitModel {
   correspondence: CorrespondenceModel;
@@ -49,14 +50,14 @@ export interface CockpitModel {
   criterionIdentities: Map<string, CriterionIdentity>;
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
-  /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the
+  /** caseViewKey(case) → frozen caseId (plain name for standalone cases, source+name for suite cases) — the join between renderScenario (keyed by name) and the correspondence (keyed by the
    *  frozen `- id is` caseId). Only cases WITH a frozen id; a name shared by ≥2 frozen cases is dropped (un-revealable,
    *  not mis-revealed). A scenario whose name is absent here renders but is not a cross-pane reveal target. */
   caseIdByName: Record<string, string>;
-  /** Frozen-case NAMEs shared by ≥2 cases (dropped from caseIdByName → those cases are un-revealable). The shell surfaces
+  /** caseViewKey identities shared by ≥2 frozen cases (dropped from caseIdByName → those cases are un-revealable). The shell surfaces
    *  these so a KE knows why some cases aren't navigable — it's a CEL data-quality signal, not a tool bug. */
   caseNameCollisions: string[];
-  /** Names shared by >1 case in the render (FROZEN OR UNFROZEN) — the stronger mis-join guard: an unfrozen+frozen
+  /** caseViewKey identities shared by >1 case in the render (FROZEN OR UNFROZEN) — the stronger mis-join guard: an unfrozen+frozen
    *  same-name pair survives caseIdByName (the frozen one wins) but is unsafe to compare. The correspondence check
    *  classifies a scenario unchecked (case-name-collision) when its name is in here, BEFORE the caseId lookup. */
   duplicateScenarioNames: Set<string>;
@@ -136,4 +137,30 @@ export function buildExecutionModel(graph: ResolvedCelGraph): Omit<CockpitModel,
     caseNameCollisions: frozenCollisions,
     duplicateScenarioNames,
   };
+}
+
+/** REFACTOR:grounded: every file keeps its own graph and case identity in a shared policy tree. */
+export function buildSuiteExecutionModel(suite: CelSuite): Omit<CockpitModel, "correspondence"> | undefined {
+  if (!suite.files.length) return undefined;
+  const base = buildExecutionModel(suite.files[0].graph);
+  const scenarios = { ...base.scenarios, scenarios: [] as typeof base.scenarios.scenarios, errors: [] as string[], caseCount: 0, passCount: 0, failCount: 0, errorCount: 0 };
+  const ids: Record<string, string> = {}, collisions: string[] = [], duplicateNames = new Set<string>();
+  for (const [i, file] of suite.files.entries()) {
+    const rendered = i === 0 ? base.scenarios : renderScenario(file.graph);
+    const join = buildCaseIdJoin(file.graph);
+    scenarios.success &&= rendered.success;
+    scenarios.errors.push(...rendered.errors.map(e => `${file.sourceFile}: ${e}`));
+    scenarios.caseCount += rendered.caseCount;
+    scenarios.passCount += rendered.passCount;
+    scenarios.failCount += rendered.failCount;
+    scenarios.errorCount += rendered.errorCount;
+    for (const sc of rendered.scenarios) {
+      const identity = suiteCaseKey(file.sourceFile, sc.case.name), caseId = join.caseIdByName[sc.case.name];
+      if (caseId !== undefined) ids[identity] = caseId;
+      if (join.duplicateScenarioNames.has(sc.case.name)) duplicateNames.add(identity);
+      scenarios.scenarios.push({ ...sc, case: { ...sc.case, identity, sourceFile: file.sourceFile, caseId } });
+    }
+    collisions.push(...join.frozenCollisions.map(name => suiteCaseKey(file.sourceFile, name)));
+  }
+  return { ...base, scenarios, caseIdByName: ids, duplicateScenarioNames: duplicateNames, caseNameCollisions: collisions };
 }

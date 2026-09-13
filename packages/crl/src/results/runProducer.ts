@@ -121,12 +121,12 @@ export function classify(
   }
   // ⚠ An engine can exit 0 having reported errors in its OperationOutcome. Treating a clean exit as
   // proof of a clean run is what made the very first apply against our layout look successful.
-  if (/ERROR|encountered exception/i.test(stderr) && !results.questionnaire) {
-    return { state: "failed", reason: "engine reported an error and produced no questionnaire" };
+  const otherErrors = stderr.split(/\r?\n/).filter(line => !/multiple values for a non repeating group/i.test(line)).join("\n");
+  if (/\bERROR\b|encountered exception/i.test(otherErrors)) {
+    return { state: "failed", reason: `engine reported an error${describeStderr(stderr)}` };
   }
-  // ⚠ The known `repeats` debt: ANY re-answered question (`most recent this` recency) trips this while
-  // the disposition stays correct. Folding it into `failed` makes every recency case read as broken,
-  // KEs learn to ignore the failure column, and that is how a real failure ships unnoticed.
+  // Preserve the known repeats/population diagnostic as its own case state. The aggregate
+  // unsuccessful count includes degradation; the state does not certify a disposition.
   const populateError = /multiple values for a non repeating group/i.test(stderr);
   if (!results.questionnaire) {
     return populateError

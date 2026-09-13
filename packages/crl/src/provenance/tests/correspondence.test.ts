@@ -338,7 +338,7 @@ describe("buildCorrespondenceModel — finding targets", () => {
 
   it("a wrong-file CEL ref (existing caseId, wrong file) is unresolved — builder agrees with the file-aware validator", () => {
     const wrong = unit("cl7").cel[0];
-    expect(wrong.unresolved).toMatch(/not the policy/i); // NOT silently resolved by caseId alone
+    expect(wrong.unresolved).toMatch(/unknown or ambiguous/i); // NOT silently resolved by caseId alone
     const f = findBy("cel-unresolved").find((x) => x.finding.cluster === "cl7")!;
     expect(f.targets.some((t) => t.pane === "cel" && t.resolution === "unresolved")).toBe(true);
   });

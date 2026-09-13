@@ -14,7 +14,10 @@ import { z } from "zod";
 const CRL_PACKAGE_VERSION: string = (require("../../package.json") as { version: string }).version;
 
 import { queryAuthoringKit } from "../authoring-kit/query";
-import { CEL_DATA_MANIFEST, emitCelToFhir, writeEmitResult } from "../cel/emitter";
+import { CEL_DATA_MANIFEST } from "../cel/emitter";
+import { publishMvCel } from "../cel/publishSuite";
+import { resolveCelSuite } from "../cel/suite";
+import { validateCelCommand } from "../cel/validateCommand";
 import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
@@ -363,7 +366,7 @@ function runValidateCel(args: { path?: string; soft?: boolean }) {
       e instanceof ToolInputError ? e.message : `Cannot read path "${p}": ${(e as Error).message}`;
     return { content: [{ type: "text" as const, text: msg }], isError: true };
   }
-  const result = validateCELFile(p, { soft: args.soft === true });
+  const result = validateCelCommand(p, { soft: args.soft === true });
   // Strip the .graph from the response — it carries the full registry which
   // can be very large. Callers needing the raw graph should use the npm
   // package directly.
@@ -448,7 +451,7 @@ export function createServer(): McpServer {
       title: "Validate CEL",
       description:
         "Validate a CEL (Case Example Language) document end-to-end against the covered CRL library's " +
-        "closure. Pass `path` (a .cel file); inline `code` is not supported in this tool because the " +
+        "closure. Classified files also validate MV/regression union identities and MV cases receive conservative off-path advice. Pass `path` (a .cel file); inline `code` is not supported in this tool because the " +
         "validator needs the file's project root to walk the CRL closure. " +
         "Returns { success, errors[], warnings[] } — the AST is omitted (use build_crl_ast on a .crl file " +
         "for AST inspection, or call buildCEL from the npm package). " +
@@ -634,20 +637,20 @@ export function createServer(): McpServer {
       title: "Emit FHIR Instance Resources from CEL",
       description:
         "Emit supported FHIR instance resources for each CEL (Case Example Language) case. Repeated emitting identities can invalidate a case; repeated Patient references do not add Patients. Inspect diagnostics and the returned resource/case manifests. " +
-        "Pass `path` (an absolute .cel file path); the resolver walks to the nearest package.json to load the covered CRL closure. " +
+        "Pass `path` (an absolute MV CEL file or policy directory). Selects the complete src/cel/mv suite under its policy package.json; regression and unclassified paths are refused. Each file independently covers the same CRL root. Failed validation preserves previous output. " +
         "Returns a SUMMARY envelope by default: " +
         "`{ success, caseCount, resourceCount, caseManifest:[{caseSlug, librarySlug, resourceCount}], resourceManifest:[{caseSlug, resourceType, id, outputPath}], diagnostics }`. " +
         "Pass `includeResources: true` to also receive the full `emittedCases[]` array (each case's full FHIR JSON bodies). " +
         "Writes the instance tree under the nearest package.json project root by default. Pass `out` (an ABSOLUTE root) to replace that root, retaining `tests/data/fhir/`; returns a `written` manifest. Use a scratch root for inspection because omission still writes. " +
-        "success is true iff there are zero error-severity diagnostics; `unsupported-yet`, `result-deferred`, and `precondition-failed` (when not error) are warnings, surfaced but non-fatal. " +
+        "success is true iff there are zero error-severity diagnostics; `unsupported-yet` and `result-deferred` warnings are surfaced but non-fatal. A declared case that cannot emit refuses the complete MV publication. " +
         "Diagnostic kinds: unsupported-yet (an underivable fact may emit no resource while other case resources remain), " +
         "result-deferred (`result is` is an expectation and emits no FHIR data resource), " +
-        "precondition-failed (parse error / unresolved covers / etc. — case skipped).",
+        "precondition-failed (a declared case could not emit; complete MV publication refused); mv-off-path-data (conservative CRE advice about later skipped local Boolean inputs; data is unchanged).",
       inputSchema: {
         path: z
           .string()
           .min(1)
-          .describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
+          .describe("Absolute path to an MV CEL file or policy directory. Selects the entire MV suite."),
         includeResources: z
           .boolean()
           .optional()
@@ -755,7 +758,7 @@ export function createServer(): McpServer {
     {
       title: "Run an engine over an emitted artifact and write the results (JVM)",
       description:
-        "Produce what an ENGINE returns for each CEL case and write it to the results tree. For " +
+        "Select the whole src/cel/mv suite and produce native results for every case. Regression/unclassified input is refused. The normal results manifest reports each case's generated, no-questionnaire or failure state. For " +
         "`prior-auth` that is a Questionnaire + QuestionnaireResponse per case, from " +
         "`PlanDefinition/$apply`. ⚠ THIS IS NOT AN `emit_*` IN THE PURE SENSE: every other `emit_*` here " +
         "is a function of source, while this SPAWNS A JVM. Results are not case data — CEL emits the " +
@@ -780,7 +783,7 @@ export function createServer(): McpServer {
         "it does NOT yet drive the answer-reveal loop or assert dispositions against the `result is` " +
         "oracle, so a form whose deeper questions are revealed only by answering may under-reach.",
       inputSchema: {
-        celPath: z.string().min(1).describe("Absolute path to the .cel suite."),
+        celPath: z.string().min(1).describe("Absolute path to an MV CEL file or policy directory; selects the whole MV suite."),
         crlPath: z.string().min(1).describe("Absolute path to the .crl library the suite covers."),
         useCase: z
           .string()
@@ -1788,7 +1791,7 @@ function emitResults(args: {
   });
 
   if (!outcome.ok) {
-    return err([outcome.reason, ...(outcome.detail ?? [])].join("\n"));
+    return { content: [{ type: "text" as const, text: JSON.stringify(outcome) }], isError: true };
   }
   return {
     content: [
@@ -2145,63 +2148,22 @@ function runEmitCel(args: { path: string; includeResources?: boolean; out?: stri
   }
   const outDir = outCheck.outDir;
 
-  let stat;
-  try {
-    stat = statSync(args.path);
-  } catch {
-    return {
-      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
-      isError: true,
-    };
-  }
-  if (!stat.isFile()) {
-    return {
-      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
-      isError: true,
-    };
-  }
-
-  const graph = resolveCelImports(args.path);
-  const result = emitCelToFhir(graph);
-  const hasErrors = result.diagnostics.some((d) => d.severity === "error");
-
-  // When `out` is set, write to disk. Gate on no error-severity diagnostic
-  // (warnings still write, mirroring the CLI's write-then-exit-2). A blocked
-  // write reports `written: null`; a filesystem failure surfaces as isError.
-  let written: string[] | null = null;
-  if (!hasErrors) {
-    const partial: string[] = [];
-    try {
-      written = writeEmitResult(result, outDir, partial);
-    } catch (e) {
-      // Symmetric with `emit_crl`: a machine-readable partial-write list, not just prose.
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              {
-                error:
-                  `Failed to write CEL emit output under "${outDir}"; it may hold a partial ` +
-                  `deliverable: ${(e as Error).message}`,
-                written: partial,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
+  // REFACTOR:grounded: selecting one MV file publishes all files in its policy suite.
+  const root = resolveEmitOutput("cel", args.path, args.out);
+  if (!root.ok) return { content: [{ type: "text", text: root.reason }], isError: true };
+  const publication = publishMvCel(args.path, root.root);
+  if (!publication.ok) return { content: [{ type: "text", text: JSON.stringify({ success: false, ...publication, written: null }, null, 2) }], isError: true };
+  const { result, written } = publication;
 
   const resourceCount = result.emittedCases.reduce((n, c) => n + c.resources.length, 0);
   const summary = {
-    success: !hasErrors,
+    success: true,
     caseCount: result.emittedCases.length,
     resourceCount,
     caseManifest: result.emittedCases.map((c) => ({
+      sourceFile: c.sourceFile,
+      caseId: c.caseId,
+      caseName: c.caseName,
       caseSlug: c.caseSlug,
       librarySlug: c.librarySlug,
       resourceCount: c.resources.length,

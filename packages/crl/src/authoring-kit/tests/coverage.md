@@ -1,5 +1,126 @@
 # Kit evidence ledger
 
+## Maintenance — MV and regression case sets (744–746)
+
+Baseline: `cc1b675ed9431d047bd5fb34305abef1b9af18a8`.
+Target: pending reviewed content commit. Kit schema `2.3`; content hash
+`75720d63e074fc63f88f9e8d3f6f98d3097be313c5b8f4dd91a3fa1d11aea7b8`.
+This is a complete source/test delta from the saved audit, including its following
+metadata commit and the small post-audit 5.3 keyboard-focus correction. Historical
+5.3 limitations below describe that release; this section supersedes them for 5.4.
+
+Operator intent: MV contains clinical question-path examples; regression evaluates
+those same examples plus engineering controls. Runtime data is never rewritten to
+make a demonstration cleaner. Git owns source and review history. The abandoned
+prototype's freshness protocol, output transactions, scratch ownership, failed-run
+receipts and history migration API are excluded, not teaching to preserve.
+
+| Changed assertion/input or implementation | Disposition, observation and limits |
+| --- | --- |
+| `cel/tests/suite.test.ts`: selects every MV file from file or policy; same-name cases retain IDs; independent Boolean facts emit true/false unchanged; regression union has three cases versus two MV; missing/empty folders, duplicate library/ID, foreign policy and unclassified inputs | **Kit updated**, `mv-case-authoring:suite-selection`. Fixture is the test's Policy/Answer Observation, two Clinical files and Engineering control, with a policy package.json and canonicalBase. Verifies discovery, CRE identity and FHIR data emission, not native outcome or clinical completeness. Invalid engineering syntax does not disable normal MV. |
+| Same suite tests (including explicit MV validation with invalid regression): invalid sibling returns no publishable partial suite, explicit empty MV clears data inventory, authored now values share one clock | **Existing guidance sufficient**, `emitted-trees-are-ours` and explicit CEL clock guidance. Aggregate before the existing writer; no transaction/recovery promise. Preserved prior files on validation refusal do not establish rollback after a write failure. |
+| `cel/tests/regression.test.ts`: actual API and built CLI with pass, incorrect expected disposition, and missing result assertion | **Kit updated**, `mv-case-authoring:regression-assertions`. Policy A with Approve/Deny verifies case status, checks.success and exit 0/2. Running CRE successfully is insufficient unless each assertion passes. No native oracle claim. |
+| `results/tests/suiteProduction.test.ts`: same-name MV cases, source/frozen IDs, union once each in automatic temporary output, normal unsuccessful states, no-questionnaire with/without closure inputs, superseded manifest reporting, explicit empty MV, manifest identity and outside-root redirect | **Kit updated**, `mv-case-authoring:regression-isolation`; existing emitted ownership guidance covers pruning and foreign-resource preservation. Real suite/data/filesystem, substituted compiler/JVM. Temporary union contains three cases; normal MV remains separate. Failed/timeout/not-run/populate-degraded stay ordinary case states. No proof of native activities, pause or interactive sequences. |
+| `results/tests/produceCleanup.test.ts`: empty suite with prune on/off and injected deletion failure; `runProducer.test.ts`: ordinary ERROR text classification | **Existing guidance sufficient**, three `emitted-trees-are-ours` tags retained. Removed mock graph/compiler prerequisites in favor of real empty-folder selection. Failed deletion remains reported while other owned Q/QR files are pruned; foreign resources remain outside ownership. Error-marker correction prevents classifying an engine failure as success, including a separate genuine error beside the known repeats diagnostic. Aggregate unsuccessful counts include degradation/not-run without erasing their distinct case states. Removed the unverified closure-wide no-questionnaire promotion; case-specific native expectations remain the oracle. |
+| `cel/tests/offPathWarnings.test.ts`: supplied preempted B, earlier false A, missing A, criterion-computed B, possible source overlap, regression purpose and CRE refusal | **Kit updated**, `mv-case-authoring:off-path-advisory`. Uses actual two-condition first-match CRL/CEL. Asserts B warning and byte-unchanged CEL; uncertain/shared dependencies and failed evaluation suppress advice. Conservative local Boolean advice only; absence of warning does not prove minimality or coverage. Cross-library frame lookup is implementation-reviewed, not independently native-tested. |
+| `provenance/tests/correspondenceCheck.test.ts`: MV/regression same-basename files, project-relative links, FINAL only MV, conflicting frozen IDs excluded; correspondence unresolved wording | **Kit updated**, `mv-case-authoring` source identity and FINAL scope. Reuses existing L/D approve-inner-deny-outer-deny fixture with independent CEL library/IDs. Valid engineering references resolve without entering MV completion; conflicts cannot attach engineering evidence to MV IDs. Source correspondence remains independent of execution. |
+| `provenance/generateFiles.ts`: scaffold each selected graph and merge corresponding clusters | **Existing guidance sufficient**, source-fidelity/correspondence rules remain binding; generation remains scaffolding, not proof of final narrative coverage. The added `generate-disposition-path.test.ts` case calls the generator on two same-basename independent suites: four source/ID references occur exactly once, two cases share one cluster without duplicate CRL refs, two other clusters survive, and FINAL correspondence reports no mismatch or unchecked case. The test runs both MV+MV and MV+regression variants and passes the suite model through checkCockpitCorrespondence; all 18 generator tests pass. caseViewKey consistently supplies standalone or source-aware identity. |
+| `cel/validateCommand.ts`, CLI/MCP emission/validation, producer wrappers, source-aware view model and cockpit, caseInput/manifest/writer | **Kit updated**, complete MV selection and ordinary result reporting. Existing low-level CEL/FHIR semantics are reused. The schema remains 1 with optional sourceFile/caseId, not a freshness protocol. Native regression invokes existing form production; independent native-outcome verification remains required. |
+| `cli/tests/run-mcp-server.test.mjs`: CMS22 fixture copied to package/src/crl and src/cel/mv, tool output and write checks retained; kit full JSON/Markdown pins | **Existing guidance sufficient**, entry-point verification and kit identity rules. Actual transport is exercised. Fixture facts are unchanged; folder placement now supplies required project scope. Kit hash/retrieval checks do not prove native execution. |
+| Extension launch tests, CEL selection routing, watcher/result lookup, same-name key and script literal | **Not language semantics** beyond the suite selection taught above. Tests replace obsolete per-file ambiguity with whole-policy selection, retain policy boundaries, reject explicit regression and loose CEL. Viewer geometry/design is unchanged. |
+| Prior audit/ledger stamp, 5.3 flow focus selector, package versions/lock/bin, docs | **Not author-facing semantics** for stamp/version/focus. New CLI bin and docs expose the reviewed operations. No dependency version, grammar, CQL/FHIR compiler or driver change. Package changes remain separately reviewed release metadata. |
+
+Four new owning tags: `mv-case-authoring:suite-selection`,
+`:regression-assertions`, `:regression-isolation`, `:off-path-advisory`.
+No existing owning tag or language-kit assertion was removed. Untagged boundary
+rows are dispositioned above rather than excluded as whole files. The rules `cel-cases`, `mv-case-authoring`, `cel-identity`, `verify-loop` and `produce-results` now consistently teach the selected-set contract, complete-publication refusal, validation scope, result states and review reset obligations. Reference artifacts, examples, grammar and native verification obligations remain unchanged. No second teaching fixture
+or native assertion oracle was introduced.
+
+Final bounded corrections: explicit validation checks every selected graph with
+source-path diagnostics; FINAL with no MV graphs reports render-failed; same-file
+duplicate names retain collision diagnostics without contaminating another file;
+cross-file repeated display names show source suffixes in the UI. The shared
+classifier follows platform path casing. These extend the selected-set, identity
+and FINAL obligations above without changing syntax or native semantics.
+
+Final source checks: core4901 pass/32 skipped, actual MCP passed; extension1262
+pass/3 expected failures;32 focused core checks cover the final bounded fixes;
+builds/typechecks and diff checks pass. Review746 round2 external2critical,
+7important,1nit received3Accept/3Refine/4Reject; final native code0critical,
+1important,0nit accepted and corrected a test-fixture identity. All dispositions
+and full responses are recorded; no unrun external convergence is claimed.
+Installed release verification remains separate from this source/kit audit.
+
+Bleph delivery FINAL is not clean:36 source-correspondence errors and24 manual
+findings, versus66 errors/24manual in the original copy; exact comparison shows
+no new findings and no retired-case-ID references. These existing content issues
+remain KE/source-review work. Clinical copies are local test inputs, not certified
+release content. Neither their CRE outcomes nor native form production proves
+clinical validity or resolves those source-correspondence findings.
+
+Additional review746: native initially0/0/0; external3critical/8important/6nit.10Accept/6Refine/1Reject dispositions recorded in746-followup.md.342 affected core tests pass after corrections; core/extension and actual MCP gates rerun before stamping. Real Bleph37 and RX10 MV sets produce zero conservative advisories; that is not a minimality proof.29 edited Bleph examples receive new IDs, with no MV review sidecars in the delivery copy. Review/check status will be finalized before the stamp advances. Discussion744
+accepted all three native findings (regression assertion status, conflicting
+provenance identities, stale failure-receipt promise); follow-up converged with
+zero critical/important/nit findings. External743 returned no substantive findings
+before exhausting its budget; no external code convergence is claimed.
+
+Complete changed-path inventory (including new candidate files):
+
+- `packages/crl/src/provenance/tests/generate-disposition-path.test.ts`
+- `packages/crl-vscode/src/mcp-server.test.mjs`
+- `packages/crl-vscode/src/celPaneHtml.test.mjs`
+- `packages/crl/src/provenance/correspondenceCheck.ts`
+
+- `docs/cel-suites.md`
+- `docs/medical-validation-plan.md`
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/src/celPaneHtml.ts`
+- `packages/crl-vscode/src/cockpitWebviewScript.test.mjs`
+- `packages/crl-vscode/src/correspondenceCockpit.ts`
+- `packages/crl-vscode/src/flowPaneHtml.ts`
+- `packages/crl-vscode/src/policyLaunchTarget.test.mjs`
+- `packages/crl-vscode/src/policyLaunchTarget.ts`
+- `packages/crl/package.json`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/cel/emitter/types.ts`
+- `packages/crl/src/cel/emitter/writer.ts`
+- `packages/crl/src/cel/offPathWarnings.ts`
+- `packages/crl/src/cel/publishSuite.ts`
+- `packages/crl/src/cel/regression.ts`
+- `packages/crl/src/cel/suite.ts`
+- `packages/crl/src/cel/suiteEmit.ts`
+- `packages/crl/src/cel/tests/offPathWarnings.test.ts`
+- `packages/crl/src/cel/tests/regression.test.ts`
+- `packages/crl/src/cel/tests/suite.test.ts`
+- `packages/crl/src/cel/validateCommand.ts`
+- `packages/crl/src/cli/run-emit-results.ts`
+- `packages/crl/src/cli/run-emitter.ts`
+- `packages/crl/src/cli/run-regression.ts`
+- `packages/crl/src/cli/run-validator.ts`
+- `packages/crl/src/cli/tests/run-mcp-server.test.mjs`
+- `packages/crl/src/cre/viewModel.ts`
+- `packages/crl/src/index.ts`
+- `packages/crl/src/mcp/server.ts`
+- `packages/crl/src/provenance/cockpitModel.ts`
+- `packages/crl/src/provenance/correspondence.ts`
+- `packages/crl/src/provenance/generateFiles.ts`
+- `packages/crl/src/provenance/tests/correspondence.test.ts`
+- `packages/crl/src/provenance/tests/correspondenceCheck.test.ts`
+- `packages/crl/src/provenance/validateFiles.ts`
+- `packages/crl/src/results/caseInput.ts`
+- `packages/crl/src/results/manifest.ts`
+- `packages/crl/src/results/produce.ts`
+- `packages/crl/src/results/readSuiteResult.ts`
+- `packages/crl/src/results/runProducer.ts`
+- `packages/crl/src/results/tests/produceCleanup.test.ts`
+- `packages/crl/src/results/tests/runProducer.test.ts`
+- `packages/crl/src/results/tests/suiteProduction.test.ts`
+
 ## Maintenance — MV route inspection and wording handoff (737/738)
 
 Baseline: `34d591eeab7fae22485546add54efe41106d756d`.

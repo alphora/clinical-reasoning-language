@@ -30,7 +30,7 @@ const CRL_VERSION: string = (require("../../package.json") as { version: string 
 const HELP_TEXT = `crl-emit-results — run an engine over an emitted artifact and write the results
 
 USAGE:
-  crl-emit-results --cel <file.cel> --crl <file.crl> --use-case <${RESULT_USE_CASES.join("|")}>
+  crl-emit-results --cel <policy-or-MV-file> --crl <file.crl> --use-case <${RESULT_USE_CASES.join("|")}>
                    --jar <producer.jar> --jar-sha256 <hex> --enable [--out <dir>]
   crl-emit-results --help
 
@@ -41,6 +41,7 @@ WHAT IT DOES
 
       tests/results/fhir/patient/<compartmentId>/<resourceType>/
 
+  Regression and unclassified input are refused. Case failures are reported in the normal results manifest.
   Case DATA stays where the CEL emitter puts it (tests/data/fhir/patient/...). Results are
   what an ENGINE produced and live in their own tree.
 
@@ -49,7 +50,7 @@ WHAT IT DOES
   knowledge engineers producing them turn it on.
 
 FLAGS:
-  --cel <file>         The CEL suite. Required.
+  --cel <file>         An MV CEL file or policy directory; selects all MV files. Required.
   --crl <file>         The CRL library the suite covers. Required.
   --use-case <name>    ${RESULT_USE_CASES.join(" | ")}. Required.
   --jar <path>         Engine jar. OPTIONAL — uses this build's identified cache.
@@ -67,7 +68,7 @@ FLAGS:
   --help               Show this message and exit 0.
 
 EXIT CODES:
-  0  Every case reached a terminal state and none FAILED.
+  0  The MV run completed without case failures.
   2  At least one case failed, or the engine could not be run.
   1  Bad arguments, or --enable was not given.
 `;

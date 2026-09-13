@@ -7,16 +7,17 @@
  * surfaces call it and differ only in how they report.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { emitCelToFhir } from "../cel/emitter";
-import { resolveCelImports } from "../cel/imports";
+import { emitCelSuite, type CelSuiteEmission } from "../cel/suiteEmit";
+import { resolveCelSuite, type CelSuite } from "../cel/suite";
+import { canonicalizeFsPath } from "../imports/paths";
 import { emitCrlTwoLane } from "../emit-two-lane";
-import { buildProducerInputs, casesMissingFromEmit } from "./caseInput";
+import { buildProducerInputs } from "./caseInput";
 import { isInsideResultsTree, scanOrphans, splitOrphans } from "./orphans";
-import { producerManifestName, type ProducerManifest } from "./manifest";
+import { suiteResultsManifestPath, type ProducerManifest } from "./manifest";
 import { buildEngineRepoBundle, cqlIndex } from "./repoBundle";
 import { runOneCase } from "./runProducer";
 import {
@@ -71,7 +72,7 @@ export type ProduceOutcome =
       ok: true;
       manifest: ProducerManifest;
       manifestPath: string;
-      /** Cases the suite declares that the emitter did not produce — reported, never silently skipped. */
+      /** Compatibility field: empty on success; incomplete suite emission returns ok:false before production. */
       notEmitted: string[];
       /** Q/QR this run DELETED from the results tree. Empty when `prune: false`. */
       pruned: string[];
@@ -99,6 +100,51 @@ export type ProduceOutcome =
  * plausible-looking empty success in an earlier cut of this code.
  */
 export function produceResults(req: ProduceRequest): ProduceOutcome {
+  return produceSuiteResults(req, "mv");
+}
+
+/** Engineering runs reuse the producer in a newly created temporary directory. */
+export function produceRegressionResults(req: Omit<ProduceRequest, "outRoot" | "celPath"> & { projectPath: string }): ProduceOutcome {
+  const outRoot = mkdtempSync(path.join(tmpdir(), "crl-regression-"));
+  return produceSuiteResults({ ...req, celPath: req.projectPath, outRoot }, "regression");
+}
+
+// REFACTOR:grounded: case-set selection is the only difference between these operations.
+function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regression"): ProduceOutcome {
+  if (!isImplementedUseCase(req.useCase)) return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
+  const selection = resolveCelSuite(req.celPath, purpose);
+  if (!selection.ok) return { ok: false, reason: "Invalid CEL suite", detail: selection.diagnostics.map(d => d.message) };
+  try {
+    const suite = selection.suite;
+    if (suite.policyPath && canonicalizeFsPath(req.crlPath) !== canonicalizeFsPath(suite.policyPath)) return { ok: false, reason: "crlPath must be the policy covered by every selected CEL file." };
+    const emission = emitCelSuite(suite);
+    if (emission.result.diagnostics.some(d => d.severity === "error")) return { ok: false, reason: "CEL suite did not emit completely", detail: emission.result.diagnostics.map(d => d.message) };
+    const result = suite.files.length ? produceCandidate(req, suite, emission) : emptyResult(req, suite, emission);
+    if (!result.ok) return result;
+    mkdirSync(path.dirname(result.manifestPath), { recursive: true });
+    writeFileSync(result.manifestPath, JSON.stringify(result.manifest, null, 2) + "\n");
+    // Existing results-tree cleanup, once for the complete selected case set.
+    const scan = scanOrphans(req.outRoot, result.manifest);
+    const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
+    // Report superseded per-file manifests; readers use only the returned suite manifest.
+    for (const name of readdirSync(path.dirname(result.manifestPath))) {
+      if (/^questionnaire-manifest-.*\.json$/.test(name) && name !== path.basename(result.manifestPath)) reportOnly.push(`tests/results/${name}`);
+    }
+    const pruned: string[] = [];
+    for (const rel of prunable) {
+      if (req.prune === false || !isInsideResultsTree(req.outRoot, rel)) { reportOnly.push(rel); continue; }
+      try { rmSync(path.join(req.outRoot, rel)); pruned.push(rel); }
+      catch { reportOnly.push(rel); }
+    }
+    return { ...result, pruned, orphaned: reportOnly.sort(), skippedLinks: scan.skippedLinks };
+  } catch (error) { return { ok: false, reason: String(error) }; }
+}
+
+function emptyResult(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission): Extract<ProduceOutcome, { ok: true }> {
+  return { ok: true, manifest: { schemaVersion: 1, celLibrary: suite.purpose, useCase: req.useCase, generatedAt: emission.clock, provenance: { crlVersion: req.crlVersion }, cases: [] }, manifestPath: path.join(req.outRoot, suiteResultsManifestPath(suite.purpose)), notEmitted: [], pruned: [], orphaned: [], skippedLinks: [], failed: 0, java: { exe: "not invoked (empty suite)", major: 0 }, engineJar: { path: "not invoked (empty suite)", defaulted: req.jarPath === undefined } };
+}
+
+function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission): ProduceOutcome {
   if (!isImplementedUseCase(req.useCase)) {
     return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
   }
@@ -184,14 +230,9 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
   }
 
   const cql = cqlIndex(two.cqlLibraries ?? []);
-  const celGraph = resolveCelImports(req.celPath);
-  const celEmit = emitCelToFhir(celGraph);
-  const { inputs } = buildProducerInputs(celEmit);
-
-  const declared = ((celGraph.cel?.statements ?? []) as { type: string; name?: string }[])
-    .filter((st) => st.type === "CELCase")
-    .map((st) => String(st.name ?? ""));
-  const notEmitted = casesMissingFromEmit(declared, celEmit);
+  const { inputs, diagnostics } = buildProducerInputs(emission.result);
+  if (diagnostics.length) return { ok: false, reason: "CEL cases have no native input", detail: diagnostics.map(d => `${d.sourceFile}: ${d.message}`) };
+  const notEmitted: string[] = [];
 
   const defs = (two.fhir.resources as unknown as { resource: Record<string, unknown> }[]).map(
     (w) => w.resource,
@@ -222,14 +263,17 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
 
   const manifest: ProducerManifest = {
     schemaVersion: 1,
-    celLibrary: path.basename(req.celPath, ".cel"),
+    celLibrary: suite.purpose,
     useCase: req.useCase,
-    generatedAt: new Date().toISOString(),
-    provenance: { crlVersion: req.crlVersion, producerJarSha256: jarCheck.sha256 },
+    generatedAt: emission.clock,
+    provenance: {
+      crlVersion: req.crlVersion, producerJarSha256: jarCheck.sha256,
+    },
     cases: [],
   };
 
   let failed = 0;
+  try {
   for (const input of inputs) {
     const repo = buildEngineRepoBundle({
       definitions: defs as never,
@@ -240,6 +284,8 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
       // ⚠ FAIL the case. Launching without its CQL produces an expression-level engine error that never
       // names the missing library, which then reads as a legitimate empty result.
       manifest.cases.push({
+        sourceFile: input.sourceFile,
+        caseId: input.caseId,
         caseName: input.caseName,
         compartmentDir: `patient/${input.compartmentId}`,
         state: "failed",
@@ -266,54 +312,23 @@ export function produceResults(req: ProduceRequest): ProduceOutcome {
         repoPath,
       },
     );
+    entry.sourceFile = input.sourceFile;
+    entry.caseId = input.caseId;
     manifest.cases.push(entry);
-    if (entry.state === "failed" || entry.state === "timeout") failed++;
+    if (entry.state !== "generated" && entry.state !== "no-questionnaire") failed++;
   }
+  } finally { rmSync(scratch, { recursive: true, force: true, maxRetries: 3 }); }
 
-  // ⚠ MANIFEST LAST — the commit point. A reader that finds it can trust every path in it.
-  mkdirSync(path.join(req.outRoot, "tests/results"), { recursive: true });
-  const manifestPath = path.join(
-    req.outRoot,
-    "tests/results",
-    producerManifestName(manifest.celLibrary),
-  );
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-
-  // AFTER the manifest is written: it is the definition of what this run claims, so orphans are
-  // computed against the committed answer rather than an in-flight one.
-  // ⭐ THE RESULTS TREE IS OURS: delete every Q/QR in it this run did not write. No sibling-suite
-  // protection, no held-back states, no refusal when the run produced nothing — all of that was built
-  // and then removed by operator ruling, because it only matters if the tree is shared and it is not.
-  const scan = scanOrphans(req.outRoot, manifest);
-  const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
-  const pruned: string[] = [];
-  if (req.prune !== false) {
-    for (const rel of prunable) {
-      // Stay inside the tree. "Our folder" is the authorization; it is also the limit.
-      if (!isInsideResultsTree(req.outRoot, rel)) {
-        reportOnly.push(rel);
-        continue;
-      }
-      try {
-        rmSync(path.join(req.outRoot, rel));
-        pruned.push(rel);
-      } catch {
-        reportOnly.push(rel); // could not remove it: report rather than claim it is gone
-      }
-    }
-  } else {
-    reportOnly.push(...prunable);
-  }
-  reportOnly.sort();
+  const manifestPath = path.join(req.outRoot, suiteResultsManifestPath(suite.purpose));
 
   return {
     ok: true,
     manifest,
     manifestPath,
     notEmitted,
-    orphaned: reportOnly,
-    pruned,
-    skippedLinks: scan.skippedLinks,
+    orphaned: [],
+    pruned: [],
+    skippedLinks: [],
     failed,
     java: { exe: java.javaExe, major: java.major },
     engineJar: { path: jarPath, defaulted: req.jarPath === undefined },

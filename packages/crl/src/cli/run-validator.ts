@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { validateCELFile } from "../cel/validator";
+import { validateCelCommand } from "../cel/validateCommand";
 import { validateCRLImports } from "../imports/validate";
 
 function parseArgs(argv: string[]): {
@@ -52,7 +52,7 @@ if (!filePath) {
 // Pitch v4 critical decision #1 option (d): crl-validate auto-dispatches by
 // file extension. `.cel` → CEL validator; `.crl` (default) → CRL.
 if (filePath.toLowerCase().endsWith(".cel")) {
-  const celResult = validateCELFile(filePath, { soft });
+  const celResult = validateCelCommand(filePath, { soft });
   if (!pretty) {
     const out = {
       success: celResult.errors.length === 0,

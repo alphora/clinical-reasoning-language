@@ -7,7 +7,7 @@
  * this case, the run FAILED for this case, and the producer has never run at all. All three look like an
  * empty directory. Every eligible case therefore gets exactly one terminal state here.
  *
- * Results live under `tests/results/<use-case>/`, a sibling of the CEL emitter's
+ * Results live under `tests/results/fhir/`, separate from the CEL emitter's
  * `tests/data/fhir/patient/`. An earlier design co-located them in the case compartment and needed an
  * id-level ownership marker to survive sharing a directory with CEL-emitted `QuestionnaireResponse`
  * facts; the separate tree removes that problem rather than guarding it.
@@ -22,15 +22,15 @@ export type ProducerCaseState =
   | "generated"
   /**
    * `$apply` succeeded and legitimately offered no questionnaire — the path gathers no case-feature
-   * input. SUCCESS, not failure. ⚠ Distinguished from a silent engine no-op by a static check: if the
-   * covered closure HAS answerable concepts and this still comes back, it is a diagnostic.
+   * input. Inspect against the case-specific native expectations: inputs elsewhere in the
+   * definition closure do not prove this route should have returned a form.
    */
   | "no-questionnaire"
   /**
    * ⚠ `$populate` errored while the engine still returned output — overwhelmingly the known `repeats`
    * debt, which ANY re-answered question (`most recent this` recency arbitration) trips. Its own state
-   * deliberately: folding it into `failed` makes every recency case read as broken, KEs learn to ignore
-   * the failure column, and that is how the one real failure ships unnoticed.
+   * deliberately so the case remains distinguishable from other engine failures. Aggregate
+   * unsuccessful counts include this state; inspect the per-case state and reason for the distinction.
    *
    * ⚠ THIS STATE ASSERTS NOTHING ABOUT THE DISPOSITION. An earlier version of this comment said "the
    * disposition was asserted CORRECT", which the implementation cannot support: V1 runs a baseline
@@ -38,7 +38,7 @@ export type ProducerCaseState =
    * correctness that nothing measures is worse than claiming nothing.
    */
   | "populate-degraded"
-  /** The case ran and its outcome was wrong or absent. */
+  /** The engine run failed or its expected output was absent or unreadable. */
   | "failed"
   /** The batch JVM was killed on the whole-batch timeout while this case was running. */
   | "timeout"
@@ -56,12 +56,15 @@ export interface ProducerArtifact {
   id: string;
   /** Path relative to the emit root. */
   path: string;
-  /** sha256 of the bytes written. The consumer re-verifies before binding. */
+  /** sha256 of the bytes written, retained for inspection and verification. */
   sha256: string;
   resourceType: string;
 }
 
 export interface ProducerCaseEntry {
+  // REFACTOR:grounded: distinguish same-named cases in independent CEL files.
+  sourceFile?: string;
+  caseId?: string;
   /** The authored case name — the join key back to CEL, never a slug (two names can slug alike). */
   caseName: string;
   /** From `EmittedCase.compartmentDir`; never composed by a reader. */
@@ -80,12 +83,11 @@ export interface ProducerCaseEntry {
 
 export interface ProducerManifest {
   schemaVersion: 1;
-  /** The CEL library this manifest covers. One manifest PER CEL SOURCE — a single shared file at the
-   *  emit root would lose the ownership records of every other CEL library writing there. */
+  /** The selected case set: mv or regression. Entries retain their individual source files. */
   celLibrary: string;
   /** Which engine produced these — `prior-auth` (Questionnaire/QR), `measure` (MeasureReport), … */
   useCase: string;
-  /** Absolute-free identity of the run's inputs, so a reader can tell stale from current. */
+  /** Timestamp of this production run; not a source-freshness guarantee. */
   generatedAt: string;
   /** ⚠ Records WHAT PRODUCED THIS, because a stale definition closure makes the CEL oracle and `$apply`
    *  evaluate different source versions and nothing else would reveal it. */
@@ -100,15 +102,14 @@ export interface ProducerManifest {
 }
 
 /** The manifest filename for a CEL library, at the emit root. Deterministic so a reader can find it. */
+export const suiteResultsManifestPath = (purpose: "mv" | "regression" = "mv"): string =>
+  `tests/results/questionnaire-manifest-${purpose}.json`;
+
 export const producerManifestName = (celLibrarySlug: string): string =>
   `questionnaire-manifest-${celLibrarySlug}.json`;
 
 /**
  * Resolve the artifacts a consumer should bind for a case.
- *
- * ⚠ THE MV PANE DOES NOT YET USE THIS. It globs `caseResultsGlob` and takes the first parseable pair,
- * so it can currently show a stale artifact from a previous run whose case is now `failed`. Making the
- * manifest the pane's binding authority is owed work, not a description of today.
  *
  * Returns undefined when the manifest has no entry for the compartment (never run, or the case was not
  * eligible) or when its state is not `generated`. ⚠ A non-`generated` state is NOT an error here: the

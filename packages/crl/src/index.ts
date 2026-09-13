@@ -653,3 +653,12 @@ function toCrlError(v: ValidationError): CRLError {
     column: v.location?.start.column,
   };
 }
+// Whole-policy MV suites and manifest-bound consumers.
+export { resolveCelSuite, suiteCaseKey } from "./cel/suite";
+export type { CelSuite, CelSuiteFile } from "./cel/suite";
+export { buildSuiteExecutionModel } from "./provenance/cockpitModel";
+export { caseViewKey } from "./cre/viewModel";
+export { produceRegressionResults } from "./results/produce";
+export { readSuiteResult } from "./results/readSuiteResult";
+export { publishMvCel } from "./cel/publishSuite";
+export { runRegression } from "./cel/regression";

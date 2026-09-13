@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
 import { resolveCelImports } from "../cel/imports";
+import { celSuiteRole, resolveCelSuite } from "../cel/suite";
 
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
 import { CANONICALIZER_NAME, CANONICALIZER_VERSION } from "./canonicalize";
@@ -172,7 +173,12 @@ export function generateProvenanceFiles(
   const escape = repoEscapeAdvisory(anchorPath, carrierDir);
   if (escape) advisories.push(escape);
 
-  const graph = resolveCelImports(celPath);
+  // Classified inputs scaffold provenance for both suites; only MV is a clinical completion set.
+  const classified = celSuiteRole(celPath);
+  const selected = classified ? resolveCelSuite(celPath, "regression") : undefined;
+  if (selected && !selected.ok) throw new Error(selected.diagnostics.map(d => d.message).join("\n"));
+  const sources = selected?.ok ? selected.suite.files.map(f => ({ graph: f.graph, sourceFile: f.sourceFile })) : [{ graph: resolveCelImports(celPath), sourceFile: basename(celPath) }];
+  const graph = sources[0].graph;
   // policyId = the covered library name (the scaffold's spine). A null coversName means there is no policy anchor: the
   // scaffold would be EMPTY (generate surfaces a no-policy-anchor diagnostic via the index). Rather than silently emit
   // an empty "success" artifact that drops that reason, THROW — the CLI's try/catch + the MCP handler turn it into a
@@ -184,7 +190,7 @@ export function generateProvenanceFiles(
     );
   }
   const policyId = coversName;
-  const celFileName = basename(celPath);
+  const celFileName = sources[0].sourceFile;
 
   const fresh = generateProvenanceScaffold(graph, {
     policyId,
@@ -193,6 +199,18 @@ export function generateProvenanceFiles(
     celFileName,
     ...(opts?.clusterBy !== undefined ? { clusterBy: opts.clusterBy } : {}),
   });
+  for (const source of sources.slice(1)) {
+    const next = generateProvenanceScaffold(source.graph, { policyId, policyVersion, anchorSource, celFileName: source.sourceFile, ...(opts?.clusterBy ? { clusterBy: opts.clusterBy } : {}) });
+    for (const cluster of next.artifact.clusters) {
+      const previous = fresh.artifact.clusters.find(c => c.id === cluster.id);
+      if (!previous) fresh.artifact.clusters.push(cluster);
+      else {
+        previous.cel = [...new Map([...previous.cel, ...cluster.cel].map(ref => [JSON.stringify(ref), ref])).values()];
+        previous.crl = [...new Map([...previous.crl, ...cluster.crl].map(ref => [JSON.stringify(ref), ref])).values()];
+      }
+    }
+    fresh.diagnostics.push(...next.diagnostics.filter(d => !fresh.diagnostics.some(existing => JSON.stringify(existing) === JSON.stringify(d))));
+  }
 
   // No --merge: the fresh scaffold IS the result; only the generate channel is populated.
   if (!opts?.existingArtifactPath) {

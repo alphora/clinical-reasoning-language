@@ -54,6 +54,14 @@ describe("extracting results from the engine envelope", () => {
 describe("every case gets exactly one terminal state", () => {
   const q = { questionnaire: { resourceType: "Questionnaire", id: "q" } };
 
+  // @kit produce-results:engine-errors-block-publication
+  it("rejects expression errors even when the engine returned a questionnaire and exited zero", () => {
+    expect(classify(extractResults(PARAMS), "ERROR expression evaluation failed", false, 0).state).toBe("failed");
+    expect(classify(extractResults(PARAMS), "encountered exception evaluating Library", false, 0).state).toBe("failed");
+    expect(classify({}, "ERROR expression evaluation failed", false, 0).state).toBe("failed");
+    expect(classify(q, "ERROR multiple values for a non repeating group\nERROR expression evaluation failed", false, 0).state).toBe("failed");
+  });
+
   // @kit produce-results:generated-is-not-an-outcome-oracle
   it("⭐ a clean run with a questionnaire is `generated`", () => {
     expect(classify(q, "", false, 0).state).toBe("generated");

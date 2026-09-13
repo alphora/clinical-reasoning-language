@@ -128,11 +128,17 @@ export interface ScenarioViewModel {
 }
 
 export interface CaseView {
+  /** Suite consumers use this source-aware key; display names remain authored. */
+  identity?: string;
+  sourceFile?: string;
+  caseId?: string;
   name: string;
   description?: string;
   subject?: string;
   facts: FactView[];
 }
+
+export function caseViewKey(c: CaseView): string { return c.identity ?? c.name; }
 
 export interface FactView {
   name: string;
@@ -261,9 +267,9 @@ export type ExplanationView =
  *  shares the import-resolution path; the MCP/path entry resolves a `.cel` path to a graph first. */
 export function renderScenario(
   graph: ResolvedCelGraph,
-  opts?: { case?: string },
+  opts?: { case?: string; now?: Date },
 ): RenderScenarioResult {
-  const result = runCel(graph);
+  const result = runCel(graph, { now: opts?.now });
   const celFilePath = graph.filePath;
   if (!result.success) {
     // Fold the structured resolver/parse detail into `errors` so the UI can say WHY covers/parse failed

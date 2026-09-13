@@ -11,7 +11,7 @@ import { getAuthoringKit } from "../../../dist/authoring-kit/index.js";
 import { renderAuthoringKitMarkdown } from "../../../dist/authoring-kit/export.js";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 // #212/#230 — the flag tools write the `medical-validation/flags/` STORE, located from a `.crl` path via the enclosing policy
@@ -37,6 +37,17 @@ function freshProjectCopy(cpSync) {
   cpSync(FIXTURE_PROJECT, dest, { recursive: true });
   return dest;
 }
+
+function freshMvProject() {
+  const dest = scratchOut();
+  mkdirSync(join(dest, "src/crl"), { recursive: true });
+  mkdirSync(join(dest, "src/cel/mv"), { recursive: true });
+  copyFileSync(join(FIXTURE_PROJECT, "package.json"), join(dest, "package.json"));
+  for (const name of readdirSync(FIXTURE_PROJECT).filter(n => n.endsWith(".crl"))) copyFileSync(join(FIXTURE_PROJECT, name), join(dest, "src/crl", name));
+  copyFileSync(join(FIXTURE_PROJECT, "cms22.cel"), join(dest, "src/cel/mv/cms22.cel"));
+  return dest;
+}
+const mvFixture = freshMvProject();
 
 const storeFlags = (storeDir) => {
   try {
@@ -277,8 +288,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.2");
-    assert.equal(kit.contentHash, "f31aadf37e8e371f55d83f9632933baa383259bfa8023b5d31bba29d08392e36");
+    assert.equal(kit.schemaVersion, "2.3");
+    assert.equal(kit.contentHash, "75720d63e074fc63f88f9e8d3f6f98d3097be313c5b8f4dd91a3fa1d11aea7b8");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 13);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -420,7 +431,7 @@ first:
     // directory, so the call would write `src/cql/`, `src/fhir/` and a wiped-and-repopulated
     // `tests/data/fhir/patient/` INSIDE `packages/`. A test that mutates the repo it is testing is how
     // a suite starts passing for the wrong reason.
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const cms22Cel = join(mvFixture, "src/cel/mv/cms22.cel");
     const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: scratchOut() } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -434,7 +445,7 @@ first:
   });
 
   await check("emit_cel with includeResources:true → full emittedCases included", async () => {
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const cms22Cel = join(mvFixture, "src/cel/mv/cms22.cel");
     const r = await client.callTool({
       name: "emit_cel",
       arguments: { path: cms22Cel, includeResources: true, out: scratchOut() },
@@ -447,7 +458,7 @@ first:
   await check("emit_cel with out (absolute) → writes the FHIR tree + returns an absolute `written` manifest", async () => {
     const { mkdtempSync, rmSync, existsSync } = await import("node:fs");
     const os = await import("node:os");
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const cms22Cel = join(mvFixture, "src/cel/mv/cms22.cel");
     const outDir = mkdtempSync(resolve(os.tmpdir(), "mcp-emitcel-out-"));
     try {
       const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: outDir } });
@@ -464,7 +475,7 @@ first:
   });
 
   await check("emit_cel with a RELATIVE out → isError (server CWD is not the workspace)", async () => {
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
+    const cms22Cel = join(mvFixture, "src/cel/mv/cms22.cel");
     const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel, out: "relative/out" } });
     assert.equal(r.isError, true);
     assert.match(r.content[0].text, /ABSOLUTE/);
@@ -474,9 +485,9 @@ first:
     // ⭐ THE DEFAULT IS THE POINT OF THE TOOL, so it is tested against a REAL project — a throwaway copy
     // of the fixture, so the default has a genuine package.json to find and nothing in the repo moves.
     const { cpSync, rmSync, existsSync } = await import("node:fs");
-    const proj = freshProjectCopy(cpSync);
+    const proj = freshMvProject();
     try {
-      const cel = resolve(proj, "cms22.cel");
+      const cel = resolve(proj, "src/cel/mv/cms22.cel");
       const out = JSON.parse((await client.callTool({ name: "emit_cel", arguments: { path: cel } })).content[0].text);
       assert.ok(Array.isArray(out.written), "no out → still writes, and reports absolute paths");
       assert.ok(out.written.length > 0, "at least one resource written");
@@ -1032,6 +1043,7 @@ first:
   });
 } finally {
   await client.close();
+  rmSync(mvFixture, { recursive: true, force: true });
 }
 
 console.log(failed ? "\nrun-mcp-server.test FAILED" : "\nrun-mcp-server.test passed");

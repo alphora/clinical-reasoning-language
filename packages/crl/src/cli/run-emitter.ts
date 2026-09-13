@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, statSync, writeFileSync } from "fs";
 import * as path from "path";
 
-import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
-import { resolveCelImports } from "../cel/imports";
+import { publishMvCel } from "../cel/publishSuite";
 import { CAPABILITY_ORDER } from "../fhir-emitter";
 import type { Capability } from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
@@ -180,7 +179,9 @@ if (!filePath) {
 // default and no statement anywhere of which level each wanted, so a KE emitted to a temp directory,
 // tested there, and then either forgot to copy back or copied back to the wrong depth. The parameter
 // was the attractive nuisance, not the agents.
-const lane: EmitLane = filePath.toLowerCase().endsWith(".cel")
+let suiteInput = filePath.toLowerCase().endsWith(".cel");
+try { suiteInput ||= statSync(filePath).isDirectory(); } catch { /* resolver reports the unreadable source */ }
+const lane: EmitLane = suiteInput
   ? "cel"
   : target === "fhir-def"
     ? "crl"
@@ -199,7 +200,7 @@ const outDirResolved = resolved.dir;
 // CRL emit target. CEL has its own FHIR-instance emit pipeline.
 // Round-5 Claude [nit]: be symmetric — reject .cel + --target cql too,
 // not just .cel + --target fhir-def.
-if (filePath.toLowerCase().endsWith(".cel") && target !== undefined) {
+if (suiteInput && target !== undefined) {
   const kind = target === "fhir-def" ? "cli-cel-fhir-def-incompatible" : "cli-cel-cql-incompatible";
   process.stderr.write(
     `${kind}: CEL input is not compatible with --target ${target}. ` +
@@ -291,24 +292,13 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
 
 // Pitch v4 critical decision #1 option (d): crl-emit auto-dispatches by
 // file extension. `.cel` → FHIR JSON; `.crl` (default) → CQL.
-if (filePath.toLowerCase().endsWith(".cel")) {
-  const graph = resolveCelImports(filePath);
-  const result = emitCelToFhir(graph);
-  const blockers = result.diagnostics.filter((d) => d.severity === "error");
-  if (blockers.length > 0) {
-    process.stderr.write(JSON.stringify({ diagnostics: blockers }, null, 2) + "\n");
+if (suiteInput) {
+  const publication = publishMvCel(filePath, resolved.root);
+  if (!publication.ok) {
+    process.stderr.write(JSON.stringify(publication, null, 2) + "\n");
     process.exit(1);
   }
-  // writeEmitResult creates <outDir> up front (matching the shared writer) and
-  // throws on a filesystem / traversal failure — surface it, don't let a raw
-  // stack trace escape.
-  let written;
-  try {
-    written = writeEmitResult(result, outDirResolved);
-  } catch (e) {
-    process.stderr.write(`Failed to write CEL emit output under "${outDirResolved}": ${(e as Error).message}\n`);
-    process.exit(1);
-  }
+  const { result, written } = publication;
   process.stdout.write(`wrote ${written.length} FHIR resource(s) under ${outDirResolved}\n`);
   // T12 / #85: surface result-deferred (outcomes parsed but not emitted —
   // tied to #70 / `metric`) on stderr the same way unsupported-yet is
@@ -318,7 +308,7 @@ if (filePath.toLowerCase().endsWith(".cel")) {
   const deferred = result.diagnostics.filter((d) => d.kind === "result-deferred");
   // REFACTOR:grounded (#320, code review 563): CEL must expose the same
   // nonblocking publication preparation findings as the CRL/CQL entry point.
-  const publicationWarnings = result.diagnostics.filter((d) => d.severity === "warning" && d.kind.startsWith("publication-"));
+  const publicationWarnings = result.diagnostics.filter((d) => d.severity === "warning" && (d.kind.startsWith("publication-") || d.kind === "mv-off-path-data"));
   if (unsupported.length > 0 || deferred.length > 0 || publicationWarnings.length > 0) {
     process.stderr.write(
       JSON.stringify(

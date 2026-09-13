@@ -122,7 +122,8 @@ function writeDataManifest(result: EmitResult, plan: PlannedWrite[], baseAbs: st
       sha256: w.sha256,
     }));
     i += c.resources.length;
-    return { caseName: c.caseName, compartmentDir: c.compartmentDir, artifacts };
+    // REFACTOR:grounded: display names may repeat in separate CEL files.
+    return { caseName: c.caseName, ...(c.sourceFile ? { sourceFile: c.sourceFile } : {}), ...(c.caseId ? { caseId: c.caseId } : {}), compartmentDir: c.compartmentDir, artifacts };
   });
   const file = path.join(baseAbs, CEL_DATA_MANIFEST);
   writeFileSync(file, `${JSON.stringify({ schemaVersion: 1, cases }, null, 2)}\n`, "utf-8");

@@ -266,24 +266,25 @@ export function buildCorrespondenceModelFromResolved(
   // the validator (otherwise a cel-unresolved finding on a wrong-file ref would lose its cel target).
   const knownCelFiles = new Set([graph.filePath, basename(graph.filePath)]);
   const resolveCel = (ref: CelNodeRef): ResolvedCelNode => {
-    const base = { ref, file: graph.filePath, caseId: ref.caseId, explicitCaseId: false };
-    if (!knownCelFiles.has(ref.file))
+    const source = r.celGraphs?.get(ref.file) ?? (!r.celGraphs && knownCelFiles.has(ref.file) ? graph : undefined);
+    const base = { ref, file: source?.filePath ?? ref.file, caseId: ref.caseId, explicitCaseId: false };
+    if (!source)
       return {
         ...base,
-        unresolved: `CEL ref file "${ref.file}" is not the policy .cel (${basename(graph.filePath)})`,
+          unresolved: `CEL ref file "${ref.file}" is unknown or ambiguous; use its project-relative path under src/cel/mv or src/cel/regression and validate CEL for conflicting library or case IDs.`,
       };
-    const c = frozenCases.get(ref.caseId);
+    const c = source.cel?.statements.find((s): s is CELCase => s.type === "CELCase" && s.caseId === ref.caseId);
     if (!c)
       return {
         ...base,
-        unresolved: effectiveCaseIds.has(ref.caseId)
-          ? `CEL case "${ref.caseId}" exists but is not frozen (no \`- id is\`) in ${basename(graph.filePath)}`
-          : `no CEL case with id "${ref.caseId}" in ${basename(graph.filePath)}`,
+        unresolved: r.celCaseIds.get(ref.file)?.has(ref.caseId)
+          ? `CEL case "${ref.caseId}" exists but is not frozen (no \`- id is\`) in ${ref.file}`
+          : `no CEL case with id "${ref.caseId}" in ${ref.file}`,
       };
     return {
       ...base,
       explicitCaseId: true,
-      location: { filePath: graph.filePath, range: toZeroBasedRange(c.location) },
+      location: { filePath: source.filePath, range: toZeroBasedRange(c.location) },
     };
   };
 

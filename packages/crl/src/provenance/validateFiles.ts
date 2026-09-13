@@ -15,12 +15,14 @@ import {
   readFileSync,
   readSync,
 } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { effectiveCaseId } from "../cel/ast/caseId";
 import type { CELCase } from "../cel/ast/types";
 import { resolveCelImports } from "../cel/imports";
 import type { ResolvedCelGraph } from "../cel/imports/types";
+import { celSuiteRole, pathWithin, resolveCelSuite, type CelSuite } from "../cel/suite";
+import { collectPolicyCels } from "./policyLayout";
 
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
 import type { AnchorMeta, DerivedFromContract } from "./canonicalize";
@@ -53,6 +55,9 @@ import {
 
 /** Every intermediate of the provenance pipeline — consumed by both the validator projection and the cockpit model. */
 export interface ResolveProvenanceResult {
+  suite?: CelSuite;
+  /** Exact project-relative and absolute paths; basename aliases only when unambiguous. */
+  celGraphs?: Map<string, ResolvedCelGraph>;
   artifact: ProvenanceArtifact;
   anchor: { filePath: string; text: string; meta: AnchorSourceMeta };
   graph: ResolvedCelGraph;
@@ -400,8 +405,7 @@ export function resolveProvenance(
   }
   const artifact = parsed.artifact;
   const anchorText = readFileSync(anchorPath, "utf8");
-  const graph = resolveCelImports(celPath);
-  const index = buildProvenanceIndex(graph);
+  let graph = resolveCelImports(celPath);
 
   // caseId sets from the resolved .cel, keyed by both basename and absolute path (the artifact's CelNodeRef.file may use either).
   const cases = (graph.cel?.statements ?? []).filter((s): s is CELCase => s.type === "CELCase");
@@ -418,6 +422,54 @@ export function resolveProvenance(
     [graph.filePath, frozen],
   ]);
 
+  // REFACTOR:grounded: engineering cases may support source correspondence but are not MV review rows.
+  let suite: CelSuite | undefined;
+  const celGraphs = new Map<string, ResolvedCelGraph>([[basename(celPath), graph], [graph.filePath, graph]]);
+  if (celSuiteRole(celPath)) {
+    const selected = resolveCelSuite(celPath, "regression");
+    if (selected.ok) suite = selected.suite;
+    else {
+      const mv = resolveCelSuite(graph.projectRoot ?? celPath);
+      if (!mv.ok) throw new Error(mv.diagnostics.map(d => d.message).join("; "));
+      suite = mv.suite;
+      graph = suite.files[0]?.graph ?? graph;
+    }
+    // Broken, unreferenced engineering work must not disable clinical correspondence.
+    // Resolve valid regression references independently; malformed targets stay unresolved findings.
+    const inventory = collectPolicyCels(suite.policySrc).cels;
+    let referenceFiles = [...suite.files];
+    if (!selected.ok) for (const p of inventory) {
+      if (!pathWithin(join(suite.policySrc, "cel/regression"), p)) continue;
+      const g = resolveCelImports(p);
+      if (!g.cel || g.celParseErrors.length || g.diagnostics.some(d => d.severity === "error") || g.coversTarget?.filePath !== suite.policyPath) continue;
+      referenceFiles.push({ path: g.filePath, sourceFile: relative(suite.projectRoot, p).split("\\").join("/"), role: "regression", graph: g });
+    }
+    // A readable engineering file must not reintroduce a rejected review identity.
+    if (!selected.ok) {
+      const ids = new Map<string, number>(), libraries = new Map<string, number>();
+      for (const f of referenceFiles) {
+        const library = f.graph.cel!.library.name;
+        libraries.set(library, (libraries.get(library) ?? 0) + 1);
+        for (const c of f.graph.cel!.statements) if (c.type === "CELCase" && c.caseId) ids.set(c.caseId, (ids.get(c.caseId) ?? 0) + 1);
+      }
+      referenceFiles = referenceFiles.filter(f => f.role === "mv" || (
+        libraries.get(f.graph.cel!.library.name) === 1 &&
+        f.graph.cel!.statements.every(c => c.type !== "CELCase" || !c.caseId || ids.get(c.caseId) === 1)
+      ));
+    }
+    celCaseIds.clear(); frozenCaseIds.clear(); celGraphs.clear();
+    const basenameCounts = new Map<string, number>();
+    for (const p of inventory) basenameCounts.set(basename(p), (basenameCounts.get(basename(p)) ?? 0) + 1);
+    for (const f of referenceFiles) {
+      const declared = (f.graph.cel?.statements ?? []).filter((s): s is CELCase => s.type === "CELCase");
+      const all = new Set(declared.map((c, i) => effectiveCaseId(c, i)));
+      const frozen = new Set(declared.filter(c => c.caseId !== undefined).map(c => c.caseId!));
+      const aliases = [f.path, f.sourceFile, ...(basenameCounts.get(basename(f.path)) === 1 ? [basename(f.path)] : [])];
+      for (const alias of aliases) { celCaseIds.set(alias, all); frozenCaseIds.set(alias, frozen); celGraphs.set(alias, f.graph); }
+    }
+  }
+
+  const index = buildProvenanceIndex(graph);
   const coverage = deriveCoverage(artifact, index, anchorText);
   // Pure §9 validators (incl. #250 Todo D1's contract-tell invariant) + the #250 Todo C fs resolve/hash checks + Todo D2's
   // sidecar↔artifact record cross-check (this layer has `artifactPath` → the CARRIER dir, and `anchorPath` → the sidecar; the
@@ -433,6 +485,8 @@ export function resolveProvenance(
     artifact,
     anchor: { filePath: anchorPath, text: anchorText, meta: artifact.anchorSource },
     graph,
+    suite,
+    celGraphs,
     index,
     coverage,
     findings,
@@ -529,11 +583,13 @@ export function validateProvenanceFiles(
   // FINAL mode ONLY: fold in the provenance↔cockpit correspondence gate. It runs the cockpit's OWN resolution
   // (crlAnchorsForUnits over the real crlRevealMaps) against each case's run path — green ⇒ the cockpit lights exactly
   // each case's path. Worklist mode SKIPS it (the in-progress scaffold's correspondence isn't a "remaining-work" item).
+  const mvGraphs = r.suite ? r.suite.files.filter(f => f.role === "mv").map(f => f.graph) : [r.graph];
   const correspondenceFindings: ProvenanceFinding[] =
     mode === "final"
-      ? checkCockpitCorrespondence(buildCockpitModelFromResolved(r, { artifactPath, celPath })).map(
-          correspondenceFinding,
-        )
+      ? mvGraphs.length === 0
+        ? [correspondenceFinding({ kind: "unchecked", caseName: "(MV suite)", reason: "render-failed", details: ["No MV cases are available for FINAL correspondence."] })]
+        : mvGraphs.flatMap(graph =>
+            checkCockpitCorrespondence(buildCockpitModelFromResolved({ ...r, graph }, { artifactPath, celPath: graph.filePath })).map(correspondenceFinding))
       : [];
 
   // MERGE (do not mutate r.findings) then RECOMPUTE the severity counts + pass from the merged set — the stale
