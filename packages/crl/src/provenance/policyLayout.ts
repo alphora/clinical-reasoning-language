@@ -1,6 +1,6 @@
 // REFACTOR:grounded: a CRL/CEL policy remains launchable without source provenance.
 // #212 — the policy source-layout primitive. Given any path inside a policy artifact (a `.cel`, a `.crl`, …), find the
-// policy's `src/` directory (the one carrying `provenance/`). Extracted to core (from crl-vscode's provenanceFindings) so the
+// policy's `src/` directory (marked by `provenance/` or both `crl/` and `cel/`). Extracted to core (from crl-vscode's provenanceFindings) so the
 // flag store (`flags/mvFlagStore`) AND the crl-vscode provenance/MV code share ONE resolver; crl-vscode re-exports it, so its
 // existing consumers stay edit-free. Filesystem-dependent (node:fs + path) but deterministic; no crl-vscode deps.
 //
@@ -19,7 +19,7 @@ function isDirectory(p: string): boolean {
   }
 }
 
-/** Walk UP from `startDir` ITSELF (inclusive) to the nearest directory named `src` containing a `provenance/` directory —
+/** Walk UP from `startDir` ITSELF (inclusive) to the nearest directory named `src` containing `provenance/` or both `crl/` and `cel/` directories —
  *  the policy's source root. `undefined` when none is found.
  *
  *  Use this when you hold a DIRECTORY (e.g. the folder another extension handed us on launch). `findPolicySrc` is the
@@ -34,7 +34,7 @@ export function findPolicySrcFromDir(startDir: string): string | undefined {
   }
 }
 
-/** Walk UP from `startPath` to the nearest ancestor directory named `src` that contains a `provenance/` child — the policy's
+/** Walk UP from `startPath` to the nearest ancestor directory named `src` that contains `provenance/` or both `crl/` and `cel/` children — the policy's
  *  source root. `undefined` when none is found (the path isn't inside a discoverable policy artifact). NOTE: despite the
  *  parameter name, ANY path under the tree resolves (it walks up from `dirname(startPath)`), not only a `.cel`. */
 export function findPolicySrc(startPath: string): string | undefined {

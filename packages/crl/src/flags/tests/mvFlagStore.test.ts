@@ -99,13 +99,19 @@ test("flagStoreDir: a path not inside a policy src/ → undefined (mirrors medic
 });
 
 // @kit review-flags:tracked-store-location
-test("flagStoreDir: #230 — resolves to `<policySrc>/medical-validation/flags` (INSIDE the tracked entity, not `.crl/flags`)", () => {
+test.each([['provenance', 'cel'], ['crl', 'cel']])("flagStoreDir resolves the tracked store with layout %j", (...dirs) => {
   const root = tmp();
   const src = join(root, "src");
-  mkdirSync(join(src, "provenance"), { recursive: true }); // findPolicySrc marker: a `src/` with a `provenance/` child
-  mkdirSync(join(src, "cel"), { recursive: true });
+  for (const dir of dirs) mkdirSync(join(src, dir), { recursive: true });
   const dir = flagStoreDir(join(src, "cel", "policy.cel"));
   expect(dir).toBe(join(src, "medical-validation", "flags"));
+  saveFlag(dir!, mkFlag('layout-write'));
+  expect(loadFlags(dir!).flags.map(f=>f.id)).toEqual(['layout-write']);
+});
+
+test.each(['crl', 'cel'])("flagStoreDir rejects an incomplete %s-only layout", dir => {
+  const src=join(tmp(), 'src'); mkdirSync(join(src, dir), {recursive:true});
+  expect(flagStoreDir(join(src, dir, 'policy.cel'))).toBeUndefined();
 });
 
 const mkPolicySrc = (): { root: string; src: string; cel: string } => {
