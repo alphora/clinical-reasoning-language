@@ -18,7 +18,9 @@ import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 
 import {
   buildCockpitModel,
-  buildExecutionModel,
+  buildSuiteExecutionModel,
+  resolveCelSuite,
+  caseViewKey,
   resolveCelImports,
   buildCRL,
   conceptDeclRef,
@@ -42,8 +44,7 @@ import {
   type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
-  caseResultsGlob,
-  compartmentIdOf,
+  readSuiteResult,
 } from "@smile-digital-health/crl";
 import type { LsLocation, ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import {
@@ -296,9 +297,11 @@ function toCelNav(
 ): CelNavItem[] {
   const out: CelNavItem[] = [];
   for (const sc of scenarios.scenarios) {
-    if (duplicateScenarioNames.has(sc.case.name)) continue;
-    const caseId = caseIdByName[sc.case.name];
-    if (caseId !== undefined) out.push({ caseId, label: sc.case.name, description: sc.status });
+    if (duplicateScenarioNames.has(caseViewKey(sc.case))) continue;
+    const caseId = caseIdByName[caseViewKey(sc.case)];
+    const source = sc.case.sourceFile && scenarios.scenarios.some(other => other.case.name === sc.case.name && other.case.sourceFile !== sc.case.sourceFile)
+      ? ` — ${sc.case.sourceFile}` : "";
+    if (caseId !== undefined) out.push({ caseId, label: sc.case.name + source, description: sc.status });
   }
   return out;
 }
@@ -1625,7 +1628,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const badgeEntries: { producedLeafKeys: readonly string[]; verdict: ReviewState }[] = [];
     for (const sc of scenarios?.scenarios ?? []) {
       const produced = producedDispositionLeafKeys(sc, dispositionLeafKeys);
-      const caseId = duplicateScenarioNames.has(sc.case.name) ? undefined : caseIdByName[sc.case.name];
+      const caseId = duplicateScenarioNames.has(caseViewKey(sc.case)) ? undefined : caseIdByName[caseViewKey(sc.case)];
       const verdict: ReviewState = (caseId !== undefined ? reviewByCaseId[caseId] : undefined) ?? "unreviewed";
       badgeEntries.push({ producedLeafKeys: produced, verdict });
     }
@@ -2239,69 +2242,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * The case directory carries an outcome suffix (`…-met` / `…-unmet`) that the case id does not, hence the
    * trailing `*` on the slug.
    */
+  // REFACTOR:grounded: bind native Q/QR to the selected policy's verified suite manifest.
   async function loadFhirQuestionnaireCase(
     compartmentDir: string | undefined,
   ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string }> {
-    const slugify = artifactSlug;
-    // ⚠ Keyed on the case's FULL AUTHORED NAME, including its `-> outcome` suffix — that is what the emitter
-    // slugifies into the directory name:
-    //   "exclusion overrides full documentation -> unmet (ordered precedence)"
-    //     → exclusion-overrides-full-documentation-unmet-ordered-precedence
-    // NOT the caseId (which is a different, shorter identifier — `exclusion-overrides-precedence` here) and NOT
-    // caseDisplayName (which strips the arrow, and the outcome is part of the directory name). Keying on the
-    // caseId matched by luck on cases whose id happened to prefix the directory, and silently missed otherwise.
-    //
-    // Because the whole name is used, the match is EXACT — no prefix glob, so no risk of binding a sibling case
-    // whose slug extends this one.
-    // ⭐⭐ THE DIRECTORY COMES FROM THE EMITTER, NEVER FROM A SLUG COMPOSED HERE.
-    //
-    // ⚠ This function used to build `<slugify(library)>-cases/<slugify(case)>/Questionnaire/`. That was
-    // CORRECT against the emitter of the day and silently stopped matching at `0e7641da` (#189 KALM
-    // Patient-compartment layout), which merged the library/case pair into ONE hashed compartment segment
-    // and lowercased the type dir. Nothing errored — the pane simply found nothing, forever, and four
-    // documents went on describing the old shape. The id is a capped slug of library + case + SUBJECT plus
-    // a 12-hex hash, so it is not reproducible by any rule written down here.
-    //
-    // `subjectName` is therefore REQUIRED to address a case. A case with no subject emits no resources at
-    // all (`emitCase` returns undefined), so "no subject" and "no artifacts" are the same state.
-    const out: { q?: unknown; qr?: unknown; lookedFor: string } = { lookedFor: "" };
-    if (!compartmentDir) {
-      // Absent iff the CEL library name or the case's subject is unknown — the same state as "this case
-      // emits nothing", since `emitCase` returns undefined without a subject.
-      return { ...out, lookedFor: "(this case has no emitted compartment — nothing was searched)" };
-    }
-    // The compartment id is the join key: the SAME segment addresses a case's data under
-    // `tests/data/fhir/patient/` and its results here, so one identity serves both trees.
-    const compartmentId = compartmentIdOf(compartmentDir);
-    // ⚠ The glob comes from core, NOT spelled here. Hard-coding it is exactly what made this pane match
-    // nothing for months when the emitter's layout moved: both sides compiled, neither failed.
-    const lookedFor = caseResultsGlob(compartmentId);
-    out.lookedFor = lookedFor;
-    let hits: readonly vscode.Uri[] = [];
-    try {
-      hits = await vscode.workspace.findFiles(lookedFor, "**/node_modules/**", 200);
-    } catch {
-      return out;
-    }
-    for (const uri of hits) {
-      const segs = uri.path.split("/");
-      const type = segs[segs.length - 2]; // the LOWERCASE type dir holding the file
-      const caseDir = segs[segs.length - 3]; // the compartment id dir holding that
-      if (type !== "questionnaire" && type !== "questionnaireresponse") continue;
-      // Exact compartment match — belt and braces against a glob surprise in a multi-root workspace.
-      if (caseDir !== compartmentId) continue;
-      if (type === "questionnaire" && out.q) continue; // a case has one of each
-      if (type === "questionnaireresponse" && out.qr) continue;
-      // Per-FILE try: one malformed document must not abort the search and hide a valid one later in the list.
-      try {
-        const json: unknown = JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(uri)).toString("utf8"));
-        if (type === "questionnaire") out.q = json;
-        else out.qr = json;
-      } catch {
-        // skip this file; keep looking
-      }
-    }
-    return out;
+    if (!currentCel || !compartmentDir) return { lookedFor: "This case has no emitted compartment." };
+    return readSuiteResult(currentCel, compartmentDir);
   }
 
   function focusedScenario(): ScenarioViewModel | undefined {
@@ -2952,8 +2898,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!currentCel) return;
     const d = discoverProvenance(currentCel);
     try {
-      const graph = resolveCelImports(currentCel);
-      const cm = buildExecutionModel(graph);
+      const selected = resolveCelSuite(currentCel);
+      if (!selected.ok) { resetToEmpty(selected.diagnostics.map(d => d.message).join("\n")); return; }
+      const cm = buildSuiteExecutionModel(selected.suite);
+      if (!cm) { resetToEmpty("0 MV cases — nothing to review"); return; }
+      const graph = selected.suite.files[0].graph;
       wordingSources = graphWordingSources(graph);
       correspondence = undefined;
       model = undefined;
@@ -2976,8 +2925,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // can't mis-join a peek to the wrong case (#173 collision guard, disc 159 Claude-4).
       scenarioByCaseId = new Map();
       for (const sc of cm.scenarios.scenarios) {
-        const caseId = cm.caseIdByName[sc.case.name];
-        if (caseId !== undefined && !duplicateScenarioNames.has(sc.case.name)) scenarioByCaseId.set(caseId, sc);
+        const caseId = cm.caseIdByName[caseViewKey(sc.case)];
+        if (caseId !== undefined && !duplicateScenarioNames.has(caseViewKey(sc.case))) scenarioByCaseId.set(caseId, sc);
       }
       if (cm.caseNameCollisions.length)
         console.warn(
@@ -3137,7 +3086,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagsDebounce = undefined;
     if (!currentCel) return;
     const src = findPolicySrc(currentCel);
-    const pat = src ? new vscode.RelativePattern(src, "{provenance/*.provenance.json,anchor-source/*.txt}") : undefined;
+    const pat = src ? new vscode.RelativePattern(src, "{provenance/*.provenance.json,anchor-source/*.txt,cel/**/*.cel,crl/**/*.crl}") : undefined;
     if (pat) {
       watcher = vscode.workspace.createFileSystemWatcher(pat);
       const onFs = () => {
@@ -3208,19 +3157,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // with >500 .cel files the cap could fill with non-policy files and miss policy-shaped ones. The content project is
     // well under 500; no fix now — just the honest note. (findPolicySrc also does sync existsSync ancestor walks per
     // candidate; fine at 500, a UI-thread concern only if the cap rises.)
-    const uris = await vscode.workspace.findFiles("**/*.cel", "**/node_modules/**", 500);
+    const uris = await vscode.workspace.findFiles("**/src/cel/mv/**/*.cel", "**/node_modules/**", 500);
     // Superseded WHILE scanning (a targeted launch landed during the await) — return before putting a picker on screen.
     // Without this the epoch guard would discard the answer, but only after showing a dialog nobody asked for (#244).
     if (epoch !== showEpoch) return undefined;
     // Policy-shaped only: a .cel under a policy `src/` with a `provenance/` sibling. Sort for a stable list.
-    const policyCels = uris.map((u) => u.fsPath).filter((p) => findPolicySrc(p) !== undefined).sort();
+    const policyCels = [...new Map(uris.map(u => { const src = findPolicySrc(u.fsPath); return [src, u.fsPath] as const; }).filter(([src]) => src !== undefined)).values()].sort();
     if (policyCels.length === 0) {
       void vscode.window.showInformationMessage("CRL: no policy-shaped .cel files found in this workspace (a .cel under a policy src/ with a provenance/ folder).");
       return undefined;
     }
     const items = policyCels.map((p) => {
       const rel = vscode.workspace.asRelativePath(p, false);
-      return { label: basename(p), description: rel, value: p };
+      return { label: basename(dirname(findPolicySrc(p)!)), description: rel, value: p };
     });
     return pickCel(items, "Pick a policy .cel to open");
   }

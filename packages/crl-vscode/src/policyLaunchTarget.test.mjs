@@ -24,14 +24,17 @@ const check = (label, fn) =>
   });
 
 /** Build a policy artifact. `cels` are paths RELATIVE to `src/`. Returns the useful anchors. */
-function makePolicy(root, policyName = "rx501-105-medical-policy", cels = ["cel/p.cel"]) {
+function makePolicy(root, policyName = "rx501-105-medical-policy", cels = ["cel/mv/p.cel"]) {
   const artifact = join(root, "artifacts", policyName);
   const src = join(artifact, "src");
   mkdirSync(join(src, "provenance"), { recursive: true });
-  const celPaths = cels.map((rel) => {
+  mkdirSync(join(src, "crl"), { recursive: true });
+  writeFileSync(join(artifact, "package.json"), JSON.stringify({ name: policyName, version: "1.0.0" }));
+  writeFileSync(join(src, "crl", "policy.crl"), 'library "P".\n');
+  const celPaths = cels.map((rel, i) => {
     const p = join(src, rel);
     mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, '# C\nlibrary "C".\ncovers "P".\n');
+    writeFileSync(p, `library "C${i}".\ncovers "P".\n`);
     return p;
   });
   // KELP's anchor — the MV entity folder. Deliberately NOT created on disk by default (it is made lazily on first save).
@@ -66,7 +69,7 @@ check("KELP's entity-folder Uri → the policy's single .cel, WITHOUT the folder
 });
 
 check("the .cel lives under src/cel/, not directly in src/ (the layout the first plan got wrong)", (root) => {
-  const { celPaths } = makePolicy(root, "p", ["cel/deep/nested/x.cel"]);
+  const { celPaths } = makePolicy(root, "p", ["cel/mv/deep/nested/x.cel"]);
   const r = resolveLaunchTarget(uri(join(root, "artifacts", "p", "src", "medical-validation")));
   assert.equal(r.kind, "cel", "a nested .cel under src/cel/ must still resolve");
   assert.equal(r.celPath, celPaths[0]);
@@ -87,26 +90,21 @@ check("src/ itself, and a deep descendant, both resolve (anchor-insensitive)", (
 
 // ── ambiguity ────────────────────────────────────────────────────────────────
 
-check("several .cel under one policy → ambiguous (a NORMAL layout, not a fault)", (root) => {
-  const { src, mvEntityFolder } = makePolicy(root, "multi", ["cel/a.cel", "cel/b.cel", "cel/sub/c.cel"]);
-  const r = resolveLaunchTarget(uri(mvEntityFolder));
-  assert.equal(r.kind, "ambiguous");
-  assert.equal(r.policySrc, src);
-  assert.equal(r.cels.length, 3);
-  assert.deepEqual([...r.cels].sort(), r.cels, "candidates must be deterministically ordered");
+check("several MV files select one complete policy suite without a picker", root => {
+  const { mvEntityFolder, celPaths } = makePolicy(root, "multi", ["cel/mv/a.cel", "cel/mv/b.cel"]);
+  const selected = resolveLaunchTarget(uri(mvEntityFolder));
+  assert.equal(selected.kind, "cel"); assert.equal(selected.celPath, celPaths[0]);
 });
 
-check("ambiguity is scoped to ONE policy — a sibling policy's cels are never offered", (root) => {
-  const mine = makePolicy(root, "mine", ["cel/a.cel", "cel/b.cel"]);
-  const other = makePolicy(root, "other", ["cel/x.cel", "cel/y.cel"]);
-  const r = resolveLaunchTarget(uri(mine.mvEntityFolder));
-  assert.equal(r.kind, "ambiguous");
-  assert.deepEqual(r.cels, mine.celPaths.sort());
-  for (const p of other.celPaths) assert.ok(!r.cels.includes(p), "another policy's .cel must not appear");
+check("regression file and folder selections cannot silently retarget MV", root => {
+  const { src, celPaths } = makePolicy(root, "reg", ["cel/mv/a.cel", "cel/regression/deep/control.cel"]);
+  for (const p of [celPaths[1], join(src, "cel/regression"), join(src, "cel/regression/deep")]) {
+    const result = resolveLaunchTarget(uri(p)); assert.equal(result.kind, "error"); assert.match(result.detail, /regression/i);
+  }
 });
 
 check("candidates come from src/cel/ — a stray .cel elsewhere under src/ is not a launch target", (root) => {
-  const { src, celPaths, mvEntityFolder } = makePolicy(root, "stray", ["cel/real.cel"]);
+  const { src, celPaths, mvEntityFolder } = makePolicy(root, "stray", ["cel/mv/real.cel"]);
   // A generated/backup .cel sitting in a sibling entity folder must not become a candidate — it would either be offered
   // as a choice or, if cel/ were empty, be silently chosen AS the target.
   writeFileSync(join(src, "provenance", "notes.cel"), "x");
@@ -129,13 +127,13 @@ check("a .cel Uri → that .cel (the editor/title button's shape)", (root) => {
 check("a .cel OUTSIDE any policy still opens — MV degrades honestly, and the pre-#244 fast path allowed it", (root) => {
   const loose = join(root, "loose.cel");
   writeFileSync(loose, "x");
-  assert.equal(resolveLaunchTarget(uri(loose)).kind, "cel");
+  assert.equal(resolveLaunchTarget(uri(loose)).kind, "error");
 });
 
 check("a .cel path that does not exist → error, NOT a picker fallback", (root) => {
   const r = resolveLaunchTarget(uri(join(root, "nope.cel")));
   assert.equal(r.kind, "error");
-  assert.match(r.detail, /no such \.cel file/);
+  assert.match(r.detail, /no such \.cel file|No policy src/i);
   assert.ok(r.detail.includes("nope.cel"), "the message must name the path");
   // Surface-NEUTRAL: this resolver serves the cockpit too, so it must not hard-code "Medical Validation".
   assert.ok(!/Medical Validation|cockpit/i.test(r.detail), "the detail must not name a panel — the caller prefixes that");
@@ -153,15 +151,15 @@ check("a DIRECTORY named foo.cel → error (suffix alone must not be trusted)", 
 check("a folder outside any policy → error naming the path", (root) => {
   const r = resolveLaunchTarget(uri(root));
   assert.equal(r.kind, "error");
-  assert.match(r.detail, /not inside a policy/);
+  assert.match(r.detail, /No policy src/);
 });
 
 check("a policy src/ with NO .cel anywhere → error naming the src", (root) => {
   const { src, mvEntityFolder } = makePolicy(root, "empty", []);
   const r = resolveLaunchTarget(uri(mvEntityFolder));
   assert.equal(r.kind, "error");
-  assert.match(r.detail, /no \.cel files found/);
-  assert.ok(r.detail.includes(src));
+  assert.match(r.detail, /Missing src\/cel\/mv/);
+  assert.ok(r.detail.includes("src/cel/mv"));
 });
 
 check("`provenance` as a FILE does not mark a policy src/", (root) => {

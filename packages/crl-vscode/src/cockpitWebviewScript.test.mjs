@@ -568,7 +568,7 @@ check("#210 all-pass badge: reach is EXECUTION (collectProducedActions), over th
   assert.ok(/collectProducedActions\(sv\.tree\)/.test(COCKPIT_SRC), "reach walks the PRODUCED actions of the scenario tree (execution), not crlAnchors");
   // iterate the FULL frozen list (scenarioByCaseId drops ambiguous); ambiguous/duplicate-name → unreviewed → suppress.
   assert.ok(/for \(const sc of scenarios\?\.scenarios \?\? \[\]\)/.test(COCKPIT_SRC), "iterate the FULL scenarios.scenarios (not scenarioByCaseId, which drops ambiguous)");
-  assert.ok(/duplicateScenarioNames\.has\(sc\.case\.name\) \? undefined : caseIdByName\[sc\.case\.name\]/.test(COCKPIT_SRC), "ambiguous duplicate-name case → no caseId");
+  assert.ok(/duplicateScenarioNames\.has\(caseViewKey\(sc\.case\)\) \? undefined : caseIdByName\[caseViewKey\(sc\.case\)\]/.test(COCKPIT_SRC), "ambiguous duplicate-name case → no caseId");
   assert.ok(/\?\? "unreviewed"/.test(COCKPIT_SRC), "an ambiguous/absent verdict defaults to unreviewed (suppresses the badge)");
   assert.ok(/deriveAllPassLeaves\(badgeEntries\)/.test(COCKPIT_SRC), "the all-pass fold decides the badge set");
   assert.ok(/allPassLeaves: segmentsFor\(tree, \[\.\.\.allPassLeaves\]\)\.segmentIds/.test(COCKPIT_SRC), "allPassLeaves posted as the 5th markReviewOverlay set");

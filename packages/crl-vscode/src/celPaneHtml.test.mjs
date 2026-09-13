@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { renderCelPane, reverseCelAnchors, formatNoteTimestamp, REVIEW_ORDER } from "./celPaneHtml.ts";
 import { REVIEW_STATES } from "./medicalValidationStore.ts";
 // Use the REAL nodeKey (the same fn celPaneHtml + crlStructure call) so the gate-key format is proven, not assumed.
-const { nodeKey } = await import("@smile-digital-health/crl");
+const { nodeKey, suiteCaseKey } = await import("@smile-digital-health/crl");
 
 const check = test;
 // facts: a string → a bare fact (no definedBy); an object → passed through (carries definedBy for fact-level tests).
@@ -24,6 +24,17 @@ check("a block per case: status badge + facts + produced + reveal", () => {
   const out = renderCelPane(result([sc("Pat A", "pass", ["dx"], ["Approve"])]), { "Pat A": "cA" });
   assert.match(out.html, /class="cel-case cel-pass"[^>]*data-reveal=/);
   assert.ok(out.html.includes("Pat A") && out.html.includes("facts: dx") && out.html.includes("→ Approve") && out.html.includes("✓"));
+});
+
+check("same-name suite rows show their distinct source paths without changing review IDs", () => {
+  const rows = [sc("Shared", "pass"), sc("Shared", "pass")];
+  rows[0].case.sourceFile = "src/cel/mv/a.cel";
+  rows[1].case.sourceFile = "src/cel/mv/nested/a.cel";
+  for (const row of rows) row.case.identity = suiteCaseKey(row.case.sourceFile, row.case.name);
+  const ids = Object.fromEntries(rows.map((row, i) => [row.case.identity, `c${i}`]));
+  const out = renderCelPane(result(rows), ids);
+  assert.ok(out.html.includes("src/cel/mv/a.cel") && out.html.includes("src/cel/mv/nested/a.cel"));
+  assert.deepEqual(Object.keys(out.anchors).sort(), ["c0", "c1"]);
 });
 
 check("UX fix: the authored `-> outcome` suffix is stripped from the worklist case NAME (but the computed `→ produced` badge stays)", () => {
@@ -453,4 +464,3 @@ check("notes: worklist ABSENT (cockpit) → no glyph, no drawer even if notes pa
   const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: false, statesByCaseId: {}, openNotesCaseId: "cA", notesByCaseId: { cA: [NOTE("n1", "x")] } } });
   assert.ok(!out.html.includes("cel-notes-glyph") && !out.html.includes("cel-notes-drawer"), "cockpit render unaffected");
 });
-

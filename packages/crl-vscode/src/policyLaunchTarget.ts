@@ -1,3 +1,4 @@
+import { resolveCelSuite } from "@smile-digital-health/crl";
 // #244 — resolving a LAUNCH ARGUMENT into a policy `.cel` to open Medical Validation (or the cockpit) on.
 //
 // Who calls the commands with an argument:
@@ -14,8 +15,9 @@
 //
 // vscode-free on purpose (a structural Uri shape, not the class) so the whole policy is unit-testable; the cockpit keeps
 // only the `showErrorMessage` / QuickPick presentation.
-import { findPolicySrcNear, collectPolicyCels, isFile } from "./provenanceFindings";
-import { isAbsolute, resolve } from "node:path";
+import { findPolicySrcNear, isFile } from "./provenanceFindings";
+import { isAbsolute, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
 
 /** The structural shape we accept for a `vscode.Uri` — matching the class by duck-type keeps this module vscode-free. */
 interface UriLike {
@@ -77,37 +79,11 @@ export function resolveLaunchTarget(arg: unknown): LaunchTarget {
   if (!isAbsolute(raw)) return { kind: "error", detail: `the launch path must be absolute: ${raw}` };
   const path = resolve(raw);
 
-  // A `.cel` was named directly (the editor/title button, or any caller that already knows the file).
-  if (path.toLowerCase().endsWith(".cel")) {
-    if (!isFile(path)) return { kind: "error", detail: `no such .cel file: ${path}` };
-    // Deliberately NOT requiring it to sit inside a policy `src/`: the pre-#244 active-editor fast path accepted any
-    // `.cel`, and MV degrades honestly (no sidecar, no flag store) rather than breaking. Keeping that reachable.
-    return { kind: "cel", celPath: path };
-  }
-
-  // Otherwise treat it as a folder and find the policy it belongs to — up from the folder itself, then one level down
-  // (so an artifact ROOT, whose `src/` is a child, resolves too).
+  // REFACTOR:grounded: one policy's complete MV suite is one launch target.
   const policySrc = findPolicySrcNear(path);
-  if (!policySrc) {
-    return { kind: "error", detail: `${path} is not inside a policy (no src/ with a provenance/ folder).` };
-  }
-
-  const { cels, complete, unreadable } = collectPolicyCels(policySrc);
-  if (cels.length === 0) {
-    // Say WHY we found nothing. "No .cel files here" and "we could not read part of the tree" are different faults and
-    // send whoever reads the message to different places.
-    return {
-      kind: "error",
-      detail: complete
-        ? `no .cel files found under ${policySrc}`
-        : `no .cel files found under ${policySrc} — and part of the tree could not be read (${unreadable.join(", ")}).`,
-    };
-  }
-  // Several is NORMAL, not a fault: a policy may hold multiple `.cel` clusters under `src/cel/`. Ambiguous ≠ unresolvable
-  // — several valid targets exist and only a human can choose, so offer exactly those rather than failing.
-  //
-  // An INCOMPLETE enumeration is treated as ambiguous even when it yielded exactly one hit: we cannot claim it is the
-  // only candidate when we know we did not see everything, and silently opening the wrong artifact is the bad outcome.
-  if (cels.length === 1 && complete) return { kind: "cel", celPath: cels[0] };
-  return { kind: "ambiguous", policySrc, cels };
+  if (!policySrc) return { kind: "error", detail: `No policy src/ found near ${path}.` };
+  if (path.toLowerCase().endsWith(".cel") && !isFile(path)) return { kind: "error", detail: `No such .cel file: ${path}` };
+  const selected = resolveCelSuite(existsSync(path) ? path : policySrc);
+  if (!selected.ok) return { kind: "error", detail: selected.diagnostics.map(d => d.message).join("; ") };
+  return { kind: "cel", celPath: selected.suite.files[0]?.path ?? join(policySrc, "cel/mv") };
 }

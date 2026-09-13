@@ -8,7 +8,7 @@
 // targets aren't concepts) AND whose concept key is revealable (in `revealableConceptKeys`) renders as a clickable span
 // with its OWN `fact:`-namespaced anchor. A click "peeks" that concept across panes (shell-side, no engine selection).
 // Fact peek is independent of the case's frozen id — the concept's correspondence doesn't depend on the case anchor.
-import { displayDetermination, nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
+import { caseViewKey, displayDetermination, nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
 
 import { caseDisplayName } from "./caseDisplayName";
 
@@ -122,7 +122,7 @@ export function renderCelPane(
   // #214: ONE verdict resolver shared by the filter SKIP decision + the chip COUNTS (so they can never drift). An
   // unfrozen/ambiguous case has no caseId → no persisted verdict → "unreviewed" (it displays a disabled "To do").
   const reviewStateFor = (sc: (typeof result.scenarios)[number]): ReviewState => {
-    const cid = duplicateNames.has(sc.case.name) ? undefined : caseIdByName[sc.case.name];
+    const cid = duplicateNames.has(caseViewKey(sc.case)) ? undefined : caseIdByName[caseViewKey(sc.case)];
     return cid !== undefined ? (worklist?.statesByCaseId[cid] ?? "unreviewed") : "unreviewed";
   };
   // #214 filter chips: per-verdict counts over ALL cases (the to-do count INCLUDES unreviewable cases — they display To do).
@@ -186,8 +186,8 @@ export function renderCelPane(
     // FIX 1 (disc 160): an AMBIGUOUS-name case (its name shared by >1 case) must NOT be anchored to the frozen
     // caseIdByName[name] — clicking EITHER same-name block would otherwise select that ONE frozen caseId and apply
     // cross-pane `.current` highlights as if it were the frozen case (a mis-attribution). So treat it as un-revealable.
-    const ambiguous = duplicateNames.has(sc.case.name);
-    const caseId = ambiguous ? undefined : caseIdByName[sc.case.name]; // undefined → case un-revealable (no case anchor)
+    const ambiguous = duplicateNames.has(caseViewKey(sc.case));
+    const caseId = ambiguous ? undefined : caseIdByName[caseViewKey(sc.case)];
     // #214: filtered out → ADVANCE idx (absolute row numbers + collision-free `cel${idx}` ids stay stable, Q5) then skip the
     // ENTIRE row BEFORE any anchor/reveal/worklistActions registration (a hidden row has no DOM element to anchor).
     if (worklist?.filter && !worklist.filter.has(reviewStateFor(sc))) { idx++; continue; }
@@ -285,6 +285,8 @@ export function renderCelPane(
       keySlot +
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
       `<span class="cel-name">${escapeHtml(caseDisplayName(sc.case.name))}</span>` +
+      (sc.case.sourceFile && result.scenarios.some(other => other.case.name === sc.case.name && other.case.sourceFile !== sc.case.sourceFile)
+        ? ` <span class="cel-subject">${escapeHtml(sc.case.sourceFile)}</span>` : "") +
       (sc.case.subject ? ` <span class="cel-subject">(${escapeHtml(sc.case.subject)})</span>` : "") +
       (ambiguous ? ` <span class="cel-ambiguous-marker" title="This case's name is shared by another case — give each a distinct name to make it selectable.">⚠ name shared; not selectable</span>` : "") +
       (factParts.length ? `<div class="cel-facts">facts: ${factParts.join(", ")}</div>` : "") +
