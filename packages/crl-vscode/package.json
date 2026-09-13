@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL\u2192CQL + CEL\u2192FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "5.3.0",
+  "version": "5.4.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.95.0"
