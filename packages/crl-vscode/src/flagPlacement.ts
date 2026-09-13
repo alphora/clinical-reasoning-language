@@ -1,5 +1,5 @@
 // Todo 2 (disc 356/357) — the PURE flag→node placement pass shared by `driveFlagBadges` (which gids to LIGHT) and the
-// node-filtered flag entry (`flagsByGid`: WHICH open flags lit each gid). Extracted from the cockpit so the reverse-map
+// node-filtered flag entry (`flagsByGid`: WHICH flags belong to each gid). Extracted from the cockpit so the reverse-map
 // assembly — dedup, order, the collapsed-criterion rollup, and the moved-occurrence exclusion — is node-testable without vscode
 // (impl review 357 [important]). No `vscode` import. The two crlStructure/`resolveAnchor`-dependent lookups (decision-object
 // segments, live-occurrence gid) are CALLBACKS supplied by the host — both are separately unit-tested — so this module is a
@@ -7,20 +7,31 @@
 
 import type { MvFlag, MvFlagAnchor } from "@smile-digital-health/crl";
 
+/** Keep workflow step and status associated: resolved authoring work is not an open authoring finding. */
+export function summarizeFlagBadges(byGid: ReadonlyMap<string, readonly MvFlag[]>) {
+  return [...byGid].map(([gid,flags])=>({
+    gid,
+    open: flags.filter(f=>f.status!=="resolved").length,
+    resolved: flags.filter(f=>f.status==="resolved").length,
+    authoringOpen: flags.filter(f=>f.category==="extraction" && f.status!=="resolved").length,
+    authoringResolved: flags.filter(f=>f.category==="extraction" && f.status==="resolved").length,
+  }));
+}
+
 /** The flow render's flag-relevant substrate (a subset of the tree PaneView): where each concept/criterion draws. */
 export interface FlagPlacementSubstrate {
   /** every `when`/def-leaf a concept draws as — `{gid, lib, name}` (a concept flag lights EACH by (lib,name)). */
-  conceptOccurrences: readonly { gid: string; lib: string; name: string }[];
-  /** the rendered criterion boxes — a COLLAPSED one rolls its open body-concept flags up onto its own gid. */
+  conceptOccurrences: readonly { gid: string; lib: string; name: string; flagGid?: string }[];
+  /** the rendered criterion boxes — a COLLAPSED one rolls its body-concept flags up onto its own gid. */
   criterionOccurrences: readonly { gid: string; collapsed: boolean; bodyConcepts: readonly { lib: string; name: string }[] }[];
 }
 
 export interface FlagPlacementResult {
   /** the gids to LIGHT (`.has-flag`), for the flagBadges message — order-insensitive (the webview toggles a class). */
   gids: string[];
-  /** node gid → the OPEN flags that lit it, deduped by id, in placement order (see `computeFlagPlacement` for the ordering). */
+  /** node gid → the flags that lit it, deduped by id, in placement order (see `computeFlagPlacement` for the ordering). */
   byGid: Map<string, MvFlag[]>;
-  /** open OCCURRENCE flags whose keyed target moved/removed (matched no node) — the start-badge "N⚠" suffix. */
+  /** OCCURRENCE flags in the supplied set whose keyed target moved/removed (matched no node) — the start-badge "N⚠" suffix. */
   unplaced: number;
 }
 
@@ -28,9 +39,24 @@ export interface FlagPlacementResult {
 // (concept + library names legitimately contain spaces; a bare space-joined key would collide).
 const conceptKey = (lib: string | undefined, name: string): string => JSON.stringify([lib ?? null, name]);
 
+/** Explicit creation targets for a visible node, including helpers displayed through a Criterion.
+ * Keep each original concept identity; a shared display location must never pick the first helper implicitly. */
+export function conceptFlagTargetsForGids(
+  occurrences: FlagPlacementSubstrate["conceptOccurrences"],
+  gids: readonly string[],
+): { lib: string; name: string }[] {
+  const owners = new Set(gids), targets = new Map<string, { lib: string; name: string }>();
+  for (const o of occurrences) {
+    if (owners.has(o.gid) || (o.flagGid !== undefined && owners.has(o.flagGid))) {
+      targets.set(conceptKey(o.lib, o.name), { lib: o.lib, name: o.name });
+    }
+  }
+  return [...targets.values()];
+}
+
 /**
  * Match each flag in `flags` to the render node(s) it belongs on and build both the lit-gid set and the reverse `gid → flags`
- * map. STATUS-AGNOSTIC: the caller decides the status filter — `driveFlagBadges` passes the OPEN set (badges are open-only);
+ * map. STATUS-AGNOSTIC: `driveFlagBadges` passes all statuses for badges and the open set for unplaced-blocker metrics;
  * `driveFlagNodeHighlight` passes a single flag regardless of status (a resolved flag's drawer still lights its node). Do NOT
  * add an `isOpen` filter here — that would silently kill the resolved-flag highlight (disc 359 [important]).
  *
@@ -66,7 +92,7 @@ export function computeFlagPlacement(
     const a = f.anchor;
     let matched: readonly string[] = [];
     if (a.scope === "concept") {
-      matched = substrate.conceptOccurrences.filter((o) => o.name === a.name && o.lib === a.library).map((o) => o.gid);
+      matched = substrate.conceptOccurrences.filter((o) => o.name === a.name && o.lib === a.library).map((o) => o.flagGid ?? o.gid);
     } else if (a.scope === "decision") {
       if (a.occurrenceKey) {
         const g = occurrenceGid(a);

@@ -1,3 +1,5 @@
+import { VERDICT_ICON_STYLE } from "./branchVerdict";
+import {FLOW_LOGIC_STYLE} from "./flowLogicHighlight";
 // REFACTOR:grounded: connector truth, transparent fallbacks and upper-right pins follow the operator mockups.
 // CRL FLOW pane RENDERER (vscode-free, unit-tested) — the graphical decision-tree flowchart (T2, disc 132).
 // Renders CrlDecisionStructure[] as an SVG forest: each decision root branches through its when/otherwise/action sub-nodes;
@@ -65,7 +67,7 @@ export interface RenderedFlow {
    *  targetName}` to these gids to paint the per-node flag badge (a concept may render as SEVERAL `when` nodes / def-leaves
    *  → badge ALL; matched on (lib,name), never name alone — cross-lib same-name concepts exist). Decision-scope flags reuse
    *  `anchors[decisionNodeKey]`; activity/`otherwise` nodes carry no meta so they never appear here (they can't be flagged). */
-  conceptOccurrences: { gid: string; lib: string; name: string }[];
+  conceptOccurrences: { gid: string; lib: string; name: string; flagGid?: string }[];
   /** #224 ii.3 Slice 2b / #233 Todo 2a — one entry per RENDERED criterion box: a ROOT criterion absorbed into a `when`
    *  box (the sole case) AND every NON-ROOT `flow-crit-row` (a conjunct / nested criterion, #233). Each carries its `<g>`
    *  id, the criterion IDENTITY (`{lib,name}`, library-local), its `collapsed` state, and the body leaf identities. The
@@ -101,7 +103,7 @@ const flowRing = (x: number, y: number, w: number, h: number, off: number, rx: n
 const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: string, what = "criterion body"): string => {
   const d = collapsed ? `M${cx - 3} ${cy - 4} L${cx + 3} ${cy} L${cx - 3} ${cy + 4} Z` : `M${cx - 4} ${cy - 3} L${cx + 4} ${cy - 3} L${cx} ${cy + 3} Z`;
   return (
-    `<g class="flow-crit-toggle" data-toggle-crit="${escapeHtml(revealKey)}">` +
+    `<g class="flow-crit-toggle" data-toggle-crit="${escapeHtml(revealKey)}" role="button" tabindex="0" aria-expanded="${!collapsed}">` +
     // `what` names what this chevron opens. #189 reuses this toggle for a coded question's ANSWERS, and a
     // hardcoded "criterion body" would have told a clinician the wrong thing about their own question.
     `<title>${collapsed ? `expand ${what}` : `collapse ${what}`}</title>` +
@@ -110,20 +112,11 @@ const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: strin
   );
 };
 
-/** #224 ii.3 Slice 2b — the model-level criterion VERDICT chip: a small circle + a state glyph, HIDDEN by default and
- *  revealed by the host adding `.crit-pass` / `.crit-fail` / `.crit-pending` / `.crit-stale` to the row (the
- *  `.flow-allpass-badge` idiom — pre-rendered + class-toggled so a verdict change never re-renders `#root`). All four
- *  glyphs are pre-rendered; the row class shows exactly one + colors the dot. Informational (`pointer-events:none`) — the
- *  verdict is SET via the right-click menu, not this chip (disc 319). Sits top-right, where a criterion `when`'s suppressed
- *  concept leaves the flag slot free. A `stale` verdict (edited-since-review) shows a muted "in-flux" three-dot glyph and
- *  is NEVER the settled pass/fail. */
-const critVerdictChip = (cx: number, cy: number): string =>
-  `<g class="flow-crit-verdict"><title>criterion review verdict</title>` +
-  `<circle class="flow-crit-vdot" cx="${cx}" cy="${cy}" r="7"/>` +
-  `<path class="flow-crit-g flow-crit-g-pass" d="M${cx - 3.2} ${cy} l2.2 2.4 l4.2 -4.8"/>` +
-  `<path class="flow-crit-g flow-crit-g-fail" d="M${cx - 2.6} ${cy - 2.6} l5.2 5.2 M${cx + 2.6} ${cy - 2.6} l-5.2 5.2"/>` +
-  `<path class="flow-crit-g flow-crit-g-pending" d="M${cx - 3} ${cy} h6"/>` +
-  `<g class="flow-crit-g flow-crit-g-stale"><circle cx="${cx - 2.7}" cy="${cy}" r="0.95"/><circle cx="${cx}" cy="${cy}" r="0.95"/><circle cx="${cx + 2.7}" cy="${cy}" r="0.95"/></g>` +
+/** Criterion verdict uses the shared review icon; its identity and persistence remain model-level. */
+const critVerdictChip = (cx: number, cy: number, revealKey: string): string =>
+  `<g class="flow-crit-verdict review-verdict-icon" data-criterion-verdict="${escapeHtml(revealKey)}" data-verdict="unreviewed" role="button" tabindex="0" aria-label="Verdict: To do"><title>Verdict: To do</title>` +
+  `<circle cx="${cx}" cy="${cy}" r="8"/>` +
+  `<path d="M${cx - 4} ${cy} l2.6 2.9 l5 -5.6"/>` +
   `</g>`;
 
 /** #224 ii.3 Slice 2b-2: collect the ADDRESSABLE leaf-concept identities in a criterion body outline (recursing or/and/not
@@ -145,7 +138,7 @@ const collectLeafIdentities = (e: DefStructExpr, out: { lib: string; name: strin
   }
 };
 
-/** #208: wrap a label to ≤2 lines for a FIXED-width box (we wrap, never widen — the operator rejected horizontal sprawl).
+/** Initial tree labels use ≤2 lines in the compact box. Pinned question layouts refit the full label to their actual width.
  *  `maxChars` is the per-line char budget (the old single-line limit). Line 1 is GUARANTEED ≤ maxChars — the LONGEST
  *  whitespace-bounded prefix that fits — so it never overflows horizontally. Line 2 is the remainder (trailing-trimmed,
  *  `…`-truncated only if it STILL overflows). A single word longer than maxChars is CHAR-split across both lines (keeps
@@ -173,7 +166,7 @@ export function wrapLabel(label: string, maxChars: number): string[] {
 const labelMarkup = (label: string, x: number, y: number, h: number, maxChars: number, dx: number, center = false): string => {
   const lines = wrapLabel(label, maxChars);
   const tx = x + dx;
-  const anchor = center ? ` text-anchor="middle"` : "";
+  const anchor = ` data-flow-label="${escapeHtml(label)}"` + (center ? ` text-anchor="middle"` : "");
   return lines.length === 1
     ? `<text x="${tx}" y="${y + h / 2 + 4}"${anchor}>${escapeHtml(lines[0])}</text>`
     : `<text x="${tx}"${anchor}><tspan x="${tx}" y="${y + h / 2 - 4}">${escapeHtml(lines[0])}</tspan><tspan x="${tx}" y="${y + h / 2 + 11}">${escapeHtml(lines[1])}</tspan></text>`;
@@ -197,6 +190,9 @@ const LEAF_LABEL_MAX = 17;
 type FlowKind = "decision" | "when" | "otherwise" | "action" | "leaf";
 
 interface LaidNode {
+  visualElided?: boolean;
+  choice?: { system?: string; code: string; display: string };
+  choiceFor?: string;
   incomingOutcome?: "Yes" | "No";
   delegatedDecisionKey?: string;
   nodeKey: string;
@@ -276,6 +272,23 @@ export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): S
   return leaves;
 }
 
+/** Expand the selected disclosure's available outline descendants; collapse only the selected key. */
+export function toggleCriterionExpansion(current: Set<string>, key: string, structure: CrlDecisionStructure[], opts: Parameters<typeof renderFlowPane>[1] = {}): Set<string> {
+  const next = new Set(current);
+  if (next.delete(key)) return next;
+  const {roots} = buildLaid(projectFlowStructure(structure), new Map((opts.concepts ?? []).map(c=>[c.nodeKey,c])), {...opts,expandAllCriteria:true});
+  const open = (n: LaidNode) => {
+    if (n.criterionCollapse || n.critRow) next.add(n.nodeKey);
+    if (n.optionsRow) next.add(n.optionsRow.posKey);
+    n.children.filter(c=>c.outline).forEach(open);
+  };
+  const find = (n: LaidNode): void => {
+    if (n.nodeKey === key || n.optionsRow?.posKey === key) {open(n);next.add(key);return;}
+    n.children.forEach(find);
+  };
+  roots.forEach(find); return next;
+}
+
 /**
  * Tidy-tree layout (vscode-free, pure). Leaves take globally-sequential integer slots in DFS in-order, so every subtree
  * occupies a CONTIGUOUS disjoint slot band; an internal node sits at the midpoint of its children. Because x is fixed by
@@ -289,8 +302,9 @@ function buildLaid(
   opts: {
     defExpr?: ResolveDefExprEntry;
     guardOutlines?: Map<string, GuardOutline>;
+    expandAllCriteria?: boolean;
     expandedGuardWhens?: Set<string>;
-    answerOptionsByConcept?: Map<string, { code: string; display: string }[]>;
+    answerOptionsByConcept?: Map<string, { system?: string; code: string; display: string }[]>;
     /** #189 — for a question whose answers live in a pure-REFERENCE terminology we cannot expand: the
      *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
     answersFromByConcept?: Map<string, string>;
@@ -314,7 +328,7 @@ function buildLaid(
   // the bottom of the branch-body band. Each visible row (op label / leaf / external / more) takes ONE compact row (DFS
   // pre-order: a header before its children) at an INDENT-based `absX`. `opPath` is the positional index path — the same
   // concept at two positions gets DISTINCT `leaf::` keys (no anchor/verdict collision). `topWhenKey` threads to every leaf.
-  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }, inputSeen = new Set<string>()): LaidNode => {
+  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }, inputSeen = new Set<string>(), inCriterion = false): LaidNode => {
     const base = { useDecision: false, outline: true as const, indent, absX: outlineX(whenLeft, indent), depth: 0, topWhenKey };
     const take = (): number => {
       const y = cursor.y;
@@ -325,12 +339,12 @@ function buildLaid(
       case "or":
       case "and": {
         const y = take();
-        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`, cursor));
+        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`, cursor, inputSeen, inCriterion));
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: s.kind === "or" ? "any of" : "all of", full: s.kind === "or" ? "any of" : "all of", y, children };
       }
       case "not": {
         const y = take();
-        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`, cursor);
+        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`, cursor, inputSeen, inCriterion);
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: "not", full: "not", y, children: [child] };
       }
       case "external": {
@@ -343,22 +357,32 @@ function buildLaid(
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "more"), kind: "leaf", outlineRow: "more", label, full: s.count > 0 ? `${s.count} more operand(s)` : "deeper operands elided", y, children: [] };
       }
       case "leaf": {
-        const y = take();
-        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, indent + 1, `${opPath}.c`, cursor)] : [];
-        children.push(...buildInputs(s.lib, s.name, whenLeft, topWhenKey, indent + 1, `${opPath}.inputs`, cursor, inputSeen));
+        const concept = conceptMap.get(s.nodeKey);
+        const inputs = valueInputs(s.lib,s.name);
+        // Project only fully represented helpers inside a Criterion with preserved review controls.
+        const complete = (e: DefStructExpr): boolean => e.kind === "external" || e.kind === "more" ? false
+          : e.kind === "leaf" ? !!conceptMap.get(e.nodeKey) && conceptMap.get(e.nodeKey)!.definitionRefs.every(k=>conceptMap.has(k)) && (!e.composite || complete(e.composite))
+          : e.kind === "and" || e.kind === "or" ? e.operands.every(complete)
+          : e.kind === "criterion" ? !e.elided && complete(e.operand) : e.kind === "not" && complete(e.operand);
+        const visualElided = inCriterion && !s.isSource && !!concept && !concept.hasValueProjection && (
+          (concept.definitionKind === "definition-is" && concept.definitionRefs.length === 1 && inputs.length === 1 && inputs[0].hasLocalCode) ||
+          (concept.definitionKind === "defined-as" && !!s.composite && complete(s.composite)));
+        const y = visualElided ? cursor.y : take();
+        const childIndent = indent + (visualElided ? 0 : 1);
+        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, childIndent, `${opPath}.c`, cursor, inputSeen, inCriterion)] : [];
+        children.push(...buildInputs(s.lib, s.name, whenLeft, topWhenKey, childIndent, `${opPath}.inputs`, cursor, inputSeen, inCriterion, visualElided));
         // ⭐ #189: a concept with `value from:` options is a CODED QUESTION. Expanding it shows the answers,
         // POSITION-keyed like a criterion and default-COLLAPSED, so a wide option set never bloats the tree
         // until a reviewer asks for it. Reuses the criterion toggle channel with its own key prefix.
-        const answers = opts.answerOptionsByConcept?.get(s.nodeKey);
+        const answers = inputs.length ? undefined : opts.answerOptionsByConcept?.get(s.nodeKey);
         let optionsRow: LaidNode["optionsRow"];
-        // ⚠ NOT gated on `children.length === 0`. An earlier cut skipped any leaf that already had a
-        // composite body — which silently excluded EVERY coded question in the field, because the node a
-        // tree shows is the boolean wrapper and wrappers have composites. Option rows APPEND after the
-        // composite: the body says how the answer is computed, the options say what may be answered.
+        // Actual input questions own their choices. A helper with resolved inputs does not repeat
+        // inherited options; opaque questions without such inputs retain their available choices.
         if (answers && answers.length > 0) {
           const posKey = outlineKey(topWhenKey, opPath, "opts");
-          const collapsed = !(opts.expandedGuardWhens?.has(posKey) ?? false);
+          const collapsed = !opts.expandAllCriteria && !(opts.expandedGuardWhens?.has(posKey) ?? false);
           optionsRow = { posKey, collapsed, count: answers.length };
+          cursor.y += 24 / ROW;
           if (!collapsed) {
             for (const [oi, o] of answers.entries()) {
               children.push({
@@ -366,6 +390,7 @@ function buildLaid(
                 nodeKey: outlineKey(topWhenKey, `${opPath}.o${oi}`, "opt"),
                 kind: "leaf", outlineRow: "option", indent: indent + 1,
                 absX: outlineX(whenLeft, indent + 1),
+                choice: o, choiceFor: JSON.stringify([s.lib,s.name]),
                 label: o.display, full: `${o.display} — answer option \`${o.code}\``,
                 y: take(), children: [],
               });
@@ -375,7 +400,7 @@ function buildLaid(
         // ⭐ #189 — a question whose answers live in a pure-REFERENCE terminology. ONE plain row, ALWAYS
         // visible, NO chevron: we hold no member list, and a disclosure promises content. Without it the
         // node is indistinguishable from a concept that asks nothing at all.
-        const answersFrom = !answers?.length ? opts.answersFromByConcept?.get(s.nodeKey) : undefined;
+        const answersFrom = !inputs.length && !answers?.length ? opts.answersFromByConcept?.get(s.nodeKey) : undefined;
         if (answersFrom) {
           children.push({
             ...base,
@@ -391,7 +416,7 @@ function buildLaid(
           ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
           label: s.name, full: `${s.name} — concept "${s.lib}"`,
           conceptKey: s.nodeKey, conceptName: s.name, conceptLib: s.lib, isSource: s.isSource,
-          ...(optionsRow ? { optionsRow } : {}),
+          visualElided, ...(optionsRow ? { optionsRow } : {}),
           y, children,
         };
       }
@@ -400,15 +425,15 @@ function buildLaid(
         // A NON-ROOT criterion reference remains a collapsible component boundary.
         // A ROOT criterion never reaches here (its identity is carried by the `when` tab via
         // `criterionCollapse` — the outline-hanging branch unwraps a root criterion to its `.operand`). Collapse is
-        // POSITION-keyed (`posKey = (whenKey,opPath)`) + INDEPENDENT (a criterion nested inside a just-expanded parent
-        // appears collapsed), default COLLAPSED. `bodyConcepts` = the addressable leaf identities inside the body (the
+        // POSITION-keyed (`posKey = (whenKey,opPath)`), default COLLAPSED. The host expands all
+        // available descendants on opening; closing a parent preserves their stored state. `bodyConcepts` = the addressable leaf identities inside the body (the
         // collapsed-box flag rollup, model-derived so it is complete whether or not the body is laid out this render).
         const y = take();
         const posKey = outlineKey(topWhenKey, opPath, "crit");
-        const collapsed = !(opts.expandedGuardWhens?.has(posKey) ?? false);
+        const collapsed = !opts.expandAllCriteria && !(opts.expandedGuardWhens?.has(posKey) ?? false);
         const bodyConcepts: { lib: string; name: string }[] = [];
         collectLeafIdentities(s.operand, bodyConcepts);
-        const children = collapsed ? [] : [buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.b`, cursor)];
+        const children = collapsed ? [] : [buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.b`, cursor, inputSeen, true)];
         if (!collapsed) cursor.y += 12 / ROW; // cursor uses slots; reserve 12 pixels for the closing border
         return {
           ...base, nodeKey: posKey, kind: "leaf", outlineRow: "crit",
@@ -422,14 +447,14 @@ function buildLaid(
 
   // Value helpers have data dependencies, not Boolean operands. Keep those inputs
   // addressable at their own occurrence so their question never migrates to the helper.
-  const buildInputs = (lib: string, name: string, left: number, whenKey: string, indent: number, path: string, cursor: {y:number}, seen = new Set<string>()): LaidNode[] => {
+  const buildInputs = (lib: string, name: string, left: number, whenKey: string, indent: number, path: string, cursor: {y:number}, seen = new Set<string>(), inCriterion = false, transparent = false): LaidNode[] => {
     const key = JSON.stringify([lib,name]);
     if (seen.has(key)) return [];
     const inputs = valueInputs(lib,name);
     if (!inputs.length) return [];
-    const y = cursor.y; cursor.y += OUTLINE_ADVANCE;
-    const children = inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+1, `${path}.${i}`, cursor, new Set([...seen,key])));
-    return [{nodeKey:outlineKey(whenKey,path,"inputs"),kind:"leaf",useDecision:false,outline:true,outlineRow:"op",indent,absX:outlineX(left,indent),depth:0,topWhenKey:whenKey,label:"input",full:"Input to this condition",y,children}];
+    const y = cursor.y; if (!transparent) cursor.y += OUTLINE_ADVANCE;
+    const children = inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+(transparent ? 0 : 1), `${path}.${i}`, cursor, new Set([...seen,key]), inCriterion));
+    return [{visualElided:transparent,nodeKey:outlineKey(whenKey,path,"inputs"),kind:"leaf",useDecision:false,outline:true,outlineRow:"op",indent,absX:outlineX(left,indent),depth:0,topWhenKey:whenKey,label:"input",full:"Input to this condition",y,children}];
   };
 
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
@@ -460,7 +485,7 @@ function buildLaid(
     // `soleCriterion` sidecar was retired disc 330), so the render + the outline-hanging unwrap read ONE fact.
     const sole = guardOutline ? topCriterion(guardOutline.expr) : undefined;
     const collapsible = sole !== undefined;
-    const collapsed = collapsible && !opts.expandedGuardWhens?.has(n.nodeKey);
+    const collapsed = collapsible && !opts.expandAllCriteria && !opts.expandedGuardWhens?.has(n.nodeKey);
     // #224 ii.3 Slice 2b-2: the criterion body's addressable leaf identities (for the collapsed-box flag rollup).
     const critBodyConcepts: { lib: string; name: string }[] = [];
     if (sole && guardOutline) collectLeafIdentities(guardOutline.expr, critBodyConcepts);
@@ -513,7 +538,7 @@ function buildLaid(
       // conjuncts render as named `crit` rows via `buildOutline`'s criterion arm. This unwrap and the `sole` collapse read
       // above both key on `guardOutline.expr` (via `topCriterion`) — ONE source since `soleCriterion` was retired (disc 330).
       const rootExpr = guardOutline.expr.kind === "criterion" ? guardOutline.expr.operand : guardOutline.expr;
-      outlineRoots.push(buildOutline(rootExpr, whenLeft, n.nodeKey, 0, "0", cursor));
+      outlineRoots.push(buildOutline(rootExpr, whenLeft, n.nodeKey, 0, "0", cursor, new Set(), !!sole));
       slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling clears it
     } else if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
       const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
@@ -525,12 +550,9 @@ function buildLaid(
           cursor.y += OUTLINE_ADVANCE;
           outlineRoots.push({ nodeKey: outlineKey(n.nodeKey, "top", "or"), kind: "leaf", useDecision: false, outline: true, outlineRow: "topor", indent: 0, absX: outlineX(whenLeft, 0), label: "or", full: "or", depth: 0, topWhenKey: n.nodeKey, y, children: [] });
         }
-        // Parity with the questionnaire's `renderInferredWhen`: an INFERRED (non-Source) composite whose body is a single
-        // operand (a bare-ref alias / a top-level `not` / an `external`) is wrapped in an `ANY OF` box — so `X defined as Y`
-        // reads identically in both panes. An `or`/`and` body already carries its own box, so it is not wrapped.
         const struct = buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1);
-        const wrapped: DefStructExpr = !cf.isSource && struct.kind !== "or" && struct.kind !== "and" ? { kind: "or", operands: [struct] } : struct;
-        outlineRoots.push(buildOutline(wrapped, whenLeft, n.nodeKey, 0, "0", cursor));
+        // Keep authored operator nesting; aliases and NOT do not invent an ANY OF.
+        outlineRoots.push(buildOutline(struct, whenLeft, n.nodeKey, 0, "0", cursor));
         slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling doesn't overlap it
       }
     }
@@ -576,9 +598,10 @@ function buildLaid(
       const whenLeft = PAD + depth * COL;
       const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
       const posKey = outlineKey(n.nodeKey, "self", "opts");
-      const optCollapsed = !(opts.expandedGuardWhens?.has(posKey) ?? false);
+      const optCollapsed = !opts.expandAllCriteria && !(opts.expandedGuardWhens?.has(posKey) ?? false);
       const y = cursor.y;
       cursor.y += OUTLINE_ADVANCE;
+      cursor.y += 24 / ROW;
       const optChildren: LaidNode[] = [];
       if (!optCollapsed) {
         for (const [oi, o] of selfAnswers.entries()) {
@@ -586,6 +609,7 @@ function buildLaid(
             nodeKey: outlineKey(n.nodeKey, `self.o${oi}`, "opt"),
             kind: "leaf", useDecision: false, outline: true, outlineRow: "option",
             indent: 1, absX: outlineX(whenLeft, 1),
+            choice: o, choiceFor: JSON.stringify([cf.conceptLib,cf.conceptName]),
             label: o.display, full: `${o.display} — answer option \`${o.code}\``,
             depth: 0, topWhenKey: n.nodeKey, y: cursor.y, children: [],
           });
@@ -648,7 +672,7 @@ export function renderFlowPane(
      *  criterion-ref when not listed renders `▸ <name>` with its body hidden; listed → `▾` + the Slice-1 body outline. */
     expandedGuardWhens?: Set<string>;
     /** #189: inline `value from:` answers per concept nodeKey — what makes a coded question expandable. */
-    answerOptionsByConcept?: Map<string, { code: string; display: string }[]>;
+    answerOptionsByConcept?: Map<string, { system?: string; code: string; display: string }[]>;
     /** #189 — for a question whose answers live in a pure-REFERENCE terminology we cannot expand: the
      *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
     answersFromByConcept?: Map<string, string>;
@@ -659,7 +683,7 @@ export function renderFlowPane(
   const anchors: Record<string, FlowAnchor> = {};
   const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string } | { criterionOccurrence: { lib: string; name: string; bodyHash: string; elided: boolean } }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
-  const conceptOccurrences: { gid: string; lib: string; name: string }[] = []; // #203 Todo 4b Slice A
+  const conceptOccurrences: { gid: string; lib: string; name: string; flagGid?: string }[] = []; // #203 Todo 4b Slice A
   const criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[] = []; // #224 ii.3 Slice 2b
   const flaggableGids: string[] = [];
 
@@ -717,10 +741,11 @@ export function renderFlowPane(
   // Edges first (so node boxes paint over them). Edges are pure <path> — NEVER reveal targets.
   let body = "";
   for (const n of all) {
-    if (n.kind === "otherwise") continue;
+    if (n.kind === "otherwise" || n.visualElided) continue;
     const px = left(n) + nodeW(n);
     const py = midY(n);
-    for (const c of n.children.flatMap(c => c.kind === "otherwise" ? c.children.map(child => ({ ...child, incomingOutcome: "No" as const })) : [c])) {
+    const visibleChildren = (children: LaidNode[]): LaidNode[] => children.flatMap(c=>c.visualElided ? visibleChildren(c.children) : [c]);
+    for (const c of visibleChildren(n.children).flatMap(c => c.kind === "otherwise" ? c.children.map(child => ({ ...child, incomingOutcome: "No" as const })) : [c])) {
       if (c.outline) {
         // #187 Option-C: an OUTLINE connector is a dashed grey `.flow-def-edge` ELBOW (a vertical spine down from the
         // parent + a horizontal run to the child's left) — NOT the horizontal control-flow Bézier. The spine sits just
@@ -758,7 +783,7 @@ export function renderFlowPane(
     // REFACTOR:grounded: a NON-ROOT criterion is a reusable component tab. TWO preserved channels: a ▸/▾ chevron
     // (`data-toggle-crit` → `{criterionToggle: posKey}` → `toggleCriterionExpand`), and the box BODY (`data-reveal` →
     // `{criterionOccurrence}` carrying the criterion identity + canonical bodyHash → RIGHT-click opens the model-level
-    // criterion-encoding menu; LEFT-click is inert, diverted host-side). #233 Todo 2b: the hidden model-level verdict CHIP
+    // criterion-encoding menu; LEFT-click is inert, diverted host-side). #233 Todo 2b: the model-level verdict CHIP
     // (top-right) + a collapsed-body flag ROLLUP ⚑ (host lights `.has-flag` when folded + a body concept has an open flag);
     // `driveCriterionVerdicts` maps this occurrence's `(lib,name)` verdict → `.crit-*` on the gid (the chip idiom).
     if (n.outline && n.outlineRow === "crit") {
@@ -771,10 +796,10 @@ export function renderFlowPane(
       body +=
         `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        labelMarkup("Component", x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
+        labelMarkup("Criterion", x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
-        critVerdictChip(x + OUTLINE_NODE_W - 11, y + 9) +
-        flagBadge(x + OUTLINE_NODE_W - 10, y + OUTLINE_H - 10, gid, false) +
+        critVerdictChip(x + OUTLINE_NODE_W - 13, y + 9, key) +
+        flagBadge(x + OUTLINE_NODE_W - 13, y + OUTLINE_H - 10, gid, false) +
         `</g>`;
       continue;
     }
@@ -849,10 +874,10 @@ export function renderFlowPane(
         // ⚠ The 5th arg is maxChars, NOT pixels. `- 12` (mistaking it for the 12px shift) left EIGHT chars
         // per line out of OUTLINE_LABEL_MAX = 20, so every coded question wrapped to two 8-char fragments.
         // The crit-row precedent above reserves 5 chars for a 20px gutter; 12px is ~2 chars at ~5.9px/char.
-        labelMarkup(n.label, x + (optRow ? 12 : 0), y, OUTLINE_H, OUTLINE_LABEL_MAX - (optRow ? 2 : 0), 9) +
-        (optRow ? critToggle(x + 8, y + OUTLINE_H / 2, optRow.collapsed, optTogKey, `${optRow.count} answer options`).replace('<g ', '<g data-flow-choices-toggle="1" ') : "") +
+        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
+        (optRow ? critToggle(x + 8, y + OUTLINE_H + 13, optRow.collapsed, optTogKey, `answer choices (${optRow.count})`).replace('<g ', '<g data-flow-choices-toggle="1" ').replace('</g>', `<text x="${x+20}" y="${y+OUTLINE_H+17}">Answer choices (${optRow.count})</text></g>`) : "") +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
-        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 10, y + OUTLINE_H - 10, gid) : "") +
+        (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 13, y + OUTLINE_H - 10, gid) : "") +
         `</g>`;
       continue;
     }
@@ -902,8 +927,8 @@ export function renderFlowPane(
     // #210 ALL-PASS ✓ BADGE — a HIDDEN theme-aware (green circle + white check) grandchild on every disposition leaf,
     // revealed by the host-toggled `.leaf-allpass` when EVERY route producing this outcome is pass. Right-CENTER interior
     // (clears the top guard-tab band + the stadium's rounded corners + the left-aligned label). `pointer-events:none` (CSS).
-    const badgeCx = x + NODE_W - 13;
-    const badgeCy = y + NODE_H / 2;
+    const badgeCx = x + NODE_W - 22;
+    const badgeCy = y + 10;
     const allPassBadge = isLeafEnd
       ? `<g class="flow-allpass-badge"><circle cx="${badgeCx}" cy="${badgeCy}" r="8"/><path d="M${badgeCx - 4} ${badgeCy} l2.6 2.9 l5 -5.6"/></g>`
       : "";
@@ -915,7 +940,7 @@ export function renderFlowPane(
     if (flaggable) flaggableGids.push(gid);
     if (isWhenConcept) conceptOccurrences.push({ gid, lib: n.conceptLib!, name: n.conceptName! });
     // Per-node flags sit at the bottom-right, inset further for rounded outcomes.
-    const flagBadgeMarkup = flaggable ? flagBadge(x + NODE_W - (stadium ? 25 : 10), y + NODE_H - 10, gid) : "";
+    const flagBadgeMarkup = flaggable ? flagBadge(x + NODE_W - (stadium ? 22 : 13), y + NODE_H - 10, gid) : "";
     // The PRIMARY/start node (first decision root) additionally carries the chrome-mirror COUNT badge — a pill showing the
     // total open-flag count (`⚑ N`), the catch-all click target (see driveFlagBadges). Pre-rendered hidden; the host sets
     // its text + `.has-startflag`. Sits at the top-right, straddling the node's top edge (within the PAD, no clip).
@@ -929,21 +954,21 @@ export function renderFlowPane(
     const labelDx = critC ? 24 : 10;
     const labelMax = critC ? LABEL_MAX - 4 : LABEL_MAX;
     // #224 ii.3 Slice 2b: a single-criterion `when` records an OCCURRENCE (identity `{lib,name}` — the model-level verdict
-    // is keyed on it, reviewed once across all occurrences + cases) + carries a HIDDEN verdict chip at the top-right (a
+    // is keyed on it, reviewed once across all occurrences + cases) + carries a verdict control at the top-right (a
     // criterion `when` has its concept suppressed → no flag badge there, so the slot is free). The host reveals the chip
     // per-occurrence via `.flow-row.crit-{pass,fail,pending,stale}` without re-render (the flagBadge/allPass idiom).
     if (critC) criterionOccurrences.push({ gid, lib: critC.lib, name: critC.name, collapsed: critC.collapsed, bodyConcepts: critC.bodyConcepts });
-    const critVerdictMarkup = critC ? critVerdictChip(x + NODE_W - 13, y + 13) : "";
+    const critVerdictMarkup = critC ? critVerdictChip(x + NODE_W - 13, y + 13, key) : "";
     // Bottom-right flag: grey creates an occurrence flag; yellow includes open flags rolled up from a collapsed body.
     // `flaggableGids` includes the gid so the host's bulk-clear covers it.
-    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 10, y + NODE_H - 10, gid) : "";
+    const critFlagMarkup = critC ? flagBadge(x + NODE_W - 13, y + NODE_H - 10, gid) : "";
     if (critC) flaggableGids.push(gid);
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
-      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(critC ? "Component" : n.label, x, y, NODE_H, labelMax, labelDx)) +
+      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(critC ? "Criterion" : n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       (n.kind === "when" ? `<text class="flow-truth-unknown" x="${x - 14}" y="${y + 16}"><title>Not answered — evaluation paused here</title>?</text>` +
         (!n.children.some(c => c.incomingOutcome === "No") ? `<path class="flow-false-stop" d="M${x + NODE_W} ${y + NODE_H / 2} h24 m0 -4 v8"><title>Condition false — this branch stops here</title></path>` : "") : "") +
@@ -960,9 +985,22 @@ export function renderFlowPane(
 
   const parents = new Map<string, string>();
   for (const n of all) for (const child of n.children) parents.set(child.nodeKey, n.nodeKey);
+  const byNodeKey = new Map(all.map(n=>[n.nodeKey,n]));
+  const isLogic = (n: LaidNode) => n.outlineRow === "op" && (n.label === "all of" || n.label === "any of");
+  const logicParent = (n: LaidNode): LaidNode | undefined => {
+    let parent = byNodeKey.get(parents.get(n.nodeKey) ?? "");
+    while (parent && !isLogic(parent)) parent = byNodeKey.get(parents.get(parent.nodeKey) ?? "");
+    return parent;
+  };
   for (const [i, n] of all.entries()) {
     const id = `${prefix}flow${i}`;
-    const metadata = ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
+    let groupDepth = 0;
+    for (let p = logicParent(n); p; p=logicParent(p)) groupDepth++;
+    const metadata = (n.visualElided ? ' display="none" data-flow-elided="1" aria-hidden="true"' : '') +
+      (n.optionsRow ? ' data-flow-has-choices="1"' : '') +
+      (n.choice ? ` data-flow-choice="${escapeHtml(JSON.stringify(n.choice))}" data-flow-choice-for="${escapeHtml(n.choiceFor!)}"` : '') +
+      (isLogic(n) ? ` data-flow-logic="${escapeHtml(n.nodeKey)}" data-flow-logic-parent="${escapeHtml(logicParent(n)?.nodeKey ?? "")}" data-flow-logic-depth="${groupDepth}" data-flow-logic-kind="${n.label === "any of" ? "any" : "all"}" role="button" tabindex="0" aria-pressed="false"` : '') +
+      ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
       (n.outlineRow === "option" ? ' data-flow-decoration="choices"' : n.outlineRow === "op" && n.label === "input" ? ' data-flow-decoration="input"' : '') +
       (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit") ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
@@ -977,6 +1015,14 @@ export function renderFlowPane(
     body = body.replace(`<g id="${escapeHtml(id)}"`, `<g id="${escapeHtml(id)}"${metadata}`);
   }
 
+  // Display hidden-helper flags on their enclosing Criterion. Keep gid for target creation/identity.
+  for (const occurrence of conceptOccurrences) {
+    const n = all[Number(occurrence.gid.slice(`${prefix}flow`.length))];
+    if (!n?.visualElided) continue;
+    let owner = byNodeKey.get(parents.get(n.nodeKey) ?? "");
+    while (owner && !owner.critRow && !owner.criterionCollapse) owner = byNodeKey.get(parents.get(owner.nodeKey) ?? "");
+    if (owner) occurrence.flagGid = `${prefix}flow${all.indexOf(owner)}`;
+  }
   const svg =
     `<svg class="flow-svg" aria-label="Decision tree" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
@@ -992,11 +1038,12 @@ export function renderFlowPane(
   return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
 }
 
-// Bottom-right per-node badge: grey creates a flag, yellow opens existing flags. Rollup-only badges remain hidden until
+// Bottom-right flag: grey adds, yellow opens unresolved MV flags, green opens resolved MV flags. Rollup-only badges remain hidden until
 // flagged. The gid belongs to the badge itself so the separate start-node count pill still opens the whole-policy list.
 const flagBadge = (bx: number, by: number, gid: string, canCreate = true): string =>
-  `<g class="flow-flag-badge${canCreate ? " flow-flag-create" : ""}" data-mv-flag-badge="1" data-node-flag-gid="${escapeHtml(gid)}" role="button" tabindex="0" aria-label="Review flag"><title>${canCreate ? "Add or open review flag" : "Open review flags"}</title>` +
-  `<circle cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text></g>`;
+  `<g class="flow-flag-badge${canCreate ? " flow-flag-create" : ""}"><title>${canCreate ? "Add or open review flag" : "Open review flags"}</title>` +
+  `<circle class="flow-flag-control" data-mv-flag-badge="1" data-flag-category="validation" data-node-flag-gid="${escapeHtml(gid)}" role="button" tabindex="0" aria-label="Review MV flag" cx="${bx}" cy="${by}" r="7"/><text class="flow-flag-glyph" x="${bx}" y="${by + 3.5}">⚑</text>` +
+  `<g class="flow-flag-authoring" data-mv-flag-badge="1" data-flag-category="extraction" data-node-flag-gid="${escapeHtml(gid)}" role="button" tabindex="0" aria-label="Review KE flags" data-flag-state="none"><title>Review KE flags</title><rect x="${bx-30}" y="${by-6}" width="17" height="12" rx="3"/><text x="${bx-21.5}" y="${by+3}">KE</text></g></g>`;
 
 // The start-node COUNT badge — a copy of the tree chrome (`⚑ N open flags`) pinned to the primary/start node: a pill with
 // a count the host sets (`.flow-startflag-text`), shown via `.has-startflag` on the row (the same class-toggle idiom as
@@ -1019,37 +1066,33 @@ const startFlagBadge = (bx: number, by: number): string =>
 // focusBorder is also the filter-chip focus color). Verdict = a FILL (with an alpha wash on the tree); inferred/ring = a STROKE.
 const TOK_VERDICT_PASS = "var(--vscode-testing-iconPassed,#73c991)";
 const TOK_VERDICT_FAIL = "var(--vscode-testing-iconFailed,#f14c4c)";
-const TOK_VERDICT_PENDING = "var(--vscode-charts-yellow,#d29922)";
+const TOK_VERDICT_PENDING = "var(--vscode-charts-orange,#d18616)";
 const TOK_INFERRED = "var(--vscode-charts-purple,#c586c0)";
 const TOK_RING = "var(--vscode-focusBorder,#3794ff)";
 
-/** #218: the MV flow-pane color KEY (operator-scoped to EXACTLY three concepts — verdict fill, inferred purple, selected-path
- *  ring; no grey/disposition, no ✓ badge, no stadium). MV-ONLY: verdict fills paint only in medical-validation mode, and the
- *  operator chose MV-only (so purple/ring go unlabelled in cockpit mode — a known, accepted limitation). Rendered into the
- *  tree-pane `#fcChrome`; the swatch CSS lives in FLOW_STYLE keyed on the SAME `TOK_*` consts. The verdict chips are full
- *  opacity (hue-truthful; the tree wash is `.2/.16`, invisible at chip size — a deliberate alpha divergence, hue is what the
- *  key decodes). "Selected path" NOT "Selected case": the ring also marks source-primary correspondence reach, not only a case. */
+/** MV-only key, grouped by purpose. Shared tokens keep legend swatches aligned with tree paint. */
 export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string {
   if (mode !== "medical-validation") return "";
   const chip = (cls: string, label: string, gap: boolean): string =>
     `<span class="fc-lg${gap ? " fc-lg-gap" : ""}"><i class="fc-sw ${cls}" aria-hidden="true"></i>${label}</span>`;
   return `<div class="fc-legend" role="group" aria-label="Tree color key">` +
-    `<span class="fc-legend-group"><b>Review</b>`+chip("fc-sw-pass","Pass",false)+chip("fc-sw-fail","Fail",false)+chip("fc-sw-pending","Pending",false)+`</span>`+
+    `<span class="fc-legend-group"><b>Review</b>`+chip("fc-sw-todo","To do",false)+chip("fc-sw-pass","Pass",false)+chip("fc-sw-fail","Fail",false)+chip("fc-sw-pending","Pending",false)+`</span>`+
     `<span class="fc-legend-group"><b>Condition</b>`+chip("fc-sw-true","True",false)+chip("fc-sw-false","False",false)+`<span class="fc-lg">? Unanswered</span></span>`+
-    `<span class="fc-legend-group">`+chip("fc-sw-inferred","Inferred",false)+chip("fc-sw-ring","Selected path",false)+`</span></div>`;
+    `<span class="fc-legend-group"><b>Navigation</b>`+chip("fc-sw-focus","Focus",false)+chip("fc-sw-inferred","Inferred",false)+chip("fc-sw-ring","Selected path",false)+`</span><span class="fc-legend-group"><b>Groups</b><span class="fc-group-colors"><i class="flow-group-teal">━</i> ANY OF <i class="flow-group-orange">━</i> ALL OF</span></span><span class="fc-legend-group"><b>Flags</b>`+chip("fc-sw-flag-open","Open",false)+chip("fc-sw-pass","Resolved",false)+`<span class="fc-lg">KE Authoring</span></span></div>`;
 
 }
 
-export const FLOW_STYLE =
-  `[data-flow-key]:focus-visible>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2}` +
-  `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pin-available>.flow-pin,.flow-pinned>.flow-pin{display:inline}` +
+export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
+  `html:has(.flow-svg){overflow-anchor:none}` +
+  `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
+  `body[data-mode="medical-validation"] #root:not(.flow-has-pin) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-show-all-pins:not(.flow-has-pin) .flow-activity>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
   `.fc-legend .fc-sw.fc-sw-true,.fc-legend .fc-sw.fc-sw-false{width:16px;height:2px;background:#fff;border:0;box-shadow:0 0 3px 1px #00e676}.fc-legend .fc-sw.fc-sw-false{box-shadow:0 0 3px 1px #f14c4c}` +
   `.flow-fallback{display:none}.flow-truth-unknown,.flow-false-stop{display:none;pointer-events:none}` +
   `.flow-edge.flow-condition-true{stroke:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}` +
   `.flow-edge.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `.flow-condition-false>.flow-false-stop{display:inline;fill:none;stroke-width:1.75;vector-effect:non-scaling-stroke}` +
-  `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-charts-yellow,#d29922);font-weight:bold}` +
+  `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-foreground,#ddd);font-weight:bold}` +
   `.flow-wrap{display:inline-block;min-width:100%}` +
   // `cursor:grab` = the grab-drag pan affordance on the tree background (a `.flow-row` overrides it with `pointer`, so nodes
   // still read as clickable); `user-select:none` so a pan-drag over node text doesn't select it.
@@ -1070,8 +1113,8 @@ export const FLOW_STYLE =
   `.flow-when.flow-inferred>rect{stroke:${TOK_INFERRED};stroke-width:1.4}` +
   // REFACTOR:grounded: the component tab identifies reusable structure; truth stays on internal logic.
   `.flow-component-frames>rect{fill:rgba(160,160,160,.025);stroke:rgba(160,160,160,.45);stroke-width:1;vector-effect:non-scaling-stroke}` +
-  `[data-flow-component]>rect{fill:transparent!important;stroke:rgba(160,160,160,.45)!important;stroke-width:1!important}` +
-  `[data-flow-component="expanded"]>rect{stroke:transparent!important}` +
+  `.flow-row[data-flow-component]>rect,.flow-crit-row[data-flow-component]>rect{fill:transparent;stroke:rgba(160,160,160,.45);stroke-width:1}` +
+  `.flow-row[data-flow-component="expanded"]>rect,.flow-crit-row[data-flow-component="expanded"]>rect{stroke:transparent}` +
   `[data-flow-component]>text{font-size:10px;fill:var(--vscode-descriptionForeground,#aaa)}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
   // A recommend TARGET. #210: ALL recommend activities (incl. determinations) → neutral grey, the SAME as an ordinary
@@ -1103,9 +1146,10 @@ export const FLOW_STYLE =
   `.flow-leaf.flow-inferred>rect{stroke:${TOK_INFERRED};stroke-width:1.4}` + // #210: off-path purple slightly heavier (on-path 2 wins, later)
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
   // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
-  // ANY OF / ALL OF tab; render-only (not clickable). An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
+  // ANY OF / ALL OF labels toggle manual connector emphasis. An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
   `.flow-outline{cursor:default}` +
   `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
+  `.flow-logic-label{cursor:pointer}.flow-crit-toggle>text{font-size:11px;fill:var(--vscode-foreground,#ddd)}.flow-opt.flow-choice-selected>rect{fill:var(--vscode-editor-selectionBackground,#264f78);stroke:var(--vscode-focusBorder,#3794ff)}.flow-opt.flow-choice-selected>text{fill:var(--vscode-foreground,#ddd)}` +
   `.flow-logic-label>text{fill:var(--vscode-foreground,#ddd);font-size:13px;letter-spacing:.04em}` +
   `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
   `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
@@ -1120,7 +1164,7 @@ export const FLOW_STYLE =
   // `.flow-row.has-flag .flow-flag-badge` selector wouldn't match). The verdict chip + right-click verdict land in 2b.
   `.flow-crit-row{cursor:default}` +
   `.flow-crit-row>rect{fill:var(--vscode-editorHoverWidget-background,#2c2c2d);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.2}` +
-  `.flow-crit-row>text{fill:var(--vscode-foreground,#cccccc);font-size:11px}` +
+  `[data-flow-choices-toggle] .flow-crit-hit{fill:var(--vscode-button-secondaryBackground,#333);stroke:var(--vscode-descriptionForeground,#aaa);stroke-width:1}[data-flow-choices-toggle] .flow-crit-chevron{fill:var(--vscode-foreground,#fff);stroke:var(--vscode-foreground,#fff);stroke-width:1}[data-flow-choices-toggle]>text{font-size:12px;fill:var(--vscode-foreground,#ddd);font-weight:600}.flow-crit-row>text{fill:var(--vscode-foreground,#cccccc);font-size:11px}` +
   `.flow-crit-row.has-flag .flow-flag-badge{display:inline}` +
   // #187 Todo 3: the on-path RING — a hidden `<rect>` in `.flow-ring`, revealed by `.current` (main path) or
   // `.flow-leaf-yes` (a TRUE operand). Deterministic rect-stroke (NOT a CSS outline), composes with the node's own
@@ -1170,9 +1214,9 @@ export const FLOW_STYLE =
   // #173 T3: the failed-criterion overlay on an SVG <g> — the shell's global `.failed-criterion` HTML outline does not
   // paint on a <g>, so paint the rect (a dashed error-colored stroke, visually distinct from `.current`'s solid focus).
   `.flow-row.failed-criterion>rect{stroke:var(--vscode-editorError-foreground,#f14c4c);stroke-width:2.5;stroke-dasharray:4 2}` +
-  // FIX 3 (disc 160): a preemption row (a SATISFIED diverting sibling) gets the DISTINCT amber stroke, not the red.
-  `.flow-row.failed-criterion-pending>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}` +
-  `.flow-row.failed-criterion-preempt>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}` +
+  // FIX 3 (disc 160): a preemption row (a SATISFIED diverting sibling) gets a neutral dashed stroke, not the red.
+  `.flow-row.failed-criterion-pending>rect{stroke:var(--vscode-descriptionForeground,#999);stroke-width:2.5;stroke-dasharray:4 2}` +
+  `.flow-row.failed-criterion-preempt>rect{stroke:var(--vscode-descriptionForeground,#999);stroke-width:2.5;stroke-dasharray:4 2}` +
   // #156 slice 5 / #210 VERDICT PAINTING: the Medical Validation review overlay — a PERSISTENT channel that survives
   // selection (unlike failed-criterion, which clears on every reveal). It is a NON-OUTLINE FILL TINT on the rect, an
   // INDEPENDENT SVG axis from the two stroke-only channels above: `.current` and `.failed-criterion`/`-preempt` set only
@@ -1199,25 +1243,9 @@ export const FLOW_STYLE =
   `.flow-row.leaf-allpass .flow-allpass-badge{display:inline}` +
   `.flow-allpass-badge>circle{fill:var(--vscode-testing-iconPassed,#3fb950);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
   `.flow-allpass-badge>path{fill:none;stroke:#ffffff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
-  // #224 ii.3 Slice 2b / #233 Todo 2b — the model-level criterion VERDICT chip (top-right of a ROOT criterion `when` box OR
-  // a NON-ROOT `flow-crit-row`). HIDDEN; the host reveals it per-occurrence by toggling `.crit-{pass,fail,pending,stale}` on
-  // the row (no #root re-render — the allpass idiom). The `.crit-*` classes are posted ONLY to criterion rows (both kinds),
-  // so the selectors key on `.crit-*` WITHOUT a row-type prefix → one rule matches the `when` box AND the crit-row. The dot
-  // color encodes the state (the same TOK_* the case-verdict wash uses; stale = a muted grey), and exactly one glyph shows:
-  // ✓ pass / ✗ fail / – pending (undecided) / ⋯ stale (edited-since-review, never the settled judgment).
-  `.flow-crit-verdict{display:none;pointer-events:none}` +
-  `.crit-pass .flow-crit-verdict,.crit-fail .flow-crit-verdict,.crit-pending .flow-crit-verdict,.crit-stale .flow-crit-verdict{display:inline}` +
-  `.flow-crit-vdot{stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
-  `.crit-pass .flow-crit-vdot{fill:${TOK_VERDICT_PASS}}` +
-  `.crit-fail .flow-crit-vdot{fill:${TOK_VERDICT_FAIL}}` +
-  `.crit-pending .flow-crit-vdot{fill:${TOK_VERDICT_PENDING}}` +
-  `.crit-stale .flow-crit-vdot{fill:var(--vscode-descriptionForeground,#8c8c8c)}` +
-  `.flow-crit-g{display:none;fill:none;stroke:#ffffff;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}` +
-  `.flow-crit-g-stale circle{fill:#ffffff;stroke:none}` +
-  `.crit-pass .flow-crit-g-pass{display:inline}` +
-  `.crit-fail .flow-crit-g-fail{display:inline}` +
-  `.crit-pending .flow-crit-g-pending{display:inline}` +
-  `.crit-stale .flow-crit-g-stale{display:inline}` +
+  // Criterion review controls remain visible in MV, including To do and edited-since-review.
+  `.flow-crit-verdict{display:none}` +
+  `body[data-mode="medical-validation"] .flow-crit-verdict{display:inline}` +
   // #203 Todo 4b Slice A — the per-node review-flag ⚑ badge. HIDDEN; shown when the host toggles `.has-flag` on the row
   // (a flag resolve un-paints without a #root re-render, preserving the verdict/failed-criterion overlays). The `<g>` is
   // CLICKABLE (`pointer-events:auto`) and carries `data-mv-flag-badge` — the webview intercepts it BEFORE the row's
@@ -1226,14 +1254,19 @@ export const FLOW_STYLE =
   `body[data-mode="medical-validation"] .flow-flag-create{display:inline}` +
   `.flow-row.has-flag .flow-flag-badge{display:inline}` +
   `.flow-flag-badge>circle{fill:var(--vscode-descriptionForeground,#999);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
-  `.has-flag .flow-flag-badge>circle{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700))}` +
-  `.flow-flag-badge:focus-visible>circle{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5}` +
+  `.flow-flag-badge[data-flag-state=open]>circle{fill:#e6c200}` +
+  `.flow-flag-badge[data-flag-state=none]>circle{fill:var(--vscode-descriptionForeground,#999)}` +
+  `.flow-flag-badge:not(.flow-flag-create)[data-flag-state=none]>.flow-flag-control,.flow-flag-badge:not(.flow-flag-create)[data-flag-state=none]>.flow-flag-glyph{display:none}` +
+  `.flow-flag-badge[data-flag-state=resolved]>circle,.flow-flag-authoring[data-flag-state=resolved]>rect{fill:var(--vscode-testing-iconPassed,#3fb950)}` +
+  `.flow-flag-authoring[data-flag-state=none]{display:none}.flow-flag-authoring>rect{pointer-events:auto;fill:var(--vscode-descriptionForeground,#999)}.flow-flag-authoring[data-flag-state=open]>rect{fill:#e6c200}.flow-flag-authoring>text{pointer-events:none;fill:#1e1e1e;font-size:8px;font-weight:bold;text-anchor:middle}` +
+  `.flow-flag-authoring[data-flag-state=resolved]>rect{fill:var(--vscode-testing-iconPassed,#3fb950)}` +
   `.flow-flag-glyph{fill:#1e1e1e;font-size:9px;font-weight:bold;text-anchor:middle;pointer-events:none}` +
   // The start-node COUNT badge (chrome mirror). HIDDEN; shown when the host toggles `.has-startflag` on the start row +
   // sets `.flow-startflag-text`. Amber pill (open) — the host recolors the text/pill semantics via the count it posts.
   `.flow-startflag-badge{display:none;cursor:pointer;pointer-events:auto}` +
   `.flow-row.has-startflag .flow-startflag-badge{display:inline}` +
   `.flow-startflag-badge>rect{fill:var(--vscode-testing-iconQueued,var(--vscode-charts-yellow,#cca700));stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.flow-startflag-badge[data-flag-state=resolved]>rect{fill:var(--vscode-testing-iconPassed,#3fb950)}` +
   `.flow-startflag-text{fill:#1e1e1e;font-size:10px;font-weight:bold;pointer-events:none}` +
   // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
   // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
@@ -1242,14 +1275,11 @@ export const FLOW_STYLE =
   // pass node that's the focused question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
   // `-preempt`/`.diverter`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
   // so on a node that is BOTH the focused question and selected/a-criterion the focused-question marker (the primary
-  // indicator) overrides the transient selection/criterion stroke (the right tradeoff). The color is a DISTINCT accent
-  // (`--vscode-charts-orange`), NOT the blue `--vscode-focusBorder` the reveal (`.current`) uses — blue means "selected /
-  // on the path", so the focus ("the question you're on") must read differently from a path node (it is not on the path,
-  // e.g. a not-adult deny whose Q1 `when` isn't in the reveal cluster). Thicker than `.current` (2.5); `stroke-dasharray:none`.
-  `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}` +
+  // indicator) overrides the transient selection/criterion stroke. Neutral focus remains distinct from path blue.
+  `.flow-row.this-node>rect{stroke:var(--flow-focus-color,#fff);stroke-width:3;stroke-dasharray:none}` +
   // #210 (disc 239): the CRL Assist FOCUS ring — the tree node the agent has as its flag anchor. A neutral GLOW (drop-shadow),
   // NOT a coloured stroke: EVERY semantic colour in the flowchart is taken (blue=selection, orange=this-node, purple=Inferred,
-  // yellow=flags/pending, green/red=verdicts), so a bright NEUTRAL halo is the only non-colliding "the agent is focused here"
+  // yellow=active flags, green/red=verdicts), so a bright NEUTRAL halo is the only non-colliding "the agent is focused here"
   // signal. A glow is a separate visual axis — it leaves every node's border intact + coexists with the protected overlays.
   // THEME-ADAPTIVE: a WHITE halo pops on a dark canvas (default / HC-dark); on a LIGHT theme swap to a BLACK halo (VS Code
   // stamps `vscode-light` / `vscode-high-contrast-light` on the webview body) so it never disappears. Two shadows = crisp.
@@ -1264,7 +1294,7 @@ export const FLOW_STYLE =
   // are a FILL at FULL opacity (the tree wash is `.2/.16` — invisible at 9px; the key decodes HUE, deliberately not alpha);
   // inferred/ring chips are a BORDER (mirroring the tree's stroke). Muted via the LABEL `color` only (NOT parent `opacity`,
   // which would fade the chips too). `fc-lg-gap` splits the row into 3 concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path].
-  `.fc-legend{display:flex;flex-wrap:wrap;gap:8px 20px;padding:8px 0;font-size:11px;color:var(--vscode-descriptionForeground,#8c8c8c)}.fc-legend-group{display:inline-flex;gap:10px;align-items:center}.fc-legend-group b{font-weight:500;opacity:.7;margin-right:2px}` +
+  `.fc-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:780px;gap:8px 24px;padding:10px 0;font-size:11px;color:var(--vscode-foreground,#ccc)}.fc-legend-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fc-legend-group b{font-weight:600;min-width:66px;color:var(--vscode-descriptionForeground,#aaa)}.fc-sw-todo{background:var(--vscode-descriptionForeground,#999)}.fc-sw-focus{background:var(--flow-focus-color,#fff)}.fc-sw-flag-open{background:#e6c200}` +
   `.fc-legend .fc-lg{display:inline-flex;align-items:center}` +
   `.fc-legend .fc-lg-gap{margin-left:8px}` +
   `.fc-legend .fc-sw{display:inline-block;width:9px;height:9px;margin-right:3px;border-radius:2px;box-sizing:border-box}` +
@@ -1273,6 +1303,7 @@ export const FLOW_STYLE =
   `.fc-legend .fc-sw-pending{background:${TOK_VERDICT_PENDING}}` +
   `.fc-legend .fc-sw-inferred{border:1.5px solid ${TOK_INFERRED}}` +
   `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING}}` +
+  `body{--flow-focus-color:#fff}body.vscode-light,body.vscode-high-contrast-light{--flow-focus-color:#000}.flow-svg g:focus{outline:none}.flow-svg g:focus-visible{outline:1px solid var(--flow-focus-color);outline-offset:2px}.flow-pointer-interaction .flow-svg g:focus{outline:none}.flow-svg [data-flow-key]:focus{outline:none}.flow-svg [data-flow-key]:focus>rect{filter:drop-shadow(0 0 4px var(--flow-focus-color))}body.mv-pointer-interaction :is(button,[role=button],summary):focus{outline:none}` +
   // tree zoom control — a floating control fixed to the pane corner. Co-located HERE with the control's MARKUP (renderFlowPane's
   // `${zoom}`) so the ONE flow-pane stylesheet owns it: the cockpit shell (which includes FLOW_STYLE) AND the standalone
   // snapshot export both get it, and they can't drift. ⚠ the background fallback ends in a HEX (not a nested var) so it renders

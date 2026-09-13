@@ -28,12 +28,11 @@ const COLS: { state: "unreviewed" | "pending" | "pass" | "fail"; label: string }
   { state: "fail", label: "Fail" },
 ];
 
-/** The criterion verdict vocabulary differs from the case one (disc 346): a criterion "Pass"/"Fail" attests
- *  "Correctly encoded"/"Encoding wrong". We keep the neutral segment labels but disambiguate per option via aria/title. */
+/** Case and criterion selectors share verdict labels; their stored review scopes remain separate. */
 // unreviewed reads "Todo" (matching the visible segment) so the accessible name CONTAINS the visible label — WCAG 2.5.3
 // Label-in-Name, so voice-control "click Todo" matches (the "To do" chip/GRID_STATE_LABEL keeps the spaced prose form).
 const CELL_ARIA: Record<string, Record<string, string>> = {
-  criterion: { unreviewed: "Todo", pending: "Undecided", pass: "Correctly encoded", fail: "Encoding wrong" },
+  criterion: { unreviewed: "Todo", pending: "Pending", pass: "Pass", fail: "Fail" },
   case: { unreviewed: "Todo", pending: "Pending", pass: "Pass", fail: "Fail" },
 };
 

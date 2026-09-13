@@ -44,7 +44,7 @@ export interface CriterionToggleHit {
 /** #233 Todo 2b: a NON-ROOT criterion box's BODY (right-click → the model-level criterion-encoding verdict menu). Carries
  *  the criterion IDENTITY (`{lib,name}`, library-local), its CANONICAL `bodyHash` (the render-independent fingerprint the
  *  reviewer is judging — the staleness key), and this occurrence's IN-SITU `elided` — true when THIS box's rendered body was
- *  truncated to a `…` (e.g. inside a breaching guard, where the canonical body may still be fine). A "Correctly encoded" pass
+ *  truncated to a `…` (e.g. inside a breaching guard, where the canonical body may still be fine). A "Pass" verdict
  *  is REFUSED when the seen body was elided (can't attest a body you didn't see — disc 330 [critical]). A ROOT criterion
  *  `when` instead resolves its identity from its `{nodeKey}` guard outline (`topCriterion`, whose `elided` == canonical at the
  *  root). Kept OUT of `RevealHit` — LEFT-click is inert (v1), only RIGHT-click (verdict) + the encoding menu resolve it. */

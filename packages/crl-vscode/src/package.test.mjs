@@ -181,6 +181,7 @@ check("the package default and the MV spec's fallback are the SAME list", () => 
   // value when the setting is unset, spec.canonical when it is set to a non-array.
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
   assert.deepEqual([...MEDICAL_VALIDATION_PANE_SPEC.canonical], prop.default);
+  assert.deepEqual([...MEDICAL_VALIDATION_PANE_SPEC.valid], prop.items.enum);
 });
 
 check("every default pane is a valid pane", () => {
@@ -323,4 +324,3 @@ check("the CRL Assist reopener keybinding is contributed (Ctrl+Alt+A → crl.age
   const kb = (c.keybindings ?? []).find((x) => x.command === "crl.agent.chat");
   assert.ok(kb && /ctrl\+alt\+a/i.test(kb.key), "expected a Ctrl+Alt+A keybinding for crl.agent.chat");
 });
-

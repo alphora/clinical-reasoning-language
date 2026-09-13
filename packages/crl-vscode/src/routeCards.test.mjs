@@ -2,14 +2,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { buildCRL, buildExecutionModel, resolveCelImports, nodeKey, conceptDeclRef } from '@smile-digital-health/crl';
 import { buildRouteCards, definitionValueInputs, formatAnswer } from './routeCards.ts';
-import { createPresentationProposal, resolveWordingTarget, savePresentationProposal, graphWordingSources, pendingPresentationProposals } from './presentationProposal.ts';
+import { createPresentationProposal, resolveWordingTarget, resolveSourceWordingTarget, savePresentationProposal, graphWordingSources, pendingPresentationProposals } from './presentationProposal.ts';
 import { executionRoutes, buildRouteQuestionnaire } from './executionRoutes.ts';
 
 const base = `library "L".\nconcept "Complaint":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is \`complaint\`.\n- shape reduction is most recent.\n`;
 const presentation = `\npresentation for "Complaint":\n- question text is "Which complaint?".\n- question description is "Select one.".\n`;
+// @kit mv-wording-patches:scope
 test('wording proposal preserves baseline, validates new CRL, and writes only into MV', () => {
   const root = mkdtempSync(join(tmpdir(),'mv-cards-')), src=join(root,'src'), file=join(src,'crl','policy.crl');
   mkdirSync(join(src,'crl'),{recursive:true}); writeFileSync(file,base+presentation);
@@ -47,6 +49,7 @@ test('cards show a coded selected answer rather than qualification Boolean, with
   assert.equal(reference.choicesFrom,'Complaint choices');assert.deepEqual(reference.answerChoices,[]);
   assert.equal(formatAnswer({type:'Quantity',value:{value:25,unit:'kg/m2'}}),'25 kg/m2');
 });
+// @kit mv-wording-patches:field-owners
 test('scoped text and inherited description retain different owners in the patch',()=>{
   const src=resolve('test-policy/src');
   const source=base+presentation+`\nactivity "Met":\n- request CPGCommunicationRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n`;
@@ -56,8 +59,9 @@ test('scoped text and inherited description retain different owners in the patch
   const p=createPresentationProposal(target,'New scoped question','New shared description',src,{caseId:'c',routeId:'r',unsavedBaseline:false});
   assert.equal(p.fields[0].declaration.contexts[0].kind,'decision'); assert.equal(p.fields[1].declaration.contexts.length,0);
 });
+// @kit mv-case-authoring:selected-values
 test('real Bleph execution exposes selected coded publication values',()=>{
-  const cm=buildExecutionModel(resolveCelImports(resolve('packages/crl/test/acceptance/bleph/src/cel/completed.cel')));
+  const cm=buildExecutionModel(resolveCelImports(fileURLToPath(new URL('../../crl/test/acceptance/bleph/src/cel/completed.cel',import.meta.url))));
   assert.ok(cm.scenarios.scenarios.length,JSON.stringify(cm.scenarios.errors));
   const values=cm.scenarios.scenarios.flatMap(s=>s.conceptValues??[]).filter(v=>v.answerValue?.type==='CodeableConcept');
   assert.ok(values.length,'Bleph coded answers must be carried from actual CRE publication selection');
@@ -72,12 +76,31 @@ test('imported presentation wording comes from the graph even when the owner is 
     const entry={filePath:file,ast:buildCRL(base+presentation).result};
     const sources=graphWordingSources({crlRegistry:{byNameLocal:new Map(),byNamePackage:new Map([['L',entry]])},resolvedLibraryPaths:new Set([file])});
     const source=sources.get('L'); assert.ok(source);
-    const target={...resolveWordingTarget(source.filePath,source.source,'Complaint'),editable:false};
+    assert.equal(source.packaged,true);
+    const target=resolveSourceWordingTarget(source,'Complaint');
     const q={questions:[{nodeId:'w',conceptName:'Complaint',libraryName:'L',answer:'yes',isInferred:false}]};
     const built=buildRouteCards(q,{decision:{libraryName:'L'}},()=> 'node',()=>target);
     assert.equal(built.cards[0].text,'Which complaint?'); assert.equal(built.cards[0].description,'Select one.');
     assert.equal(built.cards[0].editable,false); assert.equal(built.targets.size,0);
   } finally {rmSync(root,{recursive:true,force:true});}
+});
+
+// @kit mv-wording-patches:invalid-presentation
+test('invalid and missing question wording are explicit; invalid wording cannot create a patch',()=>{
+  const file=resolve('test-policy/src/crl/policy.crl'),source=base+presentation+presentation;
+  const invalid=resolveWordingTarget(file,source,'Complaint'); assert.equal(invalid.editable,false);assert.match(invalid.readOnlyReason,/presentation-overlap/);
+  assert.throws(()=>createPresentationProposal(invalid,'Changed','',resolve('test-policy/src'),{caseId:'c',routeId:'r',unsavedBaseline:false}),/wording needs correction/);
+  const missing=resolveWordingTarget(file,base,'Complaint');assert.equal(missing.editable,true);assert.match(missing.readOnlyReason,/No question wording authored/);
+  const q={questions:[{nodeId:'w',conceptName:'Complaint',libraryName:'L',answer:'yes',isInferred:false}]};
+  const built=buildRouteCards(q,{decision:{libraryName:'L'}},()=> 'node',()=>invalid);
+  assert.match(built.cards[0].readOnlyReason,/presentation-overlap/);assert.equal(built.targets.size,0);
+});
+
+// @kit mv-wording-patches:package-owner
+test('a package owner beneath the policy root remains read-only and cannot produce a patch',()=>{
+  const target=resolveSourceWordingTarget({filePath:resolve('test-policy/node_modules/library/policy.crl'),source:base+presentation,packaged:true},'Complaint');
+  assert.equal(target.editable,false);assert.equal(target.questionText,'Which complaint?');
+  assert.throws(()=>createPresentationProposal(target,'Changed','',resolve('test-policy/src'),{caseId:'c',routeId:'r',unsavedBaseline:false}),/imported library/);
 });
 test('an available value cannot disguise an invalidated unknown determination',()=>{
   const sv={status:'pass',decision:{libraryName:'L',name:'D'},conceptTruth:[],conceptValues:[{libraryName:'L',name:'Complaint',answerValue:{type:'boolean',value:true}}],
@@ -87,6 +110,7 @@ test('an available value cannot disguise an invalidated unknown determination',(
   const card=buildRouteCards(q,sv,()=> 'node',()=>({questionText:'Complaint?',questionDescription:'',editable:false})).cards[0];
   assert.equal(card.determination,'Unknown'); assert.match(card.value,/Determination: Unknown/); assert.match(card.value,/Available value: Yes/);
 });
+// @kit mv-wording-patches:completion
 test('pending and malformed MV patches prevent completion, explicit dispositions clear the gate',()=>{
   const root=mkdtempSync(join(tmpdir(),'mv-pending-')), dir=join(root,'medical-validation','crl-patches'); mkdirSync(dir,{recursive:true});
   try {
@@ -108,7 +132,7 @@ test('adding a missing description stays in the existing scoped presentation',()
 });
 
 test('Bleph route includes coded supporting answers behind qualification helpers',()=>{
-  const graph=resolveCelImports(resolve('packages/crl/test/acceptance/bleph/src/cel/completed.cel')), cm=buildExecutionModel(graph), sv=cm.scenarios.scenarios[0];
+  const graph=resolveCelImports(fileURLToPath(new URL('../../crl/test/acceptance/bleph/src/cel/completed.cel',import.meta.url))), cm=buildExecutionModel(graph), sv=cm.scenarios.scenarios[0];
   const route=executionRoutes(sv,cm.crlStructure)[0];
   const key=(lib,name)=>nodeKey(conceptDeclRef(lib,name)), concepts=new Map(cm.conceptLayer.map(c=>[c.nodeKey,c]));
   const q=buildRouteQuestionnaire(sv,route,(lib,name)=>concepts.get(key(lib,name))?.valueTypes??[],sv.decision.libraryName,{conceptShape:(lib,name)=>cm.conceptShape.get(key(lib,name)),defExpr:(lib,name)=>cm.defExpr.get(key(lib,name))});
@@ -161,4 +185,14 @@ test('distinct criterion presentations remain separate even for the same input q
  const built=buildRouteCards(q,{},()=> 'when-key',(lib,name,id,criteria)=>name==='Q'?{questionText:criteria[0]+' question?',questionDescription:'',context:{decision:'D',criteria}}:undefined,()=>[],()=>[],(lib,name)=>name==='Q');
  assert.equal(built.cards.length,2);assert.deepEqual(built.cards.map(c=>c.text),['C1 question?','C2 question?']);
  assert.equal(built.targets.size,2);
+});
+
+test('answer wording and selected choices share unambiguous coding identity',()=>{
+ const val=(coding)=>({type:'CodeableConcept',value:{coding:[coding]}});
+ const choices=[{system:'urn:a',code:'x',display:'A'},{system:'urn:b',code:'x',display:'B'}];
+ assert.equal(formatAnswer(val({system:'urn:b',code:'x'}),choices),'B');
+ assert.equal(formatAnswer(val({system:'urn:c',code:'x'}),choices),'x');
+ assert.equal(formatAnswer(val({code:'x'}),choices),'x');
+ assert.equal(formatAnswer(val({code:'x'}),choices.slice(0,1)),'A');
+ assert.equal(formatAnswer(val({system:'urn:b',code:'x'}),[{code:'x',display:'Unique'}]),'Unique');
 });

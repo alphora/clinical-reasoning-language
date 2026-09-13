@@ -39,33 +39,42 @@ export function resolveWordingTarget(filePath: string, source: string, concept: 
   const ast = parsed.result;
   if (!ast.statements.some(s => s.type === "Concept" && s.name === concept && s.code)) return undefined;
   const catalog = createPresentationCatalog(ast, filePath), resolved = catalog.resolveOccurrence(concept, context);
-  if ([...catalog.diagnostics, ...resolved.diagnostics].some(d => d.severity === "error")) return undefined;
+  const errors = [...catalog.diagnostics, ...resolved.diagnostics].filter(d => d.severity === "error");
   const scopes = [resolved.fieldOwners.questionText, resolved.fieldOwners.questionDescription].filter((p): p is Declaration => !!p);
   const scopeLabel = [...new Set(scopes.map(p => p.contexts.length ? p.contexts.map(c => `${c.kind} ${JSON.stringify(c.ref)}`).join(", ") : "all uses in this library"))].join("; ") || "new default for all uses in this library";
   return { filePath, library: ast.library.name, concept, baseline: source,
-    questionText: resolved.wording.questionText ?? concept, questionDescription: resolved.wording.questionDescription ?? "",
+    editable: errors.length === 0,
+    readOnlyReason: errors.length ? `Question wording needs correction (${[...new Set(errors.map(d=>d.kind))].join(', ')}). Ask the CRL owner to validate it.` : !resolved.wording.questionText ? "No question wording authored." : undefined,
+    questionText: errors.length ? concept : resolved.wording.questionText ?? concept, questionDescription: errors.length ? "" : resolved.wording.questionDescription ?? "",
     scopeLabel, owners: { ...resolved.fieldOwners, questionDescription: resolved.fieldOwners.questionDescription?.questionDescription !== undefined ? resolved.fieldOwners.questionDescription : resolved.declaration },
     ...(context ? { context: { decision: context.decision, criteria: [...context.criteria] } } : {}) };
 }
 
 /** Resolve display owners from the same include closure used for evaluation, including packages. */
 export function graphWordingSources(graph: ReturnType<typeof resolveCelImports>) {
-  const sources = new Map<string, { filePath: string; source: string }>();
+  const sources = new Map<string, { filePath: string; source: string; packaged: boolean }>();
   const ambiguous = new Set<string>();
-  const entries = [...(graph.crlRegistry?.byNameLocal.values() ?? []), ...(graph.crlRegistry?.byNamePackage.values() ?? [])];
-  for (const entry of entries) {
+  const entries = [...[...(graph.crlRegistry?.byNameLocal.values() ?? [])].map(entry=>({entry,packaged:false})), ...[...(graph.crlRegistry?.byNamePackage.values() ?? [])].map(entry=>({entry,packaged:true}))];
+  for (const {entry,packaged} of entries) {
     if (!graph.resolvedLibraryPaths?.has(entry.filePath)) continue;
     const name = entry.ast.library.name;
     if (sources.has(name) && sources.get(name)!.filePath !== entry.filePath) { ambiguous.add(name); continue; }
-    sources.set(name, { filePath: entry.filePath, source: readFileSync(entry.filePath, "utf8") });
+    sources.set(name, { filePath: entry.filePath, source: readFileSync(entry.filePath, "utf8"), packaged });
   }
   for (const name of ambiguous) sources.delete(name);
   return sources;
 }
 
+/** Package provenance governs editing even when node_modules is inside the policy directory. */
+export function resolveSourceWordingTarget(source: {filePath:string; source:string; packaged:boolean}, concept: string, context?: PresentationContext): WordingTarget | undefined {
+  const target=resolveWordingTarget(source.filePath, source.source, concept, context);
+  return target && source.packaged ? {...target, editable:false, readOnlyReason: target.readOnlyReason ?? "Wording belongs to an imported library. Its CRL owner must propose the change."} : target;
+}
+
 /** Immutable proposal, with field-level ownership and exact baseline for the owning KE. */
 export function createPresentationProposal(target: WordingTarget, questionText: string, questionDescription: string, policySrc: string,
   evidence: { caseId: string; routeId: string; unsavedBaseline: boolean }) {
+  if (target.editable === false) throw new Error(target.readOnlyReason ?? "This question is read-only in this workspace.");
   if (!questionText.trim()) throw new Error("Question text is required.");
   if (questionText.length > 8000 || questionDescription.length > 16000) throw new Error("Presentation wording exceeds the editing limit.");
   const sourcePath = relative(dirname(policySrc), target.filePath).replace(/\\/g, "/");

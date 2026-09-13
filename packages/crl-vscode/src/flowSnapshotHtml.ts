@@ -74,7 +74,7 @@ export function renderFlowSnapshotDocument(opts: FlowSnapshotOptions): string {
     `html,body{margin:0;padding:0}` +
     `body{background:var(--vscode-editor-background,#1e1e1e);color:var(--vscode-foreground,#cccccc);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}` +
     `.snap-caption{position:sticky;top:0;z-index:8;padding:6px 14px;font-size:12px;background:var(--vscode-editorWidget-background,#252526);border-bottom:1px solid var(--vscode-panel-border,#454545)}` +
-    `#flowroot .flow-row,#flowroot .flow-guard-tab,#flowroot .flow-crit-toggle{cursor:grab}` +
+    `#flowroot .flow-row,#flowroot .flow-guard-tab,#flowroot .flow-crit-toggle,#flowroot .flow-logic-label{cursor:grab}` +
     opts.styleCss +
     `</style>` +
     `</head><body>` +

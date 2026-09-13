@@ -67,13 +67,13 @@ check("reviewGridHtml: an orphan case → only 'To do' enabled (Pending/Pass/Fai
   assert.match(html, /orphaned/);
 });
 
-check("reviewGridHtml: criterion Pass/Fail options read 'Correctly encoded'/'Encoding wrong' via aria (per-kind vocabulary)", () => {
+check("reviewGridHtml: criterion Pass/Fail options read 'Pass'/'Fail' via aria (shared vocabulary)", () => {
   const html = reviewGridHtml([row()]);
-  assert.match(html, /aria-label="A: Correctly encoded"/);
-  assert.match(html, /aria-label="A: Encoding wrong"/);
+  assert.match(html, /aria-label="A: Pass"/);
+  assert.match(html, /aria-label="A: Fail"/);
 });
 
-check("reviewGridHtml: a case Pass option reads 'Pass' via aria (NOT the criterion vocabulary)", () => {
+check("reviewGridHtml: a case Pass option reads 'Pass' via aria (same as the criterion vocabulary)", () => {
   const html = reviewGridHtml([{ kind: "case", id: "c1", label: "Case 1", currentLabel: "To do", enabled: { unreviewed: true, pending: true, pass: true, fail: true } }]);
   assert.match(html, /aria-label="Case 1: Pass"/);
 });

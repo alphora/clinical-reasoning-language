@@ -21,8 +21,8 @@ import { findPolicySrc } from "./provenanceFindings";
  * From a `.cel` path, resolve the ONE policy-scoped Medical Validation sidecar:
  * `<policySrc>/medical-validation/<policyName>.json`.
  *
- * - `<policySrc>` is reused from `findPolicySrc` (provenanceFindings.ts:46): the first ancestor named `src` that has a
- *   `provenance/` child (that one child is the actual predicate) — i.e. the policy `src/` that, by the crl-content
+ * - `<policySrc>` is reused from `findPolicySrc`: the first ancestor named `src` with `provenance/` or both
+ *   `crl/` and `cel/` children — i.e. the policy `src/` that, by the crl-content
  *   convention, also holds `cel/` and `anchor-source/`. The new `medical-validation/` dir is a sibling of those (disc 161 §2).
  * - `<policyName>` is the basename of the POLICY DIR — the parent of `src/` (in the crl-content layout
  *   `artifacts/<policy>/src/...`, so `<policyName> === <policy>`). This is the per-policy naming the provenance machinery

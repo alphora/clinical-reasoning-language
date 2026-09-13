@@ -22,7 +22,7 @@ function setup() {
 }
 test('grey flag retains concept versus occurrence choice; yellow opens without creating', async () => {
   const s = setup(); await s.run('r','g',3); expect(s.created[0].target).toBe(s.choices[1]);
-  s.state.flagsByGid.set('g', [{}]); await s.run('r','g',3); expect(s.opened).toEqual(['g']); expect(s.created).toHaveLength(1);
+  s.state.flagsByGid.set('g', [{category:'validation'}]); await s.run('r','g',3); expect(s.opened).toEqual(['g']); expect(s.created).toHaveLength(1);
 });
 test('stale generation and unknown targets cannot create flags', async () => {
   const s = setup(); await s.run('r','g',2); await s.run('missing','g',3); await s.run('r','missing',3);
@@ -37,7 +37,7 @@ test('retarget while confirming draft discard does not create a stale draft', as
   await s.run('r','g',3); expect(s.created).toEqual([]);
 });
 test('flag appearing during chooser opens the existing flag instead of creating another', async () => {
-  const s = setup(); s.state.vscode.window.showQuickPick = async items => { s.state.flagsByGid.set('g',[{}]); return items[0]; };
+  const s = setup(); s.state.vscode.window.showQuickPick = async items => { s.state.flagsByGid.set('g',[{category:'validation'}]); return items[0]; };
   await s.run('r','g',3); expect(s.created).toEqual([]); expect(s.opened).toEqual(['g']);
 });
 test('single target skips scope picker and discard cancellation preserves the draft', async () => {

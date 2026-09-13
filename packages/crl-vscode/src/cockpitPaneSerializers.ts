@@ -25,6 +25,7 @@
 import * as vscode from "vscode";
 
 import { ALL_PANES, cockpitViewType } from "./paneOrder";
+import { BRANCH_QUESTIONNAIRE_VIEW_TYPE } from "./branchQuestionnairePanel";
 
 /**
  * Register a disposing serializer for every cockpit pane view type. Returns nothing; the registrations are
@@ -49,4 +50,11 @@ export function registerCockpitPaneSerializers(
       }),
     );
   }
+  // A pin is session-local; its optional Branch Questionnaire cannot survive a window reload.
+  context.subscriptions.push(vscode.window.registerWebviewPanelSerializer(BRANCH_QUESTIONNAIRE_VIEW_TYPE, {
+    async deserializeWebviewPanel(panel: vscode.WebviewPanel): Promise<void> {
+      onRestored?.("branchQuestionnaire");
+      panel.dispose();
+    },
+  }));
 }

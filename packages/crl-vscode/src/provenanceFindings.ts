@@ -105,7 +105,7 @@ function resolveAnchor(anchorDir: string, artifact: ArtifactLite): { anchorPath?
 export function discoverProvenance(celPath: string): ProvenanceDiscovery {
   try {
     const src = findPolicySrc(celPath);
-    if (!src) return { found: false, status: "none", reason: "not inside a policy src/ dir with a provenance/ folder", candidates: [], warnings: [] };
+    if (!src) return { found: false, status: "none", reason: "not inside a discoverable policy src/ directory", candidates: [], warnings: [] };
     const candidates = listFiles(join(src, "provenance"), ".provenance.json");
     if (candidates.length === 0)
       return { found: false, status: "none", reason: "no provenance artifact for this policy", candidates: [], warnings: [] };

@@ -168,4 +168,14 @@ test("description row: ALWAYS shown (operator — human-editable on AI flags), e
   assert.ok(!/>Ref</.test(noRef), "no Ref row when ref absent");
 });
 
+test('Authoring-step flags allow status changes but not content edits or deletion',()=>{
+ for(const status of ['open','resolved']){
+  const html=renderFlagActionDrawer({...OPEN_VIEW,status,readOnly:true,issueNo:42});
+  assert.match(html,/Authoring flag · Content read only/);
+  assert.doesNotMatch(html,/data-flag-action-(edit|delete)/);
+  assert.match(html,/data-flag-action-toggle/);
+  assert.match(html,/data-flag-action-issue/);assert.match(html,/data-flag-action-close/);
+ }
+});
+
 console.log("flagActionDrawerHtml.test: ok");

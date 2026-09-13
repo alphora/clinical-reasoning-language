@@ -12,6 +12,15 @@ export interface RouteCard {
   answerChoices: { system?: string; code: string; display: string; selected: boolean }[];
   choicesFrom?: string;
 }
+// One identity rule for answer text and choice selection; never borrow a known different system.
+export function resolveAnswerChoice(coding: {system?: string; code?: string}, options: {system?: string; code: string; display: string}[]) {
+  const sameCode = options.filter(o => o.code === coding.code);
+  const exact = coding.system ? sameCode.filter(o => o.system === coding.system) : [];
+  if (exact.length) return exact.length === 1 ? exact[0] : undefined;
+  if (sameCode.length !== 1) return undefined;
+  const only = sameCode[0];
+  return coding.system && only.system && coding.system !== only.system ? undefined : only;
+}
 export function formatAnswer(value: { type: string; value: unknown } | undefined, options: { system?: string; code: string; display: string }[] = []): string | undefined {
   if (!value) return undefined;
   const v = value.value;
@@ -21,7 +30,7 @@ export function formatAnswer(value: { type: string; value: unknown } | undefined
   const r = v as Record<string, unknown>;
   if (value.type === "Quantity") return [r.value, r.unit ?? r.code].filter(x => x !== undefined).join(" ");
   if (value.type === "CodeableConcept") return typeof r.text === "string" ? r.text : Array.isArray(r.coding)
-    ? r.coding.map(c => { const matches = options.filter(o => o.code === c.code); return c.display ?? (matches.length === 1 ? matches[0].display : c.code) ?? ""; }).filter(Boolean).join(", ") : undefined;
+    ? r.coding.map(c => { const match = resolveAnswerChoice(c, options); return c.display ?? match?.display ?? c.code ?? ""; }).filter(Boolean).join(", ") : undefined;
   return JSON.stringify(v);
 }
 
@@ -55,7 +64,7 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     const options = optionsFor(lib, name);
     const raw = formatAnswer(evidence?.answerValue, options);
     const coded = evidence?.answerValue?.type === "CodeableConcept" ? evidence.answerValue.value as {coding?: {system?: string; code?: string}[]} : undefined;
-    const selectedCodes = new Set(Array.isArray(coded?.coding) ? coded.coding.filter(c=>c.system).map(c=>JSON.stringify([c.system,c.code])) : []);
+    const selectedChoices = new Set(Array.isArray(coded?.coding) ? coded.coding.map(c=>resolveAnswerChoice(c, options)).filter(Boolean) : []);
     const determination = valueOnly ? "" : answer === "yes" ? "True" : answer === "no" ? "False" : "Unknown";
     let value: string;
     if (valueOnly) value = raw ?? "Not answered";
@@ -69,9 +78,9 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     const id = `card-${cards.length}`;
     cards.push({ id, ownerKey, concept: name, library: lib, text: target?.questionText ?? name,
       description: target?.questionDescription ?? "", value,
-      answerChoices: options.map(o=>({...o, selected: !!o.system && selectedCodes.has(JSON.stringify([o.system,o.code]))})),
+      answerChoices: options.map(o=>({...o, selected: selectedChoices.has(o)})),
       choicesFrom: choicesFromFor(lib,name),
-      determination, explanation, criteria, criterionPaths: [criteria], editable: !!target && target.editable !== false, ...(target ? { scopeLabel: target.scopeLabel, readOnlyReason: target.readOnlyReason } : {}) });
+      determination, explanation, criteria, criterionPaths: [criteria], editable: !!target && target.editable !== false, ...(target ? { scopeLabel: target.scopeLabel, readOnlyReason: target.readOnlyReason } : {readOnlyReason:"Question wording is unavailable. Ask the CRL owner to validate its presentation."}) });
     emitted.set(occurrence,cards[cards.length-1]);
     if (target && target.editable !== false) targets.set(id, target);
     } else if (answerable) {

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-import { renderFlowPane, FLOW_STYLE, flowLegendChrome, wrapLabel, collectDispositionLeafKeys } from "./flowPaneHtml.ts";
+import { renderFlowPane, FLOW_STYLE, flowLegendChrome, wrapLabel, collectDispositionLeafKeys, toggleCriterionExpansion } from "./flowPaneHtml.ts";
 
 const check = test;
 
@@ -162,7 +162,7 @@ check("#210 verdict painting: .review-pass/-fail/-pending + .error-node overlay 
   // iconPassed, fail→testing-iconFailed, pending→charts-yellow. Lock the tokens so the two can't drift.
   assert.match(fillOf(rules.pass), /testing-iconPassed/, "pass fill = the dropdown's pass token (testing-iconPassed)");
   assert.match(fillOf(rules.fail), /testing-iconFailed/, "fail fill = the dropdown's fail token (testing-iconFailed)");
-  assert.match(fillOf(rules.pending), /charts-yellow/, "pending fill = the dropdown's pending token (charts-yellow)");
+  assert.match(fillOf(rules.pending), /charts-orange/, "pending review uses orange, reserving yellow for flags");
 });
 
 check("#210: verdict overlay COEXISTS — .failed-criterion/-preempt rules are ALL stroke-only (no fill)", () => {
@@ -464,14 +464,14 @@ check("Option-C: the SAME concept at two positions gets DISTINCT path-keyed anch
   assert.equal(Object.entries(rr.leafConcepts).filter(([, v]) => v.name === "A").length, 2, "A gets TWO leafConcepts entries (the Todo-5 verdict join is not corrupted)");
 });
 
-check("Option-C: an INFERRED single-operand body (bare-ref alias) is wrapped in ANY OF (parity with the questionnaire's renderInferredWhen)", () => {
+check("Option-C: an inferred alias does not invent an ANY OF operator", () => {
   const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];
   const struct2 = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const map = { C: dentry("c:C", "C", dref("L", "c:L")) }; // C `defined as` L — a single bare ref
   const rr = renderFlowPane(struct2, { concepts: cs, defExpr: defExprOf(map) });
-  assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ANY OF</.test(rr.html), "a single-operand inferred body gets a synthetic ANY OF wrapper");
+  assert.ok(!rr.html.includes("flow-logic-label"), "a bare alias has no authored ANY OF");
   assert.ok(leafRowsOf(rr.html).some((l) => l.label === "L"), "the wrapped leaf L renders under it");
   assert.ok(!/flow-topor/.test(rr.html), "still no top-OR (it's inferred)");
 });
@@ -683,22 +683,22 @@ check("#208 render: a long label emits two <tspan>s in a NODE_H=44 box; a short 
   const rr = renderFlowPane(st, { concepts: cs });
   // the long when concept (INTERIOR) wraps → two tspans, LEFT-anchored (no text-anchor). The short "Unmet" is a disposition
   // LEAF → one <text>, CENTERED (text-anchor="middle") per #210.
-  assert.match(rr.html, /<text x="\d+"><tspan x="\d+" y="\d+">[^<]+<\/tspan><tspan x="\d+" y="\d+">[^<]+<\/tspan><\/text>/, "a wrapped INTERIOR label renders two left-anchored tspans");
-  assert.match(rr.html, /<text x="\d+" y="\d+" text-anchor="middle">Unmet<\/text>/, "a disposition LEAF label is CENTERED (text-anchor=middle)");
+  assert.match(rr.html, /<text x="\d+" data-flow-label="[^"]*"><tspan x="\d+" y="\d+">[^<]+<\/tspan><tspan x="\d+" y="\d+">[^<]+<\/tspan><\/text>/, "a wrapped INTERIOR label renders two left-anchored tspans");
+  assert.match(rr.html, /<text x="\d+" y="\d+" data-flow-label="Unmet" text-anchor="middle">Unmet<\/text>/, "a disposition LEAF label is CENTERED (text-anchor=middle)");
   // every structure box is NODE_H=44 and its on-path ring rect is 44+2*2.5=49 tall (box height + 2*off).
   assert.ok(rr.html.includes('height="44"'), "structure boxes are NODE_H=44");
   assert.ok(rr.html.includes('height="49"'), "the on-path ring rect = box height + 2*off (44 + 5)");
 });
 
 // ── #218 the MV flow-pane color KEY (flowLegendChrome + shared-const drift-proofing) ──
-check("#218 legend: MV mode renders exactly the operator's 3 concepts (verdict Pass/Fail/Pending, Inferred, Selected path); cockpit → empty", () => {
+check("MV legend groups review, conditions, navigation, logic and flags; cockpit stays empty", () => {
   const mv = flowLegendChrome("medical-validation");
   assert.equal(flowLegendChrome("cockpit"), "", "cockpit mode → no legend (MV-only, mirrors progress/diverterToggle gating)");
   for (const [cls, label] of [["fc-sw-pass", "Pass"], ["fc-sw-fail", "Fail"], ["fc-sw-pending", "Pending"], ["fc-sw-inferred", "Inferred"], ["fc-sw-ring", "Selected path"]])
     assert.ok(mv.includes(`class="fc-sw ${cls}" aria-hidden="true"></i>${label}`), `${label} chip present + swatch aria-hidden`);
   assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
   // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
-  assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 3, "review, selection and condition outcomes have distinct legend groups");
+  assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 5, "review, conditions, navigation, groups and flags each have a labeled section");
   assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
 });
 check("#218 legend: swatch tokens are the SAME shared consts as the paint — key can't drift from the tree (extracted-equality)", () => {
@@ -730,7 +730,7 @@ check("#203 Slice A + GAP 3: flaggableGids = decision root + resolved `when`s + 
   for (const k of ["a:D2", "o", "w:Z"]) assert.ok(!flaggable.has(gidOf(k)), `${k} should NOT be flaggable (use-decision / otherwise / unresolved)`);
   assert.equal(r.flaggableGids.length, 6);
 });
-check("#203 Slice A + GAP 3: renders a grey creation flag on flaggable nodes; existing flags turn yellow", () => {
+check("#203 Slice A + GAP 3: renders a grey creation flag on flaggable nodes; open flags turn yellow", () => {
   assert.equal((r.html.match(/class="flow-flag-badge flow-flag-create"/g) || []).length, 6); // d:D, w:A, w:B, a:X, a:Y, a:Q
   assert.match(r.html, /data-mv-flag-badge="1"/);
   assert.match(r.html, /class="flow-flag-glyph"[^>]*>⚑</);
@@ -739,7 +739,7 @@ check("#203 Slice A + GAP 3: renders a grey creation flag on flaggable nodes; ex
 });
 check("Todo 2 (disc 356): each per-node ⚑ carries data-node-flag-gid == its enclosing row id (the node-filter token); the START pill has none", () => {
   // every per-node badge's gid is a REAL row id (so the host's flagsByGid lookup can resolve it)
-  const badges = [...r.html.matchAll(/<g class="flow-flag-badge flow-flag-create" data-mv-flag-badge="1" data-node-flag-gid="([^"]+)"[^>]*>/g)].map((m) => m[1]);
+  const badges = [...r.html.matchAll(/<circle class="flow-flag-control" data-mv-flag-badge="1" data-flag-category="validation" data-node-flag-gid="([^"]+)"[^>]*>/g)].map((m) => m[1]);
   assert.equal(badges.length, 6, "all six per-node badges carry a node-flag gid");
   for (const gid of badges) assert.ok(r.html.includes(`<g id="${gid}"`), `badge gid ${gid} matches a rendered row id`);
   // the per-node gids ARE the flaggable row gids
@@ -801,10 +801,10 @@ check("Todo 3: an EXPANDED single-criterion when hangs its body outline; the com
   // Expanded → the body is visible: an ALL OF row over two leaf rows.
   assert.ok(/class="flow-outline flow-op flow-logic-label"><text[^>]*>ALL OF</.test(rr.html), "an ALL OF operator row for the `and` guard body");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the two criterion-body leaves render when expanded");
-  // Component tab hides the name; its technical title and collapse control remain.
+  // Criterion tab hides the name; its technical title and collapse control remain.
   assert.match(rr.html, /<g id="[^"]*"[^>]* class="flow-row flow-when flow-greyborder"[^>]*><title>Elig[^<]*<\/title>/, "neutral grey when box, titled with the criterion name");
-  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "visible tab says Component");
-  assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>collapse criterion body</.test(rr.html), "an expanded criterion carries a ▾ collapse chevron");
+  assert.ok(/<text[^>]*>Criterion<\/text>/.test(rr.html), "visible tab says Criterion");
+  assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"[^>]*><title>collapse criterion body</.test(rr.html), "an expanded criterion carries a ▾ collapse chevron");
   assert.ok(Object.entries(rr.leafConcepts).every(([, v]) => v.topWhenKey === "w:crit"), "body leaves inherit topWhenKey = the criterion when");
 });
 
@@ -817,8 +817,8 @@ check("Todo 3 Slice 2: a single-criterion when defaults to COLLAPSED — a ▸ c
   const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g6c_", guardOutlines }); // no expandedGuardWhens ⇒ collapsed
   assert.equal(leafRowsOf(rr.html).length, 0, "collapsed ⇒ NO body leaves rendered");
   assert.ok(!/ALL OF/.test(rr.html), "collapsed ⇒ no operator rows");
-  assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"><title>expand criterion body</.test(rr.html), "a collapsed criterion carries a ▸ expand chevron with a toggle key");
-  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "collapsed tab says Component");
+  assert.ok(/class="flow-crit-toggle" data-toggle-crit="[^"]*"[^>]*><title>expand criterion body</.test(rr.html), "a collapsed criterion carries a ▸ expand chevron with a toggle key");
+  assert.ok(/<text[^>]*>Criterion<\/text>/.test(rr.html), "collapsed tab says Criterion");
 });
 
 check("Todo 3 Slice 2: a compound-with-criterion guard (no soleCriterion) is NOT collapsible — always expanded, no chevron", () => {
@@ -844,8 +844,8 @@ check("Todo 3 [critical 1]: a SOLE-REF criterion does NOT masquerade as its body
   // Only the GUARD outline's leaves — B's defined-as leaves (L1/L2) are suppressed (no double-hang).
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["P", "Q"], "only the guard-body leaves render; B's own composite is suppressed");
   assert.ok(!/>L1<|>L2</.test(rr.html), "B's defined-as leaves do NOT appear (precedence: guard outline wins)");
-  // Component retains its technical title without masquerading as body concept B.
-  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "component does not impersonate body concept B");
+  // Criterion retains its technical title without masquerading as body concept B.
+  assert.ok(/<text[^>]*>Criterion<\/text>/.test(rr.html), "component does not impersonate body concept B");
   assert.ok(!/flow-when flow-inferred/.test(rr.html), "the criterion when is NOT painted purple-inferred from concept B");
 });
 
@@ -913,7 +913,7 @@ const critStruct = () => [{ decision: "D", lib: "Pol", nodeKey: "d:D", location:
 ] }];
 const critCs = () => [concept("c:A", "A"), concept("c:B", "B")];
 
-check("Todo 3 Slice 2b: a single-criterion when records ONE criterionOccurrence (identity {lib,name}, collapsed) + a HIDDEN verdict chip on the SAME gid", () => {
+check("Todo 3 Slice 2b: a single-criterion when records ONE criterionOccurrence (identity {lib,name}, collapsed) + a verdict control on the SAME gid", () => {
   const guardOutlines = new Map([["w:crit", gout(gand(gleaf("A", "c:A"), gleaf("B", "c:B")), "Elig")]]);
   const rr = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "gv_", guardOutlines }); // collapsed by default
   assert.equal(rr.criterionOccurrences.length, 1, "exactly one occurrence for the single criterion when");
@@ -921,7 +921,7 @@ check("Todo 3 Slice 2b: a single-criterion when records ONE criterionOccurrence 
   assert.deepEqual({ lib: occ.lib, name: occ.name, collapsed: occ.collapsed }, { lib: "Pol", name: "Elig", collapsed: true }, "identity + collapsed state");
   assert.ok(rr.html.includes(`id="${occ.gid}"`), "the occurrence gid is the criterion when's <g> id");
   // The chip is pre-rendered but HIDDEN (no crit-* class yet); the host reveals it per-occurrence without a re-render.
-  assert.ok(/<g class="flow-crit-verdict">/.test(rr.html), "a criterion when carries a pre-rendered verdict chip");
+  assert.ok(/<g class="flow-crit-verdict review-verdict-icon"/.test(rr.html), "a criterion when carries a pre-rendered verdict chip");
   assert.ok(!/class="flow-row[^"]*\bcrit-(pass|fail|pending|stale)\b/.test(rr.html), "no verdict state class is baked into the render (host-driven)");
 });
 
@@ -953,12 +953,11 @@ check("Todo 3 Slice 2b: a compound-with-criterion guard (no soleCriterion) recor
   assert.ok(!/flow-crit-verdict/.test(rr.html), "no verdict chip on a non-single-criterion guard");
 });
 
-check("Todo 3 Slice 2b / #233 Todo 2b: the verdict chip is hidden by default; `.crit-*` (row-type-agnostic → matches BOTH the root when box and a non-root crit-row) reveals each state", () => {
-  assert.ok(/\.flow-crit-verdict\{display:none/.test(FLOW_STYLE), "chip hidden by default");
-  for (const s of ["pass", "fail", "pending", "stale"])
-    assert.ok(FLOW_STYLE.includes(`.crit-${s} .flow-crit-verdict`), `.crit-${s} reveals the chip (no .flow-row prefix → covers the crit-row too)`);
-  // The dot color for each state is distinct (the case-verdict TOK_* for pass/fail/pending; a muted grey for stale).
-  assert.ok(/\.crit-stale \.flow-crit-vdot\{fill:var\(--vscode-descriptionForeground/.test(FLOW_STYLE), "stale dot is muted grey (never a settled pass/fail color)");
+check("criterion verdict uses the shared, always-visible MV review control", () => {
+  assert.ok(FLOW_STYLE.includes('body[data-mode="medical-validation"] .flow-crit-verdict{display:inline}'));
+  for (const state of ['pass','fail','pending']) assert.ok(FLOW_STYLE.includes(`.review-verdict-icon[data-verdict=${state}]>circle`));
+  const rr=renderFlowPane(critStruct(),{concepts:critCs(),guardOutlines:new Map([['w:crit',gout(gand(gleaf('A','c:A'),gleaf('B','c:B')),'Elig')]])});
+  assert.match(rr.html,/data-criterion-verdict="[^"]+" data-verdict="unreviewed" role="button"/);
 });
 
 // ── #233 Todo 2a/2b: criterion-everywhere — a criterion renders as a NAMED collapsible box at EVERY guard position ──
@@ -970,12 +969,12 @@ check("#233 Todo 2a ROOT-ABSORPTION: a SOLE criterion is absorbed into the `when
   // EXPANDED: the when box carries the criterion name + a ▾ chevron; the body leaves hang; NO separate crit-row for the root.
   const e = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: gouts, expandedGuardWhens: new Set(["w:crit"]) });
   assert.match(e.html, /class="flow-row flow-when flow-greyborder"[^>]*><title>Elig/, "the root criterion is the when box (named Elig), not a crit-row");
-  assert.ok(/<text[^>]*>Component<\/text>/.test(e.html) && /data-toggle-crit="[^"]*"><title>collapse criterion body</.test(e.html), "when box named Elig + a ▾ chevron");
+  assert.ok(/<text[^>]*>Criterion<\/text>/.test(e.html) && /data-toggle-crit="[^"]*"[^>]*><title>collapse criterion body</.test(e.html), "when box named Elig + a ▾ chevron");
   assert.deepEqual(leafRowsOf(e.html).map((l) => l.label).sort(), ["A", "B"], "the body leaves hang below the when box");
   assert.ok(!/flow-crit-row/.test(e.html), "the ROOT criterion draws NO crit-row (absorbed into the when box)");
   // COLLAPSED (default): the when box keeps the name + a ▸ chevron; no body, no crit-row.
   const c = renderFlowPane(critStruct(), { concepts: critCs(), revealPrefix: "z_", guardOutlines: gouts });
-  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c.html) && /<text[^>]*>Component<\/text>/.test(c.html), "collapsed: named ▸ when box");
+  assert.ok(/data-toggle-crit="[^"]*"[^>]*><title>expand criterion body</.test(c.html) && /<text[^>]*>Criterion<\/text>/.test(c.html), "collapsed: named ▸ when box");
   assert.equal(leafRowsOf(c.html).length, 0, "collapsed: no body leaves");
   assert.ok(!/flow-crit-row/.test(c.html), "collapsed root criterion draws no crit-row");
 });
@@ -997,8 +996,8 @@ check("#233 Todo 2a: a NON-ROOT criterion conjunct (`when A and CritC`) draws Cr
   const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]); // compound root → NO soleCriterion → CritC is non-root
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "nr_", guardOutlines: gouts });
   assert.ok(/class="flow-outline flow-crit-row"/.test(rr.html), "CritC draws a named crit-row box");
-  assert.ok(/<text[^>]*>Component<\/text>/.test(rr.html), "component name is hidden from visible text");
-  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(rr.html), "collapsed by default → a ▸ expand chevron");
+  assert.ok(/<text[^>]*>Criterion<\/text>/.test(rr.html), "component name is hidden from visible text");
+  assert.ok(/data-toggle-crit="[^"]*"[^>]*><title>expand criterion body</.test(rr.html), "collapsed by default → a ▸ expand chevron");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A"], "the criterion body leaf B is HIDDEN while collapsed; only the plain conjunct A renders as a leaf");
   assert.equal(rr.criterionOccurrences.length, 1, "one occurrence for the non-root criterion");
   assert.deepEqual({ lib: rr.criterionOccurrences[0].lib, name: rr.criterionOccurrences[0].name, collapsed: rr.criterionOccurrences[0].collapsed }, { lib: "Pol", name: "CritC", collapsed: true });
@@ -1030,7 +1029,7 @@ check("#233 Todo 2a: EXPANDING a non-root criterion (its posKey in expandedGuard
   const collapsed = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ex_", guardOutlines: gouts });
   const posKey = Object.values(collapsed.reveals).find((h) => "criterionToggle" in h).criterionToggle;
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ex_", guardOutlines: gouts, expandedGuardWhens: new Set([posKey]) });
-  assert.ok(/data-toggle-crit="[^"]*"><title>collapse criterion body</.test(rr.html), "expanded → a ▾ collapse chevron");
+  assert.ok(/data-toggle-crit="[^"]*"[^>]*><title>collapse criterion body</.test(rr.html), "expanded → a ▾ collapse chevron");
   assert.deepEqual(leafRowsOf(rr.html).map((l) => l.label).sort(), ["A", "B"], "the criterion body leaf B now renders below the crit-row");
   assert.equal(rr.criterionOccurrences[0].collapsed, false, "the occurrence reports collapsed:false when expanded");
 });
@@ -1040,14 +1039,14 @@ check("#233 Todo 2a: the crit-row has its OWN CSS (box + a has-flag rollup rule 
   assert.match(FLOW_STYLE, /\.flow-crit-row\.has-flag \.flow-flag-badge\{display:inline\}/, "the crit-row rollup ⚑ shows on host .has-flag (its own rule — .flow-row wouldn't match)");
 });
 
-check("#233 Todo 2b: the crit-row box carries a {criterionOccurrence} data-reveal (RIGHT-click → encoding menu; LEFT-click inert) + a HIDDEN verdict chip", () => {
+check("#233 Todo 2b: the crit-row box carries a {criterionOccurrence} data-reveal (RIGHT-click → encoding menu; LEFT-click inert) + a verdict control", () => {
   const gouts = new Map([["w:cmp", { expr: cmpExpr() }]]);
   const rr = renderFlowPane(cmpStruct(), { concepts: critCs(), revealPrefix: "ir_", guardOutlines: gouts });
   // The crit-row GROUP now carries a data-reveal (its {criterionOccurrence} key) for the right-click encoding menu; the
   // chevron has its OWN data-toggle-crit key. A hidden `.flow-crit-verdict` chip is pre-rendered (host reveals per verdict).
   assert.ok(/<g id="[^"]*"[^>]* class="flow-outline flow-crit-row" data-reveal="[^"]*">/.test(rr.html), "the crit-row group carries a data-reveal (right-click encoding)");
   assert.ok(/class="flow-crit-toggle" data-toggle-crit=/.test(rr.html), "the chevron has its own data-toggle-crit (a DISTINCT key)");
-  assert.ok(/<g class="flow-crit-verdict">/.test(rr.html), "a non-root crit-row carries a pre-rendered (hidden) verdict chip");
+  assert.ok(/<g class="flow-crit-verdict review-verdict-icon"/.test(rr.html), "a non-root crit-row carries a pre-rendered verdict control");
   assert.ok(!/class="flow-row[^"]*flow-crit-row/.test(rr.html), "the crit-row is NOT a .flow-row (verdict-fill/ring channels don't touch it)");
 });
 
@@ -1072,7 +1071,7 @@ check("#233 Todo 2a: nested criterion independence — a criterion INSIDE anothe
   const c1 = renderFlowPane(struct, { concepts: cs, revealPrefix: "n1_", guardOutlines: gouts, expandedGuardWhens: new Set([parentKey]) });
   assert.equal((c1.html.match(/flow-crit-row/g) || []).length, 2, "Parent expanded → Parent + Child rows");
   assert.ok(/<title>Child[^<]*<\/title>/.test(c1.html), "Child technical identity now renders");
-  assert.ok(/data-toggle-crit="[^"]*"><title>expand criterion body</.test(c1.html), "Child defaults to COLLAPSED (▸) inside the just-expanded Parent — independent, position-keyed");
+  assert.ok(/data-toggle-crit="[^"]*"[^>]*><title>expand criterion body</.test(c1.html), "Child defaults to COLLAPSED (▸) inside the just-expanded Parent — independent, position-keyed");
   assert.deepEqual(leafRowsOf(c1.html).map((l) => l.label).sort(), ["A", "P"], "Parent's own leaf P shows; Child's leaf B stays hidden (Child folded)");
   assert.deepEqual(c1.criterionOccurrences.map((o) => o.name).sort(), ["Child", "Parent"], "two occurrences now: Parent + Child");
   // 3) Expand Child too (its distinct posKey): leaf B finally renders. Parent + Child posKeys are distinct (independent).
@@ -1208,13 +1207,87 @@ check('per-node flags sit bottom-right and clear an outcome all-pass badge',()=>
  for(const gid of r.flaggableGids){
   const start=r.html.indexOf(`<g id="${gid}"`),next=r.html.indexOf('<g id="',start+1),chunk=r.html.slice(start,next<0?undefined:next);
   const rect=chunk.match(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="([\d.]+)"/);
-  const flag=chunk.match(/class="flow-flag-badge[^>]*>[\s\S]*?<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
+  const flag=chunk.match(/class="flow-flag-badge[^>]*>[\s\S]*?<circle[^>]* cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
   assert.ok(rect&&flag);const [,x,y,w,h,rx]=rect.map(Number),[,fx,fy,fr]=flag.map(Number);
-  assert.equal(fy,y+h-10);assert.equal(fx,x+w-(rx>10?25:10));
+  assert.equal(fy,y+h-10);assert.equal(fx,x+w-(rx>10?22:13));
   const pass=chunk.match(/class="flow-allpass-badge"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
-  if(pass){const [,px,py,pr]=pass.map(Number);assert.ok(Math.hypot(fx-px,fy-py)>fr+pr+1,'flag and pass badge do not overlap');}
+  if(pass){const [,px,py,pr]=pass.map(Number);assert.equal(fx,px,'flag and verdict centers align vertically');assert.ok(Math.hypot(fx-px,fy-py)>fr+pr+1,'flag and pass badge do not overlap');}
  }
 });
 check('ALL OF and ANY OF operator captions use prominent text',()=>{
  assert.match(FLOW_STYLE,/\.flow-logic-label>text\{fill:var\(--vscode-foreground,#ddd\);font-size:13px/);
+});
+
+check("expanding a criterion opens bounded descendants and choices, collapse preserves child state",()=>{
+ const tree=critStruct();const cs=[concept('c:A','A',{hasLocalCode:true}),concept('c:B','B',{hasLocalCode:true})];
+ const guardOutlines=new Map([['w:crit',{expr:gcrit('Outer',gand(gcrit('Inner',gleaf('A','c:A')),gcrit('Sibling',gleaf('B','c:B'))))}]]);
+ const opts={concepts:cs,guardOutlines,answerOptionsByConcept:new Map([['c:A',[{code:'x',display:'X'}]]])};
+ const opened=toggleCriterionExpansion(new Set(),'w:crit',tree,opts);
+ const render=()=>renderFlowPane(tree,{...opts,expandedGuardWhens:opened});
+ const rr=render();assert.equal(rr.criterionOccurrences.length,3);assert.ok(rr.criterionOccurrences.every(o=>!o.collapsed));assert.ok(rr.html.includes('answer option'));
+ const inner=Object.values(rr.reveals).filter(h=>'criterionToggle' in h).map(h=>h.criterionToggle);
+ assert.ok(inner.every(k=>opened.has(k)),'full-model keys match actual rendered toggle keys');
+ const collapsed=toggleCriterionExpansion(opened,'w:crit',tree,opts);assert.equal(collapsed.has('w:crit'),false);assert.ok(inner.every(k=>collapsed.has(k)));
+ const reopened=toggleCriterionExpansion(collapsed,'w:crit',tree,opts);assert.deepEqual(reopened,opened);
+ const sibling=rr.criterionOccurrences.find(o=>o.name==='Sibling');assert.ok(sibling);
+ const innerKey=inner.find(k=>k.endsWith('"crit"]')&&k.includes('0.0'));
+ assert.ok(innerKey,'nested criterion toggle found');{const one=toggleCriterionExpansion(opened,innerKey,tree,opts);assert.equal(one.has('w:crit'),true);assert.equal(one.size,opened.size-1);}
+});
+check("helper projection retains distinct truth anchors, actual input, original flag identity and one choice list",()=>{
+ const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['c:Q']});
+ const question=concept('c:Q','Question',{hasLocalCode:true});
+ const opts={concepts:[helper,question],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',gleaf('Qualifies','c:H',{isSource:false,isInferred:true}))}]]),answerOptionsByConcept:new Map([['c:H',[{code:'a',display:'A'}]],['c:Q',[{code:'a',display:'A'}]]])};
+ const expandedGuardWhens=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);
+ const rr=renderFlowPane(critStruct(),{...opts,expandedGuardWhens});
+ const helperKey=Object.keys(rr.leafConcepts).find(k=>rr.leafConcepts[k].name==='Qualifies');
+ const questionKey=Object.keys(rr.leafConcepts).find(k=>rr.leafConcepts[k].name==='Question');
+ assert.ok(helperKey&&questionKey);assert.notEqual(helperKey,questionKey);assert.notEqual(rr.anchors[helperKey].scrollTo,rr.anchors[questionKey].scrollTo);
+ assert.equal(rr.conceptOccurrences.find(o=>o.name==='Qualifies').flagGid,rr.criterionOccurrences[0].gid);
+ assert.equal(rr.conceptOccurrences.find(o=>o.name==='Qualifies').gid,rr.anchors[helperKey].scrollTo);
+ assert.equal((rr.html.match(/data-flow-choices-toggle/g)||[]).length,1);
+ assert.match(rr.html,/data-flow-elided="1"/);assert.match(rr.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
+ const outside=renderFlowPane(critStruct(),{...opts,guardOutlines:new Map([['w:crit',{expr:gleaf('Qualifies','c:H',{isSource:false,isInferred:true})}]])});
+ assert.ok(!outside.html.includes('data-flow-elided'),'no silent removal without a visible review owner');
+ const unresolved={...helper,definitionRefs:['c:Q','missing']};
+ const partial=renderFlowPane(critStruct(),{...opts,concepts:[unresolved,question],expandedGuardWhens});assert.ok(!partial.html.includes('data-flow-elided'),'partial dependencies retain helper');
+});
+
+check("defined-as wrapper is retained when its nested value helper has an unresolved dependency",()=>{
+ const outer=concept('c:Outer','Outer helper',{definitionKind:'defined-as'});
+ const inner=concept('c:Inner','Inner helper',{definitionKind:'definition-is',definitionRefs:['c:Q','missing']});
+ const q=concept('c:Q','Q',{hasLocalCode:true});
+ const expr=gleaf('Outer helper','c:Outer',{isSource:false,isInferred:true,composite:gleaf('Inner helper','c:Inner',{isSource:false,isInferred:true})});
+ const rr=renderFlowPane(critStruct(),{concepts:[outer,inner,q],guardOutlines:new Map([['w:crit',{expr:gcrit('Container',expr)}]]),expandedGuardWhens:new Set(['w:crit'])});
+ assert.ok(!rr.html.includes('data-flow-elided'));
+ assert.ok(Object.values(rr.leafConcepts).some(v=>v.name==='Q'),'known input remains visible');
+});
+
+check("resolved imported input is preserved when its local helper header is suppressed",()=>{
+ const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['Imported:Q']});
+ const question={...concept('Imported:Q','Imported question',{hasLocalCode:true}),lib:'Imported'};
+ const opts={concepts:[helper,question],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',gleaf('Qualifies','c:H',{isSource:false,isInferred:true}))}]])};
+ const expandedGuardWhens=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);
+ const rr=renderFlowPane(critStruct(),{...opts,expandedGuardWhens});
+ assert.match(rr.html,/data-flow-elided="1"/);
+ assert.ok(Object.values(rr.leafConcepts).some(v=>v.lib==='Imported'&&v.name==='Imported question'));
+ const missing=renderFlowPane(critStruct(),{...opts,concepts:[helper],expandedGuardWhens});
+ assert.ok(!missing.html.includes('data-flow-elided'),'unresolved import retains the helper');
+});
+
+check("defined-as completeness accepts a resolved imported leaf and retains an unresolved one",()=>{
+ const helper=concept('c:H','Qualifies',{definitionKind:'defined-as',definitionRefs:['Imported:Q']});
+ const question={...concept('Imported:Q','Imported question',{hasLocalCode:true}),lib:'Imported'};
+ const expr=gleaf('Qualifies','c:H',{isSource:false,isInferred:true,composite:gleaf('Imported question','Imported:Q',{lib:'Imported'})});
+ const opts={concepts:[helper,question],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',expr)}]])};
+ const expandedGuardWhens=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);
+ const rr=renderFlowPane(critStruct(),{...opts,expandedGuardWhens});
+ assert.match(rr.html,/data-flow-elided="1"/);
+ const missing=renderFlowPane(critStruct(),{...opts,concepts:[helper],expandedGuardWhens});
+ assert.ok(!missing.html.includes('data-flow-elided'));
+});
+
+check("full display labels are escaped and retained for wider question layouts",()=>{
+ const name='Individual Blepharoplasty Documentation & <complete> "wording"';
+ const rr=renderFlowPane([{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:long','when','when Long',['c:Long'],[])]}],{concepts:[concept('c:Long',name)]});
+ assert.match(rr.html,/data-flow-label="Individual Blepharoplasty Documentation &amp; &lt;complete&gt; &quot;wording&quot;"/);
 });

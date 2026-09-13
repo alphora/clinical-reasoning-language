@@ -33,7 +33,7 @@ describe("registerCockpitPaneSerializers", () => {
     for (const pane of ALL_PANES) {
       assert.ok(vscode.__registered.has(cockpitViewType(pane)), `no serializer for pane '${pane}'`);
     }
-    assert.equal(c.subscriptions.length, ALL_PANES.length, "every registration must be disposable with the extension");
+    assert.equal(c.subscriptions.length, ALL_PANES.length + 1, "every registration, including the pinned Branch Questionnaire, must be disposable with the extension");
   });
 
   it("DISPOSES the restored panel rather than adopting it", () => {
@@ -55,6 +55,13 @@ describe("registerCockpitPaneSerializers", () => {
     registerCockpitPaneSerializers(ctx());
     assert.ok(vscode.__registered.has("crlCockpit.questionnaire"));
     assert.ok(vscode.__registered.has("crlCockpit.fhirQuestionnaire"));
+  });
+
+  it("closes a restored Branch Questionnaire because its pin is session-local", async () => {
+    registerCockpitPaneSerializers(ctx());
+    let disposed = false;
+    await vscode.__registered.get("crl.branchQuestionnaire").deserializeWebviewPanel({ dispose: () => { disposed = true; } });
+    assert.equal(disposed, true);
   });
 });
 

@@ -20,6 +20,7 @@ function fixture(nodes, qualifier='all') {
   return { sv:{status:'pass',tree:nodes,decision:{name:'D',libraryName:'L'},conceptTruth:[]},
     structure:[{lib:'L',decision:'D',nodeKey:'root',childrenQualifier:qualifier,children:shape(nodes)}] };
 }
+// @kit mv-case-authoring:parallel-routes
 test('parallel terminal occurrences inspect separately without changing the original case',()=>{
   const {sv,structure}=fixture([when('when[0]','A',true,[action('when[0]/action[0]','X')]),when('when[1]','B',true,[action('when[1]/action[0]','Y')])]);
   const before=JSON.stringify(sv), routes=executionRoutes(sv,structure);
@@ -28,6 +29,7 @@ test('parallel terminal occurrences inspect separately without changing the orig
   assert.deepEqual(routes.map(r=>buildQuestionnaire(routeScenario(sv,r),()=>['boolean'],'L').questions.map(q=>q.conceptName)),[['A'],['B']]);
   assert.equal(JSON.stringify(sv),before);
 });
+// @kit mv-case-authoring:prerequisites
 test('first route retains earlier No prerequisites but omits skipped later data',()=>{
   const {sv,structure}=fixture([when('when[0]','A',false),when('when[1]','B',true,[action('when[1]/action[0]','X')]),{...when('when[2]','Extra',true),evaluated:false}],'first');
   sv.conceptTruth=[{libraryName:'L',name:'Extra',satisfied:true}];

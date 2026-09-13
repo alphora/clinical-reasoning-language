@@ -375,7 +375,7 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
 });
 
 check("#218 legend: buildTreeChromeHtml appends flowLegendChrome(mode) AFTER the banner (MV-gating lives in the exported helper)", () => {
-  assert.ok(/return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
+  assert.ok(/return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
   assert.ok(/import \{[^}]*flowLegendChrome[^}]*\} from "\.\/flowPaneHtml"/.test(COCKPIT_SRC), "flowLegendChrome imported from flowPaneHtml (co-located with FLOW_STYLE + the shared TOK_* consts)");
 });
 
@@ -656,7 +656,7 @@ check("#217 host: nodeVerdictMenu is routed, normalizes the hit to a SEMANTIC ke
   assert.ok(m, "nodeVerdictMenu body");
   assert.ok(/tree\?\.reveals\[revealKey\]/.test(m[1]), "looks the opaque reveal key up in the tree reveals (never passes it raw to the resolver)");
   assert.ok(/isSubQuestionHit\(hit\)[\s\S]*hit\.subQuestionLeafKey[\s\S]*"nodeKey" in hit[\s\S]*hit\.nodeKey/.test(m[1]), "normalizes {subQuestionLeafKey}/{nodeKey} → the semantic key");
-  assert.ok(/litNodeKeysForCase\(caseId, sv[\s\S]*caseIdsForNodeThroughLit\(semanticKey, entries\)/.test(m[1]), "resolves cases via the SHARED lit reach + the pure membership core over scenarioByCaseId");
+  assert.ok(/caseIdsThroughReviewNode\(semanticKey\)/.test(m[1]), "resolves cases via the SHARED lit reach + the pure membership core over scenarioByCaseId");
   assert.ok(/setStatusBarMessage/.test(m[1]), "every no-op exit emits a transient status note (the native menu is already suppressed — no silent dead click)");
 });
 check("#217 host: litNodeKeysForCase is the SHARED reach — driveDoneOverlay paints with it, and it routes through questionnaireFor (NOT buildFocusedQuestionnaire)", () => {
@@ -695,7 +695,7 @@ check("#219 host: a click sets scrollSuppressPane to the origin pane around the 
   assert.ok(/\} finally \{\s*scrollSuppressPane = undefined;\s*\}/.test(COCKPIT_SRC), "and clears it in finally (the flag is live only for the synchronous dispatch)");
 });
 check("#219 host: postReveal suppresses scroll for the origin pane; highlightRows omits scrollTo when suppressed", () => {
-  assert.ok(/const noScroll = pane === scrollSuppressPane;/.test(COCKPIT_SRC), "postReveal computes noScroll = pane is the click origin");
+  assert.ok(/const noScroll = pane === scrollSuppressPane \|\|/.test(COCKPIT_SRC), "postReveal computes noScroll = pane is the click origin");
   // every highlightRows call in postReveal threads noScroll (cross-pane targets still scroll; the origin pane does not).
   assert.ok(!/highlightRows\(v, crlAnchorsForUnits\(unitsForCase\(target\.id, m\), m\)\);/.test(COCKPIT_SRC), "the case→tree highlight passes noScroll (no bare call left)");
   assert.ok(/highlightRows\(v, \[\.\.\.new Set\(keys\)\], noScroll\)/.test(COCKPIT_SRC), "case→tree/crl highlight threads noScroll");
@@ -719,15 +719,18 @@ check("#219 webview: BOTH scroll handlers (highlight + markFailedCriteria) scrol
 });
 
 // ── #203 Todo 4b Slice A: per-node flag badges ──
-check("#203 Slice A webview: the flagBadges handler clears `.has-flag` off flaggableGids then sets it on gids, gen-gated", () => {
+check("flagBadges delegates to the status-aware painter behind the generation guard", () => {
   assert.match(SCRIPT, /m\.type==='flagBadges'\)\{if\(m\.gen!==gen\)return;/);
-  assert.match(SCRIPT, /m\.flaggableGids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.remove\('has-flag'\)/);
-  assert.match(SCRIPT, /m\.gids\|\|\[\]\)\)\{const el=document\.getElementById\(id\);if\(el\)el\.classList\.add\('has-flag'\)/);
+  assert.match(SCRIPT, /message\.flaggableGids/);
+  assert.match(SCRIPT, /classList\.remove\(['"]has-flag['"]\)/);
+  assert.match(SCRIPT, /message\.summaries/);
+  assert.match(SCRIPT, /classList\.add\(['"]has-flag['"]\)/);
 });
-check("#203 webview: the flagBadges handler ALSO drives the start-node count badge (⚑ N / ✓ / ⚠) + .has-startflag", () => {
-  assert.match(SCRIPT, /var sg=m\.startNodeGid\?document\.getElementById\(m\.startNodeGid\):null;/);
-  assert.match(SCRIPT, /m\.flagError\?'⚠':\(m\.open>0\?'⚑ '\+m\.open:\(m\.resolved>0\?'✓':''\)\)/); // chrome-mirror label
-  assert.match(SCRIPT, /if\(st\)st\.textContent=label;sg\.classList\.toggle\('has-startflag',label!==''\)/); // set text + toggle visibility
+check("flagBadges drives the start-node count and incomplete-placement indicator", () => {
+  assert.match(SCRIPT, /message\.startNodeGid/);
+  assert.match(SCRIPT, /message\.flagError/);
+  assert.match(SCRIPT, /message\.unplaced/);
+  assert.match(SCRIPT, /classList\.toggle\(['"]has-startflag['"],\s*label\s*!==\s*['"]['"]\)/);
 });
 check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-reveal]; per-node → nodeFlags(gid), start pill → mvFlags", () => {
   assert.match(SCRIPT, /closest\('\[data-mv-flag-badge\]'\)/);
@@ -736,7 +739,7 @@ check("#203 Slice A webview: a ⚑ badge click is intercepted BEFORE [data-revea
   const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
   assert.ok(badgeAt > 0 && badgeAt < revealAt, "badge intercept comes before the data-reveal click routing");
   // Todo 2 (disc 356): read data-node-flag-gid off the MATCHED badge element (fb) — present → nodeFlags(gid), absent → mvFlags
-  assert.ok(SCRIPT.includes("v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),gen})"));
+  assert.ok(SCRIPT.includes("v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),category:fb.getAttribute('data-flag-category'),gen})"));
 });
 check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is intercepted BEFORE [data-reveal] and posts toggleCriterion", () => {
   assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\)/);
@@ -781,16 +784,15 @@ check("#233 Todo 2b host: the criterion-encoding menu captures the seen hash + i
   assert.match(COCKPIT_SRC, /if \(mvSidecarPath !== openSidecar\) return note\("policy changed/);
   assert.match(COCKPIT_SRC, /applyCriterionVerdict\(ident\.lib, ident\.name, pick\.value, openHash, seenElided\)/);
 });
-check("#224 Slice 2b host: the criterion-encoding menu uses DISTINCT vocab (Correctly encoded / Encoding wrong / Undecided / Clear), never the per-case 'Needs work'", () => {
-  assert.match(COCKPIT_SRC, /function criterionEncodingMenu\(/);
+check("criterion verdict menu shares case labels while retaining criterion persistence", () => {
   const at = COCKPIT_SRC.indexOf("function criterionEncodingMenu");
   const body = COCKPIT_SRC.slice(at, at + 3200);
-  for (const label of ["Correctly encoded", "Encoding wrong", "Undecided", "Clear"]) assert.ok(body.includes(label), `menu offers "${label}"`);
-  assert.ok(!/Needs work/.test(body), "criterion menu does not reuse a per-case verdict label");
+  assert.match(body, /REVIEW_ORDER\.map\(value => opt\(REVIEW_LABEL\[value\]/);
+  assert.match(body, /applyCriterionVerdict/);
 });
-check("#233 Todo 2b host: nodeMenu offers 'Criterion encoding' for a ROOT criterion (topCriterion) OR a non-root {criterionOccurrence}, routing to criterionEncodingMenu", () => {
+check("#233 Todo 2b host: nodeMenu offers 'Verdict' for a ROOT criterion (topCriterion) OR a non-root {criterionOccurrence}, routing to criterionEncodingMenu", () => {
   assert.match(COCKPIT_SRC, /const isCriterion = \(rootGo !== undefined && topCriterion\(rootGo\.expr\) !== undefined\) \|\| isCriterionOccurrenceHit\(hit\)/);
-  assert.match(COCKPIT_SRC, /isCriterion \? \[\{ label: "\$\(law\) Criterion encoding/);
+  assert.match(COCKPIT_SRC, /isCriterion \? \[\{ label: "\$\(pass\) Verdict/);
   // a non-root crit-row is NOT case-bearing → straight to the encoding menu (no case-verdict option)
   assert.match(COCKPIT_SRC, /choices\.length === 0 && isCriterion && !hasCaseVerdict\) return criterionEncodingMenu/);
   assert.match(COCKPIT_SRC, /pick\.act === "criterion"\) return criterionEncodingMenu/);
@@ -863,7 +865,7 @@ check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `w
   const m = COCKPIT_SRC.match(/function flagTargetChoices\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "flagTargetChoices body");
   assert.match(m[1], /crlStructure\.find\(\(s\) => s\.nodeKey === nodeKey\)/); // decision root = object-decision only
-  assert.match(m[1], /tree\.conceptOccurrences\.find\(\(o\) => o\.gid === gid\)/); // when → the concept (object)
+  assert.match(m[1], /conceptFlagTargetsForGids\(tree\.conceptOccurrences, \[gid\]\)/); // when → the concept (object)
   assert.match(m[1], /occurrenceByNodeKey\(dec, nodeKey\)/); // leaf/condition → the occurrence
   assert.match(m[1], /key: occurrenceKeyValue\(occ\)/); // occurrence target carries the <nodeId>~<signature> key
   // #211: the occurrence carries a SHORT header label (no verbose signature) + the full label (signature) as the tooltip
@@ -1118,11 +1120,11 @@ check("tree zoom: applyZoom scales the SVG BOX (viewBox base × treeZoom, not a 
   assert.match(SCRIPT, /const applyZoom=\(\)=>\{const s=root\.querySelector\('\.flow-svg'\)/); // reads the flow SVG
   assert.match(SCRIPT, /s\.style\.width=\(bw\*treeZoom\)\+'px';s\.style\.height=\(bh\*treeZoom\)\+'px'/); // scale the box → the pane scrolls to pan
   assert.match(SCRIPT, /const setZoom=\(z\)=>\{treeZoom=Math\.min\(3,Math\.max\(\.25,z\)\)/); // clamped 0.25–3×
-  assert.match(SCRIPT, /root\.innerHTML=m\.html;fcc\.innerHTML='';[\s\S]*?applyZoom\(\);/); // persists across a re-render
+  assert.match(SCRIPT, /root\.innerHTML=m\.html;if\(!m\.preserveViewport\)fcc\.innerHTML='';[\s\S]*?applyZoom\(\);/); // persists across a re-render
 });
 check("grab-drag pan: pointerdown on .flow-svg starts a pan; window pointermove past a threshold adjusts scroll + swallows the node click", () => {
   // press starts only on the flow pane, left button, and captures the scroll origin
-  assert.match(SCRIPT, /addEventListener\('pointerdown',\(e\)=>\{if\(e\.button!==0\|\|!\(e\.target\.closest&&e\.target\.closest\('\.flow-svg'\)\)\)return;fpPan=true;fpMoved=false;/);
+  assert.match(SCRIPT, /addEventListener\('pointerdown',\(e\)=>\{if\(e\.button!==0\|\|!\(e\.target\.closest&&e\.target\.closest\('\.flow-svg'\)\)\|\|e\.target\.closest\('foreignObject'\)\)return;fpPan=true;fpMoved=false;/);
   // move rides window (tracks outside the pane), has a 4px threshold (so a stationary press still selects), and pans scroll
   assert.match(SCRIPT, /window\.addEventListener\('pointermove',\(e\)=>\{if\(!fpPan\)return;.*Math\.abs\(dx\)\+Math\.abs\(dy\)<4\)return;fpMoved=true;.*s\.scrollLeft=fpL-dx;s\.scrollTop=fpT-dy;e\.preventDefault\(\)/);
   // a moved (panned) press swallows the ensuing click in CAPTURE so the node isn't selected after a pan
@@ -1262,7 +1264,7 @@ check("tree-snapshot: the trigger is an IN-PANE chrome button on the tree pane (
   // host: the tree-chrome builder renders the export button
   assert.match(COCKPIT_SRC, /class="fc-toggle-btn fc-export" data-export-snapshot/, "the export button is in the tree chrome");
   assert.match(COCKPIT_SRC, /const exportBtn =/);
-  assert.match(COCKPIT_SRC, /return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
+  assert.match(COCKPIT_SRC, /return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires \+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
   // webview: the fcChrome click delegate posts exportSnapshot
   assert.match(SCRIPT, /closest\('\[data-export-snapshot\]'\);.*v\.postMessage\(\{type:'exportSnapshot'\}\);return;/s);
   // host: the exportSnapshot message (tree-only) runs the command with a catch backstop
@@ -1350,7 +1352,7 @@ check("bulk-verdict: apply persists ONCE + repaints both halves + notifies once;
 check("bulk-verdict: the grid is a #flagDrawer MODE — its style/script fold into the cockpit shell, no separate panel shell", () => {
   assert.doesNotMatch(COCKPIT_SRC, /reviewGridShellHtml/, "the panel-era shell is removed (no-legacy)");
   // the drawer style/script are concatenated into the ONE cockpit shell + COCKPIT_WEBVIEW_SCRIPT (CSP-nonced there).
-  assert.match(COCKPIT_SRC, /\$\{QUESTIONNAIRE_STYLE\}\$\{ROUTE_CARD_STYLE\}\$\{REVIEW_GRID_DRAWER_STYLE\}/, "drawer CSS folded into the cockpit <style>");
+  assert.match(COCKPIT_SRC, /\$\{QUESTIONNAIRE_STYLE\}\$\{ROUTE_CARD_STYLE\}\$\{ROUTE_POINTER_STYLE\}\$\{REVIEW_GRID_DRAWER_STYLE\}/, "drawer CSS folded into the cockpit <style>");
   assert.match(COCKPIT_SRC, /REVIEW_GRID_DRAWER_SCRIPT;/, "drawer IIFE appended to COCKPIT_WEBVIEW_SCRIPT (reuses fld/v; one acquireVsCodeApi)");
   // the grid body is posted via the SAME flagDrawer message (innerHTML) — rendered FROM the snapshot (the one render authority).
   assert.match(COCKPIT_SRC, /reviewGridSnapshot\s*\n\s*\?\s*reviewGridHtml\(reviewGridViewModel\(reviewGridSnapshot\.items\), reviewGridSnapshot\.epoch\)/);
@@ -1470,8 +1472,8 @@ check("flag-action drawer: the host handlers act on the captured flagActionView 
 // ── Todo 2 (disc 356/357) — node-filtered flag list ───────────────────────────────────────────────────────────────────
 check("node-filter: driveFlagBadges delegates to the PURE computeFlagPlacement + swaps the map wholesale; cleared on every no-badge path", () => {
   // the reverse-map ASSEMBLY (dedup / order / rollup) is executably tested in flagPlacement.test.mjs; here we lock the host wiring
-  assert.match(COCKPIT_SRC, /import \{ computeFlagPlacement \} from "\.\/flagPlacement";/);
-  assert.match(COCKPIT_SRC, /const placement = flagPlacementFor\(tree, open\);/);
+  assert.match(COCKPIT_SRC, /import \{ computeFlagPlacement, conceptFlagTargetsForGids \} from "\.\/flagPlacement";/);
+  assert.match(COCKPIT_SRC, /const placement = flagPlacementFor\(tree, flagsList\);/);
   assert.match(COCKPIT_SRC, /function flagPlacementFor\(tree: PaneView, flags: MvFlag\[\]\)/); // the shared placement wiring (disc 359)
   assert.match(COCKPIT_SRC, /conceptOccurrences: tree\.conceptOccurrences, criterionOccurrences: tree\.criterionOccurrences/);
   // the two host-state lookups passed as callbacks: decision-object segments + live-occurrence gid
@@ -1486,10 +1488,10 @@ check("node-filter: driveFlagBadges delegates to the PURE computeFlagPlacement +
 });
 
 check("node-filter: openNodeFlags — single-skip on length===1, >1 filtered picker, unknown/empty gid → note, full disc-355 re-find", () => {
-  const m = COCKPIT_SRC.match(/async function openNodeFlags\(gid: string\): Promise<void> \{([\s\S]*?)\n  \}/);
+  const m = COCKPIT_SRC.match(/async function openNodeFlags\(gid: string, category\?: [^)]*\): Promise<void> \{([\s\S]*?)\n  \}/);
   assert.ok(m, "openNodeFlags body");
-  assert.match(m[1], /const flags = flagsByGid\.get\(gid\) \?\? \[\];/, "gid looked up in the host map (unknown → empty)");
-  assert.match(m[1], /if \(flags\.length === 0\) return flagNote\("no open flags on this node"\);/, "unknown/stale gid + genuinely-empty unified to one note");
+  assert.match(m[1], /const flags = \(flagsByGid\.get\(gid\) \?\? \[\]\)\.filter/, "gid looked up in the host map (unknown → empty)");
+  assert.match(m[1], /if \(flags\.length === 0\) return flagNote\("no flags on this node"\);/, "unknown/stale gid + genuinely-empty unified to one note");
   assert.match(m[1], /if \(flags\.length === 1\) return openOne\(flags\[0\]\);/, "single-skip predicate = length === 1");
   // openOne re-finds by id (ghost guard + store-warning keep — disc 355), used by BOTH the skip and the picker paths
   assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === snap\.id\);/);
@@ -1506,7 +1508,7 @@ check("node-filter: the per-node message routes to openNodeFlags(gid); the start
   assert.match(COCKPIT_SRC, /else if \(msg\.type === "mvFlags"\) \{\s*\n\s*void openFlagList\(\);/);
   assert.match(COCKPIT_SRC, /gid\?: string;/, "the incoming-message type carries an optional gid");
   // the webview reads data-node-flag-gid off the MATCHED badge (per-node → nodeFlags, start pill → mvFlags)
-  assert.ok(SCRIPT.includes("v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),gen})"));
+  assert.ok(SCRIPT.includes("v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),category:fb.getAttribute('data-flag-category'),gen})"));
 });
 
 // ── Todo 2.5 (disc 359) — drawer UX revision: gold node-link, toggle, picker glyph color ──────────────────────────────
@@ -1590,12 +1592,12 @@ check("edit: the dispatcher renders create → edit → action → empty (edit r
   assert.match(m[0], /tag: editFlag\.tag, summary: editFlag\.gist\.replace\(\/\[\\r\\n\]\+\/g, " "\), stub: editFlag\.description, fields: editFlag\.fields/);
   assert.match(m[0], /: flagActionView\s*\n?\s*\?\s*renderFlagActionDrawer/); // action still after edit
 });
-check("edit: openFlagEditDraft opens for EVERY flag, captures the descriptionOnly mode + cel (no ver), settles+clears the other modes", () => {
+check("edit: openFlagEditDraft rejects authoring flags and captures mutable MV draft mode and policy", () => {
   const m = COCKPIT_SRC.match(/function openFlagEditDraft\(\): void \{([\s\S]*?)\n  \}/);
   assert.ok(m, "openFlagEditDraft body");
-  // Todo 3.5: no human-only gate — the mode is descriptionOnly for a non-MV tag (AI/extraction/legacy)
+  // Workflow ownership blocks authoring flags; mutable non-MV tags retain the restricted form.
   assert.match(m[1], /const descriptionOnly = flagDisplayNameOf\(view\.flag\.tag\) === undefined;/);
-  assert.ok(!/return flagNote\("this flag type is read-only"\)/.test(m[1]), "the read-only gate is gone (every flag is editable)");
+  assert.match(m[1], /if \(isAuthoringFlag\(view\.flag\)\) return flagNote/);
   assert.match(m[1], /settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\)/);
   assert.match(m[1], /flagEditDraft = \{ flag: view\.flag, cel: view\.cel, descriptionOnly \};/); // no ver — survives a rebuild
 });

@@ -4,7 +4,20 @@
 // design test list (impl review 357 [important]).
 import assert from "node:assert/strict";
 
-import { computeFlagPlacement } from "./flagPlacement.ts";
+import { computeFlagPlacement, conceptFlagTargetsForGids, summarizeFlagBadges } from "./flagPlacement.ts";
+
+test("badge status and authoring step stay paired in mixed groups",()=>{
+  const summaries=summarizeFlagBadges(new Map([
+    ['human-open',[{status:'open',category:'validation'},{status:'resolved',category:'extraction'}]],
+    ['ai-open',[{status:'resolved',category:'validation'},{status:'open',category:'extraction'}]],
+    ['unknown',[{status:'open',category:'validation'}]],
+  ]));
+  assert.deepEqual(summaries,[
+    {gid:'human-open',open:1,resolved:1,authoringOpen:0,authoringResolved:1},
+    {gid:'ai-open',open:1,resolved:1,authoringOpen:1,authoringResolved:0},
+    {gid:'unknown',open:1,resolved:0,authoringOpen:0,authoringResolved:0},
+  ]);
+});
 
 let seq = 0;
 /** A minimal MvFlag with the fields computeFlagPlacement reads (id + anchor). */
@@ -132,3 +145,25 @@ test("empty open set → empty result", () => {
 });
 
 console.log("flagPlacement.test: ok");
+
+test("Criterion creation offers all hidden helper targets without changing their identity", () => {
+  const occurrences = [
+    { gid: 'hiddenA', flagGid: 'criterion', lib: 'L', name: 'A' },
+    { gid: 'hiddenB', flagGid: 'criterion', lib: 'L', name: 'B' },
+    { gid: 'repeatA', flagGid: 'criterion2', lib: 'L', name: 'A' },
+    { gid: 'unrelated', flagGid: 'other', lib: 'L', name: 'C' },
+    { gid: 'input', lib: 'L', name: 'Question' },
+  ];
+  assert.deepEqual(conceptFlagTargetsForGids(occurrences, ['criterion', 'criterion2']), [{lib:'L',name:'A'}, {lib:'L',name:'B'}]);
+  assert.deepEqual(conceptFlagTargetsForGids(occurrences, ['input']), [{lib:'L',name:'Question'}]);
+  assert.deepEqual(conceptFlagTargetsForGids(occurrences, ['hiddenA']), [{lib:'L',name:'A'}]);
+  assert.deepEqual(conceptFlagTargetsForGids(occurrences, ['missing']), []);
+});
+
+test("hidden helper display placement preserves separate creation identity and original flags",()=>{
+ const flags=[mk({scope:'concept',library:'L',name:'A'}),mk({scope:'concept',library:'L',name:'B'})];
+ const occurrences=[{gid:'hiddenA',flagGid:'criterion',lib:'L',name:'A'},{gid:'hiddenB',flagGid:'criterion',lib:'L',name:'B'}];
+ const r=computeFlagPlacement(flags,{conceptOccurrences:occurrences,criterionOccurrences:[]},NO_DECISION,NO_OCCURRENCE);
+ assert.deepEqual(r.gids,['criterion']);assert.deepEqual(r.byGid.get('criterion'),flags);assert.ok(!occurrences.find(o=>o.gid==='criterion'));
+ assert.equal(flags[0].anchor.name,'A');assert.equal(flags[1].anchor.name,'B');
+});
