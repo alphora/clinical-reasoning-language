@@ -3,7 +3,7 @@
 ## Maintenance — MV and regression case sets (744–746)
 
 Baseline: `cc1b675ed9431d047bd5fb34305abef1b9af18a8`.
-Target: pending reviewed content commit. Kit schema `2.3`; content hash
+Target: `74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f`. Kit schema `2.3`; content hash
 `75720d63e074fc63f88f9e8d3f6f98d3097be313c5b8f4dd91a3fa1d11aea7b8`.
 This is a complete source/test delta from the saved audit, including its following
 metadata commit and the small post-audit 5.3 keyboard-focus correction. Historical
@@ -58,7 +58,7 @@ remain KE/source-review work. Clinical copies are local test inputs, not certifi
 release content. Neither their CRE outcomes nor native form production proves
 clinical validity or resolves those source-correspondence findings.
 
-Additional review746: native initially0/0/0; external3critical/8important/6nit.10Accept/6Refine/1Reject dispositions recorded in746-followup.md.342 affected core tests pass after corrections; core/extension and actual MCP gates rerun before stamping. Real Bleph37 and RX10 MV sets produce zero conservative advisories; that is not a minimality proof.29 edited Bleph examples receive new IDs, with no MV review sidecars in the delivery copy. Review/check status will be finalized before the stamp advances. Discussion744
+Additional review746: native initially0/0/0; external3critical/8important/6nit.10Accept/6Refine/1Reject dispositions recorded in746-followup.md.342 affected core tests pass after corrections; core/extension and actual MCP gates rerun before stamping. Real Bleph37 and RX10 MV sets produce zero conservative advisories; that is not a minimality proof.29 edited Bleph examples receive new IDs, with no MV review sidecars in the delivery copy. Final source review/check status is recorded above; installed release gates are separate. Discussion744
 accepted all three native findings (regression assertion status, conflicting
 provenance identities, stale failure-receipt promise); follow-up converged with
 zero critical/important/nit findings. External743 returned no substantive findings

@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "cc1b675ed9431d047bd5fb34305abef1b9af18a8",
-  "auditedSchemaVersion": "2.2",
-  "auditedContentHash": "f31aadf37e8e371f55d83f9632933baa383259bfa8023b5d31bba29d08392e36",
-  "scope": "Kit schema 2.2 maintenance from 34d591eeab7fae22485546add54efe41106d756d through cc1b675ed9431d047bd5fb34305abef1b9af18a8. MV case authoring and wording-patch handoff; corrected provenance-independent flag storage. Complete changed-test/source delta reviewed in 737-739. Core 4,864 pass/32 skipped, actual MCP pass; extension 1,261 pass/3 expected failures. Scoped presentation emit parity and 19-case CRE comparison with installed 5.2.0 passed. Native final review converged; external final review exhausted its budget after prior findings were dispositioned. This stamp does not claim suite-aware MV/regression emission or new clinical/native verification. See evidence ledger.",
+  "auditedRevision": "74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f",
+  "auditedSchemaVersion": "2.3",
+  "auditedContentHash": "75720d63e074fc63f88f9e8d3f6f98d3097be313c5b8f4dd91a3fa1d11aea7b8",
+  "scope": "Kit schema 2.3 maintenance from cc1b675ed9431d047bd5fb34305abef1b9af18a8 through 74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f. Two case-set operations: complete MV examples and regression reusing MV plus engineering controls; selected-set validation/emission, source identities, conservative advisory warnings and ordinary results. Five existing rules updated. Reviews744-746 and complete changed-source/test inventory in the evidence ledger. Core4901 pass/32 skipped, actual MCP passed, extension1262 pass/3 expected failures, final bounded core32/32. External findings dispositioned; no unrun convergence claimed. No freshness, transaction, receipt or history-migration framework. This source audit does not certify pending installed release gates, native outcomes or clinical content; existing Bleph source-correspondence findings remain explicit.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
