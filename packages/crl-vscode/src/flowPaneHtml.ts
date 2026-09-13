@@ -1303,7 +1303,7 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   `.fc-legend .fc-sw-pending{background:${TOK_VERDICT_PENDING}}` +
   `.fc-legend .fc-sw-inferred{border:1.5px solid ${TOK_INFERRED}}` +
   `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING}}` +
-  `body{--flow-focus-color:#fff}body.vscode-light,body.vscode-high-contrast-light{--flow-focus-color:#000}.flow-svg g:focus{outline:none}.flow-svg g:focus-visible{outline:1px solid var(--flow-focus-color);outline-offset:2px}.flow-pointer-interaction .flow-svg g:focus{outline:none}.flow-svg [data-flow-key]:focus{outline:none}.flow-svg [data-flow-key]:focus>rect{filter:drop-shadow(0 0 4px var(--flow-focus-color))}body.mv-pointer-interaction :is(button,[role=button],summary):focus{outline:none}` +
+  `body{--flow-focus-color:#fff}body.vscode-light,body.vscode-high-contrast-light{--flow-focus-color:#000}.flow-svg g:focus{outline:none}.flow-svg g:focus-visible{outline:1px solid var(--flow-focus-color);outline-offset:2px}.flow-pointer-interaction .flow-svg g:focus{outline:none}.flow-svg [data-flow-key]:not([data-flow-logic]):focus{outline:none}.flow-svg [data-flow-key]:focus>rect{filter:drop-shadow(0 0 4px var(--flow-focus-color))}body.mv-pointer-interaction :is(button,[role=button],summary):focus{outline:none}` +
   // tree zoom control — a floating control fixed to the pane corner. Co-located HERE with the control's MARKUP (renderFlowPane's
   // `${zoom}`) so the ONE flow-pane stylesheet owns it: the cockpit shell (which includes FLOW_STYLE) AND the standalone
   // snapshot export both get it, and they can't drift. ⚠ the background fallback ends in a HEX (not a nested var) so it renders
