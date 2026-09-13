@@ -51,6 +51,16 @@ its turn budget without returning findings; final two-arm convergence is not cla
 Prior external findings are fully dispositioned. Installed artifact/native/UI gates
 remain release verification, not a prerequisite claimed complete by this stamp.
 
+Post-audit release review: UI-only commit a17e386c exempts text-only ALL OF/ANY OF
+controls from blanket focus-outline suppression. Discussion740 accepted one native
+finding; code review converged.90 focused tests, browser checks and trusted Tab on
+the final installed VSIX passed; pointer outlines remain absent. No kit content,
+language behavior, API or owning kit assertion changed, so the audited content
+revision/hash remains the target above. Final installed core/MCP/driver fingerprints
+match the artifacts that passed116 native Bleph cases and19 installed Q/QR cases
+through each MCP entry point. These are release-specific native checks, not an
+extension of the kit's general clinical proof claims.
+
 Complete changed-path inventory (includes untracked candidate files):
 
 - `docs/medical-validation-plan.md`
