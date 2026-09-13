@@ -1,5 +1,10 @@
 # Reverse kit claim map
 
+Maintenance738 adds `mv-case-authoring:{prerequisites,parallel-routes,selected-values}` and
+`mv-wording-patches:{scope,field-owners,completion,invalid-presentation,package-owner}`. Owning extension assertions, fixtures,
+proof limits and delta dispositions are recorded in coverage.md. `verify-loop:kit-discovery`
+adds four search rows; existing language/native claims remain unchanged.
+
 Maintenance642/643: one unified payload replaces the former CPG/PA selection;
 the initial grouped semantic mappings below still apply. `typeAllowlist.recommended`
 replaces `stageRecommended`. New `verify-loop:kit-discovery` evidence lives in

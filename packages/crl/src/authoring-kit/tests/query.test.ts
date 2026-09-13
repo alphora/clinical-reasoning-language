@@ -76,6 +76,10 @@ describe("one authoring kit: discovery and complete guidance", () => {
   // @kit verify-loop:kit-discovery
   it.each([
     ["dropdown with a none answer", "rule:named-answer-options"],
+    ["MV CEL", "rule:mv-case-authoring"],
+    ["off path data", "rule:mv-case-authoring"],
+    ["edit question", "rule:mv-wording-patches"],
+    ["KE handoff", "rule:mv-wording-patches"],
     ["coded answers", "rule:named-answer-options"],
     ["age today", "rule:patient-age-projection"],
     ["Scalar", "rule:concept-form"],

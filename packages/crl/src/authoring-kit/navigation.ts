@@ -22,11 +22,15 @@ const ALIASES: Record<string, string[]> = {
   "terminology-forms": ["codes", "terminology", "code system", "valueset is", "external ValueSet"],
   "library-scoping": ["import", "include library", "qualified reference"],
   "cel-cases": ["test cases", "CEL", "data", "expected activity"],
+  "mv-case-authoring": ["MV CEL", "medical validation cases", "off path data", "regression suite", "Result Questionnaire", "selected route"],
+  "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change"],
   "produce-results": ["emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
   "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine"],
 };
 
 const RELATED: Record<string, string[]> = {
+  "mv-case-authoring": ["rule:cel-cases", "rule:verify-loop", "rule:produce-results", "rule:emit-output-root"],
+  "mv-wording-patches": ["rule:concept-presentation", "rule:mv-case-authoring", "rule:produce-results", "rule:verify-loop"],
   "guards": ["rule:branch-guards", "rule:decision-composition"],
   "branch-guards": ["rule:publication-selection", "rule:cel-cases"],
   "concept-form": ["rule:publication-selection"],

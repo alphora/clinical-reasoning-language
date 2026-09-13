@@ -1,38 +1,27 @@
 # Medical Validation paths and separate regression suites
 
-Status: implementation plan, 2026-09-11. The operator authorized implementation;
-publication is a later gate. Existing partial viewer changes are not a delivered build.
+Status: remaining suite-isolation plan. **Suite selection, folder-based emission enforcement, and off-path-data diagnostics are unimplemented in 5.3.0.**
+The shipped viewer is specified in [MV component view](mv-component-view.md).
 
-## Outcome
+## Shipped viewer
 
-Medical Validation presents the policy's distinct question paths with the answers
-needed to demonstrate each path and its recommendation. A clinician must not need
-an explanation of an engineering test to understand a case. Regression controls
-exercise the same CRL separately and do not appear in normal emitted content or MV.
+The current tree, pinned Question–Result view, attached question cards and separate
+Result Questionnaire are documented in [MV component view](mv-component-view.md).
+CRL Questionnaire and FHIR Questionnaire remain independently available panes.
+The selected-route and deployed native views serve different purposes and may differ.
+The former in-canvas detached questionnaire, its connector lines, and retirement
+of the CRL Questionnaire are superseded designs, not release behavior.
 
-The operator can open RX501.117 or Bleph, select a leaf and a path, and see the
-selected tree route, its question cards and source text. The deployed FHIR Q/QR view
-shows the complete unmodified $apply result for the associated case. These views
-serve different purposes and may legitimately differ. Switching selections
-refreshes those panes. A leaf pin controls tree focus independently of selection.
+## Planned suite behavior — not implemented in 5.3.0
 
+The remaining sections describe future suite isolation. They are not instructions
+to depend on current discovery or emission filtering. Until implementation, select
+the actual CEL entry point and inspect returned manifests. Separate suite emission
+must use isolated project/output roots because current producer-owned trees do not
+protect sibling suites. Minimize clinician-facing case data while retaining required
+negative prerequisites and independent engineering/native verification.
 
-## Pinned question cards
-
-Pinning establishes the inspected route. Walk its nodes to construct read-only
-question cards only for answerable Case Features, with authored presentation text and CEL-evaluated values. Collections and composite/calculated conditions remain nodes; traverse their answerable inputs without creating a card for the condition itself. Do not
-construct a whole-case questionnaire and subsequently filter its questions.
-Cards directly cap their owning nodes, sharing their width. Reserve space by relaying out the pinned display graph; do not float cards in a separate band. Descriptions are collapsible and initially collapsed. A layout toggle moves
-those same cards into one compact numbered questionnaire above the branch, within the same canvas,
-retaining connector lines to their owning nodes. The toggle changes layout only.
-Unpin removes cards and restores the full tree. Pin snapshots survive ordinary
-selection changes with their case/route identified, and clear on model rebuild.
-
-The standalone CRL Questionnaire pane is retired from launch, settings and saved
-pane restoration. The optional deployed FHIR Questionnaire remains available and
-shows the unmodified full case result from $apply. Different contents are expected
-because the two views serve different purposes. No native output is trimmed.
-## Agreed layout and behavior
+## Target layout and behavior
 
 ```text
 src/cel/mv/          -> emit_cel     -> tests/data/fhir/
@@ -132,7 +121,7 @@ selected policy must always supply both resources of the pair.
 
 ### 2. Re-author the two MV deliveries and regenerate provenance/results
 
-For RX501.117 and the retained Bleph example, inventory the authored decision paths
+For each retained policy delivery, inventory the authored decision paths
 and assign each case to MV or regression. Keep separate CEL entry points, not a
 hidden filter based on case names. Preserve useful engineering controls in
 `regression/`; minimize MV facts and use clinician-readable case descriptions.
@@ -140,12 +129,7 @@ Build a coverage table against authored decisions/criteria and narrative intent,
 independent of the evaluator's observed answer. Preserve required false prerequisites.
 
 Update imports, workspace launch targets and provenance to the relocated cases.
-Regenerate MV data and native Q/QR, and reconcile generated inventories. The 41
-obsolete HCSC generated files previously blocked from removal remain an explicit
-cleanup item; do not claim a clean delivered inventory until verified. Preserve
-source narrative and unrelated operator edits. Remove only task-owned temporary
-customer copies after retained artifacts and verification are complete.
-The exact obsolete-file inventory is `tmp/mv-install-minimal-hcsc.json` (`removes`).
+Regenerate MV data and native Q/QR, and reconcile generated inventories. Preserve source narrative and unrelated operator edits. Verify retained generated inventories against their owning manifests before removing obsolete files.
 
 MV completion/review progress uses the complete active MV suite, rather than the
 currently opened CEL file. Preserve notes/verdict history for moved regression
@@ -160,59 +144,10 @@ controls in isolation, including the ephemeral QR pause/resume/clear sequence.
 Check MV case picker and output manifests contain no regression cases. Both
 questionnaire panes must use the newly generated cases, with valid source joins.
 
-### 3. Finish the questionnaire and tree presentation
+### 3. Viewer implementation
 
-Complete and review the partial source edits already present:
-
-- Show the selected case's reached questions; omit skipped conditions even when
-  extra case data supplies their answers. Reached unknown questions stay visible.
-  Known calculated values are not mislabeled as explicit user answers. Preserve
-  every operand inside a retained compound explanation; do not simplify its logic
-  by deleting unknown operands. Verify reference-only criteria deliberately.
-  Preserve explanations for false calculated conditions as well as true/unknown.
-  A selected route scopes the MV questions and pin. Parallel execution may remain
-  in the unmodified deployed view. Selecting a route never changes answers or
-  evaluation; if the case does not reach the requested route, expose that mismatch.
-- Render one condition with Yes/No successors rather than an independent
-  `otherwise` condition box. Preserve fallback source/review identities on its
-  connector. Respect `first`, `all` and `any`, nested blocks, delegated decisions,
-  and multiple occurrences of the same activity.
-  For `first`, No advances to the next condition, and the last No reaches the
-  fallback. Without a fallback it produces no invented leaf. Preserve parallel
-  `all`/`any` evaluation and action-guard explanations; an action guard is not
-  silently redrawn as a first-block fallback.
-- Show green/red connectors for evaluated true/false conditions, with a distinct unknown
-  indication. A supplied value alone is not proof that a condition was evaluated.
-  Keep path selection and medical-review verdict styling distinguishable.
-- Make solid and dashed connectors consistently thicker and visible in light and
-  dark themes. Verify readability at practical zoom levels.
-- Offer a pin on the selected path's leaf. Clicking the pin focuses/unfocuses the
-  tree; ordinary selection does not unpin it. Pin the selected route, retaining its
-  required earlier false conditions. Keep necessary decision roots,
-  reached delegation connectors and explanations visible. Preserve the snapshot
-  across selections and harmless re-renders; clear it on a semantic model rebuild. Provide a
-  visible pinned-state/unpin affordance, keyboard operation and an explanation if
-  a cross-pane selection points outside the pinned tree.
-
-Use the stable structural node key for the pinned leaf occurrence, not its label
-or generated SVG ID. The value-provenance wording above means avoid claiming an
-answer was explicitly supplied when the viewer only knows its evaluated value;
-it does not add an unsupported asserted-versus-calculated badge to native QR.
-
-Execution is the authority for the blue tree path, case/path lookup, questionnaire
-membership and pinning. Authored provenance is only the source correspondence
-dependency. Incorrect or absent source mappings must not add or remove executed
-nodes, questions or selectable cases. Missing or malformed provenance must produce
-a source-pane diagnostic without preventing CRL/CEL model construction. Verify
-actual launch with absent and malformed provenance, not only helper calls with
-empty maps. Existing correspondence-driven tree lookup and the all-pane discovery
-gate still need replacement; the questionnaire filtering change alone does not
-satisfy this requirement.
-
-Tests: true/false/unknown routes, skipped answers, criterion explanations, nested
-and delegated graphs, duplicate leaf labels, pin persistence/unpin, stale render
-messages, source refresh and keyboard interaction. Actual installed extension
-checks follow unit tests; source changes alone do not update the user's viewer.
+Superseded by [MV component view](mv-component-view.md). Use that document for
+current behavior; suite-aware multi-file discovery remains work in sections 1–2.
 
 ### 4. Add MV-focused diagnostics and maintain the KE kit
 
@@ -247,7 +182,7 @@ as one coherent change set; do not ship an intermediate version that rejects its
 own supported fixtures. Low-level language fixtures can continue using in-memory
 APIs. No temporary permissive fallback that emits unclassified mixed suites.
 Use an isolated extension candidate containing the intended changes, excluding the
-unrelated dirty `fhir-emitter/decision.ts` patch. Execute both real policy deliveries
+unrelated dirty `fhir-emitter/decision.ts` patch. Execute the retained policy deliveries
 through the candidate's CLI/MCP and actual MV panes. Verify independent expected
 recommendations, source highlights, case/path switching, questionnaire answers and
 pin behavior. Inspect exact generated file inventories as well as manifests.
@@ -257,31 +192,12 @@ verification evidence. Human medical approval remains theirs. A release follows
 the separate release protocol after this implementation is validated; do not
 substitute a release build for finishing the features.
 
-## Current evidence and limits
+## Verification limits and patch ownership
 
-The integrated viewer slice passes 385 targeted viewer checks (plus three existing
-expected failures) and 157 core publication/presentation checks. In the isolated
-development extension, RX501.117 verified five selected-route cards, both layouts,
-MV-only patch saving with unchanged CRL hashes, persistent pinning across re-render
-and case changes, and current-case colors after unpinning. Removing source
-provenance preserves tree/cards and reports unavailable source correspondence.
-Bleph verified eighteen route cards, including four coded supporting answers and
-their authored presentation text. Uncoded definition helpers expose supporting
-values; helpers with representation projectors are not expanded through that
-bounded display traversal.
+Historical development checks are recorded in the review discussions. They do not
+establish the unimplemented suite contract above. Release verification is recorded
+separately for the installed candidate.
 
-These are source and development-host results, not an installed release or human
-Medical Validation. The preceding released-5.2.0 native checks covered 23 HCSC and
-69 Bleph cases; no new full native run is claimed for this viewer slice. Suite-aware
-routing and final installed delivery remain governed by the rest of this design.
-
-Each implementation stage gets its detailed plan/code review and readable review
-records. The native/external reviewers advise; operator intent above governs.
-
-## Presentation patch ownership
-
-Card text and descriptions can be edited as MV-scoped proposals. Save never modifies CRL directly. The owning KE pulls the proposal, applies it in CRL scope, and re-emits CQL/FHIR and results. See [the patch workflow](mv-presentation-patches.md). This supersedes the earlier direct-edit suggestion.
-
-Operator visual refinement: connector widths are 1.75px solid and 1.25px dashed. Remove visible Yes/No labels and otherwise boxes; fallback destinations share the true siblings' column. Keep fallback identities for route/review mapping. Pin sits outside upper-right; unanswered marker remains exposed at the left. A false condition without a continuation gets a short terminal red connector, never an invented activity.
-
-Refinement checks: 274 focused tests pass. Browser Bleph has 11 answerable cards; RX uc-met has four (the calculated Not Used Concurrently helper is a tree node, not an extra question). Attached/expanded cards do not overlap nodes. Detached rows are contiguous with one connector per question. Unpin restores original transforms, body rectangles and paths exactly. Native review converged; external plan timeout and retry internal error produced no findings. These remain development-host checks, not an installed release.
+Question wording changes are MV-scoped proposals. The owning KE pulls and reconciles
+them in CRL scope, then validates and re-emits CQL/FHIR and results. See the current
+[patch workflow](mv-presentation-patches.md).

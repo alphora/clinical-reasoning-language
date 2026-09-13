@@ -341,7 +341,9 @@ export type {
 // "1.38" → "2.0": one complete kit with task/topic retrieval, executable prerequisites,
 // explicit applicability and separate repository audit identity. No kit use-case selector.
 // "2.0" → "2.1" (SHAPE + CONTENT): every rule has explicit force clauses; no implicit classification.
-const SCHEMA_VERSION = "2.1";
+// schemaVersion → "2.2": MV case intent, route inspection, and CRL wording-patch ownership.
+// Language syntax and native verification obligations are unchanged.
+const SCHEMA_VERSION = "2.2";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -938,6 +940,29 @@ const RULES: KitRule[] = [
     ],
   },
   {
+    id: "mv-case-authoring",
+    applicability: "Preparing cases for clinician Medical Validation",
+    category: "cel",
+    rule: "Prepare clinician-facing CEL cases to demonstrate the authored question routes, with only the data needed for the route being reviewed. Include earlier false answers required to reach a later branch; missing evidence is not No. Keep deliberate overlap, precedence, conflicting-evidence and pause/clear controls in engineering verification. Those controls remain necessary where required by cel-cases and native-outcome-verification; simplifying an MV demonstration must not remove their proof. Regression harnesses may reuse MV cases and add controls; CEL has no CEL-to-CEL fact import. In CRL 5.3.0, src/cel/mv and src/cel/regression are a planned organization, not implemented discovery or emission filters. Do not rely on folder names to exclude cases, and do not emit separate suites into the same producer-owned output tree. Select and verify the actual CEL entry point and output manifest. The pinned Result Questionnaire walks the selected executed route and its answerable inputs. Extra data for a skipped condition does not add that question to this route; parallel produced routes remain separately inspectable. The retained CRL Questionnaire covers the complete reached case rather than just the pinned route. The FHIR Questionnaire shows the associated native output. These three views serve different purposes and can differ legitimately. Displayed answer labels and choice highlights are not a terminology-validation oracle; validate coding identity and native behavior independently. Tree execution does not depend on authored source correspondence; source-text highlighting still does. Neither viewer repairs authored CEL or replaces native verification.",
+    why: "A clinician should be able to review a question route without interpreting an implementation stress test. Author intent, execution evidence and native result verification remain separate responsibilities.",
+    ref: "cel-cases; verify-loop; docs/mv-component-view.md; docs/medical-validation-plan.md; crl-vscode/src/executionRoutes.test.mjs",
+    clauses: [
+      { text: "Default MV examples to minimally sufficient route data, retaining necessary earlier false answers and meaningful clinical alternatives. Keep deliberate engineering controls and reuse MV cases where practical; do not invent CEL case inheritance.", force: "default" },
+      { text: "Verify the actual entry point, complete case/output inventory and native outcomes. Folder naming alone does not implement suite isolation in 5.3.0, and route-focused MV does not discharge native verification or source-fidelity obligations.", force: "invariant", test: "verifyLoop:native-outcome-verification" },
+    ],
+  },
+  {
+    id: "mv-wording-patches",
+    applicability: "Question wording proposed during Medical Validation",
+    category: "process",
+    rule: "The question-card pencil opens Edit Question; Save change records a proposed CRL presentation patch under src/medical-validation/crl-patches in the MV scope. It does not edit deployed CRL or regenerate FHIR. Candidate checks cover parsing and the owning library only, not cross-library presentation overlap or full emission. Imported owners require their owning workspace; a consumer cannot override them locally. The KE holding the CRL scope pulls that MV scope, reviews all competing proposals, and reconciles each field against the recorded baseline and current source. Question text and description can have different presentation owners; an inherited default description affects every use that inherits it. Apply only the agreed fields to their recorded owners, preserving newer source and unrelated changes; never overwrite current CRL wholesale with an old proposedSource. Validate and re-emit CRL/CQL/FHIR and native results, refresh correspondence as needed, and return the actual updated resources for renewed MV. Record the applied patch and validating revision/evidence, or an explicit rejected, withdrawn or superseded disposition. Pending or unreadable patches block MV completion. The file-based handoff does not automatically apply patches or prove successful emission or renewed review.",
+    ref: "concept-presentation; docs/mv-presentation-patches.md; crl-vscode/src/routeCards.test.mjs",
+    clauses: [
+      { text: "Use the MV patch handoff for wording proposals. The CRL-scope owner reconciles field ownership, baseline drift and competing proposals, applies the agreed change and records its explicit disposition.", force: "default" },
+      { text: "Validate and regenerate the affected artifacts and native results before renewed MV approval. A saved or applied-status patch alone proves neither emitted wording nor runtime correctness.", force: "invariant", test: "verifyLoop:native-outcome-verification" },
+    ],
+  },
+  {
     id: "cel-identity",
     applicability: "All CRL authoring",
     category: "cel",
@@ -1167,8 +1192,8 @@ const RULES: KitRule[] = [
           "locate the store (it does no `.crl` content read). They WRITE the `medical-validation/flags/<id>.json` record (they do NOT " +
           "return `.crl` source for you to apply, and they never edit `.crl` files). `create_flag` is idempotent while open " +
           "(a same-content retry returns the existing record). PRECONDITION: the store is located by walking up to the " +
-          'policy\'s `src/` dir (the one holding `provenance/`); if the tool errors "not inside a discoverable policy", the ' +
-          "policy layout isn't set up yet (run the provenance/promotion step first). (`@validation-concern`'s optional " +
+          'policy\'s `src/` dir, identified by `provenance/` or by both `crl/` and `cel/`; if the tool errors "not inside a discoverable policy", check that layout. ' +
+          "Source correspondence is still required for source highlighting and the provenance/promotion workflow, but not to locate this flag store. (`@validation-concern`'s optional " +
           "`kind` triage enum + any occurrence `key` are carried as `fields` by the same tools.)",
         force: "default",
       },

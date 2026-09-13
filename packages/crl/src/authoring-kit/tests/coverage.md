@@ -1,5 +1,152 @@
 # Kit evidence ledger
 
+## Maintenance — MV route inspection and wording handoff (737/738)
+
+Baseline: `34d591eeab7fae22485546add54efe41106d756d`.
+Target: pending reviewed content commit. Kit schema `2.2`; literal target/hash finalized in the separate stamp commit.
+Scope: complete delta from the saved audit, including the preceding metadata stamp,
+5.2 documentation/version updates, and the 5.3 candidate core/MV implementation.
+No grammar, CQL emitter, CEL emitter, FHIR-emitter directory or driver source changes are included. Shared `emit/presentation.ts` adds field ownership; its wording/diagnostic behavior and scoped CQL/FHIR outputs match 5.2.0 in the bounded parity probe.
+The separate dirty ordered-input FHIR experiment and corrupted service-request fixture
+are excluded from this candidate and preserved in the source workspace.
+
+| Changed evidence and exact observations | Disposition and limit |
+| --- | --- |
+| `executionRoutes.test.mjs`: “first route retains earlier No prerequisites but omits skipped later data” asserts A=no and B=yes, excluding supplied but unevaluated Extra; “parallel terminal occurrences inspect separately without changing the original case” asserts separate A/B routes and original JSON unchanged. Same-label occurrences, delegated callers, invalid/unknown prefixes and missing mappings retain distinct identity/error states. | Kit updated: `mv-case-authoring:prerequisites` and `:parallel-routes`. These synthetic executed-tree rows prove display projection, not CEL/native evaluation. Minimal-data case authoring is an operator-directed default, not a validator rule. |
+| `routeCards.test.mjs`: “real Bleph execution exposes selected coded publication values” runs `completed.cel` through actual CRE; coded-choice tests distinguish system/code, ambiguity, imported wording, unknown determination and Quantity display. `crlConceptLayer.test.ts` now includes coding systems in expected choice members. | Kit updated: `mv-case-authoring:selected-values`; existing `named-answer-options` remains sufficient for terminology semantics. Added optional CRE `conceptValues` reads the already-selected resource cache; no selection or emitter semantics changed. Proof is CRE/display only. The actual Bleph fixture and its package dispositions are reused, not copied into new teaching. |
+| `routeCards.test.mjs`: “wording proposal preserves baseline, validates new CRL, and writes only into MV” asserts parsed candidate, unchanged source and exclusive MV patch creation; “scoped text and inherited description retain different owners in the patch” asserts separate scoped/default owners. Missing-description and imported-owner rows retain owner/editability limits. | Kit updated: `mv-wording-patches:scope` and `:field-owners`. The existing `L`/`Complaint` Boolean CRL and scoped/default presentation fixture prove patch construction. No automatic KE consumption, full emit or clinical approval is claimed. Baseline reconciliation and ownership are manual workflow obligations. |
+| `routeCards.test.mjs`: “pending and malformed MV patches prevent completion, explicit dispositions clear the gate” asserts proposed and unreadable counts; rejected clears only its own pending count. | Kit updated: `mv-wording-patches:completion`. Implementation enumerates applied/rejected/withdrawn/superseded statuses; status is not proof of re-emission. |
+| `query.test.ts` adds MV CEL, off path data, edit question and KE handoff searches; existing full/overview/entry prerequisite checks cover both new rules. `authoring-kit.test.ts` advances content/version pins. | Kit updated: `verify-loop:kit-discovery`. Retrieval and identity proof only. New rules carry explicit default/invariant clauses and existing native verification anchors. |
+| Execution-model extraction, policy discovery without correspondence, structural child qualifiers, optional reveal maps, and all questionnaire route tests | Existing source-fidelity/provenance guidance remains binding; new MV guidance distinguishes execution from source highlighting. No removal of FINAL correspondence or native verification obligations. |
+| Remaining extension tests and browser fixtures listed below: pane lifecycle, focus, layout, leaf navigation, pin visibility, result/criterion verdicts, independent KE/MV flag controls, question badges and disclosures | Not CRL authoring semantics. Assertions cover UI identity, message routing, rendering and interaction. Existing `review-flags` phase vocabulary remains sufficient; this release does not add creator-based semantics or change the core flag API. KE flag content is read-only in MV but resolution is available. |
+| `mvFlagStore.test.ts` tracked-store tag now covers provenance+cel and crl+cel; incomplete crl-only and cel-only layouts return undefined. | Kit corrected: `review-flags:tracked-store-location`. Discovery is shared by flags and MV sidecars; source correspondence remains a separate dependency. |
+| Prior audit.json/coverage/test-inventory changes | Inspected metadata-only previous stamp finalization; no changed consumer content or owning assertions. |
+| README/TOOLING/package manifests and lockfile | Release/documentation metadata; exact dependency versions and complete generated inventories remain governed by existing guidance. No dependency range or compiler/runtime dependency change. |
+
+Eight new owning @kit tags were added in routeCards/executionRoutes. Existing tags
+are retained; the query discovery tag gains four parameter rows. New invalid-presentation and package-owner rows verify visible wording diagnostics, rejection of read-only patches, and package-origin enforcement even below the policy root. Fixture paths are module-relative so the Bleph rows run from the package working directory.
+No owning assertion
+was removed from the language kit. The historical full inventory remains historical;
+this maintenance is a complete delta, not a new full census.
+
+Explicit remaining gap: suite-aware MV/regression discovery and emission, suite-wide
+ownership/migration and off-path-data warnings are unimplemented in 5.3.0. The revised
+`docs/medical-validation-plan.md` owns that future work. Folder naming does not isolate
+emission. The kit teaches this limitation rather than claiming an implemented feature.
+No new CRL/CEL example syntax is introduced. Existing load-bearing/overlap controls
+and independent native-outcome verification remain required at their stated scope.
+
+Validation before audit advancement: core build/typecheck and4,864 tests passed
+(32 skipped); the actual `run-mcp-server.test passed` marker was observed. The
+extension build/typecheck and1,261 tests passed (three expected-failure tests).
+The combined command initially stopped at a stale extension cache type; after
+replacing it with the helper's ReturnType, the complete extension command passed.
+No core runtime changed during that correction. Scoped presentation emit payloads
+and19 Bleph CRE cases were compared with installed5.2.0; only the documented optional
+conceptValues field differed. Kit delta verification found only the two added rules
+and review-flags prerequisite correction; all reference artifacts are unchanged.
+Panel737:13 Accept,4 Refine,3 Reject. Panel738:9 Accept,1 Refine,2 Reject.
+Final739 native review:0 critical/important/nit, converged. External739 exhausted
+its turn budget without returning findings; final two-arm convergence is not claimed.
+Prior external findings are fully dispositioned. Installed artifact/native/UI gates
+remain release verification, not a prerequisite claimed complete by this stamp.
+
+Complete changed-path inventory (includes untracked candidate files):
+
+- `docs/medical-validation-plan.md`
+- `docs/mv-component-view.md`
+- `docs/mv-presentation-patches.md`
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/README.md`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/src/branchNavigation.test.mjs`
+- `packages/crl-vscode/src/branchNavigation.ts`
+- `packages/crl-vscode/src/branchQuestionnairePanel.test.mjs`
+- `packages/crl-vscode/src/branchQuestionnairePanel.ts`
+- `packages/crl-vscode/src/branchVerdict.test.mjs`
+- `packages/crl-vscode/src/branchVerdict.ts`
+- `packages/crl-vscode/src/branchVerdictHost.test.mjs`
+- `packages/crl-vscode/src/cockpitPaneSerializers.test.mjs`
+- `packages/crl-vscode/src/cockpitPaneSerializers.ts`
+- `packages/crl-vscode/src/cockpitWebviewScript.test.mjs`
+- `packages/crl-vscode/src/correspondenceCockpit.ts`
+- `packages/crl-vscode/src/correspondenceEngine.ts`
+- `packages/crl-vscode/src/executionRoutes.test.mjs`
+- `packages/crl-vscode/src/executionRoutes.ts`
+- `packages/crl-vscode/src/flagActionDrawerHtml.test.mjs`
+- `packages/crl-vscode/src/flagActionDrawerHtml.ts`
+- `packages/crl-vscode/src/flagBadgesWebview.ts`
+- `packages/crl-vscode/src/flagPlacement.test.mjs`
+- `packages/crl-vscode/src/flagPlacement.ts`
+- `packages/crl-vscode/src/flagWorkflow.test.mjs`
+- `packages/crl-vscode/src/flagWorkflow.ts`
+- `packages/crl-vscode/src/flagWorkflowHost.test.mjs`
+- `packages/crl-vscode/src/flowComponentContainers.ts`
+- `packages/crl-vscode/src/flowConnectorBorders.ts`
+- `packages/crl-vscode/src/flowDisclosureFocus.ts`
+- `packages/crl-vscode/src/flowKeyboardActions.ts`
+- `packages/crl-vscode/src/flowLogicHighlight.ts`
+- `packages/crl-vscode/src/flowPaneHtml.test.mjs`
+- `packages/crl-vscode/src/flowPaneHtml.ts`
+- `packages/crl-vscode/src/flowPinVisibility.ts`
+- `packages/crl-vscode/src/flowProjection.test.mjs`
+- `packages/crl-vscode/src/flowProjection.ts`
+- `packages/crl-vscode/src/flowSnapshotHtml.test.mjs`
+- `packages/crl-vscode/src/flowSnapshotHtml.ts`
+- `packages/crl-vscode/src/mcp-server.test.mjs`
+- `packages/crl-vscode/src/medicalValidationStore.ts`
+- `packages/crl-vscode/src/nodeFlagAction.test.mjs`
+- `packages/crl-vscode/src/package.test.mjs`
+- `packages/crl-vscode/src/paneOrder.test.mjs`
+- `packages/crl-vscode/src/paneOrder.ts`
+- `packages/crl-vscode/src/presentationProposal.ts`
+- `packages/crl-vscode/src/provenanceFindings.ts`
+- `packages/crl-vscode/src/questionnaireModel.test.mjs`
+- `packages/crl-vscode/src/questionnaireModel.ts`
+- `packages/crl-vscode/src/questionnairePaneHtml.test.mjs`
+- `packages/crl-vscode/src/questionnairePaneHtml.ts`
+- `packages/crl-vscode/src/reviewGridHtml.test.mjs`
+- `packages/crl-vscode/src/reviewGridHtml.ts`
+- `packages/crl-vscode/src/routeCards.test.mjs`
+- `packages/crl-vscode/src/routeCards.ts`
+- `packages/crl-vscode/src/routeCardsWebview.ts`
+- `packages/crl-vscode/src/treeInteractionHost.test.mjs`
+- `packages/crl-vscode/src/webviewHit.ts`
+- `packages/crl-vscode/test/flagBadges.browser.cjs`
+- `packages/crl-vscode/test/flowComponentContainers.browser.cjs`
+- `packages/crl-vscode/test/flowConnectorBorders.browser.cjs`
+- `packages/crl-vscode/test/flowDisclosureFocus.browser.cjs`
+- `packages/crl-vscode/test/flowKeyboardActions.browser.cjs`
+- `packages/crl-vscode/test/flowLogicHighlight.browser.cjs`
+- `packages/crl-vscode/test/flowPinVisibility.browser.cjs`
+- `packages/crl-vscode/test/routeCards.browser.cjs`
+- `packages/crl/README.md`
+- `packages/crl/TOOLING.md`
+- `packages/crl/package.json`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/navigation.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/authoring-kit/tests/query.test.ts`
+- `packages/crl/src/authoring-kit/tests/reverse-claim-map.md`
+- `packages/crl/src/authoring-kit/tests/test-inventory.json`
+- `packages/crl/src/cli/tests/run-mcp-server.test.mjs`
+- `packages/crl/src/cre/run.ts`
+- `packages/crl/src/cre/viewModel.ts`
+- `packages/crl/src/emit/presentation.ts`
+- `packages/crl/src/flags/tests/mvFlagStore.test.ts`
+- `packages/crl/src/index.ts`
+- `packages/crl/src/provenance/cockpitModel.ts`
+- `packages/crl/src/provenance/crlConceptLayer.ts`
+- `packages/crl/src/provenance/crlStructure.ts`
+- `packages/crl/src/provenance/index.ts`
+- `packages/crl/src/provenance/policyLayout.ts`
+- `packages/crl/src/provenance/revealMaps.ts`
+- `packages/crl/src/provenance/tests/crlConceptLayer.test.ts`
+
+
 ## Maintenance - Elements library names (668)
 
 Baseline: `5e105580a3390bedcbf7874ddb37e9f5f7d6279d`.

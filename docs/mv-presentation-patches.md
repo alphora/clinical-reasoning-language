@@ -1,6 +1,6 @@
 # Wording changes proposed during Medical Validation
 
-MV question cards display the current CRL presentation and the selected CEL execution's values. **Propose wording** edits the question text and description. **Save MV patch** writes a proposal under `src/medical-validation/crl-patches/<id>.crl.patch.json`. It does not change CRL, CEL, CQL, FHIR, or the evaluation.
+MV question cards display the current CRL presentation and the selected CEL execution's values. The pencil opens **Edit Question:** for the question text and description. **Save change** writes a proposal under `src/medical-validation/crl-patches/<id>.crl.patch.json`. It does not change CRL, CEL, CQL, FHIR, or the evaluation.
 
 This directory belongs to the existing Medical Validation entity. Pull or merge that entity through the normal scope workflow. The KE holding the CRL scope applies the proposal; the MV editor does not acquire that scope or bypass its ownership.
 
@@ -19,3 +19,5 @@ The candidate passes CRL parsing and the owning library's presentation checks. T
 The current implementation provides a file-based handoff, not an automatic patch-consumption MCP or an automatic apply status. The KE must report application and validation explicitly. Changing a presentation that was already approved requires renewed review of its wording.
 
 Pending or unreadable patch records block MV completion. After application and re-emission, the owning KE records `status: "applied"` and the validating revision/evidence in the patch; rejected, withdrawn, and superseded proposals retain their explicit disposition. These are workflow records, not automatic proof that emission or renewed MV review happened.
+
+Missing question wording is labeled explicitly. Presentation errors are shown on cards and prevent wording proposals until the CRL owner corrects them. Package-owned wording remains read-only even when its installed files are beneath the policy directory.
