@@ -3,7 +3,7 @@
 ## Maintenance — MV route inspection and wording handoff (737/738)
 
 Baseline: `34d591eeab7fae22485546add54efe41106d756d`.
-Target: pending reviewed content commit. Kit schema `2.2`; literal target/hash finalized in the separate stamp commit.
+Target: `cc1b675ed9431d047bd5fb34305abef1b9af18a8` (reviewed content commit). Kit schema `2.2`; content hash `f31aadf37e8e371f55d83f9632933baa383259bfa8023b5d31bba29d08392e36`. This following metadata-only commit stamps that existing revision.
 Scope: complete delta from the saved audit, including the preceding metadata stamp,
 5.2 documentation/version updates, and the 5.3 candidate core/MV implementation.
 No grammar, CQL emitter, CEL emitter, FHIR-emitter directory or driver source changes are included. Shared `emit/presentation.ts` adds field ownership; its wording/diagnostic behavior and scoped CQL/FHIR outputs match 5.2.0 in the bounded parity probe.

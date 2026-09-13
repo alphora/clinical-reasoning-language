@@ -1,7 +1,7 @@
 {
-    "auditedRevision":  "34d591eeab7fae22485546add54efe41106d756d",
-    "auditedSchemaVersion":  "2.1",
-    "auditedContentHash":  "28bf5d87e4802bd3da9a6e4b5798414a805ccecd740ecede8c6b977553809336",
-    "scope":  "Kit schema 2.1 naming-only maintenance from 5e105580a3390bedcbf7874ddb37e9f5f7d6279d through 34d591eeab7fae22485546add54efe41106d756d. All project retrieval-layer identities and authored split fixtures use Elements. Consumer kit content and tags are unchanged; affected evidence records were refreshed. Verified: 4,855 core tests (32 skipped), core MCP, 32 extension MCP tests, 116 Bleph native cases, four returned-QR rounds, 11 bounded BMI cases, and exact emission parity. Prior semantic and native limitations remain; see the evidence ledger.",
-    "evidence":  "packages/crl/src/authoring-kit/tests/coverage.md"
+  "auditedRevision": "cc1b675ed9431d047bd5fb34305abef1b9af18a8",
+  "auditedSchemaVersion": "2.2",
+  "auditedContentHash": "f31aadf37e8e371f55d83f9632933baa383259bfa8023b5d31bba29d08392e36",
+  "scope": "Kit2.2 maintenance from34d591eeab7fae22485546add54efe41106d756d through cc1b675ed9431d047bd5fb34305abef1b9af18a8. MV case authoring and wording-patch handoff; corrected provenance-independent flag storage. Complete changed-test/source delta reviewed in737-739. Core4,864 pass/32 skipped, actual MCP pass; extension1,261 pass/3 expected failures. Scoped presentation emit parity and19-case CRE comparison with installed5.2.0 passed. Native final review converged; external final review exhausted its budget after prior findings were dispositioned. This stamp does not claim suite-aware MV/regression emission or new clinical/native verification. See evidence ledger.",
+  "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
