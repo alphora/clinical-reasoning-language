@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f",
-  "auditedSchemaVersion": "2.3",
-  "auditedContentHash": "75720d63e074fc63f88f9e8d3f6f98d3097be313c5b8f4dd91a3fa1d11aea7b8",
-  "scope": "Kit schema 2.3 maintenance from cc1b675ed9431d047bd5fb34305abef1b9af18a8 through 74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f. Two case-set operations: complete MV examples and regression reusing MV plus engineering controls; selected-set validation/emission, source identities, conservative advisory warnings and ordinary results. Five existing rules updated. Reviews744-746 and complete changed-source/test inventory in the evidence ledger. Core4901 pass/32 skipped, actual MCP passed, extension1262 pass/3 expected failures, final bounded core32/32. External findings dispositioned; no unrun convergence claimed. No freshness, transaction, receipt or history-migration framework. This source audit does not certify pending installed release gates, native outcomes or clinical content; existing Bleph source-correspondence findings remain explicit.",
+  "auditedRevision": "badef3ce5f10c1a5d09e657371ced6c7576392e4",
+  "auditedSchemaVersion": "2.4",
+  "auditedContentHash": "4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff",
+  "scope": "Kit schema 2.4 maintenance from 74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f through badef3ce5f10c1a5d09e657371ced6c7576392e4. The complete 43-path delta covers shared Decision scaling, presentation coexistence checks, explicit CRE multiple-result refusal, UI source-definition navigation and seven authoring rules. Two reference pairs provide 20 engineering cases plus nine inline/shared CRE comparisons; normal validation, regression, emission and retrieval verified. Reviews 754/755 contain full dispositions; native closeout converged, with no unrun external convergence claim. The full core suite passed 4,945 tests with 32 skipped, extension passed 1,266 with three expected failures, and real MCP passed on preceding kit bytes. Final 249 affected checks and real MCP retrieval passed the current hash. This source audit does not certify pending installed release gates, native outcomes or clinical content. Existing source-review findings and bounded proof tiers remain explicit.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

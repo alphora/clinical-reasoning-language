@@ -4,9 +4,8 @@
 
 Baseline: `74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f` (last completed audit).
 Implementation target before kit edits: `fe4e8ba5b7c2e779b28d287297377edfc5f722d9`.
-Final reviewed content target: pending content commit. Kit schema `2.4`;
-content hash `4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`. This section will be finalized by the separate
-metadata stamp. The source audit includes the complete saved-audit delta, not just
+Final reviewed content target: `badef3ce5f10c1a5d09e657371ced6c7576392e4`. Kit schema `2.4`;
+content hash `4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`. Finalized by the separate metadata stamp. The source audit includes the complete saved-audit delta, not just
 kit bytes. No release or installed-user upgrade is implied.
 
 Intent: teach source applicability and independent Boolean conditions, actual
