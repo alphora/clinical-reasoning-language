@@ -258,6 +258,10 @@ export interface TraceNode {
    *  with the single-ref `concept`/`composition` fields. Discriminator for a
    *  compound branch: `conditionTrace !== undefined`. */
   conditionTrace?: BranchConditionTrace;
+  /** For use-decision actions, present (possibly empty) once emitAction's UseDecision
+   * arm is reached, including unresolved targets and cycle refusals. Absent when a
+   * guard excludes/refuses that arm. This is not proof the target body was entered:
+   * scenario projection also checks target resolution, cycles and guard outcome. */
   children?: TraceNode[];
 }
 
@@ -2063,13 +2067,15 @@ function runCase(
   let subjectFact: string | undefined;
   // REFACTOR:grounded (#320): clauses belong to each reference, never a last-wins fact-name map.
   const factRefs: CELFactRefField[] = [];
-  let result: CELResultField | undefined;
+  // REFACTOR:grounded: CEL can describe several results, but this executor supports one.
+  // Refuse the unsupported execution rather than silently selecting its last assertion.
+  const resultFields = c.body.filter((b): b is CELResultField => b.type === "CELResultField");
+  const result = resultFields.length === 1 ? resultFields[0] : undefined;
   for (const b of c.body) {
     if (b.type === "CELSubjectField") subjectFact = b.factName;
     else if (b.type === "CELFactRefField") factRefs.push(b);
-    else if (b.type === "CELResultField") result = b; // Existing single-result evaluator contract.
   }
-  const parsedExpected: CaseRun["expected"] = c.body.filter((b) => b.type === "CELResultField").length === 1
+  const parsedExpected: CaseRun["expected"] = resultFields.length === 1
     ? result?.value.type === "CELPauseResult" ? { leaf: result.leafName, pause: true }
       : result?.value.type === "CELBranchResult" ? { leaf: result.leafName, branch: result.value.branchName } : null
     : null;
@@ -2079,6 +2085,14 @@ function runCase(
   inputErrors.push(...authoringErrors);
   if (c.body.some((b) => b.type === "CELResultField" && b.value.type === "CELPauseResult")) {
     inputErrors.push(...pauseValidationErrors.filter((d) => !collisionDiagnostic || !d.endsWith(collisionDiagnostic)));
+  }
+  // Pause multiplicity is already a validator error above, even for runCel callers.
+  if (resultFields.length > 1 && !resultFields.some(r => r.value.type === "CELPauseResult")) {
+    const hasBoolean = resultFields.some(r => r.value.type === "CELBooleanResult");
+    const guidance = hasBoolean
+      ? " CRE also cannot evaluate Boolean Concept expectations, even individually; use a tool supporting those expectations."
+      : " Keep this CEL for other evaluation tools, or author separate single-activity CRE cases with the required facts.";
+    inputErrors.push(`cre-multiple-result-assertions: Case "${c.name}" has ${resultFields.length} result assertions. The CRE run/scenario contract carries one activity or pause expectation; no assertions were evaluated.${guidance}`);
   }
   if (publication?.error) inputErrors.push(publication.error);
   if (collisionDiagnostic) inputErrors.push(collisionDiagnostic);

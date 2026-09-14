@@ -1,7 +1,10 @@
 // REFACTOR:grounded: advisory proof from CRE reachability, never a rewrite of authored data.
-import type { Concept } from "../ast/types";
+import { getRefLibrary, getRefName, type Concept, type Decision, type BranchBlock, type WhenBlockBody } from "../ast/types";
+import { branchConditionRefs } from "../ast/branchCondition";
+import { buildGlobalDecisionMap, makeResolveDecision } from "../ast/decisionResolver";
+import { idOf, type LibAwareDecisionResolver } from "../ast/decisionSpine";
 import type { CELCase, CELFact } from "./ast/types";
-import { renderScenario, type BranchConditionView, type ViewNode } from "../cre/viewModel";
+import { childId, runCel, type TraceNode } from "../cre/run";
 import { resolveDefinedByTarget } from "./definedByResolve";
 import type { EmitDiagnostic } from "./emitter/types";
 import type { CelSuite } from "./suite";
@@ -13,12 +16,52 @@ function mentions(value: unknown, name: string): boolean {
   if (value && typeof value === "object") return Object.entries(value).some(([k, v]) => k !== "location" && mentions(v, name));
   return false;
 }
-function flatNodes(nodes: ViewNode[]): ViewNode[] { return nodes.flatMap(n => [n, ...flatNodes(n.children ?? [])]); }
-function references(expr: BranchConditionView, lib: string): string[] {
-  if (expr.op === "ref") return [key(expr.concept.libraryName ?? lib, expr.concept.name)];
-  if (expr.op === "not") return references(expr.operand, lib);
-  if (expr.op === "and" || expr.op === "or") return expr.operands.flatMap(e => references(e, lib));
-  return []; // criterion dependency analysis below prevents treating its inputs as direct questions.
+/** REFACTOR:grounded: pair source-local structure with the actual trace. Unentered
+ * definitions contribute only conservative other-use evidence, once per definition.
+ * Never expand every possible execution path to establish a skipped question. */
+function uses(decision: Decision, lib: string, trace: TraceNode[], resolve: LibAwareDecisionResolver) {
+  const index = new Map<string, TraceNode>(), skipped = new Set<string>(), other = new Set<string>();
+  const visited = new Set<string>();
+  let unresolved = false;
+  const flatten = (nodes: TraceNode[]) => { for (const node of nodes) { index.set(node.nodeId, node); flatten(node.children ?? []); } };
+  flatten(trace);
+  const branches = (rows: BranchBlock[], parent: string, frame: string, active: boolean): void => {
+    let priorMatch = false;
+    rows.forEach((row, i) => {
+      const path = childId(parent, row.type === "OtherwiseBlock" ? "otherwise" : `when[${i}]`);
+      const t = active ? index.get(path) : undefined;
+      if (row.type === "WhenBlock") for (const ref of branchConditionRefs(row.condition)) {
+        // Criterion refs are deliberately excluded. Existing dependency checks below
+        // suppress advice for any concept used by a Criterion.
+        (!t && priorMatch ? skipped : other).add(key(getRefLibrary(ref.ref) ?? frame, getRefName(ref.ref)));
+      }
+      body(row.body, path, frame, active);
+      if (t && (row.type === "OtherwiseBlock" || t.satisfied)) priorMatch = true;
+    });
+  };
+  const body = (value: WhenBlockBody, parent: string, frame: string, active: boolean): void => {
+    if (value.type === "BlockBody" && value.statements.some(s => s.type === "WhenBlock" || s.type === "OtherwiseBlock")) {
+      branches(value.statements as BranchBlock[], parent, frame, active); return;
+    }
+    const actions = value.type === "BlockBody" ? value.statements : [value];
+    actions.forEach((stmt, i) => {
+      if (stmt.type !== "ActionStatement") return;
+      const path = childId(parent, `action[${i}]`), t = active ? index.get(path) : undefined;
+      if (stmt.guard) other.add(key(getRefLibrary(stmt.guard.conceptName) ?? frame, getRefName(stmt.guard.conceptName)));
+      if (stmt.action.type !== "UseDecision") return;
+      const target = resolve(frame, stmt.action.decisionName);
+      if (!target) { unresolved = true; return; }
+      if (t?.children && !t.guardedOut) branches(target.decision.body.statements, path, target.lib, true);
+      else {
+        const targetId = idOf(target.lib, target.decision.name);
+        if (visited.has(targetId)) return;
+        visited.add(targetId);
+        branches(target.decision.body.statements, "", target.lib, false);
+      }
+    });
+  };
+  branches(decision.body.statements, "", lib, true);
+  return { skipped, other, unresolved, nodes: [...index.values()] };
 }
 
 /** Explicit commands only: automatic editor validation does not run CRE. */
@@ -28,34 +71,29 @@ export function mvOffPathWarnings(suite: CelSuite, now = new Date()): EmitDiagno
   for (const file of suite.files) {
     try {
       const graph = file.graph;
-      const rendered = renderScenario(graph, { now });
-      if (!rendered.success || !graph.cel || !graph.coversTarget || !graph.crlRegistry) continue;
+      const rendered = runCel(graph, { now });
+      if (!rendered.success || rendered.runs.some(run => run.status === "error") || !graph.cel || !graph.coversTarget || !graph.crlRegistry) continue;
       const libraries = [...graph.crlRegistry.byNameLocal.values(), ...graph.crlRegistry.byNamePackage.values()];
       const concepts = libraries.flatMap(e => e.ast.statements.filter((s): s is Concept => s.type === "Concept").map(c => ({ lib: e.name, c, source: e.filePath })));
       const facts = new Map(graph.cel.statements.filter((s): s is CELFact => s.type === "CELFact").map(f => [f.name, f]));
       const cases = graph.cel.statements.filter((s): s is CELCase => s.type === "CELCase");
-      for (const scenario of rendered.scenarios) {
-        const declared = cases.find(c => c.name === scenario.case.name);
-        const nodes = flatNodes(scenario.tree);
-        if (!declared || scenario.status === "error" || scenario.discardedUnknown || scenario.expected?.pause || !scenario.produced.length || nodes.some(n => n.unknown || n.guard?.unknown || n.invalidated || n.publicationErrors?.length)) continue;
-        const skipped = new Set<string>(), other = new Set<string>();
-        let unresolvedFrame = false;
-        for (const node of nodes) {
-          const frameLib = libraries.find(e => e.filePath === node.source.filePath)?.name;
-          if ((node.condition?.expr || node.guard) && !frameLib) { unresolvedFrame = true; break; }
-          const expr = node.condition?.expr;
-          if (expr) for (const ref of references(expr, frameLib!)) {
-            (node.unreachedReason === "preempted" && !node.evaluated ? skipped : other).add(ref);
-          }
-          // Guard inputs or attached evidence are reached uses, even outside a when condition.
-          if (node.guard) other.add(key(node.guard.concept.libraryName ?? frameLib!, node.guard.concept.name));
-          if (node.evaluated) for (const name of node.condition?.facts ?? []) {
-            const f = facts.get(name)?.body.find(b => b.type === "CELDefinedByField");
-            const t = f?.type === "CELDefinedByField" ? resolveDefinedByTarget(f.ref, graph) : undefined;
-            if (t) other.add(key(t.lib, t.name));
-          }
+      const rootLib = graph.coversTarget.name;
+      if (!rootLib) continue;
+      const decisions = graph.coversTarget.ast.statements.filter((s): s is Decision => s.type === "Decision");
+      const resolve = makeResolveDecision(buildGlobalDecisionMap({ crlRegistry: graph.crlRegistry,
+        coveredLib: rootLib, coveredFilePath: graph.coversTarget.filePath, coveredStatements: decisions }));
+      for (const scenario of rendered.runs) {
+        const declared = cases.find(c => c.name === scenario.case);
+        const decision = decisions.find(d => d.name === scenario.decision);
+        if (!declared || !decision || scenario.status === "error" || scenario.discardedUnknown || scenario.expected?.pause || !scenario.produced.length) continue;
+        const { nodes, skipped, other, unresolved } = uses(decision, rootLib, scenario.trace, resolve);
+        if (unresolved || nodes.some(n => n.unknown || n.guard?.unknown || n.invalidated || n.publicationErrors?.length)) continue;
+        // Attached evidence is another use even when absent from a direct guard ref.
+        for (const node of nodes) for (const name of node.facts ?? []) {
+          const f = facts.get(name)?.body.find(b => b.type === "CELDefinedByField");
+          const t = f?.type === "CELDefinedByField" ? resolveDefinedByTarget(f.ref, graph) : undefined;
+          if (t) other.add(key(t.lib, t.name));
         }
-        if (unresolvedFrame) continue;
         for (const ref of declared.body) {
           if (ref.type !== "CELFactRefField" || ref.intent) continue;
           if (declared.body.some(b => b.type === "CELCrossResourceField" && (b.sourceName === ref.factName || b.targetName === ref.factName))) continue;

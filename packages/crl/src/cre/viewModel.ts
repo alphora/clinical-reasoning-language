@@ -1,16 +1,10 @@
 /**
- * Scenario view-model — the stable CRE↔UI contract (roadmap item #2). `renderScenario` runs the CRE
- * over a resolved CEL graph and projects each case into a host-independent `ScenarioViewModel`: the
- * FULL decision tree (the AST is the structural spine — every branch/action, reached or not) overlaid
- * with per-node run state from the CRE trace (matched by the trace's `nodeId`). This is DECOUPLED from
- * the raw `TraceNode` on purpose: the internal trace can evolve without breaking the UI/agent contract.
- *
- * Why an AST spine (vs emitting unreached-branch skeletons in the CRE): the full tree must show EVERY
- * node grayed by reachability — not only first:-preempted siblings but also the bodies of unsatisfied
- * `when`s (condition false ⇒ body not executed). The AST already holds the complete structure; the
- * trace supplies state. `nodeId`/`recName`/`childId` are imported from `run.ts` so the walk assigns
- * ids IDENTICAL to the CRE's — the alignment key.
+ * Scenario projection: retain every local branch/action in each entered Decision frame,
+ * overlaid by occurrence-specific CRE trace IDs. Unentered shared Decisions remain
+ * explicit references with source access; the static MV model retains every definition.
+ * REFACTOR:grounded: never copy every possible shared continuation into every case.
  */
+import { collectDecisionArmsTransitive } from "../ast/decisionArms";
 import { idOf, type LibAwareDecisionResolver } from "../ast/decisionSpine";
 import type {
   ActionStatement,
@@ -71,7 +65,8 @@ import {
 // v6 (#320): pause expectation variant and reached unknown condition. Unknown is distinct from
 // false/unevaluated. Compound branch operands preserve both explicit Boolean values; unknown omits satisfied.
 // discardedUnknown identifies a reached legacy capability limit that prevents a supported pause projection.
-export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 6;
+// v7: unentered resolved Decision targets are deferred references, not copied subtrees.
+export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 7;
 
 type ActionKind = "recommend-activity" | "use-decision";
 export type ConceptView = { name: string; libraryName?: string };
@@ -246,12 +241,14 @@ export interface ActionView {
   target: ConceptView;
   qualifier?: "any" | "all";
   produced: boolean;
-  /** `use decision` only: true when the target RESOLVED and was recursed in place (its sub-tree inlined as the action
-   *  node's `children`) — a same-library target (bare or self-qualified) OR a resolvable cross-library qualified target
-   *  (#172). false only when it stays a leaf: an UNRESOLVED target (lib/sub not in the graph), one on the delegation
-   *  path (cycle), or when no resolver was supplied. Absent for a `recommend activity` action. For a recursed
-   *  cross-library target, `target.libraryName` carries the sub's owning library. */
+  /** True only when this occurrence entered the resolved target and carries its local tree. */
   expanded?: boolean;
+  /** Resolved, non-cyclic target body not entered by this occurrence. The action
+   * itself may have been evaluated and guarded out; distinct from an unresolved target. */
+  deferred?: true;
+  targetSource?: LsLocation;
+  /** Possible activities excluding this occurrence's delegation ancestors. No execution claim. */
+  reachableActivities?: string[];
 }
 
 /** VM-native projection of the `defined as` composition sub-evaluation. `sem-and`/`sem-or`/`sem-not` are the
@@ -610,48 +607,36 @@ function buildActionVM(
     stmt.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
   const guardedOut = t?.guardedOut === true;
 
-  // `use decision` recursion (#166 same-library, #172 cross-library): STRUCTURALLY inline a RESOLVABLE target (BARE in
-  // `currentLib`, or QUALIFIED in its explicit lib) that is not on the delegation path (cycle) — independent of whether
-  // this action was reached, because the view-model is the FULL tree (the static spine: every branch/action, reached or
-  // not). This keeps the VM nodeId set byte-identical to decisionSpine's + the CRE trace's (the golden parity
-  // invariant). A cross-library sub recurses in ITS OWN library + file (`resolved.lib`/`resolved.filePath`) so its
-  // spans point at its file and its own bare targets resolve there. Per-node run state (evaluated/produced) is overlaid
-  // from the trace. A use-decision node is NEVER itself `produced` — it delegates; its child RecommendActivity nodes
-  // carry the dispositions (REPLACE). An UNRESOLVED or cyclic target stays a leaf (expanded:false).
+  // REFACTOR:grounded: expand only actual delegation occurrences. Keep the original
+  // node IDs and owning source frame; source sharing must not merge case execution.
   let children: ViewNode[] | undefined;
-  let expanded: boolean | undefined;
-  let expandedLib: string | undefined; // the sub's owning library when expanded — surfaced as target.libraryName (#175).
-  if (actionKind === "use-decision") {
-    expanded = false;
-    if (stmt.action.type === "UseDecision") {
-      const resolved = resolve(currentLib, stmt.action.decisionName);
-      if (resolved) {
-        // Cycle key is `(lib,name)` of the RESOLVED owning library (#172) — cross-library `A.Sub`/`B.Sub` are distinct.
-        const subId = idOf(resolved.lib, resolved.decision.name);
-        if (!stack.has(subId)) {
-          children = walkBranchesVM(
-            resolved.decision.body.statements,
-            nodeId,
-            traceIndex,
-            resolved.filePath,
-            resolve,
-            resolved.lib,
-            new Set([...stack, subId]),
-          );
+  let expanded = false;
+  let deferred: true | undefined;
+  let targetSource: LsLocation | undefined;
+  let reachableActivities: string[] | undefined;
+  let expandedLib: string | undefined;
+  if (stmt.action.type === "UseDecision") {
+    const resolved = resolve(currentLib, stmt.action.decisionName);
+    if (resolved) {
+      expandedLib = resolved.lib !== currentLib ? resolved.lib : undefined;
+      targetSource = span(resolved.decision.location, resolved.filePath);
+      const subId = idOf(resolved.lib, resolved.decision.name);
+      if (!stack.has(subId)) {
+        const ancestors = new Set([...stack, subId]);
+        if (t?.children && !guardedOut) {
+          children = walkBranchesVM(resolved.decision.body.statements, nodeId, traceIndex,
+            resolved.filePath, resolve, resolved.lib, ancestors);
           expanded = true;
-          // Force a libraryName ONLY for a genuinely CROSS-library expansion. A BARE same-lib target keeps no
-          // libraryName (byte-identical to pre-#172). A SELF-qualified same-lib target (`"SQ"."Sub"` inside SQ) keeps
-          // whatever `conceptView` derived from its AST qualifier (here "SQ") — we don't override it; `resolved.lib ===
-          // currentLib` is benign for the #175 decomposer (`target.libraryName ?? frame.lib` → the same lib either way).
-          if (resolved.lib !== currentLib) expandedLib = resolved.lib;
+        } else {
+          deferred = true;
+          // Failed-criterion attribution needs possible continuations, not copied
+          // descendants. A cycle back to an ancestor contributes no activity here.
+          reachableActivities = [...collectDecisionArmsTransitive(resolved.decision, resolve, resolved.lib, ancestors)];
         }
       }
     }
   }
 
-  // When a cross-library sub is expanded, surface its owning library on `target.libraryName` (= resolved.lib) so the
-  // #175 decomposer re-roots `producedRuntimePathRefs` into the sub's frame. A qualified ref already carries this via
-  // conceptView; setting it from `resolved.lib` also covers the (today impossible, but defensive) bare cross-lib case.
   const target = conceptView(actionRef);
   if (expandedLib && !target.libraryName) target.libraryName = expandedLib;
 
@@ -662,7 +647,9 @@ function buildActionVM(
     // REFACTOR:grounded (#320, review 571): attempted work is not a valid production
     // when the case-wide error channel has invalidated the trace's action results.
     produced: actionKind === "use-decision" ? false : evaluated && !guardedOut && !t?.invalidated,
-    ...(actionKind === "use-decision" ? { expanded: expanded! } : {}),
+    ...(actionKind === "use-decision" ? { expanded } : {}),
+    ...(deferred ? { deferred, reachableActivities } : {}),
+    ...(targetSource ? { targetSource } : {}),
   };
   const node: ViewNode = {
     nodeId,

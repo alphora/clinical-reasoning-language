@@ -11,6 +11,7 @@ import { parseInput } from "../../ast/tests/parseInput";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { renderScenario } from "../../cre/viewModel";
+import { runCel } from "../../cre/run";
 import type { RegistryEntry } from "../../imports/types";
 import {
   allUnsatisfiedCriteria,
@@ -567,23 +568,43 @@ describe("failedCriterionFrontier — deep delegation: blocker buried in an inli
 
 // ── failedCriterionFrontier — guarded-out delegation ancestor with a deep inlined target (real VM, gpt55-5) ─────────
 describe("failedCriterionFrontier — guarded-out use-decision ancestor of an inlined target [real VM]", () => {
+  it.each(["unresolved", "cycle"])("retains empty children for an attempted %s target", mode => {
+    const source = mode === "unresolved"
+      ? GRD_CRL.replace('use decision "Sub" unless "Contra"', 'use decision "Missing"')
+      : GRD_CRL.replace('recommend activity "Approve"', 'use decision "Main"');
+    const run = runCel(graphFrom(source, GRD_CEL.replace('- fact is "fContra".', ''))).runs[0];
+    const flatten = (rows: typeof run.trace): typeof run.trace => rows.flatMap(n => [n, ...flatten(n.children ?? [])]);
+    const actions = flatten(run.trace).filter(n => n.kind === "action");
+    expect(actions).toHaveLength(mode === "unresolved" ? 1 : 2);
+    expect(Object.hasOwn(actions.at(-1)!, "children")).toBe(true);
+    expect(actions.at(-1)!.children).toEqual([]);
+  });
+  it("distinguishes dispatched target bodies from guard-excluded action traces", () => {
+    const graph = graphFrom(GRD_CRL, GRD_CEL);
+    const excluded = runCel(graph).runs[0].trace[0].children![0];
+    expect(excluded.guardedOut).toBe(true);
+    expect(Object.hasOwn(excluded, "children")).toBe(false);
+    const entered = runCel(graphFrom(GRD_CRL, GRD_CEL.replace('- fact is "fContra".', ''))).runs[0].trace[0].children![0];
+    expect(Object.hasOwn(entered, "children")).toBe(true);
+    expect(entered.children!.length).toBeGreaterThan(0);
+  });
   it("a guarded-out `use decision` whose inlined sub has the expected recommend → frontier = the GUARDED DELEGATION ROW", () => {
-    // Real VM: Main --otherwise--> use decision "Sub" UNLESS "Contra". The case supplies Contra, so the use-decision is
-    // guardedOut:true — but the VM STILL inlines its sub-tree (expansion is resolvability-based, guardedOut is a separate
-    // projected flag), so "Approve" exists as a deep recommend at otherwise/action[0]/otherwise/action[0] (evaluated:
-    // false). The frontier must walk the target's ancestor chain, hit the guarded-out delegation row, and return IT
-    // (reason guarded-out, display = unless Contra) — NOT the deep child, NOT empty.
+    // Real VM: the evaluated use-decision action is excluded by Contra. Its target
+    // body is deferred; the static activity summary still identifies this action
+    // as the demonstrated blocker for Approve without copying unentered descendants.
     const r = renderScenario(graphFrom(GRD_CRL, GRD_CEL));
     const scenario = r.scenarios[0];
     expect(scenario.status).toBe("fail");
     expect(scenario.expected).toEqual({ decision: "Main", branch: "Approve" });
 
-    // VM-signal sanity: the delegation row is guardedOut AND expanded (has inlined children).
+    // VM-signal sanity: the action is guarded out and its resolved target body is deferred.
     const useRow = scenario.tree[0].children![0];
     expect(useRow.nodeId).toBe("otherwise/action[0]");
     expect(useRow.action?.actionKind).toBe("use-decision");
     expect(useRow.guardedOut).toBe(true);
-    expect(useRow.children && useRow.children.length).toBeGreaterThan(0);
+    expect(useRow.children).toBeUndefined();
+    expect(useRow.action?.deferred).toBe(true);
+    expect(useRow.action?.reachableActivities).toContain(scenario.expected!.branch);
 
     const got = failedCriterionFrontier(scenario as unknown as FcScenario);
     expect(got).toHaveLength(1);

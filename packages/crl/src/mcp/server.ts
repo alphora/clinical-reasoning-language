@@ -728,7 +728,7 @@ export function createServer(): McpServer {
         "Compound branch traces preserve explicit true and false, omitting satisfied only for unknown. Validate CRL separately and check native answers. " +
         "Pause attribution identifies reached decision conditions; their compound traces retain operand truth. An activity `result is` passes iff its branch is " +
         "in the produced recommendation set. Same-library `use decision` is evaluated in place and produces its delegated activities, not the sub-decision name. Foreign delegation under publication preparation is refused with publication-unsupported-scope; legacy cross-library successes do not certify that path. " +
-        "Raw run schemaVersion is 1 (separate from render_scenario schemaVersion 6). Returns { schemaVersion, success, caseCount, passCount, " +
+        "Raw run schemaVersion is 1 (separate from render_scenario schemaVersion 7). Returns { schemaVersion, success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
         "source, satisfied, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
         "#224: a `when` may guard on a compound `and`/`or`/`not` — such a node OMITS `concept` and carries " +
@@ -851,8 +851,11 @@ export function createServer(): McpServer {
       description:
         "Run the CRE over a CEL document and project each case into the stable scenario view-model — the " +
         "host-independent CRE↔UI contract (roadmap item #2) the scenario-runner UI consumes. Unlike " +
-        "`run_decision` (raw evaluation trace), this returns the FULL decision tree (the CRL AST is the " +
-        "structural spine — EVERY branch and action, reached or not) overlaid with per-node run state: " +
+        "`run_decision` (raw evaluation trace), this retains all local branches and actions in entered Decision frames, " +
+        "overlaid with per-node run state. Schema7 defers unentered resolved delegations instead of copying their subtrees: " +
+        "action.expanded:false, deferred:true, targetSource for source inspection and reachableActivities for possible " +
+        "source continuations (NOT produced results). The static MV tree retains all definitions. Entered occurrence IDs are unchanged. " +
+        "Per-node state includes: " +
         "`evaluated` (reached?), `condition` (overall satisfied + facts, plus `expr`: the #224 guard expression " +
         "tree — a single `ref` leaf, `and`/`or` nodes, a `not` node (op:\"not\", carries `operand`), or a #236 " +
         "`criterion` node (op:\"criterion\", carries `criterion:{name,libraryName}` + on its FIRST occurrence per " +

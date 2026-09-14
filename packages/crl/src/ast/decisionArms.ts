@@ -39,8 +39,11 @@ export function collectDecisionArmsTransitive(
   seen: Set<string> = new Set([idOf(callerLib, decision.name)]),
 ): Set<string> {
   const arms = new Set<string>();
+  // REFACTOR:grounded: this query returns a union, not path occurrences. Preserve
+  // caller exclusions, then visit each reachable definition once for this query.
+  const visited = new Set(seen);
   for (const branch of decision.body.statements) {
-    walkArmsBranchTransitive(branch, arms, resolve, seen, callerLib);
+    walkArmsBranchTransitive(branch, arms, resolve, visited, callerLib);
   }
   return arms;
 }
@@ -98,13 +101,10 @@ function walkArmsActionStatementTransitive(
   const subId = idOf(resolved.lib, resolved.decision.name);
   if (seen.has(subId)) return;
   // Recurse in the SUB'S library so its own bare `use decision` targets resolve there.
-  const subArms = collectDecisionArmsTransitive(
-    resolved.decision,
-    resolve,
-    resolved.lib,
-    new Set([...seen, subId]),
-  );
-  for (const a of subArms) arms.add(a);
+  seen.add(subId);
+  for (const branch of resolved.decision.body.statements) {
+    walkArmsBranchTransitive(branch, arms, resolve, seen, resolved.lib);
+  }
 }
 
 function walkArmsBranch(branch: BranchBlock, arms: Set<string>): void {

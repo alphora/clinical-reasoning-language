@@ -59,7 +59,7 @@ export interface FcViewNode {
     satisfied?: boolean;
     unknown?: true;
   };
-  action?: { actionKind: "recommend-activity" | "use-decision"; produced: boolean };
+  action?: { actionKind: "recommend-activity" | "use-decision"; produced: boolean; deferred?: true; reachableActivities?: string[] };
   guardedOut?: boolean;
   children?: FcViewNode[];
 }
@@ -177,12 +177,12 @@ export function failedCriterionFrontier(sv: FcScenario): FailedCriterionNode[] {
     for (const n of nodes) {
       const nextChain = [...chain, n];
       const nextSiblings = [...siblings, nodes];
-      // A TARGET site is a PRODUCIBLE disposition: a recommend-activity whose label matches. A use-decision delegation
-      // row is excluded (never `produced`) even if its target name coincides with `expected.branch` (FIX 1).
+      // REFACTOR:grounded: a deferred continuation can lead to the expected activity.
+      // Attribute only its demonstrated ancestor/guard blocker; never claim it produced.
       if (
         n.kind === "action" &&
-        n.action?.actionKind === "recommend-activity" &&
-        n.label === expectedBranch
+        ((n.action?.actionKind === "recommend-activity" && n.label === expectedBranch) ||
+          (n.action?.deferred === true && n.action.reachableActivities?.includes(expectedBranch)))
       ) {
         sites.push({ chain: nextChain, siblings: nextSiblings });
       }

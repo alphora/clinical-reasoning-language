@@ -191,3 +191,6 @@ record's own source trail (the artifact→source hash), but the artifact↔sidec
 repaired by tool — the **post-repair residual**, NOT the original defect prevalence. Do not cite "N records still
 flagged" as evidence the problem was small; the pre-repair count was higher. (A concrete corpus figure comes from the H
 `--dry-run` sweep, not from this spec.)
+
+
+CEL `tests-branch` and `asserts-fact` references describe authored assertions, not proof of successful execution. Default decision clustering retains legal multiple-result assertions; disposition-path clustering defers cases CRE cannot execute. FINAL correspondence reports an unchecked/error finding for such cases. CEL data emission remains valid, but a full MV/FINAL or regression pass requires cases supported by CRE. This includes multiple activities asserted on the same Decision: the current run/scenario contract carries one expectation.

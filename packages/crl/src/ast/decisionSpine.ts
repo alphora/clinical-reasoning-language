@@ -37,10 +37,10 @@ export const nameOf = (id: string): string => (JSON.parse(id) as [string, string
  * Static decision spine (provenance spec §5). Walks a Decision's full AST tree — ALL branches and actions, evaluated
  * or not — and assigns each sub-node the SAME `childId` path the CRE/scenario view-model assigns. Provenance addresses
  * decision sub-nodes (`CrlNodeRef.nodeId`) by these paths, so they MUST stay byte-identical to the view-model; that
- * invariant is pinned by a golden id-parity test (decisionSpine.test) rather than by refactoring the view-model.
+ * invariant is pinned by occurrence-identity tests. Since scenario schema7, VM IDs are a subset of an exhaustive recursive spine: unentered shared targets stay deferred.
  *
  * This is the STATIC counterpart to the CRE runtime trace (which walks only reached-for-given-facts paths) and mirrors
- * the view-model's full walk structure (run.ts/viewModel.ts walkBranchesVM/walkBodyVM) — root parentId "", `when[i]`
+ * the view-model's local walk structure (run.ts/viewModel.ts walkBranchesVM/walkBodyVM) — root parentId "", `when[i]`
  * counting `otherwise` positions, `action[0]` for an inline action, `action[j]` for a menu, nested branches reusing the
  * parent id.
  *

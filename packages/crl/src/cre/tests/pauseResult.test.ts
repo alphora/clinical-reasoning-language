@@ -15,7 +15,7 @@ const withoutFilePaths = (value: unknown) => JSON.parse(JSON.stringify(value, (k
 // REFACTOR:grounded (#320): CEL expresses the expectation. These tests prove CRE behavior,
 // not native $apply conformance; the latter needs independently executed artifact evidence.
 function evaluate(options: { references?: string[]; value?: string; qualifier?: string; expected?: string;
-  extraResult?: string; legacy?: boolean; body?: string; code?: string; extraDecision?: string; extraConcept?: string; secondValue?: string } = {}) {
+  extraResult?: string; expectedLeaf?: string; legacy?: boolean; body?: string; code?: string; extraDecision?: string; extraConcept?: string; secondValue?: string } = {}) {
   const parent = path.resolve(tmpdir());
   const directory = mkdtempSync(path.join(parent, "crl-pause-"));
   if (path.dirname(directory) !== parent || !path.basename(directory).startsWith("crl-pause-")) throw new Error("Unexpected temporary directory");
@@ -57,7 +57,7 @@ fact "Y":
 case "Case":
 - subject is "Subject".
 ${(options.references ?? []).map((name) => `- fact is "${name}".`).join("\n")}
-- result is "D" is ${options.expected ?? "pause"}.
+- result is "${options.expectedLeaf ?? "D"}" is ${options.expected ?? "pause"}.
 ${options.extraResult ?? ""}`);
     const graph = resolveCelImports(celPath);
     expect(graph.celParseErrors).toEqual([]);
@@ -133,6 +133,29 @@ describe("CEL expected pause", () => {
     const { run, validation } = evaluate({ extraResult });
     expect(validation.errors.some((e) => e.kind === "conflicting-pause-results")).toBe(true);
     expect(run.status).toBe("error");
+    expect(run.diagnostics.filter(d => /conflicting-pause-results|cre-multiple-result-assertions/.test(d))).toHaveLength(1);
+  });
+
+  // REFACTOR:grounded: valid multi-result CEL must never earn a CRE pass from its last field.
+  // Quoted "pause" below names an activity; unquoted pause is tested separately.
+  it.each([
+    { expected: '"pause"', extraResult: '- result is "D" is "A".' },
+    { expected: '"A"', extraResult: '- result is "D" is "pause".' },
+    { expected: '"A"', extraResult: '- result is "D" is "A".' },
+    { expectedLeaf: "X", expected: "true", extraResult: '- result is "Y" is false.' },
+    { expectedLeaf: "X", expected: "true", extraResult: '- result is "D" is "A".' },
+    { expected: '"A"', extraResult: '- result is "X" is true.' },
+    { expected: '"A"', extraResult: '- result is "Other" is "A".', extraDecision: 'decision "Other":\n- when "X" then recommend activity "A".' },
+    { expected: '"A"', extraResult: '- result is "D" is "pause".', qualifier: "all", secondValue: "true" },
+  ])("explicitly refuses unsupported multiple expectations: %j", options => {
+    const { validation, run, emission } = evaluate({ references: ["X", "Y"], value: "true", ...options });
+    expect(validation.errors).toEqual([]);
+    expect(run.status).toBe("error");
+    expect(run.expected).toBeNull();
+    expect(run.produced).toEqual([]);
+    expect(run.trace).toEqual([]);
+    expect(run.diagnostics.filter(d => d.startsWith("cre-multiple-result-assertions:"))).toHaveLength(1);
+    expect(emission.emittedCases).toHaveLength(1); // data-only emission never claimed to check expectations
   });
 
   it("rejects a Concept pause and keeps the Decision kind diagnostic accurate", () => {
@@ -252,5 +275,31 @@ describe("CEL expected pause", () => {
         body: '- when "Composite" then recommend activity "A".\n- otherwise then recommend activity "pause".' });
       expect(run.status, run.diagnostics.join(";")).toBe("pass");
     }
+  });
+});
+
+// Compact delegation preserves the same blocker evidence without unentered copies.
+describe("deferred Decision attribution", () => {
+  const extraDecision = 'decision "Sub":\nfirst:\n- when "Y" then recommend activity "A".';
+  it.each([['false', 'unsatisfied-when'], [undefined, 'unknown-when']])("preserves %s ancestor", (value, reason) => {
+    const { view } = evaluate({ expected: '"A"', value, references: value ? ["X"] : [], extraDecision,
+      body: '- when "X" then use decision "Sub".' });
+    const use = view.tree[0].children![0];
+    expect(use.action).toMatchObject({ deferred: true, expanded: false, reachableActivities: ["A"] });
+    expect(use.action?.targetSource?.filePath).toContain("policy.crl");
+    expect(use.children).toBeUndefined();
+    expect(failedCriterionFrontier(view)).toMatchObject([{ nodeId: "when[0]", reason }]);
+  });
+  it("preserves the demonstrated preempting sibling", () => {
+    const { view } = evaluate({ expected: '"A"', value: "true", references: ["X"], extraDecision,
+      body: '- when "X" then recommend activity "pause".\n- otherwise then use decision "Sub".' });
+    expect(failedCriterionFrontier(view)).toMatchObject([{ nodeId: "when[0]", reason: "preemption" }]);
+  });
+  it("does not invent a target reachable only by returning to an ancestor", () => {
+    const { view } = evaluate({ expected: '"A"', value: "false", references: ["X", "Y"],
+      body: '- when "X" then use decision "Sub".\n- when "Y" then recommend activity "A".',
+      extraDecision: 'decision "Sub":\nfirst:\n- when "Y" then use decision "D".' });
+    expect(view.tree[0].children![0].action?.reachableActivities).toEqual([]);
+    expect(failedCriterionFrontier(view).map(n => n.nodeId)).toEqual(["when[1]"]);
   });
 });
