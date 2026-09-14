@@ -952,7 +952,8 @@ export function renderFlowPane(
     const critC = n.criterionCollapse;
     const critToggleMarkup = critC ? critToggle(x + 10, y + NODE_H / 2, critC.collapsed, key) : "";
     const labelDx = critC ? 24 : 10;
-    const labelMax = critC ? LABEL_MAX - 4 : LABEL_MAX;
+    const canOpenDecision = !!n.delegatedDecisionKey && roots.some(r => r.nodeKey === n.delegatedDecisionKey);
+    const labelMax = critC || canOpenDecision ? LABEL_MAX - 4 : LABEL_MAX;
     // #224 ii.3 Slice 2b: a single-criterion `when` records an OCCURRENCE (identity `{lib,name}` — the model-level verdict
     // is keyed on it, reviewed once across all occurrences + cases) + carries a verdict control at the top-right (a
     // criterion `when` has its concept suppressed → no flag badge there, so the slot is free). The host reveals the chip
@@ -979,6 +980,8 @@ export function renderFlowPane(
       allPassBadge +
       flagBadgeMarkup +
       startFlagMarkup +
+      (canOpenDecision
+        ? `<g data-flow-open-decision="${escapeHtml(n.delegatedDecisionKey!)}" role="button" tabindex="0" aria-label="Go to shared decision"><title>Go to shared decision</title><rect x="${x+NODE_W-24}" y="${y+8}" width="20" height="22" rx="3"/><text x="${x+NODE_W-20}" y="${y+24}">↗</text></g>` : "") +
       (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + NODE_W + 6}" y="${y - 18}" width="22" height="22" rx="4"/><path d="M${x + NODE_W + 12} ${y - 13} h10 l-2 6 l3 3 h-12 l3-3 z M${x + NODE_W + 17} ${y - 4} v5"/></g>` : "") +
       `</g>`;
   }
@@ -1121,6 +1124,7 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   // activity (the certify→green / not-certify+pended→gold borders were removed — they made the viewer PA-specific). A
   // use-decision → neutral grey with its dashed delegation shape.
   `.flow-activity>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.5}` +
+  `[data-flow-open-decision]{cursor:pointer}[data-flow-open-decision]>rect{fill:var(--vscode-button-secondaryBackground,#3a3d41);stroke:var(--vscode-descriptionForeground,#999)}[data-flow-open-decision]>text{fill:var(--vscode-foreground,#ddd);font-size:15px}[data-flow-open-decision]:hover>rect{fill:var(--vscode-button-secondaryHoverBackground,#45494e)}` +
   `.flow-use>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-dasharray:5 2}` +
   // #187 Todo 2b: a guarded recommend's "when <guard>" TAB — a labeled, clickable pill on the box top (the discoverable
   // replacement for the peek dot). Grey / purple by the guard's Source; a hover highlight signals it's interactive.

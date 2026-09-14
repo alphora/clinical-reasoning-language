@@ -64,3 +64,13 @@ test('missing structure mapping is a reported gap, never a fabricated path key',
   const [route]=executionRoutes(sv,structure);
   assert.deepEqual(route.nodeKeys,['root']);assert.deepEqual(route.gaps,['action[0]']);
 });
+
+test('guarded-out deferred delegation retains its target root and guard route',()=>{
+ const n=action('action[0]','Sub',{guardedOut:true,action:{actionKind:'use-decision',expanded:false,deferred:true,produced:false,target:{name:'Sub',libraryName:'Other'}}});
+ const {sv,structure}=fixture([n]);
+ structure.push({lib:'Other',decision:'Sub',nodeKey:'subroot',children:[]});
+ const [route]=executionRoutes(sv,structure);
+ assert.equal(route.terminalKind,'blocked-guard');
+ assert.deepEqual(route.nodeKeys,['root','key:action[0]','subroot']);
+ assert.deepEqual(route.gaps,[]);
+});

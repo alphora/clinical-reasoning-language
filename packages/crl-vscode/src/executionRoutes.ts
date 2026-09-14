@@ -47,7 +47,7 @@ export function executionRoutes(sv: ScenarioViewModel, structure: CrlDecisionStr
       };
       let childFrame = frame;
       let childQualifier = row?.childrenQualifier;
-      if (n.action?.actionKind === "use-decision" && n.action.expanded) {
+      if (n.action?.actionKind === "use-decision" && (n.action.expanded || n.action.deferred)) {
         childFrame = { lib: n.action.target.libraryName ?? frame.lib, decision: n.action.target.name, prefix: n.nodeId };
         const target = decisions.get(key(childFrame.lib, childFrame.decision));
         childQualifier = target?.childrenQualifier;

@@ -340,3 +340,14 @@ t3b("pending input has an amber channel and a distinct CRE actual result", () =>
   assert.match(html, /paused \(CRE prediction; unknown at when Input\)/);
   assert.ok(!html.includes('blocked: awaiting information'));
 });
+
+test("deferred and cyclic targets have a separate opaque source reveal", () => {
+ const source={filePath:"helper.crl",range:{start:{line:4,character:0},end:{line:8,character:0}}};
+ const scenario={case:{name:"c",facts:[]},decision:{name:"D",resolved:true},status:"fail",expected:null,produced:[],diagnostics:[],conceptTruth:[],
+ tree:[{nodeId:"when[0]/action[0]",kind:"action",label:"Sub",evaluated:false,source:{...source,filePath:"caller.crl"},action:{actionKind:"use-decision",target:{name:"Sub"},produced:false,expanded:false,deferred:true,targetSource:source}}]};
+ const result=renderScenarioHtml({schemaVersion:7,success:true,caseCount:1,passCount:0,failCount:1,errorCount:0,scenarios:[scenario],errors:[],source:{celFilePath:"case.cel"}});
+ assert.match(result.html,/Inspect decision source/);
+ const key=Object.keys(result.reveals).find(k=>k.endsWith(':decision-source'));
+ assert.deepEqual(result.reveals[key],source);
+ assert.equal(result.reveals[key.replace(':decision-source','')].filePath,'caller.crl');
+});

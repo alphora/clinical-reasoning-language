@@ -99,3 +99,10 @@ test("smoke: no throw + no 0px write on a missing-dimensions or empty (no .flow-
   assert.doesNotThrow(() => runScript(empty, null), "empty tree: script runs without throwing");
   assert.ok(empty.startsWith("<!doctype html>") && empty.trimEnd().endsWith("</html>"), "still a complete document");
 });
+
+test("static snapshots hide editor-only shared navigation without rewriting nested SVG", () => {
+  const flowHtml = '<svg><g data-flow-key="root"><rect/><g data-flow-open-decision="target" tabindex="0" role="button"><title>Go to shared decision</title><g><rect/><text>↗</text></g></g></g></svg>';
+  const html = renderFlowSnapshotDocument({ flowHtml, styleCss: "", title: "Snapshot" });
+  assert.ok(html.includes('#flowroot [data-flow-open-decision]{display:none}'));
+  assert.ok(html.includes(flowHtml), 'nested captured SVG remains intact');
+});

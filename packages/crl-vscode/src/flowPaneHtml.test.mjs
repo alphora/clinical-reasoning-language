@@ -1291,3 +1291,11 @@ check("full display labels are escaped and retained for wider question layouts",
  const rr=renderFlowPane([{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:long','when','when Long',['c:Long'],[])]}],{concepts:[concept('c:Long',name)]});
  assert.match(rr.html,/data-flow-label="Individual Blepharoplasty Documentation &amp; &lt;complete&gt; &quot;wording&quot;"/);
 });
+
+check("shared target navigation exists only for a rendered definition", () => {
+  assert.ok(!r.html.includes('data-flow-open-decision='), "unresolved target has no dead link");
+  const target = { lib: "T", decision: "D2", nodeKey: "d:D2", children: [] };
+  const linked = renderFlowPane([...structure, target]);
+  assert.match(linked.html, /data-flow-open-decision="d:D2"/);
+  assert.match(linked.html, /aria-label="Go to shared decision"/);
+});

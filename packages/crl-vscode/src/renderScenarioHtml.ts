@@ -176,6 +176,11 @@ function renderNode(
           n.guard.unknown ? " unknown" : n.guard.evaluated ? (n.guard.satisfied ? " ✓" : " ✗") : ""
         }]</span>`
       : "";
+  // Separate opaque reveal key cannot collide with slash-separated CRE node IDs.
+  const targetKey = `${key}:decision-source`;
+  if (n.action?.targetSource && !n.action.expanded) reveals[targetKey] = n.action.targetSource;
+  const inspect = n.action?.targetSource && !n.action.expanded
+    ? `<button data-reveal="${esc(targetKey)}">Inspect decision source</button>` : "";
   const children = n.children?.length
     ? `<ul>${n.children.map((c) => renderNode(c, caseIdx, prefix, reveals, marks)).join("")}</ul>`
     : "";
@@ -187,7 +192,7 @@ function renderNode(
     `<span class="row" data-reveal="${esc(key)}" title="${esc(rowTitle)}">` +
     `<span class="badge">${esc(badge)}</span>` +
     `<span class="label">${esc(displayDetermination(n.label))}</span>${facts}${guard}${fcTipSpan}` +
-    `</span>${children}</li>`
+    `</span>${inspect}${children}</li>`
   );
 }
 
