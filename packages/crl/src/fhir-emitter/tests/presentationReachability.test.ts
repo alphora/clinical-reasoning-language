@@ -66,6 +66,7 @@ describe("presentation form reachability", () => {
     expect(conflicts.every(e => e.kind === "presentation-overlap")).toBe(true);
     for (let i = 0; i < 40; i++) expect(conflicts.some(e => e.message.includes(`${base}PlanDefinition/P${i}/`))).toBe(true);
   });
+  // @kit concept-presentation:shared-coexistence
   it("distinguishes exclusive delegation bodies from simultaneous delegation", () => {
     const a = plan("A", [{ input: [text("A?")] }]), b = plan("B", [{ input: [text("B?")] }]);
     const calls = [{ condition: guard, action: [{ definitionCanonical: `${base}PlanDefinition/A|1` }] },

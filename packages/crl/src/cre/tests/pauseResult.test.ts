@@ -136,6 +136,7 @@ describe("CEL expected pause", () => {
     expect(run.diagnostics.filter(d => /conflicting-pause-results|cre-multiple-result-assertions/.test(d))).toHaveLength(1);
   });
 
+  // @kit cel-cases:multiple-expectations-refused
   // REFACTOR:grounded: valid multi-result CEL must never earn a CRE pass from its last field.
   // Quoted "pause" below names an activity; unquoted pause is tested separately.
   it.each([

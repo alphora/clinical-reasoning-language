@@ -311,7 +311,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.3");
+    expect(kit.schemaVersion).toBe("2.4");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -353,8 +353,12 @@ describe("authoring-kit — getAuthoringKit", () => {
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
       "publication-reference.crl",
+      "reused-condition-reference.cel",
+      "reused-condition-reference.crl",
       "selection-reference.cel",
       "selection-reference.crl",
+      "shared-continuation-reference.cel",
+      "shared-continuation-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
@@ -443,7 +447,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
-    expect(crePairs.length).toBe(5); // includes the shared selection test input
+    expect(crePairs.length).toBe(7); // includes the shared selection test input
     for (const crl of crePairs) {
       const base = crl.name.replace(/\.crl$/, "");
       const cel = byName.get(`${base}.cel`);
@@ -455,15 +459,18 @@ describe("authoring-kit — getAuthoringKit", () => {
           name: "authoring-kit-crerun",
           version: "1.0.0",
           private: true,
-          crl: {
-            canonicalBase: crl.name.startsWith("named-answer-") ? ANSWER_EXAMPLE_BASE : "http://example.org/authoring-kit-crerun",
-            status: "draft",
-            experimental: true,
-          },
+          crl: crl.requires.crl,
         }),
       );
-      for (const dependency of kit.referenceArtifacts.filter((a) => a.language === "crl"))
-        writeFileSync(join(dir, dependency.name), dependency.source);
+      const written = new Set<string>();
+      const materialize = (name: string) => {
+        if (written.has(name)) return;
+        written.add(name);
+        const artifact = byName.get(name)!;
+        writeFileSync(join(dir, name), artifact.source);
+        artifact.requires.artifacts.forEach(id => materialize(id.replace(/^artifact:/, "")));
+      };
+      materialize(crl.name);
       const celPath = join(dir, `${base}.cel`);
       writeFileSync(celPath, cel!.source);
       const v = validateCELFile(celPath);
@@ -493,7 +500,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const rule = getAuthoringKit().rules.find((r) => r.id === "decision-composition");
     expect(rule).toBeDefined();
     expect(rule!.rule).toMatch(/compound branch guard|named criterion/i);
-    expect(rule!.rule).toMatch(/use decision/);
+    expect(rule!.rule).toMatch(/use decision/i);
     expect(rule!.rule).toMatch(/Do not manufacture inference concepts/i); // the anti-pattern is called out
     expect(rule!.category).toBe("decision-shape");
   });
@@ -605,14 +612,15 @@ describe("authoring-kit — getAuthoringKit", () => {
     const rule = getAuthoringKit().rules.find((r) => r.id === "chaining-necessity");
     expect(rule).toBeDefined();
     expect(rule!.category).toBe("decision-shape");
-    expect(rule!.rule).toMatch(/use decision/);
+    expect(rule!.rule).toMatch(/use decision/i);
     expect(rule!.rule).toMatch(/source/i);
     // reuse is a FIRST-CLASS driver (not prohibited); the line is genuinely-shared vs fabricated-shared, not reuse-vs-not
     expect(rule!.rule).toMatch(/reuse/i);
     expect(rule!.rule).toMatch(/genuinely[ -]shared/i);
-    expect(rule!.rule).toMatch(/fabricat/i);
+    expect(rule!.rule).toContain("internal continuation");
     // the false-coupling guard survives: independent lookalikes still duplicate inline
-    expect(rule!.rule).toMatch(/duplicate/i);
+    expect(rule!.rule).toContain("Never couple independently owned policies");
+    expect(rule!.rule).toContain("regenerate/check provenance");
     // the invented-boundary invariant clause still anchors to the composition lens
     const invented = (rule!.clauses ?? []).find(
       (c) =>
@@ -643,8 +651,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.3");
-    expect(kit.contentHash).toBe("75720d63e074fc63f88f9e8d3f6f98d3097be313c5b8f4dd91a3fa1d11aea7b8");
+    expect(kit.schemaVersion).toBe("2.4");
+    expect(kit.contentHash).toBe("4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {

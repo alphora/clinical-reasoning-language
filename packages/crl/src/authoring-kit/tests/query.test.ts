@@ -53,7 +53,12 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview).not.toHaveProperty("rules");
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
-    expect(JSON.stringify(overview).length).toBeLessThan(30000);
+    // Four additional complete reference entries remain in the discoverable index.
+    expect(JSON.stringify(overview).length).toBeLessThan(32000);
+    const fullSize = JSON.stringify(query({ view: "full" })).length;
+    for (const id of ["rule:criterion", "rule:decision-composition"]) {
+      expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);
+    }
   });
 
   it("every content section and unit is reachable once; navigation cannot hide a new rule", () => {
@@ -61,6 +66,9 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const key of Object.keys(kit).filter(k => !["contentHash", "navigation", "audit"].includes(k))) expect(ids).toContain(`section:${key}`);
     for (const rule of kit.rules) expect(ids).toContain(`rule:${rule.id}`);
+    for (const rule of kit.rules) {
+      for (const id of rule.ref?.match(/artifact:[A-Za-z0-9.-]+/g) ?? []) expect(ids, rule.id).toContain(id);
+    }
     for (const example of kit.examples) expect(ids).toContain(`example:${example.id}`);
     for (const artifact of kit.referenceArtifacts) expect(ids).toContain(`artifact:${artifact.name}`);
     for (const entry of kit.navigation) {
@@ -76,6 +84,10 @@ describe("one authoring kit: discovery and complete guidance", () => {
   // @kit verify-loop:kit-discovery
   it.each([
     ["dropdown with a none answer", "rule:named-answer-options"],
+    ["internal helper", "rule:chaining-necessity"],
+    ["shared continuation", "rule:chaining-necessity"],
+    ["multiple results", "rule:cel-cases"],
+    ["vertical AND", "rule:decision-composition"],
     ["MV CEL", "rule:mv-case-authoring"],
     ["off path data", "rule:mv-case-authoring"],
     ["edit question", "rule:mv-wording-patches"],

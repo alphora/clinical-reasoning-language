@@ -15,6 +15,50 @@ should be read alongside it.
 > guard; the cockpit's "guard box" is the *branch* side. When this page writes a
 > bare "guard" inside a branch-condition discussion, it means the branch guard.
 
+## Choose the responsibility before the structure
+
+A Concept supplies a datum through supported answers, sources or computation.
+A Criterion defines the same Boolean condition once for reuse in multiple guards.
+A Decision expresses applicability, precedence, alternatives and actions. Keep a
+one-use condition inline by default; single-use criteria remain legal and the kit
+force model permits faithful overrides. Naming a criterion adds neither an answer
+slot nor a questionnaire boundary: its answerable dependencies still belong to
+the use-site input set.
+
+Use nested branches where the source requires sequencing. With ordinary Boolean
+or unknown operands, `unknown and false` is false in either operand order. An
+outer unknown guard pauses before its descendants, even if a later condition
+would be false. Similarly `unknown or true` is true, but ordered first-match
+siblings stop at the earlier unknown. These are different meanings, not two
+interchangeable drawing layouts. Evaluated errors are separate from unknown.
+
+A repeated action-bearing continuation can use same-library `use decision`
+without becoming a separate clinical determination. Preserve its callers, source
+order, unknown/error behavior, actions and multiplicity, and native question
+scope. A source may require C first, then D only if C is true, and only then E.
+Both C-false and C-true/D-true paths can invoke one remaining E decision. That
+ordered interview pauses for C-unknown/E-false; `(not C or D) and E` does not.
+
+The kit's `reused-condition-reference` and `shared-continuation-reference` contain
+complete source, engineering CEL companions, project configuration and bounded
+proof labels. Factoring existing CRL changes structural addresses: regenerate
+and check provenance, then renew affected MV review. Unentered continuations
+remain available as definitions; they are not executed child traces. Internal
+sharing does not justify coupling independently owned lookalike policies. PA
+checks still span the delegated closure, including callers that both delegate
+and recommend.
+
+Decisions contain branches, not bare top-level action lists. A guarded action
+block can invoke several decisions when its common applicability is real.
+For unconditional independent determinations without such a gate, invoke the
+actual roots separately; do not invent an always-true question to fit syntax.
+Current CRE publication preparation refuses foreign decision delegation.
+
+Native forms and route-focused MV cards can differ. Do not assume a decisive
+Boolean value suppresses every other input in the native returned form. Verify
+actual questions, values and outputs, including change/clear behavior, separately
+from CRE truth and path checks.
+
 ## Why these qualifiers (not `if` / `then` / `else`)
 
 CRL decisions use explicit block qualifiers (`first:` / `all:` / `any:`) over
@@ -152,13 +196,15 @@ doctrine.
 Two faithful constructs keep logic *out* of the parent DNF. (1) Post-#236, a
 **named `criterion`** is a first-class factoring path: a criterion reference is
 ONE DNF leaf — its `or` lives inside the criterion's own named boolean define,
-emitted once and referenced by identity — so naming a reused or large-`or`
+emitted once and referenced by identity — so naming a reused
 sub-expression collapses it to a single leaf instead of expanding at the parent
 (its atoms stay visible in the define body + the use-site `input[]`; see below).
 (2) A `use decision` sub-decision — but `use decision` is an **action**, not a
-condition, so it is available only when the source genuinely has a shared,
-action-bearing sub-determination to delegate to (with its own dispositions), never
-a fabricated one.
+condition. It can represent a genuinely shared/source-delegated determination
+or an internal continuation genuinely reached from multiple caller paths.
+Single-use compiler-bound relief is the Criterion remedy above, not a reason
+to add a single-use Decision wrapper. It must not invent a new determination
+or change when the remaining actions are reached.
 
 ### Priority exclusions — how an ordered `first:` stays ordered in FHIR (#189)
 
@@ -214,8 +260,8 @@ first:
 them — `"Failed Conservative Therapy"` — is itself a named `criterion` whose body
 is an `or` over two DISTINCT criteria (failed drug OR failed physical therapy —
 events that can co-occur, so not one fact recorded twice). Criteria compose in
-structure at every level; inference (`defined as`) is only for one criterion's
-representations. See "Four ways to combine conditions".)
+structure at every level. Concept data comes from supported source representations
+or producers. See "Four ways to combine conditions".)
 
 Syntax and semantics:
 
@@ -246,9 +292,9 @@ Syntax and semantics:
   emitted once), not 16 inline arms. Precisely: naming reduces the arm count exactly
   when the inlined-then-NNF body would have >1 DNF arm — a positive effective
   disjunction, or a negated effective conjunction (`not ( A and B )`); a body whose
-  inlined NNF is a pure conjunction is arm-neutral. Reach for a `criterion` for
-  *readability* (DRY) AND for *emit tractability* (factoring a reused or large-`or`
-  sub-term out of the DNF).
+  inlined NNF is a pure conjunction is arm-neutral. This is a compiler mechanism,
+  not a reason to impose a named wrapper on every large expression. Actual reuse
+  is the authoring default; faithful single-use factoring remains legal.
 - **A criterion holds only branch-guard logic**, never actions. It cannot
   `recommend` or `use`; it is a boolean condition, not a sub-decision.
 - **It is library-local.** Reference a criterion **unqualified** (a same-library
@@ -282,10 +328,10 @@ fires. The boundary:
 
 | You have… | Use | Lowers to | A reviewer sees… |
 |---|---|---|---|
-| **Conjuncts, or an `or` nested under an `and`, gating one rule** (shared branch, one disposition) | a **branch guard** — or a named **`criterion`** to factor a reused/large-`or` sub-term | `PlanDefinition.action` structure | each INLINE atom in the branch's guard box; a named `criterion` as one identifier condition (its atoms in the criterion's define + use-site `input[]`, post-#236) |
-| **An `or` of distinct criteria sharing one disposition, or criteria routing to *different* dispositions** | separate **`when` branches** | one branch node per criterion, each → one or more applicability actions | each criterion as its **own top-level node** |
-| **Alternative *representations* of one fact** (two data forms of a single already-defined clinical fact) | **`defined as` / `sem-*`** | a CQL boolean (inference) | one fact; the representations are internal |
-| **Reusable action-bearing logic** — a shared determination that yields recommendations | **`use decision`** | a referenced sub-`PlanDefinition` | a linked sub-decision, kept out of the DNF |
+| **Conjuncts, or an `or` nested under an `and`, gating one rule** | a **branch guard**, or a named **`criterion`** for a reused condition | authored applicability expression and dependencies | source operands; named reuse retains its dependency inputs |
+| **Independent alternatives sharing one consequence** | Boolean OR; use separate branches for source-required precedence or different actions | the authored expression and dependencies | alternatives without invented order |
+| **Alternative representations of one datum** | supported Concept source representations or `definition is` producers | the supported publication contract | the selected datum and its dependencies |
+| **Reusable action-bearing logic** — a shared determination or internal continuation | **`use decision`** | a referenced sub-`PlanDefinition`, itself independently applicable | linked action-bearing structure, kept out of the DNF |
 
 Three rules keep these from blurring:
 
@@ -296,15 +342,12 @@ branches, `use decision`), which lowers to `PlanDefinition.action` and stays
 auditable. Never fuse distinct criteria with `defined as ( A sem-and B )` /
 `( A sem-or B )` — that collapses them into one opaque CQL boolean, so the
 decision has **zero** criterion nodes and a reviewer can't see which one failed.
-`defined as` / `sem-*` is inference — it normalizes **one** criterion's
-sub-representations into one fact (e.g. "viral suppression documented" = a
-viral-load lab result OR a clinician chart note of the SAME suppression); it never
-joins distinct criteria. The operational test anchors the fact OUTSIDE the label:
-*name the one clinical reality the operands each record, without the composite's
-own name.* Two SEPARATE events (failed drug therapy AND failed physical therapy —
-each occurs independently, so they can hold at once) are DISTINCT criteria →
-structure; alternative records of a SINGLE underlying occurrence (their records may
-themselves coexist) are one fact → inference.
+For a Concept's data, use its supported source representations or `definition is`
+producers. Selected publications cannot be composed through legacy `defined as` /
+`sem-*`. If the needed data composition has no supported producer, report that
+capability gap; do not replace it with legacy Scalar inference. Distinct policy
+conditions still belong in branch guards or reused Criteria. A shared clinical
+label alone does not establish that two records describe the same occurrence.
 
 **2. `and` before disjunct-character — where the `or` sits decides the form.**
 When an `or` is a **sub-term of a larger `and`** on one rule
@@ -534,8 +577,9 @@ first:
 fused by inference — the decision has **zero** criterion nodes, so a reviewer/cockpit
 can't see which one failed. **Do this instead:** compose them in *structure* — a
 branch guard `when ( "Has Qualifying Diagnosis" and "Failed Conservative Therapy" )`,
-or nested `when` nodes (see "Four ways to combine conditions"). `defined as` is only
-for normalizing ONE criterion's representations into one fact.
+or source-required ordered `when` nodes (see "Four ways to combine conditions").
+Concept data uses supported source representations or `definition is` producers;
+missing composition support is a capability gap, not a reason to use legacy inference.
 
 ### ✗ file AND-composed distinct criteria as flat sibling branches
 ```
@@ -566,9 +610,10 @@ this instead:** parenthesize to say what you mean —
 - when ( "Eligible" and not "Excluded" ) then recommend activity "Approve".
 - when not "Meets Medical Necessity" then recommend activity "Deny".
 ```
-`not` is supported and lowers structurally: De Morgan pushes it to the ref
-leaves, and each negated literal emits a per-atom `not <ref>` applicability
-condition (never a compound CQL boolean). A `criterion` ref is itself a leaf, so
+`not` is supported. Publication-reachable guards retain the whole authored
+applicability expression, including negation. In the legacy structural lowering,
+De Morgan pushes negation to the ref leaves, and each negated literal emits a
+per-atom `not <ref>` condition. In that legacy lowering a `criterion` ref is itself a leaf, so
 `not "C"` is ONE `not "C"` condition — never De-Morganed into the criterion's
 body (which stays structural inside its define). That is the #236 negation
 advantage: inlining `not ( A and B )` would De Morgan into a 2-arm
@@ -578,7 +623,11 @@ so a criterion over an unanswered question halts the arm rather than firing it.
 This is the emit-capable way to author a single-determination `first:` exclusion,
 which a menu-member-only per-action `unless` cannot express.
 
-### ✓ use a `criterion` to factor a large `or` out of the parent DNF (#236)
+### Legacy compiler mechanism: named criteria reduce parent DNF size (#236)
+
+This excerpt illustrates compiler behavior, not the default reason to introduce
+a single-use criterion. Whole-expression selected-publication guards already
+avoid this DNF expansion.
 ```
 criterion "Left":  - when ( "A" or "B" or "C" or "D" ).
 criterion "Right": - when ( "E" or "F" or "G" or "H" ).
@@ -593,10 +642,11 @@ arm with two `text/cql-identifier` conditions, NOT the 4×4 = 16 inline arms the
 same `or`s would materialize written directly in the guard. Each `or` lives inside
 its define (`define "Left": "A" or …`), emitted once; the atoms
 remain visible in the define bodies + the use-site `input[]`. So a `criterion` is
-both a *readability* aid and a genuine *arm-count* remedy for a reused or large-`or`
-sub-term. (If you are still near the 256-arm envelope with a **faithful** *inline*
-model, that is a capability gap: raise it and consult the authoring kit, which owns
-factoring doctrine, rather than restructuring solely to satisfy the bound.)
+a genuine *arm-count* remedy in the legacy compiler path. That fact does not
+change the default of naming conditions for reuse. If a faithful legacy inline
+model exceeds the 256-arm envelope, report the compiler gap. Faithful single-use
+Criterion factoring remains an explicit remedy: preserve the expression and
+verify the result instead of changing clinical order or inventing a determination.
 
 ### ✗ `any:` over `when`-branches
 ```

@@ -1,5 +1,106 @@
 # Kit evidence ledger
 
+## Maintenance — reusable conditions and shared continuations (754/755)
+
+Baseline: `74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f` (last completed audit).
+Implementation target before kit edits: `fe4e8ba5b7c2e779b28d287297377edfc5f722d9`.
+Final reviewed content target: pending content commit. Kit schema `2.4`;
+content hash `4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`. This section will be finalized by the separate
+metadata stamp. The source audit includes the complete saved-audit delta, not just
+kit bytes. No release or installed-user upgrade is implied.
+
+Intent: teach source applicability and independent Boolean conditions, actual
+Criterion reuse, and valid same-library action-bearing continuations. Reuse-only
+is authoring purpose/default guidance, not a grammar count gate. Keeping one-use
+expressions inline avoids redundant wrappers in the MV view; faithful overrides
+remain allowed. Legacy DNF factoring capability is preserved as a compiler
+mechanism rather than the default reason to introduce a Criterion.
+
+The role lesson and fictional transfer evidence arrived through authorized mail.
+The lead independently recomputed the supplied 12 source rows and found no
+outcome/question-set mismatch. The peer's 24 native invocations and source judge
+remain peer-reported evidence, not locally rerun or clinical certification. This
+supports concise teaching; it does not certify a customer policy or universal
+prevention of modeling errors. New exact reference bytes have CRE/emission tiers
+only. Their native/interactive verification remains an explicit per-policy task.
+
+| Changed assertion, input, or implementation | Disposition and evidence limits |
+| --- | --- |
+| `cre/tests/sharedDecisionScaling.test.ts`: 25-definition emission, one graph visit per definition, 3 actual cases retaining 25 static definitions and fewer than 260 case nodes; original two-path source generator | **Kit updated**, `chaining-necessity:shared-definition-emission`, `mv-case-authoring:shared-case-projection`. Full normal two-lane emission and actual model/validation/advice APIs run on selected Boolean C/D/E Observations with canonicalBase. Limits are these bounded graphs, not universal linear runtime. The pure source builder moves into `decisionExamples.ts` and serves the small reference too. |
+| Same owner: delivered nine-case shared continuation | **Kit updated**, `chaining-necessity:ordered-shared-continuation`. Exact CRL/CEL and served `requires.crl` are executed; exact activity arrays, condition sequence and both Met terminal occurrence IDs are asserted. Source requires C0, applicable D0, then E; C0-unknown/E-false and D0-unknown/E-false pause. C0=false bypasses D0, D0=false stops before E, E true/false/missing establishes Met/Unmet/pause when reached. An inline-duplicated comparator checks the same nine CRE activity arrays and entered condition sequences, without claiming native structural equality. Nine cases are bounded engineering coverage, not exhaustive 27-state coverage. No native tier is inherited from earlier, different CEL bytes. |
+| Same owner: reused-condition reference and `criterion-reuse` snippet | **Kit updated**, `criterion:reused-applicable-condition`. One pure snippet is embedded in the complete library and the short example. Explicit single/combined universe, request type first, A OR B reused at two guards; documentation only combined. Eleven exact-output CRE rows include unknown intake, independent OR, each known drop-one conjunct, both findings true, and false conjunct dominating another unknown. Emission succeeds with the actual served project config; no native/client visibility proof. Both new CEL files explicitly belong in engineering regression, one pair per scratch project with an empty mv directory. Owning tests exercise validateCelCommand, runRegression and exact empty diagnostic sets. All answerable concepts have presentations; copied CRL includes its source assumptions. |
+| `cre/tests/pauseResult.test.ts`: eight multiple-result parameter rows; pause multiplicity assertion; `cre/run.ts` | **Kit updated**, `cel-cases:multiple-expectations-refused`. Wrong-first/correct-last, reverse, duplicate, Boolean-only/mixed, two roots and same-root all cases: ordinary CEL validation succeeds and data emits, but CRE returns error/null expected/no trace/no production and exactly one cre-multiple-result-assertions. Pause multiplicity uses existing conflicting-pause-results only. Existing zero/single Boolean unsupported message is not assigned an invented diagnostic code. Full regression/FINAL execution obligations remain binding. |
+| Same pause file deferred attribution rows and `provenance/tests/failedCriteria.test.ts`; `provenance/failedCriteria.ts` | **Existing guidance sufficient**, source fidelity and failed-criterion attribution. False/unknown/preempting ancestor and excluded action are preserved; no target is fabricated through an ancestor cycle. Legacy action-guard fixture distinguishes entered, excluded, unresolved and cyclic trace fields; it is not positive selected-publication action-menu teaching. Static reachable activity summaries do not establish executed child failures. |
+| `ast/decisionArms.ts`, `ast/decisionSpine.ts`, `ast/tests/decisionSpine.test.ts`, `cre/viewModel.ts`, `cre/tests/viewModel.test.ts`, `cre/tests/branchConditionEval.test.ts`, `provenance/tests/crlStructure.test.ts` | **Kit updated**, compact case projection and factoring migration. Entered occurrence IDs remain source-identical; source definitions remain complete; unentered target descendants are absent from the case tree, with source access. Positive root/action and entered foreign legacy occurrence assertions prevent vacuous subset checks. The corrected local fact code activates the intended legacy fixture path; it does not certify foreign publication delegation. Remaining changes are schema7 mechanics. |
+| `cel/offPathWarnings.ts`, `cel/tests/offPathWarnings.test.ts` | **Existing guidance sufficient**, `mv-case-authoring:off-path-advisory`, with clearer whole-file refusal note. Positive B warning persists without renderer; possible unentered use suppresses it; unused source definition alone does not. One errored sibling suppresses all file advice. Regression remains excluded and CRE refusal cannot break data-only emission. Cross-library advisory test substitutes an actual local trace whose changed delegation never entered; this isolates advisory identity and does not establish foreign runtime support. |
+| `fhir-emitter/presentationReachability.ts`, its tests | **Existing guidance sufficient**, `concept-presentation`, with new `concept-presentation:shared-coexistence` tag. 256 independent Boolean execution structures; 40-definition read count; exclusive vs simultaneous/versioned delegation; earlier guard inputs; cycles and permutations; unreachable first siblings; independent missing targets and conflicts; W1/W2 exclusive plus W3 simultaneous; distinct composition-site errors. These verify structural overlap checks and bounded scaling, not native question population or logical correlation across independent calls. Existing conservative cross-invocation correlation limitation remains; report a faithful-model conflict rather than changing meaning to silence it. |
+| `docs/cel-spec.md`, `docs/provenance-spec.md`, core MCP descriptions | **Kit updated**, explicit unsupported assertion contract, no tree on refusal, schema7 and authored-versus-executed correspondence. Added run_decision description makes refusal searchable. No new validator warning or runtime capability was added in kit5. |
+| `crl-vscode/src/executionRoutes.ts` and test, `renderScenarioHtml.ts` and test, `flowPaneHtml.ts` and test, `correspondenceCockpit.ts`, `flowSnapshotHtml.ts` and test | **Not language semantics** beyond source access explained above. Target-root/blocked-guard identity, trusted opaque source reveal, rendered-target-only links, theme glyph, pinned hiding/restoration, and nested-SVG-safe snapshot CSS. Actual devhost evidence for fixes1–4 is retained separately; this kit todo does not claim another live UI run. |
+| Prior audit.json/coverage stamp and package/lock version changes | **Not author-facing semantics**: inspected previous stamp and 5.4.0 version-only changes. No dependency/compiler/driver update. New audit must span them, not pretend the 2.3 stamp covered fixes1–4. |
+| Kit index/navigation/requirements and owner tags; query and kit/reference tests | **Kit updated**: seven existing rules, two paired references, criterion-reuse, related judge wording, aliases and prerequisites. Rule-to-example references are discovery pointers, not transitive prerequisites; artifact-to-rule requirements remain. Focused Criterion and decision-composition payloads stay below half of full (observed fail before correction/pass after). Generic CRE gate now materializes only served dependencies/config rather than all references under a private config. This deliberately removes incidental co-resolution of unrelated reference roots; completeness of each declared closure is checked by validation and execution. Search covers internal helper/shared continuation/multiple results/vertical AND. Full/entry/overview/Markdown checks remain; four additional reference entries justify a bounded 32KB overview ceiling. Packaging assertions prove retrieval and synchronization, not clinical truth. |
+| `docs/decision-shapes.md` | **Kit updated**: role/order lesson and shared-helper/migration guidance; legacy DNF example is explicitly mechanism evidence. Corrected the misleading blanket OR→ordered-branches table row. No grammar or lowering changes. |
+
+Six new owning tags; existing tags retained, none unknown or orphaned. Updated
+query parameter rows retain their existing discovery tag. Untagged parameter
+boundaries are dispositioned above; there is no whole-file unreviewed exclusion.
+Complete path inventory follows. The content commit is immediately followed by a separate metadata stamp commit; the intermediate contentMatchesAudit=false state is deliberate and is not releasable.
+
+Retained 5.4 delivery copies inspected: Bleph 37 MV cases and RX 10 MV cases each
+have zero multiple-result cases. This is a bounded local-copy inventory, not a
+new customer-content review or proof for arbitrary policy suites. Existing
+clinical/source-correspondence findings remain unresolved KE work.
+
+Validation: build and249 final affected tests pass; actual MCP full JSON/API and Markdown equality, complete overview, four searches and paired prerequisite retrieval pass. Full5.4.1 suite on preceding kit content passed core4945/32skipped, real MCP and extension1266/3expected failures. Subsequent changes are kit/docs/reference/test refinements only; final affected tests passed again. Native/runtime outcomes remain bounded by their separate prior receipts. Export and installed identity are checked after the separate stamp.
+
+Review754: native0critical/1important/1nit,Accept2, follow-up converged0/0/0. External4critical/7important/4nit,Accept8/Refine7/Reject0. Review755 round1: native0critical/2important/1nit,Accept3; external1critical/9important/5nit,Accept7/Refine6/Reject2. Round2: native0/0/0; external0critical/3important/2nit,Accept5; corrected prerequisite backedges, helper root exposure, Criterion-only single-use bound remedy, overview rationale and question wording. Round3 native0/0/0; external0critical/2important/4nit,Accept4/Refine1/Reject1. Final bounded corrections verify artifact discovery IDs, restore the Boolean-rule prerequisite, require explicit question text and clarify independent helper application. A deliberate missing artifact ID failed the new assertion before original bytes were restored. Final249 affected tests and actual MCP retrieval pass hash4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff. No further broad external round or unrun external convergence claimed; native narrow closeout converged0/0/0. Full inputs, responses and individual dispositions in discussions754/755. No unrun convergence asserted.
+
+
+Complete changed-path inventory (baseline through this content):
+
+- `docs/cel-spec.md`
+- `docs/decision-shapes.md`
+- `docs/provenance-spec.md`
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/src/mcp-server.test.mjs`
+- `packages/crl-vscode/src/correspondenceCockpit.ts`
+- `packages/crl-vscode/src/executionRoutes.test.mjs`
+- `packages/crl-vscode/src/executionRoutes.ts`
+- `packages/crl-vscode/src/flowPaneHtml.test.mjs`
+- `packages/crl-vscode/src/flowPaneHtml.ts`
+- `packages/crl-vscode/src/flowSnapshotHtml.test.mjs`
+- `packages/crl-vscode/src/flowSnapshotHtml.ts`
+- `packages/crl-vscode/src/renderScenarioHtml.test.mjs`
+- `packages/crl-vscode/src/renderScenarioHtml.ts`
+- `packages/crl/package.json`
+- `packages/crl/src/ast/decisionArms.ts`
+- `packages/crl/src/ast/decisionSpine.ts`
+- `packages/crl/src/ast/tests/decisionSpine.test.ts`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/decisionExamples.ts`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/navigation.ts`
+- `packages/crl/src/authoring-kit/requirements.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/authoring-kit/tests/query.test.ts`
+- `packages/crl/src/cel/offPathWarnings.ts`
+- `packages/crl/src/cel/tests/offPathWarnings.test.ts`
+- `packages/crl/src/cli/tests/run-mcp-server.test.mjs`
+- `packages/crl/src/cre/run.ts`
+- `packages/crl/src/cre/tests/branchConditionEval.test.ts`
+- `packages/crl/src/cre/tests/pauseResult.test.ts`
+- `packages/crl/src/cre/tests/sharedDecisionScaling.test.ts`
+- `packages/crl/src/cre/tests/viewModel.test.ts`
+- `packages/crl/src/cre/viewModel.ts`
+- `packages/crl/src/fhir-emitter/presentationReachability.ts`
+- `packages/crl/src/fhir-emitter/tests/presentationReachability.test.ts`
+- `packages/crl/src/mcp/server.ts`
+- `packages/crl/src/provenance/failedCriteria.ts`
+- `packages/crl/src/provenance/tests/crlStructure.test.ts`
+- `packages/crl/src/provenance/tests/failedCriteria.test.ts`
+
 ## Maintenance — MV and regression case sets (744–746)
 
 Baseline: `cc1b675ed9431d047bd5fb34305abef1b9af18a8`.

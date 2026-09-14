@@ -728,6 +728,7 @@ export function createServer(): McpServer {
         "Compound branch traces preserve explicit true and false, omitting satisfied only for unknown. Validate CRL separately and check native answers. " +
         "Pause attribution identifies reached decision conditions; their compound traces retain operand truth. An activity `result is` passes iff its branch is " +
         "in the produced recommendation set. Same-library `use decision` is evaluated in place and produces its delegated activities, not the sub-decision name. Foreign delegation under publication preparation is refused with publication-unsupported-scope; legacy cross-library successes do not certify that path. " +
+        "Multiple ordinary CEL results are legal data assertions but CRE refuses the case with cre-multiple-result-assertions; none are checked and no Decision/tree is selected. Use one supported activity or pause expectation per case; Boolean Concept expectations remain unsupported even individually. Cases with pause plus another assertion use conflicting-pause-results. " +
         "Raw run schemaVersion is 1 (separate from render_scenario schemaVersion 7). Returns { schemaVersion, success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
         "source, satisfied, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +

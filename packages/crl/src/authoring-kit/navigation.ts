@@ -12,8 +12,9 @@ const ALIASES: Record<string, string[]> = {
   "concept-presentation": ["question wording", "presentation", "question text", "question description", "label", "questionnaire"],
   "bmi-publication": ["BMI", "height weight calculation", "body mass index"],
   "patient-age-projection": ["Patient age", "age today", "birth date", "same day override"],
-  "decision-composition": ["decision tree", "sem-or", "sem-and", "defined as", "alternatives"],
-  "criterion": ["criterion", "reusable condition"],
+  "decision-composition": ["decision tree", "Concept Criterion Decision", "vertical AND", "horizontal AND", "sem-or", "sem-and", "defined as", "alternatives"],
+  "criterion": ["criterion", "reusable condition", "one use condition"],
+  "chaining-necessity": ["shared continuation", "internal helper", "remaining interview", "use decision"],
   "guards": ["guard", "only if"],
   "branch-guards": ["pause", "unknown", "null", "missing answer", "explicit false"],
   "review-flags": ["narrative completeness", "source fidelity", "narrative coverage"],
@@ -21,13 +22,16 @@ const ALIASES: Record<string, string[]> = {
   "configure-dispositions": ["crl.dispositions", "missing configuration", "empty vocabulary"],
   "terminology-forms": ["codes", "terminology", "code system", "valueset is", "external ValueSet"],
   "library-scoping": ["import", "include library", "qualified reference"],
-  "cel-cases": ["test cases", "CEL", "data", "expected activity"],
+  "cel-cases": ["test cases", "CEL", "data", "expected activity", "multiple results", "multiple assertions", "cre-multiple-result-assertions"],
   "mv-case-authoring": ["MV CEL", "medical validation cases", "off path data", "regression suite", "Result Questionnaire", "selected route"],
   "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change"],
   "produce-results": ["emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
   "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine"],
 };
 
+// These are learning prerequisites, not see-also links. Optional worked examples
+// belong in rule.ref; retain an artifact here only when needed to explain the
+// rule's contract. Artifact-to-rule prerequisites supply each example's context.
 const RELATED: Record<string, string[]> = {
   "mv-case-authoring": ["rule:cel-cases", "rule:verify-loop", "rule:produce-results", "rule:emit-output-root"],
   "mv-wording-patches": ["rule:concept-presentation", "rule:mv-case-authoring", "rule:produce-results", "rule:verify-loop"],
@@ -44,8 +48,8 @@ const RELATED: Record<string, string[]> = {
   "configure-dispositions": ["rule:pa-disposition-set"],
   "disposition-mode": ["rule:pa-disposition-set"],
   "pa-answers-not-records": ["rule:named-answer-options"],
-  "decision-composition": ["rule:criterion", "rule:guards", "rule:branch-guards", "rule:chaining-necessity"],
-  "chaining-necessity": ["artifact:source-delegated-decision-reference.crl"],
+  "decision-composition": ["rule:criterion", "rule:guards", "rule:branch-guards", "rule:chaining-necessity", "rule:guard-or-vs-sibling-or"],
+  "guard-or-vs-sibling-or": ["rule:branch-guards"],
 };
 
 /** Direct examples need their semantic guidance as well as runnable files/configuration. */
@@ -68,6 +72,8 @@ const EXAMPLE_RULES: Record<string, string[]> = {
 };
 
 const ARTIFACT_RULES: Record<string, string[]> = {
+  "shared-continuation-reference": ["chaining-necessity", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],
+  "reused-condition-reference": ["criterion", "decision-composition", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],
   "selection-reference": ["publication-selection"],
   "named-answer-reference": ["named-answer-options"],
   "named-answer-terms": ["named-answer-options", "terminology-forms"],
