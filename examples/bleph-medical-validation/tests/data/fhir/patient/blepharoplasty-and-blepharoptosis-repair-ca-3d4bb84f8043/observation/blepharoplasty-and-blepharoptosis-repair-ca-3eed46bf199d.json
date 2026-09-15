@@ -1,0 +1,33 @@
+{
+  "resourceType": "Observation",
+  "id": "blepharoplasty-and-blepharoptosis-repair-ca-3eed46bf199d",
+  "meta": {
+    "profile": [
+      "http://iehp.org/crl/StructureDefinition/mcpm-bleph-individual-blepharoplasty-documentation"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-local",
+        "code": "blepharoplasty-individually-documented"
+      }
+    ]
+  },
+  "valueBoolean": false,
+  "effectiveDateTime": "2026-01-01",
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+          "code": "survey"
+        }
+      ]
+    }
+  ]
+}

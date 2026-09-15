@@ -224,6 +224,27 @@ check("#210 collectDispositionLeafKeys: recommend-activity actions ARE leaves; u
   assert.ok(!leaves.has("a:D2"), "a use-decision action is interior delegation glue — NOT a leaf");
   assert.ok(!leaves.has("w:A") && !leaves.has("o") && !leaves.has("d:D"), "when/otherwise/decision are never leaves");
 });
+check('result order follows rendered vertical positions through first/otherwise projection and multiple decisions',()=>{
+ const result=key=>node(key,'action',key,[],[],{actionKind:'recommend-activity'});
+ const branch=(key,children,extra={})=>node(key,'when',key,[],children,extra);
+ const otherwise=(key,children)=>node(key,'otherwise','otherwise',[],children);
+ const decision=(key,children)=>({decision:key,lib:'Pol',nodeKey:key,location:{},childrenQualifier:'first',children});
+ const simple=decision('simple',[branch('a',[result('one')]),branch('b',[result('two')]),otherwise('else',[result('three')])]);
+ const nested=decision('nested',[branch('outer',[branch('inner',[result('four')]),otherwise('inner-else',[result('five')])],{childrenQualifier:'first'}),otherwise('outer-else',[result('six')])]);
+ const bare=decision('bare',[branch('guard',[result('guard-result')]),result('bare-result')]);
+ for(const forest of [[simple],[nested],[simple,nested],[bare],[{...bare,childrenQualifier:'all'}],[{...bare,childrenQualifier:'any'}]]){
+  const rendered=renderFlowPane(forest),keys=[...collectDispositionLeafKeys(forest)];
+  const positions=keys.map(key=>{
+   const id=rendered.anchors[key].scrollTo;
+   const row=rendered.html.match(new RegExp('<g id="'+id+'"[^>]*>([\\s\\S]*?)</g>'));
+   assert.ok(row,key+' renders');
+   const y=row[1].match(/<rect[^>]*\sy="([^"]+)"/);
+   assert.ok(y,key+' has a visible box');
+   return {key,y:Number(y[1])};
+  });
+  for(let i=1;i<positions.length;i++)assert.ok(positions[i].y>positions[i-1].y,'result rows strictly follow structural order');
+ }
+});
 check("#210 collectDispositionLeafKeys: a branch with MULTIPLE recommends → ALL are leaves; forest-wide; empty → empty", () => {
   const multi = [
     { decision: "M", lib: "Pol", nodeKey: "d:M", location: {}, children: [

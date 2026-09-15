@@ -1,0 +1,248 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-5a2527ffe015",
+  "questionnaire": "http://iehp.org/crl/Questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e-blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e",
+  "status": "in-progress",
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e"
+  },
+  "item": [
+    {
+      "linkId": "1",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested",
+      "text": "Is blepharoplasty requested?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "1.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested#Observation.value[x]",
+          "text": "Blepharoplasty Requested",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "2",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested",
+      "text": "Is blepharoptosis repair requested?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "2.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested#Observation.value[x]",
+          "text": "Blepharoptosis Repair Requested",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "3",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-cosmetic-surgical-purpose",
+      "text": "Is the requested surgery being performed for cosmetic purposes?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "3.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-cosmetic-surgical-purpose#Observation.value[x]",
+          "text": "Cosmetic Surgical Purpose",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "4",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-functional-or-reconstructive-surgical-indication",
+      "text": "Which listed indication is this functional or reconstructive surgery performed to correct?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "4.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-functional-or-reconstructive-surgical-indication#Observation.value[x]",
+          "text": "Functional Or Reconstructive Surgical Indication",
+          "answer": [
+            {
+              "valueCoding": {
+                "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+                "code": "visual-field-defect-due-to-dermatochalasis"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "5",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint",
+      "text": "Which complaint has the patient reported?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "5.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint#Observation.value[x]",
+          "text": "Documented Patient Complaint",
+          "answer": [
+            {
+              "valueCoding": {
+                "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+                "code": "complaint-of-interference-with-near-or-distance-vision"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "6",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photograph-submission-standards-met",
+      "text": "Do the submitted photographs conform to the photograph submission standards?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "6.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photograph-submission-standards-met#Observation.value[x]",
+          "text": "Photograph Submission Standards Met",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "7",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted",
+      "text": "What does the submitted photograph demonstrate?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "7.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted#Observation.value[x]",
+          "text": "Photographic Demonstration Submitted",
+          "answer": [
+            {
+              "valueCoding": {
+                "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-1f64a73b6291-answer-codes",
+                "code": "photograph-upper-eyelid-margin-within-2-5-mm-equivalent-to-quarter-iris-of-corneal-light-reflex"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "8",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-examination-standards-met",
+      "text": "Does the submitted visual field examination conform to the visual field examination standards?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "8.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-examination-standards-met#Observation.value[x]",
+          "text": "Visual Field Examination Standards Met",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "9",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-demonstration-submitted",
+      "text": "What does the submitted visual field examination demonstrate?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "9.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-demonstration-submitted#Observation.value[x]",
+          "text": "Visual Field Demonstration Submitted",
+          "answer": [
+            {
+              "valueCoding": {
+                "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes",
+                "code": "none-of-the-listed-visual-field-demonstrations"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

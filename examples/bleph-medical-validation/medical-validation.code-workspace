@@ -1,0 +1,16 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "crl.medical-validation.primary": "cel",
+    "crl.medical-validation.paneOrder": [
+      "source",
+      "questionnaire",
+      "fhirQuestionnaire",
+      "tree"
+    ]
+  }
+}

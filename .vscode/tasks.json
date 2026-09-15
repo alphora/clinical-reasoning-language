@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compile-crl-ext",
+      "type": "shell",
+      "command": "npm run compile -w crl-language-support",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "clear": true }
+    }
+  ]
+}

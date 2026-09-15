@@ -1,0 +1,789 @@
+{
+  "schemaVersion": 1,
+  "celLibrary": "mv",
+  "useCase": "prior-auth",
+  "generatedAt": "2026-09-13T21:55:28.264Z",
+  "provenance": {
+    "crlVersion": "5.4.0",
+    "producerJarSha256": "9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e"
+  },
+  "cases": [
+    {
+      "caseName": "indication vision-dermatochalasis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4e0014610376",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4e0014610376.json",
+          "sha256": "227ac8fef347b1073974ea6f38894e17d32d38c1c01d54e3dbb8fc1d19435d72",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4e0014610376",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4e0014610376.json",
+          "sha256": "a6821d3a7e175ebd7e7f89bc8095948a868409341cdd13a2e2eedb37b4fc84d8",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-vision-dermatochalasis-met-mv"
+    },
+    {
+      "caseName": "indication vision-blepharochalasis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-89541a52f86e",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-89541a52f86e.json",
+          "sha256": "129141e81944b527d5984752f43189e4c5597e54632f925f8bec65299de1d63a",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-89541a52f86e",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-89541a52f86e.json",
+          "sha256": "21b50a9bb248d9a00f02dcb6f677f9152919d2851563ba7a64c54c046ee1469e",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-vision-blepharochalasis-met-mv"
+    },
+    {
+      "caseName": "indication vision-blepharoptosis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-932e5cbf7cbd",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-932e5cbf7cbd.json",
+          "sha256": "7ee2fda9a2ba47687216b2e4d37956fdb07b678e3d5a90b3b4c27cb0e0ede695",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-932e5cbf7cbd",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-932e5cbf7cbd.json",
+          "sha256": "0c5928c8235bb4d46a880bb9e9f8b5c13ea2ec4982b1e99b46f28be1f406acfd",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-vision-blepharoptosis-met-mv"
+    },
+    {
+      "caseName": "indication field-dermatochalasis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-5a2527ffe015",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-5a2527ffe015.json",
+          "sha256": "aa6f50f4d508ecf9f291688dbced88ef7c9e511d6e5361c95e3d22b3a4895f0a",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-5a2527ffe015",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-5a2527ffe015.json",
+          "sha256": "d5f372b480347d2f371efbb7f2c6c8e91555f10cd54a50f77b3483264e18cf82",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-field-dermatochalasis-met-mv"
+    },
+    {
+      "caseName": "indication field-blepharochalasis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f80306725596",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f80306725596.json",
+          "sha256": "d9965b42cbf4e2199438fc57e4a3d05aed231dd125dc2e7a7d2514c36ed14eb4",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f80306725596",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f80306725596.json",
+          "sha256": "84fefd6b90108a892b10c2a97c8ac7de2b0ef0fa2f2356c8d8e34aef8d669da3",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-field-blepharochalasis-met-mv"
+    },
+    {
+      "caseName": "indication field-blepharoptosis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-fa256ce70365",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-fa256ce70365.json",
+          "sha256": "180fd2953078eb2100b16256f83872c7426ae13b85304484bfcb80bce18e1db8",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-fa256ce70365",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-fa256ce70365.json",
+          "sha256": "96dc0a20288e7722eb82609cd721b8618fc45112fdad2ab89e83baa9811a71e3",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-field-blepharoptosis-met-mv"
+    },
+    {
+      "caseName": "indication redundant-skin selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-b1ef471e2fba",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-b1ef471e2fba.json",
+          "sha256": "47f4f1b2b3cad8d616cf59d16d366138b2c04b2de364afe62d23c0e2c5e9d4b8",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-b1ef471e2fba",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-b1ef471e2fba.json",
+          "sha256": "3ec0966385a728c612d9dbc465fc500df1437ea490b6e65dde586d7545ab4601",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-redundant-skin-met-mv"
+    },
+    {
+      "caseName": "indication pretarsal-dermatitis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4bab5c6b9886",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4bab5c6b9886.json",
+          "sha256": "0e6b1bd0989eb50acec38807d514315aa39d8cf73dced741da8076f59ddb286d",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4bab5c6b9886",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4bab5c6b9886.json",
+          "sha256": "bd339ec0075026d5006125a503bd1abfecf463f1838a7cfa8e737b380a3ca32b",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-pretarsal-dermatitis-met-mv"
+    },
+    {
+      "caseName": "indication prosthesis selected as what the surgery corrects -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-79b9813a5a74",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-79b9813a5a74.json",
+          "sha256": "c6d3c926fb4564aeff6938fc0ad849a0c25c17c1f5c4dd8b1f69e583d8d5f081",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-79b9813a5a74",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-79b9813a5a74.json",
+          "sha256": "9d36f1884eeeaa27ccf6c1217062f525f5ecff7d4feabe3e54ad0e8f019df76d",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "indication-prosthesis-met-mv"
+    },
+    {
+      "caseName": "complaint field-interference alone satisfies layer 2 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-49aaab1652fb",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-49aaab1652fb.json",
+          "sha256": "5c6420fca8d9c3a47b80a7e537895103a1f47a7b03d077f2dc814729a8309ffc",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-49aaab1652fb",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-49aaab1652fb.json",
+          "sha256": "254e04f4810791900e2391ee100b8ee1e5e7ef681543d5acff68e892d416b15a",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "complaint-field-interference-met-mv"
+    },
+    {
+      "caseName": "complaint difficulty-drooping alone satisfies layer 2 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-172030ed497c",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-172030ed497c.json",
+          "sha256": "9eefa49c3c0030555f04f972fcb7a8fadbd284ff131ab6e0cc1f03dbebe7806b",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-172030ed497c",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-172030ed497c.json",
+          "sha256": "b56efe1b075621fefcd371b54427ca3ae0523d5abf333f949ea5be57303d66e8",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "complaint-difficulty-drooping-met-mv"
+    },
+    {
+      "caseName": "complaint difficulty-eyelashes alone satisfies layer 2 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-068ca81d1b25",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-068ca81d1b25.json",
+          "sha256": "c303192befa2d2509d638fca01b8c93e9b11d084f8a4aa5cdc56ab530e42107f",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-068ca81d1b25",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-068ca81d1b25.json",
+          "sha256": "ad3a17e532133d5052265ee2065662e7c09f6e0695d464d10239493cd391fb6c",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "complaint-difficulty-eyelashes-met-mv"
+    },
+    {
+      "caseName": "complaint difficulty-eyelid-skin alone satisfies layer 2 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-8ccc5806b309",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-8ccc5806b309.json",
+          "sha256": "4bf214e9da760666ceecd33bd3a998ec92616c3c3475874e61eb46ed7532380e",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-8ccc5806b309",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-8ccc5806b309.json",
+          "sha256": "292fa98ac5162b1a8be5042cfd4cd0a0235d4fe9f6a8cb2f11c618af32af8e4a",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "complaint-difficulty-eyelid-skin-met-mv"
+    },
+    {
+      "caseName": "complaint blepharitis alone satisfies layer 2 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1777405af6a6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1777405af6a6.json",
+          "sha256": "d7731585fc479781c4d809d53eeb5af2bac97ac44585b1abed40b9a9083b8021",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1777405af6a6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1777405af6a6.json",
+          "sha256": "adf08a5ea25d31473d120710e7bfe5a0e242071b34405ced4c1d7d6972d96644",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "complaint-blepharitis-met-mv"
+    },
+    {
+      "caseName": "complaint dermatitis alone satisfies layer 2 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0a338773d678",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0a338773d678.json",
+          "sha256": "a72943a22408abb390d917e28fe249cbf059cb71e4ae92b30cf919ae0db0f534",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0a338773d678",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0a338773d678.json",
+          "sha256": "1bfa15f91eff517fe508f7aea77d25986b62b073b4bc95eaabd13ffb3870ed85",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "complaint-dermatitis-met-mv"
+    },
+    {
+      "caseName": "demonstration skin-on-lashes with its lane conformance satisfies layer 3 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-9c32b6f18da6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-9c32b6f18da6.json",
+          "sha256": "0c6ae4d45956380d5282518456c2a746758ff43aff0b149c2daedc6bd9013129",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-9c32b6f18da6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-9c32b6f18da6.json",
+          "sha256": "a7e86261fe15cafd6239923d1fb93fb9041d25cec05cbe1d38fe304deddfadb7",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-skin-on-lashes-met-mv"
+    },
+    {
+      "caseName": "demonstration photo-dermatitis with its lane conformance satisfies layer 3 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-e5d704fc1d2a",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-e5d704fc1d2a.json",
+          "sha256": "54cc113c02906bb89323e4befabeab532c2332011faacfd644e44430fd1b2ecc",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-e5d704fc1d2a",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-e5d704fc1d2a.json",
+          "sha256": "b51709971a65f3d93e082c95f941032ff451ccec04a58cc72420e25f0506c02e",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-photo-dermatitis-met-mv"
+    },
+    {
+      "caseName": "demonstration photo-prosthesis with its lane conformance satisfies layer 3 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f812ff36c9c6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f812ff36c9c6.json",
+          "sha256": "0e59354da10423bbb843474aacc120a86f0da9fab6ec318e5811fef276cf7fb6",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f812ff36c9c6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f812ff36c9c6.json",
+          "sha256": "744ec4683921a06247e114c48bca580c9535d547193a89aae7255dcd1797bcad",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-photo-prosthesis-met-mv"
+    },
+    {
+      "caseName": "demonstration vf-12-degree with its lane conformance satisfies layer 3 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-da1c2da189c7",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-da1c2da189c7.json",
+          "sha256": "13e2914c326e406288d0450bd228c1982de629095619f167a7eb6c18ca6adef3",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-da1c2da189c7",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-da1c2da189c7.json",
+          "sha256": "841a46847854a2c3b78ce07f69745c7f87c0679a32b3e06c58200da043ad9e3c",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-vf-12-degree-met-mv"
+    },
+    {
+      "caseName": "demonstration vf-30-percent with its lane conformance satisfies layer 3 -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1e3cbb5e5f1e",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1e3cbb5e5f1e.json",
+          "sha256": "45bb584fe8462e58cf244f482e2c68d0cffea81164d33e37d6451df5e69a3b82",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1e3cbb5e5f1e",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1e3cbb5e5f1e.json",
+          "sha256": "00dac6bd3863ef965792d33d9cbb6c030ed3ee6d470021c45c61b04eb3715b19",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-vf-30-percent-met-mv"
+    },
+    {
+      "caseName": "CONFORMANCE DISCRIMINATOR - a photograph SHOWS the skin resting on the eyelashes but does NOT meet the page-3 submission standards -> Unmet. This is the case the old fused Conforming-Photograph-Shows-X concept could not express at all.",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-477f53b9b1d6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-477f53b9b1d6.json",
+          "sha256": "f62b5329e77240ee4f9e3e8ca288cdcd9ab4639b97e26a87c1a3d5d8c49622b7",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-477f53b9b1d6",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-477f53b9b1d6.json",
+          "sha256": "f7a06f8d827a26f83a7c9825aaf234acc3c6bebef7bfeeedf691e4069e85457d",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-photograph-non-conforming-unmet-mv"
+    },
+    {
+      "caseName": "CONFORMANCE DISCRIMINATOR - a visual field printout SHOWS 12-degree loss but the examination does NOT meet the page-3 standards -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3b346cab4c9a",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3b346cab4c9a.json",
+          "sha256": "524318eff058a8a63b3bef20b1c69abeb46145029cf847c805b3d411d084684a",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3b346cab4c9a",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3b346cab4c9a.json",
+          "sha256": "1a714c69650deef8ec0aad94c8de064d9e91819a3383dce4a3d4d55929903819",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-visual-field-non-conforming-unmet-mv"
+    },
+    {
+      "caseName": "CONFORMANCE DISCRIMINATOR (the other direction) - both lanes conform but NEITHER demonstrates a listed finding (none of the listed) -> Unmet. Conformance alone is not evidence.",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-01ff40a0af14",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-01ff40a0af14.json",
+          "sha256": "ef8ee3fee907b1203adcd75b40aae45c162bb004e4aa86fb1128182f8c9c7b6b",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-01ff40a0af14",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-01ff40a0af14.json",
+          "sha256": "996874682cd3ff4d840218dbc501f6fae274905d6855e649252fda31434a5ac5",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demonstration-conformance-without-any-finding-unmet-mv"
+    },
+    {
+      "caseName": "blepharoptosis repair with all three layers -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3ca9e3c7975b",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3ca9e3c7975b.json",
+          "sha256": "0563bd7bd4ba3c638fcc9f3c7067913db33fcbc101b4c962a805670ee542fef4",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3ca9e3c7975b",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-3ca9e3c7975b.json",
+          "sha256": "556403341694b1255bb467934a1701f3fd2c8eb719a231ea18aafc421321259f",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "blepharoptosis-repair-all-layers-met"
+    },
+    {
+      "caseName": "one requested, no qualifying indication (none of the listed) -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-a0735fc0c006",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-a0735fc0c006.json",
+          "sha256": "f8a4a1d2dc094a61f126bf7663157f6f58acbabff64a95165bf3873f74ddc48d",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-a0735fc0c006",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-a0735fc0c006.json",
+          "sha256": "a4b92dc817131f4b00a532940900c6cd4f4334701f2fa185276fd5e0e8db7624",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "one-drop-indication-unmet-mv"
+    },
+    {
+      "caseName": "one requested, no documented complaint (none of the listed) -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-57a82818e17d",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-57a82818e17d.json",
+          "sha256": "11d6487ece5fcee45ca740cb5405f1f66759f44d0c60a4708137ee663a5a4b91",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-57a82818e17d",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-57a82818e17d.json",
+          "sha256": "5a47b653f36b7b6b92dfc2b1867af2b47f762dd731b0d7ac4cc2aa8d4533a290",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "one-drop-complaint-unmet-mv"
+    },
+    {
+      "caseName": "one requested, no objective demonstration (none of the listed) -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0d69cfac39e3",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0d69cfac39e3.json",
+          "sha256": "15332d24116736bba7c4ad6a9e99aade385dbd8a90c6f69664c46d197fe22dde",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0d69cfac39e3",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0d69cfac39e3.json",
+          "sha256": "00d16ad1d19a454309f990e492005a8fe47f93e460e3f4f180012e169a2a83ad",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "one-drop-demonstration-unmet-mv"
+    },
+    {
+      "caseName": "requested with nothing documented -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1d02c75953e2",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1d02c75953e2.json",
+          "sha256": "4d23dee6382d459c1111f467e885756532c3bd3917c591d07dfb0d10c43b250a",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1d02c75953e2",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-1d02c75953e2.json",
+          "sha256": "9e08ef6f6ec374354f85e84ac4f23aee2d4f2206058d10827353744de0cb98bf",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "request-only-unmet-mv"
+    },
+    {
+      "caseName": "both procedures, three layers and both individually documented -> Met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-aef926c46ef7",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-aef926c46ef7.json",
+          "sha256": "2d4b6b3f35fb86f9907a75afd536e0c2088c672d162a63b43fda47be3a307df1",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-aef926c46ef7",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-aef926c46ef7.json",
+          "sha256": "0120e2a9dd3723b2362c8a251658a668c01b321eb4d59965ce11316b923ce026",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "both-fully-documented-met"
+    },
+    {
+      "caseName": "both requested, indication missing -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4aeaf482905b",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4aeaf482905b.json",
+          "sha256": "e2f25d37aede822415b7b488cd72a113afeb67511727c8b192ce920bfb00f8a6",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4aeaf482905b",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-4aeaf482905b.json",
+          "sha256": "8195e68d1c798f23c4cfd87ef36a0b7f99d1778666cf3d4eabb1dcc3a025df2c",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "both-drop-indication-unmet"
+    },
+    {
+      "caseName": "both requested, complaint missing -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f5e9e067c1f4",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f5e9e067c1f4.json",
+          "sha256": "8a0a430604a127fe2482322a847440ee7aee6fd661cf30f520e5697821b8e790",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f5e9e067c1f4",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-f5e9e067c1f4.json",
+          "sha256": "e7de193b9a758029d277ba3c3acc5a16bd0f38a377aa01d15ff951f590760420",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "both-drop-complaint-unmet"
+    },
+    {
+      "caseName": "both requested, demonstration missing -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-42f6f708be7f",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-42f6f708be7f.json",
+          "sha256": "553e84509f5304690bba92c5517e67185244bc58d0fdb90e94cfe38d21f0dd8a",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-42f6f708be7f",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-42f6f708be7f.json",
+          "sha256": "1bc3621752deec09354106f099070f59f5ea0bb6ace05715dbab6bc5d9f1a6ee",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "both-drop-demonstration-unmet"
+    },
+    {
+      "caseName": "both requested, blepharoplasty-documentation missing -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d72e280e6b29",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d72e280e6b29.json",
+          "sha256": "5db24913cd8c97804a2c961151d2977ffd2ed3e8102c7579fa968956bafa5767",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d72e280e6b29",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d72e280e6b29.json",
+          "sha256": "f4ef0f240fb536c4f653acb5ebfee8a5a0ab5b6d510b17c4fb2b00450e01ec2a",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "both-drop-blepharoplasty-documentation-unmet"
+    },
+    {
+      "caseName": "both requested, ptosis-documentation missing -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-652dd1e9c530",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-652dd1e9c530.json",
+          "sha256": "a38365a5410a61f8c70881fbc3e2e3186c54de710318ac2cc97b9e237b3570c3",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-652dd1e9c530",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-652dd1e9c530.json",
+          "sha256": "9d74aa1525a55c45b6f6f35b271d51acc2497caf9d410760f279785c5d8aa4de",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "both-drop-ptosis-documentation-unmet"
+    },
+    {
+      "caseName": "neither procedure requested -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-2f854c34e946",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-2f854c34e946.json",
+          "sha256": "865b2e50db6904195d53c4da774b36acd701ae0b6b9a167d2834c2a3aaba59a9",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-2f854c34e946",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-2f854c34e946.json",
+          "sha256": "ff8f7ae66269cfb6bb858a5b42b430d6e21184e4a1f30205772e9b1c5e135b6c",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "neither-procedure-requested-unmet-mv"
+    },
+    {
+      "caseName": "PINNED per customer flag 9e2927f3 (resolved, correct as encoded) - the prosthesis indication with its purpose and matching photograph but no listed complaint -> Unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-af8534cdbcb7",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-af8534cdbcb7.json",
+          "sha256": "df4469e9cdd4a62df318a9245a2c9c566c09d8fcb230dec148d368accdd7009e",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-af8534cdbcb7",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-af8534cdbcb7.json",
+          "sha256": "5b0586b78d41451f06edf268cae9a081cdba1539c46ca47d9fd151077e249312",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "prosthesis-indication-no-listed-complaint-unmet-mv"
+    },
+    {
+      "caseName": "cosmetic-makes-later-inputs-unnecessary",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d4cdadfd4143",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b/questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d4cdadfd4143.json",
+          "sha256": "64ee92176fc5ebe9b7c5130ba4da5a7d3ca2c83dc629d4eddefdb40cb44adfff",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d4cdadfd4143",
+          "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b/questionnaireresponse/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d4cdadfd4143.json",
+          "sha256": "6b9ca9d7108cdd39f3b9c331abf577e4fdd4f6fad3e1d50c752ff795be6797c0",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "cosmetic-makes-later-inputs-unnecessary"
+    }
+  ]
+}

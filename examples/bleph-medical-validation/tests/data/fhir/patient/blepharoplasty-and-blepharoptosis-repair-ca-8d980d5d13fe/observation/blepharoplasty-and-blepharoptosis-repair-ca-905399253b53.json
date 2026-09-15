@@ -1,0 +1,33 @@
+{
+  "resourceType": "Observation",
+  "id": "blepharoplasty-and-blepharoptosis-repair-ca-905399253b53",
+  "meta": {
+    "profile": [
+      "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-examination-standards-met"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-local",
+        "code": "submitted-visual-field-examination-conforms-to-the-examination-standards"
+      }
+    ]
+  },
+  "valueBoolean": false,
+  "effectiveDateTime": "2026-01-01",
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+          "code": "survey"
+        }
+      ]
+    }
+  ]
+}

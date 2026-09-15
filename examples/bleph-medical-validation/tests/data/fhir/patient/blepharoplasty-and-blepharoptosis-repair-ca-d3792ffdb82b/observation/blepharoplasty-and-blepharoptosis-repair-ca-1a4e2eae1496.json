@@ -1,0 +1,40 @@
+{
+  "resourceType": "Observation",
+  "id": "blepharoplasty-and-blepharoptosis-repair-ca-1a4e2eae1496",
+  "meta": {
+    "profile": [
+      "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-local",
+        "code": "photographic-demonstration-submitted"
+      }
+    ]
+  },
+  "valueCodeableConcept": {
+    "coding": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-1f64a73b6291-answer-codes",
+        "code": "photograph-upper-eyelid-skin-rests-on-the-eyelashes"
+      }
+    ]
+  },
+  "effectiveDateTime": "2026-01-01",
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+          "code": "survey"
+        }
+      ]
+    }
+  ]
+}

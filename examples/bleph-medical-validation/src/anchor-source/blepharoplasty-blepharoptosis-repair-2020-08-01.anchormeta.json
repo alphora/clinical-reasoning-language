@@ -1,0 +1,12 @@
+{
+  "path": "../anchor-source/blepharoplasty-blepharoptosis-repair-2020-08-01.txt",
+  "derivedFrom": "../anchor-source/blepharoplasty-blepharoptosis-repair-2020-08-01.txt",
+  "derivedFromHash": "sha256:54b18105ff3ef124724060442c2fa88fb398bed308efe78875fa01a04e3cce2e",
+  "derivedFromContract": "anchor-self",
+  "canonicalizer": "crl-anchor-docx-text",
+  "canonicalizerVersion": "1.0.0",
+  "textHash": "sha256:54b18105ff3ef124724060442c2fa88fb398bed308efe78875fa01a04e3cce2e",
+  "offsetUnit": "utf8-byte",
+  "unicodeNormalization": "NFC",
+  "rangeConvention": "half-open"
+}

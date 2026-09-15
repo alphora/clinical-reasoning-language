@@ -1,0 +1,40 @@
+{
+  "resourceType": "Observation",
+  "id": "blepharoplasty-and-blepharoptosis-repair-ca-ff53d812673c",
+  "meta": {
+    "profile": [
+      "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/mcpm-bleph-local",
+        "code": "documented-patient-complaint"
+      }
+    ]
+  },
+  "valueCodeableConcept": {
+    "coding": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin"
+      }
+    ]
+  },
+  "effectiveDateTime": "2026-01-01",
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+          "code": "survey"
+        }
+      ]
+    }
+  ]
+}

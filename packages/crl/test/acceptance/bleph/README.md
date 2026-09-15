@@ -1,5 +1,7 @@
 # Bleph native acceptance fixture
 
+For interactive Medical Validation, open [the Bleph MV workspace](../../../../../examples/bleph-medical-validation/medical-validation.code-workspace). This folder contains the frozen native regression inputs; it is not an MV workspace. The repository's **Run Bleph Medical Validation (isolated)** debugger configuration opens the MV example.
+
 This is a migration acceptance snapshot for #320, not an authoritative CRL authoring example. Customer delivery is the priority; existing syntax and comments may be superseded by the language redesign. The suite measures the actual FHIR R4, backported R5 `$apply` result. A CRE prediction never substitutes for native evidence.
 
 ## Run

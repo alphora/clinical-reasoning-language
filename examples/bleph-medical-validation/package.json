@@ -1,0 +1,30 @@
+{
+  "name": "mcpm-bleph",
+  "version": "0.0.0",
+  "private": true,
+  "crl": {
+    "name": "Blepharoplasty And Blepharoptosis Repair",
+    "version": "1.0.0",
+    "date": "2020-08-01",
+    "canonicalBase": "http://iehp.org/crl",
+    "sharedLibraries": [
+      "Medical Policy Determination"
+    ],
+    "dispositions": {
+      "version": 1,
+      "mode": "embedded",
+      "options": {
+        "certify": {
+          "Met": {
+            "label": "Medical-policy criteria met"
+          }
+        },
+        "not-certify": {
+          "Unmet": {
+            "label": "Medical-policy criteria not met"
+          }
+        }
+      }
+    }
+  }
+}

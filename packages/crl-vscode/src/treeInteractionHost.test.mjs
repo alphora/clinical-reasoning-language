@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
 const source=ts.createSourceFile('cockpit.ts',readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
-const bodies=new Map();function visit(n){if(ts.isFunctionDeclaration(n)&&['toggleCriterionExpand','navigatePinnedBranch','selectRoutesThroughNode','onWebviewMessage'].includes(n.name?.text))bodies.set(n.name.text,n.getText(source));ts.forEachChild(n,visit);}visit(source);
+const bodies=new Map();function visit(n){if(ts.isFunctionDeclaration(n)&&['toggleCriterionExpand','branchNeighbors','pinCards','navigatePinnedBranch','selectRoutesThroughNode','onWebviewMessage'].includes(n.name?.text))bodies.set(n.name.text,n.getText(source));ts.forEachChild(n,visit);}visit(source);
 test('disclosure and result navigation suppress selection pans before their final local focus',()=>{
  const calls=[],tree={gen:1};
  const c=vm.createContext({views:new Map([['tree',tree]]),expandedGuardWhens:new Set(),crlStructure:[],conceptLayer:[],guardOutlines:[],
@@ -13,9 +13,10 @@ test('disclosure and result navigation suppress selection pans before their fina
   state:{selection:{primary:'cel',caseId:'one'}},scrollSuppressPane:undefined,
   dispatch:()=>calls.push(['select',c.scrollSuppressPane]),
   pinnedCards:{token:'pin',epoch:1},indexVersion:1,mode:'medical-validation',branchOrder:()=>[],
-  leafRouteNeighbors:()=>({next:{caseId:'two',routeId:'leaf'}}),pinCards:(...args)=>calls.push(['pin',...args]),
+  collectDispositionLeafKeys:()=>new Set(['first-leaf','second-leaf']),
+  leafRouteNeighbors:(_routes,_pin,order)=>{assert.deepEqual(Array.from(order),['first-leaf','second-leaf']);return {next:{caseId:'two',routeId:'leaf'}};},pinCards:(...args)=>calls.push(['pin',...args]),
  });
- for(const name of ['toggleCriterionExpand','navigatePinnedBranch'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
+ for(const name of ['toggleCriterionExpand','branchNeighbors','navigatePinnedBranch'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
  c.toggleCriterionExpand('criterion','click');assert.deepEqual(calls,[['render','tree','click'],['select','tree']]);assert.equal(c.scrollSuppressPane,undefined);
  calls.length=0;c.navigatePinnedBranch('next','pin');assert.deepEqual(calls,[['select','tree'],['pin','two','leaf','branch-navigation']]);assert.equal(c.scrollSuppressPane,undefined);
 });
@@ -35,4 +36,13 @@ test('first-route pinning suppresses the selection pan before constructing its c
   dispatch:e=>{calls.push(c.scrollSuppressPane);c.state.selection=e.selection;},branchQuestionnaire:{close:()=>{}},pinCards:()=>calls.push('cards')});
  vm.runInContext(transformSync(bodies.get('selectRoutesThroughNode'),{loader:'ts'}).code,c);
  await c.selectRoutesThroughNode('leaf','pin',true);assert.deepEqual(calls,['tree','cards']);assert.equal(c.scrollSuppressPane,undefined);
+});
+
+test('counter and arrow dispatch share the same ordering helper',()=>{
+ const calls=[];
+ const walk=n=>{if(ts.isCallExpression(n)&&ts.isIdentifier(n.expression)&&n.expression.text==='leafRouteNeighbors')calls.push(n);ts.forEachChild(n,walk);};walk(source);
+ assert.equal(calls.length,1,'no direct legacy-order call may bypass branchNeighbors');
+ let owner=calls[0].parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
+ assert.equal(owner?.name?.text,'branchNeighbors');
+ for(const name of ['pinCards','navigatePinnedBranch'])assert.match(bodies.get(name),/branchNeighbors\(/,name+' uses shared ordering');
 });

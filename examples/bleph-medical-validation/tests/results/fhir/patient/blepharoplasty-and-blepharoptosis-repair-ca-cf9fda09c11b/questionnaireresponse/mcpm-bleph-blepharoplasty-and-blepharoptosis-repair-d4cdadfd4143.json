@@ -1,0 +1,86 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-d4cdadfd4143",
+  "questionnaire": "http://iehp.org/crl/Questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e-blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b",
+  "status": "in-progress",
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b"
+  },
+  "item": [
+    {
+      "linkId": "1",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested",
+      "text": "Is blepharoplasty requested?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "1.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested#Observation.value[x]",
+          "text": "Blepharoplasty Requested",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "2",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested",
+      "text": "Is blepharoptosis repair requested?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "2.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested#Observation.value[x]",
+          "text": "Blepharoptosis Repair Requested",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "3",
+      "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-cosmetic-surgical-purpose",
+      "text": "Is the requested surgery being performed for cosmetic purposes?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "3.1",
+          "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-cosmetic-surgical-purpose#Observation.value[x]",
+          "text": "Cosmetic Surgical Purpose",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

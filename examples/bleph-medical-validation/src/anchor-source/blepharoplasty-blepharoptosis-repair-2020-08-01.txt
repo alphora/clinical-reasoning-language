@@ -1,0 +1,82 @@
+Surgery: Eye and Ocular Adnexa
+Medi-Cal Provider Manual, Part 2 – Surgery: Eye and Ocular Adnexa. Page updated: August 2020.
+Blepharoplasty and/or Repair for Blepharoptosis
+Blepharoplasty procedure and/or a repair for blepharoptosis is reimbursable when it is considered medically necessary. The service is considered medically necessary when performed as functional/reconstructive surgery to correct one of the following:
+Impairment of near or far vision or visual field defect due to dermatochalasis, blepharochalasis or blepharoptosis
+Symptomatic redundant skin weighing down or upper lashes
+Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin
+Prosthesis difficulties in an anophthalmic socket
+A blepharoplasty procedure and/or a repair for blepharoptosis is not a benefit when performed for cosmetic purposes.
+ICD-10-CM Codes
+ICD-10-CM diagnosis codes that support medical necessity include the following (not required for claim reimbursement):
+D49.2
+G51.0
+G51.2 thru G51.8
+H02.031 thru H02.049
+H02.131 thru H02.139
+H02.201 thru H02.209
+H02.221 thru H02.229
+H02.30 thru H02.36
+H02.401 thru H02.439
+H02.521 thru H02.529
+H02.531 thru H02.539
+H02.70
+H02.831 thru H02.839
+H02.89
+H05.211 thru H05.219
+H05.89
+H49.40 thru H49.43
+H50.89
+H53.40
+L11.8
+L11.9
+L57.2
+L57.4
+L66.4
+L85.8
+L85.9
+L87.1
+L87.8
+L87.9
+L90.3 thru L90.5
+L90.8
+L90.9
+L91.8
+L91.9
+L92.2
+L94.8
+L94.9
+L98.5 thru L98.7
+L99
+Q10.0 thru Q10.3
+Q18.9
+S01.119A thru S01.119S
+S01.129A thru S01.129S
+S01.139A thru S01.139S
+S01.149A thru S01.149S
+S01.159A thru S01.159S
+S04.10XA thru S04.12XS
+TAR Requirements
+A Treatment Authorization Request (TAR) is required for a blepharoplasty procedure and/or a repair for blepharoptosis. When requesting a TAR or a Service Authorization Request (SAR), providers must include documentation of the patient complaints and either a photograph or the visual field examination printout.
+Patient complaints must include one or more of the following:
+Interference with near or distance vision or visual field;
+Difficulty seeing at distance and/or near due to upper eyelid drooping, looking through the eyelashes or seeing the upper eyelid skin; or
+Chronic blepharitis or dermatitis
+Photographs must demonstrate one or more of the following:
+The upper eyelid margin approaches to within 2.5 mm (1/4 of the diameter of the visible iris) of the corneal light reflex.
+The upper eyelid skin rests on the eyelashes.
+The upper eyelid indicates the presence of dermatitis.
+The upper eyelid position contributes to difficulty tolerating a prosthesis in an anophthalmic socket.
+Visual field examination must demonstrate a minimum of 12 degree or 30 percent loss of upper field of vision with upper lid skin and/or lid margin in respose and elevated (by taping the lid) to demonstrate potential correction by the proposed procedure or procedures.
+Photograph Submission Standards
+Providers must conform to the following standards when submitting photographs:
+Prints not slides must be frontal, canthus-to-canthus with the head perpendicular to the plane of the camera (not tilted) to demonstrate a skin rash or position of the true lid margin or the pseudo-lid margin.
+The photos must be of sufficient clarity to show a light reflex on the cornea.
+If redundant skin coexists with true lid ptosis, additional photos must be taken with the upper lid skin retracted to show the actual position of the true lid margin (needed if both CPT code 15822 and 15823 are required and planned in addition to codes 67901 thru 67908).
+Oblique photos are only needed to demonstrate redundant skin on the upper eyelashes when this is the only indication for surgery.
+If both a blepharoplasty and a ptosis repair are planned, both must be individually documented. This may require two sets of photographs, showing the effect of drooping of redundant skin (and its correction by taping) and the actual presence of blepharoptosis.
+Visual Field Examination Standards
+Providers must conform to the following standards when submitting visual field examination printout:
+Record using either a Goldmann Perimeter (III 4-E test object) or a programmable automated perimeter (equivalent to a screening field with a single intensity strategy using a 10dB stimulus) to test a superior (vertical) extent of 50 to 60 degrees above fixation with targets presented at a minimum 4 degree vertical separation starting at 24 degrees above fixation while using no wider than a 10 degree horizontal separation.
+Each eye should be tested with the upper eyelid at rest and repeated with the lid elevated to demonstrate an expected “surgical” improvement meeting or exceeding the criteria.
+A tangent screen visual field is also acceptable and must be performed at 1 meter with a 2 mm to 5 mm white test object.

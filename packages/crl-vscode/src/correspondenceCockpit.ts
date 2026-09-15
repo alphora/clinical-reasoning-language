@@ -2,7 +2,7 @@ import {isAuthoringFlag} from './flagWorkflow';
 import { paintFlagBadges } from './flagBadgesWebview';
 import { summarizeFlagBadges } from './flagPlacement';
 import { createBranchQuestionnairePanel, nextQuestionnaireColumn } from "./branchQuestionnairePanel";
-import { leafRouteNeighbors } from "./branchNavigation";
+import { leafRouteNeighbors, type BranchIdentity } from "./branchNavigation";
 import { summarizeBranchVerdict } from "./branchVerdict";
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
 // REFACTOR:grounded: pinned route cards and MV-scoped proposals (docs/medical-validation-plan.md).
@@ -2411,6 +2411,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     else branchQuestionnaire.post(msg);
   }
   function branchOrder() { return [...scenarioByCaseId.keys()].flatMap(caseId=>routesForCase(caseId).map(route=>({caseId,routeId:route.terminalId,leafKey:route.nodeKeys.at(-1)??''}))); }
+  function branchNeighbors(current: BranchIdentity) {
+    return leafRouteNeighbors(branchOrder(),current,[...collectDispositionLeafKeys(crlStructure)]);
+  }
   function caseIdsThroughReviewNode(semanticKey: string): string[] {
     const tree=views.get('tree'), maps=crlMaps;if(!tree || !maps)return [];
     const leaves=collectDispositionLeafKeys(crlStructure);
@@ -2442,7 +2445,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
   function navigatePinnedBranch(direction: string, token: unknown): void {
     const pin=pinnedCards;if(!pin || pin.epoch!==indexVersion || pin.token!==token || mode!=="medical-validation")return;
-    const neighbors=leafRouteNeighbors(branchOrder(),pin);
+    const neighbors=branchNeighbors(pin);
     const next=direction==='previous'?neighbors.previous:direction==='next'?neighbors.next:undefined;if(!next)return;
     scrollSuppressPane='tree';
     try { dispatch({type:'select',selection:{primary:'cel',...next}}); }
@@ -2474,7 +2477,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const marks = { yesKeys: leafMarks.yesKeys, noKeys: leafMarks.noKeys,
       conditions: conditionTruthKeys(sv.tree, id => selectedIds.has(id) ? resolveKey(id) : undefined) };
     const token = randomUUID();
-    const neighbors=leafRouteNeighbors(branchOrder(),{caseId,routeId});
+    const neighbors=branchNeighbors({caseId,routeId});
     const verdictCaseIds=caseIdsThroughReviewNode(route.nodeKeys[route.nodeKeys.length-1]);
     const payload = { token, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:neighbors.index+1,total:neighbors.total}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
       pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
@@ -3145,8 +3148,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let untargetedEpoch: number | undefined;
 
   /** Resolve the .cel to open a panel on (#156 slice 3, shared by BOTH commands). If the active editor is a `.cel`, use
-   *  it (preserves the long-standing focused-`.cel` behavior). Otherwise scan the workspace for policy-shaped `.cel`
-   *  files (those for which `findPolicySrc` succeeds — a non-policy `.cel` would fail discovery anyway) and quick-pick
+   *  it (preserves the long-standing focused-`.cel` behavior). Otherwise scan the workspace for MV `.cel`
+   *  files under `src/cel/mv` for which `findPolicySrc` succeeds and quick-pick
    *  one. Returns the chosen path, or undefined when cancelled / none found. */
   async function pickCelForPanel(epoch: number): Promise<string | undefined> {
     const ed = vscode.window.activeTextEditor;
@@ -3161,10 +3164,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Superseded WHILE scanning (a targeted launch landed during the await) — return before putting a picker on screen.
     // Without this the epoch guard would discard the answer, but only after showing a dialog nobody asked for (#244).
     if (epoch !== showEpoch) return undefined;
-    // Policy-shaped only: a .cel under a policy `src/` with a `provenance/` sibling. Sort for a stable list.
+    // Policy roots may have provenance or the src/crl + src/cel layout. Sort for a stable list.
     const policyCels = [...new Map(uris.map(u => { const src = findPolicySrc(u.fsPath); return [src, u.fsPath] as const; }).filter(([src]) => src !== undefined)).values()].sort();
     if (policyCels.length === 0) {
-      void vscode.window.showInformationMessage("CRL: no policy-shaped .cel files found in this workspace (a .cel under a policy src/ with a provenance/ folder).");
+      void vscode.window.showInformationMessage("CRL: no Medical Validation CEL files found under src/cel/mv/. Open the policy workspace; keep engineering cases under src/cel/regression/.");
       return undefined;
     }
     const items = policyCels.map((p) => {

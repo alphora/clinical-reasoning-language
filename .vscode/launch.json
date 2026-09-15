@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Bleph Medical Validation (isolated)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensions-dir=${workspaceFolder}/tmp/crl-debug-extensions",
+        "--disable-extensions",
+        "--user-data-dir=${workspaceFolder}/tmp/bleph-mv-profile",
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/crl-vscode",
+        "${workspaceFolder}/examples/bleph-medical-validation/medical-validation.code-workspace"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/packages/crl-vscode/dist/**/*.js"
+      ],
+      "preLaunchTask": "compile-crl-ext"
+    },
+    {
+      "name": "Run CRL Extension (Scenario Runner)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensions-dir=${workspaceFolder}/tmp/crl-debug-extensions",
+        "--disable-extensions",
+        "--user-data-dir=${workspaceFolder}/tmp/scenario-runner-profile",
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/crl-vscode",
+        "${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/packages/crl-vscode/dist/**/*.js"
+      ],
+      "preLaunchTask": "compile-crl-ext"
+    }
+  ]
+}
