@@ -143,9 +143,21 @@ Not the working tree. The thing a user installs.
       its old bundle, activation copies the old bundle, and globalStorage stays stale. You then
       conclude "the build is broken". (#224 hit exactly this at 4.92.2 → fixed by bumping to 4.92.3.)
       A patch bump is enough; `check-core.cjs` does not enforce crl-vscode↔core parity.
-- [ ] Reinstall: `code --install-extension <vsix> --force`, **reload the VS Code window** (re-stages
-      globalStorage), **and restart Claude Code** — a separate process that re-spawns the MCP server;
-      a window reload alone is not enough.
+- [ ] Use a dedicated verification profile and extensions directory for maintainer test hosts.
+      On Windows, a copied VS Code build also needs a distinct `win32AppUserModelId` in its own
+      `product.json`. A separate `--user-data-dir` alone
+      does not isolate Windows recent-project launch entries: a test copy with the normal app ID
+      can rewrite them to launch its executable against the user's normal profile. Verify those
+      entries still target the normal installation after launching the test host. This is maintainer
+      setup, not a KE installation step.
+- [ ] Install the VSIX into the dedicated verification extensions directory:
+      `code --user-data-dir <profile> --extensions-dir <extensions> --install-extension <vsix> --force`.
+      Activate those installed bytes in the verification window/profile and confirm its extension
+      path/version. Reload that verification window when needed to restage its own globalStorage.
+      Start a fresh MCP client process pointed explicitly at that profile's staged server path;
+      restarting an unrelated client still pointed at the normal profile does not test these bytes.
+      The two installed MCP checks use this staged VSIX server and the fresh npm installation's
+      server. Record both actual paths and compare their kit payloads with the release export.
 - [ ] Confirm the tools the bundle actually registers:
       `grep -oE 'registerTool\(\s*"[a-z_]+"' packages/crl-vscode/dist/mcp-server.js | sort -u`
       — and against the INSTALLED globalStorage copy, which is the one that runs. v2.4.0, v2.4.1 and
