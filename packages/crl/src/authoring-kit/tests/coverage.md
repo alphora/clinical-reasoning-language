@@ -1,5 +1,35 @@
 # Kit evidence ledger
 
+## Maintenance — MV result order and runnable Bleph workspace (5.4.2)
+
+Baseline: `badef3ce5f10c1a5d09e657371ced6c7576392e4` (last completed kit audit).
+Reviewed implementation target: `d3492ccb0302d33b47f264b957d96e5e5ccaab56`. This maintenance preserves kit schema
+`2.4` and content hash `4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`.
+The following metadata commit supplies the resolved target in the audit stamp.
+
+| Changed assertions, inputs, and implementation | Disposition and evidence limits |
+| --- | --- |
+| `crl-vscode/src/branchNavigation.ts` and its test | **Not author-facing language semantics.** Next/Previous and one-based count use visual disposition order, preserving the first authored route for each covered result. New rows cover scrambled case order, alternate routes, uncovered/duplicate visual keys, empty terminal keys, non-disposition fallback and unchanged empty-order behavior. Existing endpoints do not wrap. The original implementation fails the new order assertion; restored implementation passes all five tests. |
+| `crl-vscode/src/correspondenceCockpit.ts`, `treeInteractionHost.test.mjs`, `flowPaneHtml.test.mjs` | **Not author-facing language semantics.** Both navigation dispatch and counter use the same helper. VM coverage asserts the structural keys passed by that actual helper. SVG tests compare rendered result y positions against structural order for first/otherwise, nested first, and multiple decisions. Live Bleph traversed 1 of 6 through 6 of 6 and back, matching visual result identities. No authored CEL cases or route evaluation were changed. |
+| `crl-vscode/src/mvWorkspaceFixture.test.mjs`; `examples/bleph-medical-validation/**` (467 files) | **Existing guidance sufficient**, `mv-case-authoring` and `cel-cases`. The example retains the already tested 5.4.0 delivery: 37 MV cases and 69 full regression cases. All 465 prior delivery files compare byte-for-byte; README and a workspace entry make it runnable. Tests resolve actual suites, require the MV/regression split, and check the native manifest's case membership, Q/QR presence, paths and hashes. Snapshot assertions also bind the normalized source/configuration and original manifest provenance; patient data hashes and exact workspace layout are checked. These are fixture-integrity checks, not fresh native execution or clinical certification; existing source correspondence findings remain KE work. |
+| `.vscode/launch.json`, `.vscode/tasks.json`, `.gitignore`, acceptance Bleph README | **Not author-facing semantics.** Debugger opens the maintained policy-shaped workspace and compiles the development extension. The frozen 116-case native fixture is unchanged except a README pointer. Tests resolve the workspace, build task and development extension path. |
+| `crl-vscode/package.json` setting descriptions and cockpit discovery message | **Existing guidance sufficient**, `mv-case-authoring`. Text identifies src/cel/mv and distinguishes optional Worklist panes from result review in the tree. No discovery rule or setting default changed. Other package edits are versions or equivalent JSON Unicode serialization. |
+| `.claude/skills/crl-release/SKILL.md` | **Not author-facing language semantics.** Maintainer Windows test copies require separate application identity and a dedicated profile. This prevents test executables from replacing regular recent-project launch entries. It is not a CRL renderer fix or a new KE setup requirement. The separate-process startup stall cleared after the operator restarted the laptop; fresh installed-artifact verification remains a separate release gate. |
+| Previous audit/coverage finalization; root/core/extension package versions and lockfile | **Not author-facing semantics.** Complete saved-audit-to-release delta inspected. No dependency, grammar, compiler, CEL assertion, FHIR emission, runtime asset or kit-content change. |
+
+No owning @kit tags were added, removed or changed. New untagged UI and fixture
+assertions are dispositioned above; existing teaching remains sufficient.
+The complete source path inventory is in
+[maintenance-5.4.2-paths.txt](maintenance-5.4.2-paths.txt), including generated example files.
+It includes the prior audit.json stamp finalization already changed since the baseline.
+The new audit.json stamp remains untouched until the reviewed source commit exists.
+
+Validation: full core 4,945 passed/32 skipped, real MCP passed, extension 1,271
+passed/3 expected failures; both typechecks passed. Final 104 focused checks passed after the narrow review corrections, with fresh core/extension builds. Review 759 covers the order
+plan and 760 the code. Installed-archive acceptance is recorded separately in the
+release receipt; this source audit alone does not certify it or native outcomes.
+
+
 ## Maintenance — reusable conditions and shared continuations (754/755)
 
 Baseline: `74d4f1e6322cd81c8fa3ccf5fd1583cb1c456f5f` (last completed audit).
