@@ -1117,7 +1117,6 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   // REFACTOR:grounded: the component tab identifies reusable structure; truth stays on internal logic.
   `.flow-component-frames>rect{fill:rgba(160,160,160,.025);stroke:rgba(160,160,160,.45);stroke-width:1;vector-effect:non-scaling-stroke}` +
   `.flow-row[data-flow-component]>rect,.flow-crit-row[data-flow-component]>rect{fill:transparent;stroke:rgba(160,160,160,.45);stroke-width:1}` +
-  `.flow-row[data-flow-component="expanded"]>rect,.flow-crit-row[data-flow-component="expanded"]>rect{stroke:transparent}` +
   `[data-flow-component]>text{font-size:10px;fill:var(--vscode-descriptionForeground,#aaa)}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
   // A recommend TARGET. #210: ALL recommend activities (incl. determinations) → neutral grey, the SAME as an ordinary
