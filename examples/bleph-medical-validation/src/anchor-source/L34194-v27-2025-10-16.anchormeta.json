@@ -1,0 +1,13 @@
+{
+  "textHash": "sha256:399da03fe734fa9505a845b18d413cd081ae7a592c253cdfed939743e0a9adc7",
+  "canonicalizer": "crl-anchor-docx-text",
+  "canonicalizerVersion": "1.0.0",
+  "offsetUnit": "utf8-byte",
+  "unicodeNormalization": "NFC",
+  "rangeConvention": "half-open",
+  "path": "L34194-v27-2025-10-16.txt",
+  "derivedFrom": "../refined-source/L34194-v27-2025-10-16.docx",
+  "derivedFromHash": "sha256:757aefa2b6c78a9a3966b9cf3fe6f7575a36ce65e3e0452ab90966086c382768",
+  "derivedFromContract": "upstream-source",
+  "warnings": []
+}

@@ -1,0 +1,40 @@
+{
+  "resourceType": "Observation",
+  "id": "blepharoplasty-and-blepharoptosis-repair-ca-f29db62a87c6",
+  "meta": {
+    "profile": [
+      "http://example.org/crl/StructureDefinition/l34194-bleph-example-upper-eyelid-skin-finding"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-bleph-example-local",
+        "code": "upper-eyelid-skin-finding"
+      }
+    ]
+  },
+  "valueCodeableConcept": {
+    "coding": [
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "pseudo-mrd-at-most-2-mm"
+      }
+    ]
+  },
+  "effectiveDateTime": "2026-01-01",
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+          "code": "survey"
+        }
+      ]
+    }
+  ]
+}

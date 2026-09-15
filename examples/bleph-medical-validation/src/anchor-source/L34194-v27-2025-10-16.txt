@@ -1,0 +1,65 @@
+L34194 Blepharoplasty Eyelid Surgery and Brow Lift
+Refined clinical source. Noridian Healthcare Solutions, LLC; CMS Medicare Coverage Database version 27, revision R7, effective October 16, 2025. CMS document (https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34194&ver=27). The October 2025 revision consolidates JE/JF contractor information and states that coverage intent is unchanged.
+Source records: original HTML (../source/L34194-v27-2025-10-16.html), readable section extraction (../source/L34194-v27-2025-10-16.txt), and retrieval metadata (../source/L34194-v27-2025-10-16.metadata.json). The numbered requirements below organize the policy; their identifiers are local to this refinement, not CMS rule numbers. Source headings identify the original passages. This is a clinical source refinement, not a PA submission specification or executable decision tree.
+Terminology
+Source: Coverage Guidance → Introductory Definitions.
+Dermatochalasis: excess skin with loss of elasticity, usually associated with aging.
+Blepharochalasis: excess skin associated with recurrent eyelid edema.
+Blepharoptosis: drooping of the actual upper eyelid margin relative to the visual axis.
+Pseudoptosis: in this policy, excessive skin overhangs an otherwise appropriately positioned eyelid margin, creating a pseudo-margin.
+Brow ptosis: a drooping brow pushes excess tissue into the upper eyelid and may cause mechanical blepharoptosis or dermatochalasis.
+MRD/MRD1: distance from the corneal light reflex to the actual upper eyelid margin, with brows relaxed. Do not substitute the overhanging skin margin.
+Pseudo-MRD: corresponding measurement to the overhanging skin's pseudo-margin.
+Scope and coverage
+LCD 01 Functional upper eyelid and brow surgery
+Source: Coverage Guidance → Upper Blepharoplasty, Blepharoptosis Repair, and Brow Ptosis Repair.
+The policy addresses upper blepharoplasty, blepharoptosis repair, and brow ptosis repair, individually or in the minimum combination needed for a satisfactory surgical outcome. Functional surgery addresses a visually significant restriction associated with low upper-lid position or overhanging skin from the listed conditions. The introductory description uses approximately 30 degrees or less remaining from fixation, correlated in the literature with MRD of 2.0 mm or less. Section A specifies the physical findings used for the particular procedure.
+LCD 02 Cosmetic procedures and mixed operative sessions
+Source: CMS National Coverage Policy; Coverage Guidance → Coverage when a Noncovered Procedure is Performed with a Covered Procedure.
+Purely cosmetic procedures without functional benefit are excluded, subject to the national statutory exceptions described in the source. In a session containing both covered and noncovered cosmetic procedures, benefits apply to the covered procedure only. If brow repair alone sufficiently resolves dermatochalasis, additional upper blepharoplasty is cosmetic. If upper blepharoplasty alone sufficiently resolves the visual deficit, additional blepharoptosis repair is cosmetic. Assess the necessity of each proposed procedure, including whether another proposed procedure already supplies the required correction.
+LCD 03 Reconstructive surgery outside this policy s scope
+Source: Coverage Guidance → paragraph beginning “This policy is not intended to cover reconstructive surgery.”
+The functional-surgery criteria in this LCD do not govern reconstructive surgery for congenital or developmental abnormalities, trauma, infection, tumors, or other diseases not specifically included. Examples include ectropion/entropion, ocular exposure, difficulty fitting an ocular prosthesis, refractory primary essential idiopathic blepharospasm, and prompt accidental-injury repair. This is a scope boundary, not a general Medicare denial of reconstructive surgery.
+Documentation obligations remain: the complaint affecting daily activities, or a statement that repair prevents anticipated ocular damage when a specific complaint is absent; examination of the anatomy; appropriate testing and photographs; operative notes and consents.
+LCD 04 Lower eyelids
+Source: Coverage Guidance → Lower Eyelid Blepharoplasty.
+Lower blepharoplasty is generally noncovered under this policy because it is almost never functional. The policy allows case-by-case appeal consideration.
+Clinical and documentary requirements
+LCD 05 Complaint and consistent physical signs
+Source: Documentation Requirements → Section A. Patient Complaints and Physical Signs.
+Document a functional deficit or disturbance caused by eyelid or brow abnormalities, such as visual interference affecting reading or driving. The eye considered for surgery must have physical signs consistent with that deficit or abnormality. A diagnostic label alone does not establish the described functional impact and physical findings.
+LCD 06 Blepharoptosis repair
+Source: Section A → For Blepharoptosis Repair.
+Document actual-margin MRD of 2.0 mm or less, measured with relaxed brows. When only the more ptotic eye initially meets that criterion, applicable Herring's effect can support bilateral repair: raising that lid with tape or the described phenylephrine technique causes the other lid to fall enough to meet the criterion. Preserve which eye is measured and the rest-versus-raised condition.
+LCD 07 Upper blepharoplasty and brow repair
+Source: Section A → For Upper Blepharoplasty and/or Brow Ptosis Repair.
+Document either:
+Redundant tissue over the lid margin causing central pseudo-MRD of 2.0 mm or less; or
+Predominantly medial or lateral redundant tissue clearly obscuring the line of sight in the corresponding gaze.
+These findings concern the skin/pseudo-margin and are distinct from the true-lid measurement for ptosis repair.
+LCD 08 Visual fields and exceptional assessment
+Source: Documentation Requirements; Section A → paragraphs following upper blepharoplasty/brow criteria.
+Ordinary necessity documentation relies on clinical notes and physical findings rather than formal visual-field testing. Formal testing may be performed for other stated clinical purposes; the policy does not ordinarily use it to establish reasonable-and-necessary surgery. A failed MRD criterion with a clinician's supporting visual-field rationale may be considered on appeal.
+When an anatomical abnormality makes MRD difficult to establish or meaningless, the surgeon should explain why an equivalent standard is met. Preserve this documented-equivalence provision separately from the visual-field appeal provision.
+The Sources of Information section cites an ASOPRS statement discussing at least 12 degrees of improvement with lid elevation. That citation is not stated as a separate ordinary coverage route. Thirty degrees remaining, percentage field loss, and change in degrees are different measurements.
+LCD 09 Patient wishes and expected benefit
+Source: Documentation Requirements.
+The record should state that the patient wants surgical correction; risks, benefits and alternatives were explained; and meaningful functional improvement is reasonably expected. Inadequate or illegible documentation that fails to establish medical necessity supports denial under the policy.
+LCD 10 General photographic evidence
+Source: Section B. Photographs.
+Upper-eyelid surgery requires photographs demonstrating the relevant Section A physical signs. Images must have sufficient quality, size and detail. Head and camera planes must be parallel without distorting tilt. Use primary gaze unless another gaze is needed to show the particular deficit. Oblique views are needed only when the required finding is not adequately demonstrated otherwise. Digital and film photographs are acceptable. Identify photographs with the beneficiary's name and date.
+LCD 11 Ptosis photographs and calibration
+Source: Section B → For Blepharoptosis Repair.
+Frontal photographs of both eyelids should demonstrate the Section A MRD. The source describes eyelid obstruction of the pupil as a clear-cut surgical indication; retain that observation alongside the Section A requirements rather than losing it in a numeric summary.
+For bilateral surgery relying on Herring's effect, provide both a resting image and an image with the more ptotic eyelid raised, showing the other eyelid now meeting the ptosis threshold. Photographic measurement assumes an approximately 11 mm corneal diameter. Document deviations greater than 0.5 mm, or provide an appropriately positioned millimeter rule approximately in the corneal plane.
+LCD 12 Upper blepharoplasty and brow photographs
+Source: Section B → For Upper Lid Blepharoplasty; For Brow Ptosis Repair.
+Upper blepharoplasty photographs show the affected eyelid(s) in frontal and lateral views; add oblique views only if needed. Brow repair requires a frontal view showing brow droop and the relevant Section A findings. When correcting dermatochalasis is the purpose, a second view should show improvement with manual brow elevation. Provide additional appropriately overlapping photographs if one view makes relevant structures too small to assess.
+LCD 13 Multiple procedures
+Source: Documentation Requirements; concluding note in Section B.
+Each planned procedure needs its own documented necessity. Combined blepharoplasty and ptosis repair may require separate photographic sets: one demonstrating skin-related pseudo-MRD and correction with taping, and another demonstrating actual blepharoptosis-related MRD. Multiple sets are conditional on what is needed to demonstrate the findings; the policy does not impose a fixed number for every combined case. Independent documentation does not replace LCD-02's minimum-necessary-procedure assessment.
+LCD 14 Records and coding
+Source: Associated Information → Other requirements.
+Maintain supporting records and make them available to the contractor. Each page must be legible and identify the patient and relevant service dates. Follow CMS signature requirements. A preoperative examination and operative report must be available. The record must support the diagnosis codes and the reported procedure codes must describe the service performed.
+For workflow implementation, distinguish documents available before surgery from the completed operative record. The LCD states medical-necessity and record requirements; it does not make an already completed operation a prerequisite for prospective authorization.
+The related coding reference is A57190, version 11 (https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleId=57190&ver=11). Its code tables are not reproduced or adjudicated in this L34194 refinement. The LCD lists no related NCD.

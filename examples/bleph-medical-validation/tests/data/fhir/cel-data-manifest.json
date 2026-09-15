@@ -2,2524 +2,754 @@
   "schemaVersion": 1,
   "cases": [
     {
-      "caseName": "indication vision-dermatochalasis selected as what the surgery corrects -> Met",
+      "caseName": "Upper blepharoplasty — pseudo-MRD 2.0 mm or less",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-vision-dermatochalasis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612",
+      "caseId": "upper-pseudo-mrd-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612.json",
-          "sha256": "be72a329f2937c5a462bd0358a74a88cc361bbb22956f695fe43e3ea66af4754"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55.json",
+          "sha256": "33d00d6b4446d7873ed70d3191cc1c7e9139320ff5825d670e95585b62e9150f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f5cf9eb706a4",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4b0159252141",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-f5cf9eb706a4.json",
-          "sha256": "eb82d8594e1737a11b4f7466e72124034fd89f865351f8af94240c12a77b1dda"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/observation/blepharoplasty-and-blepharoptosis-repair-ca-4b0159252141.json",
+          "sha256": "662485f0905a1610ff2724311c14fe000fa8b10fb21902f5d6ca6b9d77bff574"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a932195a1aa5",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3e7de246839e",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-a932195a1aa5.json",
-          "sha256": "6593d2d032db926125111b05633e0789f6851c91a3a64041daa3a7d27e5b6cc0"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/observation/blepharoplasty-and-blepharoptosis-repair-ca-3e7de246839e.json",
+          "sha256": "7e65b071a22d7f8cf19b60f085bd3ed18acf33d77d86e4ba3cc94aa2cfd0c869"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4aea9a658d2a",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c9c3d00b220f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-4aea9a658d2a.json",
-          "sha256": "e0c2875c59d363ec59a30b1d100c792dabe9e53c103bb4fc660e3d6d7af3fec6"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/observation/blepharoplasty-and-blepharoptosis-repair-ca-c9c3d00b220f.json",
+          "sha256": "9be68e6ff0a701501d7abaa998794c8c0147a6213549f43d61edbce991245025"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fdb148382baf",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-38a2cc226186",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-fdb148382baf.json",
-          "sha256": "bdbbe0817186b7067d81a6383b6e65537ad6c7b0f3d80d2323265dabae68f684"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/observation/blepharoplasty-and-blepharoptosis-repair-ca-38a2cc226186.json",
+          "sha256": "216458dd369477ccbfc3a331b4af74620d9d7ab949b219a323ea2e2e9a706538"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-07e27d749922",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9a7d0e7a3f6e",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-07e27d749922.json",
-          "sha256": "5517aeb526c6fcc4195cc64d459303dbcd26358557bb172c0ac77193fe9899e4"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/observation/blepharoplasty-and-blepharoptosis-repair-ca-9a7d0e7a3f6e.json",
+          "sha256": "bce25b9255ba46f5281241556cc804301f5028cd1b0fb0d6a68373113ed679e3"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3b6a11beaa59",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f43bc1445179",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-3b6a11beaa59.json",
-          "sha256": "334cfd7710cd29f8f853cafc4399e005f690775195c31066d8c5504101bc8586"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-69515f80fe36",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-69515f80fe36.json",
-          "sha256": "38f6bf3ff2cdfb07cba8d0d48c983952d03fd48aa6340287aa62bcef0fa9e0bf"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-251a2edda4a0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-251a2edda4a0.json",
-          "sha256": "34d70bcf568f2b4ec68aee931fad78f933d475196e4a9f00226a74aed8a1fdcc"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0d0b223dd674",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f94f6a811612/observation/blepharoplasty-and-blepharoptosis-repair-ca-0d0b223dd674.json",
-          "sha256": "f8080e887f9a5539554d3119f6499b37f9526addd138ed5f96ebe3e1a359e21c"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/observation/blepharoplasty-and-blepharoptosis-repair-ca-f43bc1445179.json",
+          "sha256": "4587f96070cec148c656686c52dabc998167a3c3e1f58d83b21cf3ad71d43096"
         }
       ]
     },
     {
-      "caseName": "indication vision-blepharochalasis selected as what the surgery corrects -> Met",
+      "caseName": "Upper blepharoplasty — side-gaze obstruction",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-vision-blepharochalasis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96",
+      "caseId": "upper-side-gaze-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96.json",
-          "sha256": "6d3e809da7749d2e8e8b7c1829e42036edf546d8bb6dd5ef2c6d6e656f0e5433"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9.json",
+          "sha256": "b67251b6edcd4467f4b08c27cebdab16f62cf88ed6786bc5d8bb09e17b2bc916"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fee600ce8fa2",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f195c8da2ef2",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-fee600ce8fa2.json",
-          "sha256": "94cc157870eef0cb92fed4186dc5230962d46d8b9580e4e66aafb6aa918bd2e6"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/observation/blepharoplasty-and-blepharoptosis-repair-ca-f195c8da2ef2.json",
+          "sha256": "aac8a53ffc4169ed3c4e2950c8f9db208f11c4011f2aaf3ec4bd2c89138dce49"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-dae4791c641f",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0b3d28ffbb7f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-dae4791c641f.json",
-          "sha256": "d9eea4dbd449e617ae6a54e8594bb1f2ac937ff26eab2c7077498c93854b291e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/observation/blepharoplasty-and-blepharoptosis-repair-ca-0b3d28ffbb7f.json",
+          "sha256": "530d4f6d5b026359c359792fc1276c1adafc9719d0ace9d6a71a6bc7bacd6da9"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-20c6e8680247",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e0a785732e4d",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-20c6e8680247.json",
-          "sha256": "c51f44e6152646469361793a9f15fb26d42b452bc90919fb244f66f764a6b15b"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/observation/blepharoplasty-and-blepharoptosis-repair-ca-e0a785732e4d.json",
+          "sha256": "82b53bc2ee5c3abb9afa085ec2544368359dd3446ef72b26b649a9371e0a817f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0abdb9b512b6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bf4e2ea7d745",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-0abdb9b512b6.json",
-          "sha256": "587e938522bc47bacb8657ad6eda427fba02a365759e7d5818281b73dd97832f"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/observation/blepharoplasty-and-blepharoptosis-repair-ca-bf4e2ea7d745.json",
+          "sha256": "e9f5715ac7c4b2a4c9392fa4f43b50d70d4e828d34a17a24a7f149aaab212d29"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-83782f087a5e",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-409a82513e59",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-83782f087a5e.json",
-          "sha256": "cdc61de598248355353d414bf581456f5ea0fae10f3530d74de61d1d59c27236"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/observation/blepharoplasty-and-blepharoptosis-repair-ca-409a82513e59.json",
+          "sha256": "c12807eacb4d538f9f28b3d2ed630427479879bc450f13e50b432428255ce1cc"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f6747ad65c6a",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-eb63563c5b00",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-f6747ad65c6a.json",
-          "sha256": "ca02978f556e7b6d856dcab40ec6e86e5d4c2aa8679aa91f72b661a48d29a5c9"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-865e0dd37ee8",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-865e0dd37ee8.json",
-          "sha256": "8c7f524b4cbaaee5af0bcc72552b50932dcaa9340a498b37d8ffe65672537301"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2e5317f55dbc",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-2e5317f55dbc.json",
-          "sha256": "67604708583dcb5b324361d0e315a020bfbac77c22f806eb97d42843d319c9dc"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bfe9fe1f5005",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-37fcdef99c96/observation/blepharoplasty-and-blepharoptosis-repair-ca-bfe9fe1f5005.json",
-          "sha256": "6e868f2c82616ba0cd054cb4ed126c2407bfaaa638548bcf19618c1bc7b7c567"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/observation/blepharoplasty-and-blepharoptosis-repair-ca-eb63563c5b00.json",
+          "sha256": "20ecf5723b1ef6b3de04219cc3d27c6df3d5141382f3d1a99301987282ae5333"
         }
       ]
     },
     {
-      "caseName": "indication vision-blepharoptosis selected as what the surgery corrects -> Met",
+      "caseName": "Upper blepharoplasty — another affected daily activity",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-vision-blepharoptosis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c",
+      "caseId": "upper-other-activity-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c.json",
-          "sha256": "0a8e624456bc4a74f6bd79e1542547cfc04e4ce3ba31e9e8a544af0f640acc7c"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b.json",
+          "sha256": "e3cc0e0d191298e9f71047a6c6709a369e0229d54204b8b92e7d0a398032960f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-855dae74d1b2",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f7c336798272",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-855dae74d1b2.json",
-          "sha256": "65bec0878762f607060f89df1f51fcc1da26ccd41ad21322d0bd5d1402a5384a"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/observation/blepharoplasty-and-blepharoptosis-repair-ca-f7c336798272.json",
+          "sha256": "cac02700d54c2d4c210b13edf18dd4ec812efd5e4c0c271ef3b6b9f7c7dca0e2"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6666ccbdcd63",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0ce65493221c",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-6666ccbdcd63.json",
-          "sha256": "5987e273baed38c0ec826414e05c5d95f0013e599effe2cc1e1bb4bdff49fc85"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/observation/blepharoplasty-and-blepharoptosis-repair-ca-0ce65493221c.json",
+          "sha256": "7ad0101de0f2620fe1393ecf33d9a2436097d8ed37ba252ce9ad182366ab5f8b"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-55232b085aa0",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f59b83cadfd0",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-55232b085aa0.json",
-          "sha256": "76a247a48763d0f631ccdede0a5438fe2be697fd9c34949e5cbf8a9fa470c2f3"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/observation/blepharoplasty-and-blepharoptosis-repair-ca-f59b83cadfd0.json",
+          "sha256": "a9da89396e9fe173cc9e809124ae57eef82b16371360e8c7641443b683b296ea"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-15a7a57d0432",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d4a431b9410b",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-15a7a57d0432.json",
-          "sha256": "0c002d94febb23829c6300048b2b98bc9c021949343a1ba7cf3a4997889f06b8"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/observation/blepharoplasty-and-blepharoptosis-repair-ca-d4a431b9410b.json",
+          "sha256": "54c404b4718b088a7fb0b01917f597d09ba6f63dcd44556fd3fc6f7112309a6f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1c55fec127a9",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f29db62a87c6",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-1c55fec127a9.json",
-          "sha256": "5503865da14b605b34acbd7ffd4cb5d66f4d79886662736fae61fe27fb09a159"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/observation/blepharoplasty-and-blepharoptosis-repair-ca-f29db62a87c6.json",
+          "sha256": "edf15a9260fd6d4ad247c3953099d66d83ef6a5882d523e3d1b861ac0df75600"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4308b580cf9b",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b335438b01e8",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-4308b580cf9b.json",
-          "sha256": "2c5bccb6719866d4fa889bed8032bf4b682f58203b76129c5f0978ba0bab1969"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-92f2576b6aab",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-92f2576b6aab.json",
-          "sha256": "7f340074b095a2b619c142509964c73f1a1d64f7f4787393b16f49ac89802c75"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e1a05561dfc7",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-e1a05561dfc7.json",
-          "sha256": "a0b7cffbab1939e3c7ca8fc923f4a598907e36ea91c56f8905d4928f2e4c726a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a223649c6a46",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-1cf7caeb126c/observation/blepharoplasty-and-blepharoptosis-repair-ca-a223649c6a46.json",
-          "sha256": "edecfc342fd7068ba2386f65d03369ccf31c7ce3315497dd06dcb60acaec79d5"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/observation/blepharoplasty-and-blepharoptosis-repair-ca-b335438b01e8.json",
+          "sha256": "0734a7ab9283f777505ec69abf958613a489a9ea896feecee61c150dce9b7939"
         }
       ]
     },
     {
-      "caseName": "indication field-dermatochalasis selected as what the surgery corrects -> Met",
+      "caseName": "Ptosis repair — actual-margin MRD 2.0 mm or less",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-field-dermatochalasis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e",
+      "caseId": "ptosis-mrd-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e.json",
-          "sha256": "07ae8793832ad98aa5a22dce7a25ba2fdba72bad260a2efadaa2c4f878a0482a"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da.json",
+          "sha256": "87652708cd72bf21656d0eca2b2cf85fb85a02a94381d9bb28d51e8cc81edc0d"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-784bd5d1912e",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6a693648159d",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-784bd5d1912e.json",
-          "sha256": "a5d076de15d5a01b19ee7dd4a2a9dfea71bad9233eacf0037b3ce83e2bf0696d"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/observation/blepharoplasty-and-blepharoptosis-repair-ca-6a693648159d.json",
+          "sha256": "d1fefc17a6c7184fa89f00a351c690800a6dbd347d4d642d1a99e68c695cb416"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-deabe403bbac",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f3dc49d84004",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-deabe403bbac.json",
-          "sha256": "9bcd58097bc64e0cb4ed949065cd27b05964ba36e3cd88e65d9b0514e645c106"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/observation/blepharoplasty-and-blepharoptosis-repair-ca-f3dc49d84004.json",
+          "sha256": "e0aa74b288b7e84481e4a70978f75627c1e304b9e11912b9c2babb1ba4b7efbc"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-22d5162942d0",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f5c67968cc41",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-22d5162942d0.json",
-          "sha256": "d5a9ece72a5aa842dc9369d57fdaa55a0376351128e7190a135b4c0eeba9e0ac"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/observation/blepharoplasty-and-blepharoptosis-repair-ca-f5c67968cc41.json",
+          "sha256": "3ce8e8208d84746c69121eb90334170ff608da28bb2836263dd091fed17766dd"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-db33eb6a298f",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-668c187815bb",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-db33eb6a298f.json",
-          "sha256": "8e429fbb58c8d128e268077d6371937d04e0179600c9069bab9ac87f771234d7"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/observation/blepharoplasty-and-blepharoptosis-repair-ca-668c187815bb.json",
+          "sha256": "99817e1c78b53f5de86eed09845736303740202a7cfb50c0fc584db20db3e9c3"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0dee929666d0",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fe458bb90a00",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-0dee929666d0.json",
-          "sha256": "f4303deca0aa190d81ade6d79f05758f47be970cf1e7c8d62c0640ac3eb71972"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/observation/blepharoplasty-and-blepharoptosis-repair-ca-fe458bb90a00.json",
+          "sha256": "5ca7ebb926ccc7b72cfdc1df239c80bcda2367f9b2295d8a3239e82570d60f89"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-52ccbf19ac10",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7eac4a5c524f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-52ccbf19ac10.json",
-          "sha256": "dcdefd54560871ab16c658cf806c9baef4d28c1797c93d7b17c1ea40866617bb"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-413d4123d79e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-413d4123d79e.json",
-          "sha256": "70c389b760324ad488cab9e563c01871d6ed8481a45a17a3f465b8673e07f5cd"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e0a284d7c64c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-e0a284d7c64c.json",
-          "sha256": "b55d7715854d33e0b7b54d6eb61834a2c6c4e7a93cdb266dc8caeab409af2c81"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3ae83386a563",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-07c0fa98811e/observation/blepharoplasty-and-blepharoptosis-repair-ca-3ae83386a563.json",
-          "sha256": "0426e7fb2bb940f151020e51cdad4964c4f4159977661324daf5a498db3cc23e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/observation/blepharoplasty-and-blepharoptosis-repair-ca-7eac4a5c524f.json",
+          "sha256": "a4ce9731c8951a0a467119ef8ba411edaf70d80cd9e4ebd36c856780d2635313"
         }
       ]
     },
     {
-      "caseName": "indication field-blepharochalasis selected as what the surgery corrects -> Met",
+      "caseName": "Ptosis repair — visual interference with driving",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-field-blepharochalasis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301",
+      "caseId": "ptosis-driving-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301.json",
-          "sha256": "a3e9095dd25c70280cfe83bf6f1aea87d8a4d2a4d612a5c610d60af4ac13fb10"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c.json",
+          "sha256": "40cecb43a256f7b5de520f9a53f038e8575cbbcb7207d195e070fc7270998d05"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4b1f149fc11d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c2cb9e60676f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-4b1f149fc11d.json",
-          "sha256": "3adfc227b358909245d904e35487fa3276a3ec2fc9dab0518bee9a599ee89a2f"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/observation/blepharoplasty-and-blepharoptosis-repair-ca-c2cb9e60676f.json",
+          "sha256": "2d445df29ae4e8083fa1286a7675924c28abddfd001632634ae6b0748c37b584"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5847b902fbde",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a54424162f81",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-5847b902fbde.json",
-          "sha256": "51c0341c0c8cbe0bceef11c5b3737318cd98b75f46e92c853092b79462e6cc56"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/observation/blepharoplasty-and-blepharoptosis-repair-ca-a54424162f81.json",
+          "sha256": "6b5c25f4695fc858546ac210eccdc36d031d3c3073943de1e8d339d9f7882f43"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6b75f99929f9",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-058bfa1b2308",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-6b75f99929f9.json",
-          "sha256": "bf979986e3377c1e264b30f02666b2537e14547cc57f8de441d946bc5c0a8213"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/observation/blepharoplasty-and-blepharoptosis-repair-ca-058bfa1b2308.json",
+          "sha256": "2575f9c337500a0f32427c802dc606e2effae0683ef348f3b81eb1af58f880c1"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d81f98bf22db",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fb8fea8ff566",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-d81f98bf22db.json",
-          "sha256": "ef1c925c9371e39de3ef4dc17fe41cafc125ace3e3659ddc9c62e10b30da16bd"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/observation/blepharoplasty-and-blepharoptosis-repair-ca-fb8fea8ff566.json",
+          "sha256": "21efe183023380dc255a0086de86a7618250500ce4ed12239263eb4764c99156"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2df94871d96b",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-482c46d8921a",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-2df94871d96b.json",
-          "sha256": "86f1eb76e04c914ae83cf0df246c17f024c66f7a7d5b5ff9d248ad9b50e78d21"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/observation/blepharoplasty-and-blepharoptosis-repair-ca-482c46d8921a.json",
+          "sha256": "da7c4e8eb562307959d5721eda65d7efd2df05c0a027cfd07d4aac8d7d954379"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2c8765314d84",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-26626edf61b5",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-2c8765314d84.json",
-          "sha256": "a5ec8ff5030e29116ebd5da36484750cd9afc4c8fe3e79b8307eeee0d69881b4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e28458023c7a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-e28458023c7a.json",
-          "sha256": "d2b5551fc66988c3330f972e1e1eafa2481ae5425e1bd50cfc79e531600560c4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-11c2e6fbd50b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-11c2e6fbd50b.json",
-          "sha256": "cc51eeb53ea13f7b33978f40d1d90c92e95ee0d511d23ae0589a1940106bdf80"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-efe3990fa1a2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-4a40db56f301/observation/blepharoplasty-and-blepharoptosis-repair-ca-efe3990fa1a2.json",
-          "sha256": "c93b347e3d0872ca4ee8f9801d99c7931f4d8ca085758ef4ad1a927ab0979e9d"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/observation/blepharoplasty-and-blepharoptosis-repair-ca-26626edf61b5.json",
+          "sha256": "253103c6091b493b29934b262e23369b2d39578213df6932b617c2fcd4894a23"
         }
       ]
     },
     {
-      "caseName": "indication field-blepharoptosis selected as what the surgery corrects -> Met",
+      "caseName": "Ptosis repair — another affected daily activity",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-field-blepharoptosis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af",
+      "caseId": "ptosis-other-activity-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af.json",
-          "sha256": "22a0b0885a04dc25738b7298d87bc9c0dd0a715bb4f6d179e2998753f291c547"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3.json",
+          "sha256": "fa1fbc0a0ce87f91c915bf1eec957c73fbd15e9c169dcab5ef3a2fb91a5b7181"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f63267208b7c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4cf1cdfd4354",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-f63267208b7c.json",
-          "sha256": "4a7203f9acc2aab9967174efae879ba687b19f9ed9eb597c69e3b92daa28cde9"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/observation/blepharoplasty-and-blepharoptosis-repair-ca-4cf1cdfd4354.json",
+          "sha256": "c8ce5c8fc67c6e41f4660bda9e3dff9357f807e384ba14ff4e160c92c88b8fd9"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-db7c8ea1383d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f0e9725fe9c7",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-db7c8ea1383d.json",
-          "sha256": "aea18159b675ba86cfdcfec7dc2d5717ef7c84b9db306def054ae2d50d0935c4"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/observation/blepharoplasty-and-blepharoptosis-repair-ca-f0e9725fe9c7.json",
+          "sha256": "3c2ff4d8c708e7330b5885524df95bdf450c359cc5b31e3cd506cc70451c3c58"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0856d9d3804d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ef8097d4d67e",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-0856d9d3804d.json",
-          "sha256": "670cf44311be52c97bf4771b6199a337144104fd204aa8d770fca2bd1dbc3a40"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/observation/blepharoplasty-and-blepharoptosis-repair-ca-ef8097d4d67e.json",
+          "sha256": "6b39dd4c2254421202e4954621a28e17b1bcac45809a947f6e972f7d03984740"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-22106c167b68",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-aac8621b96f7",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-22106c167b68.json",
-          "sha256": "2759c9b07f5eca9e50a0d7b77f571a3290ac7be035eba3e17dd4871eb2de1e17"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/observation/blepharoplasty-and-blepharoptosis-repair-ca-aac8621b96f7.json",
+          "sha256": "6d2708c18c2d223e6e0dffba8319d19f7802aaa74da1aaa2cb5d6c8e387f8987"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5ed34f44908c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a518c276d3a2",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-5ed34f44908c.json",
-          "sha256": "f160d7475ede1dabca3b6bbb9f826e95df99221a56ecabb287f861590ecad52f"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/observation/blepharoplasty-and-blepharoptosis-repair-ca-a518c276d3a2.json",
+          "sha256": "f1e55cf873e3ff4cf00dc50e333e936b404402849d5522b380e4d95cdac1910f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d1c75a6745e9",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9e85b5b82bd0",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-d1c75a6745e9.json",
-          "sha256": "12062955ad2fd40ced453051cdd3b558d4bb4df0f53d5917963e17b5d8d6ac47"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2c0826f1fc40",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-2c0826f1fc40.json",
-          "sha256": "aa72fcd18b03df4d61122c6f9f91488870a4959bae7a586446f57e1049896fbb"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-85c8e6e060f6",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-85c8e6e060f6.json",
-          "sha256": "8772a7a756acebff7289af95a31ebc9cf8a81ab0c99d50918f26c823629f455c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cfc3784dff90",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d190ff0ad1af/observation/blepharoplasty-and-blepharoptosis-repair-ca-cfc3784dff90.json",
-          "sha256": "5cd4e00e9ece449bf9a2a3278a52b0935caed632b8b843bc5240aab570bc332a"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/observation/blepharoplasty-and-blepharoptosis-repair-ca-9e85b5b82bd0.json",
+          "sha256": "65b39ffe74a54a3d0e4d9bb8baec4730966937e3f25bf904aef01fff0ed78d6d"
         }
       ]
     },
     {
-      "caseName": "indication redundant-skin selected as what the surgery corrects -> Met",
+      "caseName": "upper procedure — solely cosmetic",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-redundant-skin-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613",
+      "caseId": "upper-cosmetic-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613.json",
-          "sha256": "4f152db9f3c29085e8535b6267edee3701249ab5ea6021007415668293b2ee2d"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf/patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf.json",
+          "sha256": "aa92545fb61107ad3ed1dde7ffdf97ae34e285c5eb61d6a28716713f2fd3040f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cac78ad47309",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-851de2af8046",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-cac78ad47309.json",
-          "sha256": "84601ee9bd0b909dd4b81eafff918bfb746c84da31ecffd8596623d8a6298092"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf/observation/blepharoplasty-and-blepharoptosis-repair-ca-851de2af8046.json",
+          "sha256": "d36f052f4c5a24a01b0cef87a957d634fad89792f2438e1abb732b3125a7a79b"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-64e2f1ea3948",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3230753d39c3",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-64e2f1ea3948.json",
-          "sha256": "fc428bf65b239b0a3c0d68bc1418159b0b1695f5fb9f6ea8cfed7490d31c95c4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d93d539e7d09",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-d93d539e7d09.json",
-          "sha256": "c4c945f98887acd72b54763af14e46b428a0665f7ffeb4003b1b1e5ed22ac3da"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-35913ca033d9",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-35913ca033d9.json",
-          "sha256": "3f5f55567dbc4d8dae32250328bba3787f378891cdf23a367bf516832b0562f6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f9fc3be52d50",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-f9fc3be52d50.json",
-          "sha256": "4120199a48f951e5c614b4144162d239a944e13af75412b488766762fb5ed253"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-feb79abef3bb",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-feb79abef3bb.json",
-          "sha256": "0c357374b32ab812ff2081d683e56d56e1ccdadc742e1c7830b930629c9b3cb6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7b6a6ac85f68",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-7b6a6ac85f68.json",
-          "sha256": "df9ae59992f79ed403b9f219004c231ca58561af1ca560411da82ed9e63e4930"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f2eab20f2aaa",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-f2eab20f2aaa.json",
-          "sha256": "136862f32f238a0b4e766d5dfe22ad70879a59868c334e61990b499e27c8586f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-99b5dc47a736",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-ebed337e3613/observation/blepharoplasty-and-blepharoptosis-repair-ca-99b5dc47a736.json",
-          "sha256": "d1dd0ffc08f66b076e7b8d42cc69d77e3db633fe0eef4290f6a64e9a8f74da2e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf/observation/blepharoplasty-and-blepharoptosis-repair-ca-3230753d39c3.json",
+          "sha256": "3f56b0e27b57c8d359674e3eeaa9db7c5d58e81bbaff7ccae8c33ea54553312a"
         }
       ]
     },
     {
-      "caseName": "indication pretarsal-dermatitis selected as what the surgery corrects -> Met",
+      "caseName": "upper procedure — no documented functional complaint",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-pretarsal-dermatitis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5",
+      "caseId": "upper-complaint-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5.json",
-          "sha256": "e342c15f1ee600d112788e08f0ffd2c6ca7695b3c584e11fe59ba215c0223081"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0.json",
+          "sha256": "830f1fb24f5c9b16d739d7193e8ac9ff9577e1dcde406c2e4eb687bb81c2e9dc"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-aeb718d7ca23",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-43174eba3593",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-aeb718d7ca23.json",
-          "sha256": "e504ed8043782bd1fccaa906857e061923e6d17e96afe4ee2279889ddb0ada82"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/observation/blepharoplasty-and-blepharoptosis-repair-ca-43174eba3593.json",
+          "sha256": "778a40dd8bca09ed5f66e7b66960463cb157183c6692f18cda225d8152b1e5c5"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d8bbcb7451af",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-06fe6c22073f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-d8bbcb7451af.json",
-          "sha256": "91cb60f406de589845dd863974b76ac422bccb745f5a162d231e7b2de3ae9fa5"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/observation/blepharoplasty-and-blepharoptosis-repair-ca-06fe6c22073f.json",
+          "sha256": "6241aa5128dc71f5355c29f7429602f9d62dbefd37be12cdcfb0e88773b37dfd"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-42faa341dc0d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1cd9632df944",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-42faa341dc0d.json",
-          "sha256": "6cb7f2a20e97b1daf0dac3dc79950bf5ca6b274b635043a7444dc9b761d2e63e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/observation/blepharoplasty-and-blepharoptosis-repair-ca-1cd9632df944.json",
+          "sha256": "0e8f9a956fa7e6c35c752051514876eea8666a7c822841c6f9f41bd2eecd0557"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-efe4e944e1b4",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b20d64fe37ec",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-efe4e944e1b4.json",
-          "sha256": "96c9830eb2761d1ca558731ebc30bd1edac3514c781ac704444c21cd94f4ecdf"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/observation/blepharoplasty-and-blepharoptosis-repair-ca-b20d64fe37ec.json",
+          "sha256": "71ee4e9ac8dd94a8c63ac4ed65e1802c516778166c45d30da77b5bf2b6185540"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d85589f0c20e",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-13147b36e0f4",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-d85589f0c20e.json",
-          "sha256": "363f1b555fee9fe52116918dc706560b36f4c417014828e22782ad79eb3da589"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/observation/blepharoplasty-and-blepharoptosis-repair-ca-13147b36e0f4.json",
+          "sha256": "b34be135689662e14bc8bc0180099d66d368470c4ba16655f39c07136e827ccc"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f94e529d45fa",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4b4d82aec7e2",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-f94e529d45fa.json",
-          "sha256": "55006c690e2a610ff7d6e7366192ace27706d84ff0b95a9e71201d49cb1fab49"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-135c65d0aff5",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-135c65d0aff5.json",
-          "sha256": "dad5184667e810916856bda6f0a97baba8479884f5f1591b27cfdd5843944d13"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4c16d291cb4b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-4c16d291cb4b.json",
-          "sha256": "956c82eb64da9076d2d5d504e1f3ef55e02fa5bd77ed65edbb7a9dd234afed33"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a2512bfd7a3c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-39458f274be5/observation/blepharoplasty-and-blepharoptosis-repair-ca-a2512bfd7a3c.json",
-          "sha256": "3c9032b3c0a1bfbf2eca471e8efe7fc2e8fae082189b290bea42eda51ab0defa"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/observation/blepharoplasty-and-blepharoptosis-repair-ca-4b4d82aec7e2.json",
+          "sha256": "04a3293aee36b13bf4423e632cf56ca368b16d0866cdd3d1a1b9a4bb2a20aaf2"
         }
       ]
     },
     {
-      "caseName": "indication prosthesis selected as what the surgery corrects -> Met",
+      "caseName": "upper procedure — individual necessity not established",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "indication-prosthesis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18",
+      "caseId": "upper-necessity-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-84035223de18",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18.json",
-          "sha256": "b47b41b8ebe3d4ed9b61cd0ab1ff22b99f74c1213db9f23ea36b6eedc2e04383"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af.json",
+          "sha256": "00724c818e79783e3222cb3a1bab0b0686561d5241a62557e41d0580554c392d"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a3aa4848a865",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f601413d9702",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-a3aa4848a865.json",
-          "sha256": "4f491c7bab303e35cfbadadd042f5effa7d5696b5a5299a814754913500564e6"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/observation/blepharoplasty-and-blepharoptosis-repair-ca-f601413d9702.json",
+          "sha256": "b02d1341e2b1283c00349fa24207548aa85ec04d10c1e685283ae5be2af504c2"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d8a5f0f82372",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6d45a9faff16",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-d8a5f0f82372.json",
-          "sha256": "693561547c8a5614151dec884cf260890984a14cb2c83d343541d469fb9f1970"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/observation/blepharoplasty-and-blepharoptosis-repair-ca-6d45a9faff16.json",
+          "sha256": "3362fa3862804e318d5b4cbcc00ef600c5a8f2d7e826bb21a475836f915edcda"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a2c8145e72af",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b88be731417e",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-a2c8145e72af.json",
-          "sha256": "b6712a7a4ebfbbe7fda245703087b2d4c2148ad4fc09d3e903e3ce52b7de0d9a"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/observation/blepharoplasty-and-blepharoptosis-repair-ca-b88be731417e.json",
+          "sha256": "fc545d11b30eee67213aa478e3a77c4e67ae3ab0605704a2000520aab6637531"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-38875838ae03",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-74dca183eeb3",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-38875838ae03.json",
-          "sha256": "24078f07a7dd5701350c2832a2026881d9d1996ac7a682efb646c8da940dc2d2"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/observation/blepharoplasty-and-blepharoptosis-repair-ca-74dca183eeb3.json",
+          "sha256": "fb3b9d896925a0340320361831cb8cf1dc7d4e70a5983e13649aa5075d743659"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2f02ea2a38cf",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-02d5f8e1a3d8",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-2f02ea2a38cf.json",
-          "sha256": "8059ffc4e0a34946969b0f4011b1f04927165a01c40c158e38479913f433b9d5"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/observation/blepharoplasty-and-blepharoptosis-repair-ca-02d5f8e1a3d8.json",
+          "sha256": "145e519bb9ed455095e63ecae761a6d7ed792a29681f216cec2b85ba686dd1d0"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d1d950e00b6d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3b3ee08af382",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-d1d950e00b6d.json",
-          "sha256": "24039e9240aacde605c2d5e142a728e4dd95fb3607972c8c038b015a77ef1606"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5b4cbff0eb44",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-5b4cbff0eb44.json",
-          "sha256": "78d5d84d8bf60b114612584de0308efa15b10e64d83beb54d4500aacfc6606e2"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-885bf701d3a9",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-885bf701d3a9.json",
-          "sha256": "e80bec745d59df83f28fcc91313c1e76836cc892e84198b8dee06af991e2a9e8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b54f8da5461a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-84035223de18/observation/blepharoplasty-and-blepharoptosis-repair-ca-b54f8da5461a.json",
-          "sha256": "c3c1d754caf744cc214a2391517cc8203fb73cf96b02376d100c54727570faaf"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/observation/blepharoplasty-and-blepharoptosis-repair-ca-3b3ee08af382.json",
+          "sha256": "38eb33c9bd4990db45523a6722e5a0be66cb116714311ac290b2db13249a76b6"
         }
       ]
     },
     {
-      "caseName": "complaint field-interference alone satisfies layer 2 -> Met",
+      "caseName": "ptosis procedure — solely cosmetic",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "complaint-field-interference-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5",
+      "caseId": "ptosis-cosmetic-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5.json",
-          "sha256": "2d03e15db91f27c25dfe1f15b6506dfb042f35866a22cb3231da66073669f89e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585/patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585.json",
+          "sha256": "20f9959ba9d55b5002d92318ed14fe6d498bd9a52dc98114935db1b1e67516fd"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-14e962c0e2f6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0f347a1ba5cb",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-14e962c0e2f6.json",
-          "sha256": "d8f9ce8662bb5ebc787c02e7d86e85b993c46fc48bf598a9f0dbf7c71a5c1c56"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585/observation/blepharoplasty-and-blepharoptosis-repair-ca-0f347a1ba5cb.json",
+          "sha256": "012a1e5027a115d662eaae4a01961fc4b130d739dd53c2e268e4980abcc44182"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2a941a58b5f9",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7ea03f818517",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-2a941a58b5f9.json",
-          "sha256": "0b2df863b590b97537beb40934d25b84115f8473914dfe3b4bbc62b9ad38a86d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f590b8c7a081",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-f590b8c7a081.json",
-          "sha256": "17059460c7682fa0d53420b73839571cf20952e55b51ec972bc250802660fcb5"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c42bfe5ee944",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-c42bfe5ee944.json",
-          "sha256": "5516b77c797714f92b0904c18aaca99a218c6d2bf1d0bb66fa4c6a1f706adfa8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-136b8fc600f0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-136b8fc600f0.json",
-          "sha256": "7e2518069b86021729025e3ebc09b8f10120b54ddccb97bf7d786d2bb9550017"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bafe2aedcb04",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-bafe2aedcb04.json",
-          "sha256": "f4b89ddc196719ed81c144f50f6f902e928fd3859fbd32e872cf09933e23d04b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d07b9c409fad",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-d07b9c409fad.json",
-          "sha256": "b4e9dfddd22325fd96d68c8a7698200839b5c7ef221b06265c78c5b5535813a2"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3a2947e0d36f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-3a2947e0d36f.json",
-          "sha256": "a68ecede3b66ec85f4027b5f8d79dea129d2b2267ef0d1b47f20716ec443c2d6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4f02ec444635",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-32f13b44ceb5/observation/blepharoplasty-and-blepharoptosis-repair-ca-4f02ec444635.json",
-          "sha256": "5c2abb71021435a3f6c4a663706580045498ca8e40e3c1503ea2ff98c123342a"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585/observation/blepharoplasty-and-blepharoptosis-repair-ca-7ea03f818517.json",
+          "sha256": "4ab802dc9cadb06b491a9079c48da0fea2c0a1d3c06a942a0e1e41e0dc7116ce"
         }
       ]
     },
     {
-      "caseName": "complaint difficulty-drooping alone satisfies layer 2 -> Met",
+      "caseName": "ptosis procedure — no documented functional complaint",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "complaint-difficulty-drooping-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d",
+      "caseId": "ptosis-complaint-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d.json",
-          "sha256": "b993ed90434d002a02158430c64885d5c86d7c9eccd305476fcd7523d5185ff4"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca.json",
+          "sha256": "a8d01a489202e9924a2ba180f1d8bd5a1f6fd2249fe442f7f2f0e863644d9eae"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c280e98ce504",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0ac29457bf69",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-c280e98ce504.json",
-          "sha256": "04169d4560e3cd4670ad1bcb54bfb47be44fd6a58b28a8949a89fed056fa6937"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/observation/blepharoplasty-and-blepharoptosis-repair-ca-0ac29457bf69.json",
+          "sha256": "937d38ab1c579a27497c44d8712d61ffd672612cac2fe60fd6edfdd7748f6916"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-407bee77d3d4",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-279fece811f2",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-407bee77d3d4.json",
-          "sha256": "1c8a71fda9502b4f5315f446597c234f260964086016d08392aaa6ba624ca706"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/observation/blepharoplasty-and-blepharoptosis-repair-ca-279fece811f2.json",
+          "sha256": "4d9b12f88a8b7a71ddcbd3e33d261dd73c0d585c72268ad3f3711a3f8ad9f3c9"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-164aa6cacb20",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fecf3f1db3f2",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-164aa6cacb20.json",
-          "sha256": "ae3449cc71816275af7e97a7ac0cf1eb0d27b4a27754738b94940e90f084fe14"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/observation/blepharoplasty-and-blepharoptosis-repair-ca-fecf3f1db3f2.json",
+          "sha256": "105424ed1c2f7f283199845fffaa6db9e62e0a15ce436ae7a32f46bdb2d4340b"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a64f244401a6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cbb1bc14a9e0",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-a64f244401a6.json",
-          "sha256": "92d42eba11bf196d4fde65aa26c29f7719417b76331870cdc48499fabb18f25d"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/observation/blepharoplasty-and-blepharoptosis-repair-ca-cbb1bc14a9e0.json",
+          "sha256": "cb9d556e013dd79e651431f394a09e3e2c5155761dc1ac5d58a11f02c65c0eb2"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0b4bff60c28d",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-194c1efd6964",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-0b4bff60c28d.json",
-          "sha256": "2ba2790441479c5bdc870c7f679d0247908a31061457e3819789d1c1e99f7f44"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/observation/blepharoplasty-and-blepharoptosis-repair-ca-194c1efd6964.json",
+          "sha256": "bef5716ae2ef0ce2b1689c9c3151e6e590775dd5506d54433974209277e7081f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-efcbaf5db3c0",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f244bcc81f63",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-efcbaf5db3c0.json",
-          "sha256": "8efdf68b64f0955064cf16d050549c08dd267325b1244bcbc2815c9729f7873c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-81d98fdc1251",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-81d98fdc1251.json",
-          "sha256": "7b00185f23df9f6aad9e5f8141accf5f8962fdaca1ca4249bfc3b2b7f48d6a2d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-01cb4a39131f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-01cb4a39131f.json",
-          "sha256": "c1b33a00209a7f2dfac4304bf596d0619b883af605c63dd935ea77d5e7fc9c25"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5385403c3df9",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8987ab79aa8d/observation/blepharoplasty-and-blepharoptosis-repair-ca-5385403c3df9.json",
-          "sha256": "8287171f853337ae2622aacb1e55c704b6e9e3a42052161ec2b7f2fd57e3e373"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/observation/blepharoplasty-and-blepharoptosis-repair-ca-f244bcc81f63.json",
+          "sha256": "c83bf045c1160ad4572be55d2b542d9ffb76b6e3ddc3ca60762a8fd83b4faf7c"
         }
       ]
     },
     {
-      "caseName": "complaint difficulty-eyelashes alone satisfies layer 2 -> Met",
+      "caseName": "ptosis procedure — individual necessity not established",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "complaint-difficulty-eyelashes-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721",
+      "caseId": "ptosis-necessity-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721.json",
-          "sha256": "240a80be3c4ebc4375ab24f4b8e83339de157abbdf0c0596424eb8181bb6760c"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd.json",
+          "sha256": "d414f629d0cc8a8ec87331dffd365fcfbade64085c18752e4b1517892c1c38b2"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3f29315b275c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-56b75a5fc1e7",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-3f29315b275c.json",
-          "sha256": "732e59872525c45c25502734ed09f098e8007b9b9d9cfeb2efe6242d6f77b620"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/observation/blepharoplasty-and-blepharoptosis-repair-ca-56b75a5fc1e7.json",
+          "sha256": "77ce285730fd302df6ba37bb40eb51fff2ab4a11bb0e78a446273ff5171081b9"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cb34b036140e",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7c03d02e5449",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-cb34b036140e.json",
-          "sha256": "b2bde73c5d0547607d0cf3c5de5fe0cd2756aaa41012f9b47f9a038f028d6293"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/observation/blepharoplasty-and-blepharoptosis-repair-ca-7c03d02e5449.json",
+          "sha256": "a6c0eb3e516b2fd1d39b563bbdc4badfd4360daca1c8b6279517c06a76cc380f"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1325412548e5",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ef204161916d",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-1325412548e5.json",
-          "sha256": "f9f7ba166ba5a0c159263d7eaa5795496e0a356a1fa933e608a80af05ace406e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/observation/blepharoplasty-and-blepharoptosis-repair-ca-ef204161916d.json",
+          "sha256": "5b21dcba8face5d707b53b00773570cb3ee5ac023d753ad47f52b06b730bf8b7"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5eb6287e8097",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e0aabd9fff5a",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-5eb6287e8097.json",
-          "sha256": "e64aae73e114bc43ac867a2f68479f13cf46dd465675bb9c2fc988029da5177e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/observation/blepharoplasty-and-blepharoptosis-repair-ca-e0aabd9fff5a.json",
+          "sha256": "5cdde7547045c4fea2c809ff8f4f341b63efafcfb4aee084aa8bc0a3d0a0d5cb"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-da55d8a771b7",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-31f9cf8337c4",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-da55d8a771b7.json",
-          "sha256": "efeca1220a644f5300c2b4767b9bee0552c1f27bea782140d1b98aaa379eb139"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/observation/blepharoplasty-and-blepharoptosis-repair-ca-31f9cf8337c4.json",
+          "sha256": "31d8aa96c43348fa9bd91d80849193f13a1fe6e48866de37347f49ebc1b824c8"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b6f7d7527925",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-34fbe3cd057f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-b6f7d7527925.json",
-          "sha256": "44e1b43fd15c8381627da64d07e0f78e19ad967302c28b1ea4d8cc6e1f07253c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2b51b7a26a68",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-2b51b7a26a68.json",
-          "sha256": "b3c9703e520ca91a5b939170ea14cfa5d03dbf91330c57893e17e1aed33cf799"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1258ea31b4d2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-1258ea31b4d2.json",
-          "sha256": "4779f1fd50797830a1c5218aed009202de277ab1c827ae06e5bcf087390bd1bc"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d70cea7c64da",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-da10e8872721/observation/blepharoplasty-and-blepharoptosis-repair-ca-d70cea7c64da.json",
-          "sha256": "6b5be75f76030c29a1e7d70df5d69406f656bac856f6a964bc7db1a740f72add"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/observation/blepharoplasty-and-blepharoptosis-repair-ca-34fbe3cd057f.json",
+          "sha256": "247c7cf9a746c41518f680acd5164d1a140e571186cfb46c75470b152016d4ba"
         }
       ]
     },
     {
-      "caseName": "complaint difficulty-eyelid-skin alone satisfies layer 2 -> Met",
+      "caseName": "Upper blepharoplasty — neither qualifying skin finding",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "complaint-difficulty-eyelid-skin-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54",
+      "caseId": "upper-skin-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54.json",
-          "sha256": "e9844b48cbdb99fec4836cd5211f9a6c68e80275c68513684ed6c868e73880a0"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38.json",
+          "sha256": "36f938fc4a4f1cca7dab97d723c883c83311735696e83f953f4901d95e711115"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9733fc3a88eb",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-64267d13a4d1",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-9733fc3a88eb.json",
-          "sha256": "901288554b7611e49bc756bcb7aad9e45871a4e01f88e16dc8ec7932cdc180c0"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/observation/blepharoplasty-and-blepharoptosis-repair-ca-64267d13a4d1.json",
+          "sha256": "3aac1cb15fde3e663973eb08e1109c22830b186e5eede0845d77eb68623288c2"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-81415240636e",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-35e149943340",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-81415240636e.json",
-          "sha256": "85d5143962bec630cae76ba8ef58709e5c4ea942f58239ed60a4eafbc9e724bb"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/observation/blepharoplasty-and-blepharoptosis-repair-ca-35e149943340.json",
+          "sha256": "2f5999fc408b065ffb174e29cef7ab2bedbfb1e84265d329a6314399e8862e52"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ff53d812673c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f7fda36f1dc4",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-ff53d812673c.json",
-          "sha256": "a805084a7e62767015c0c057f08e26f24cbac1f871428cce8a3e32ac322f1bce"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/observation/blepharoplasty-and-blepharoptosis-repair-ca-f7fda36f1dc4.json",
+          "sha256": "89d51642a6fb7d8122d0831d721248fe5aa3ea8cc9c90995380df8dd8ca9e85a"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4c64b7bf36d6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-980355e3656c",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-4c64b7bf36d6.json",
-          "sha256": "5048ef4894927277cd93110df219901a8ccd448a48a2614551c021f5b44d1d20"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/observation/blepharoplasty-and-blepharoptosis-repair-ca-980355e3656c.json",
+          "sha256": "46c740ba472a0ac4480c69384e092f9607bf4c1881e1699af558b3befb055259"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4c469c33dd48",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-35ccfcf65244",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-4c469c33dd48.json",
-          "sha256": "0254cfb3f1409638e8b4e79b7a1facad93cb3752349a0dbc5ea69d3794e0c948"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/observation/blepharoplasty-and-blepharoptosis-repair-ca-35ccfcf65244.json",
+          "sha256": "51209d1fcdc9cc5bc557a32e4453111d01ba41f019b07f48d8f142d4f97b886b"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c9ee61764df7",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e0eae5229d5f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-c9ee61764df7.json",
-          "sha256": "2d03aee1af2782f8a7343bf56431c178280e04f77b8681b3a5f041bd47960f97"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-29e28ceed66d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-29e28ceed66d.json",
-          "sha256": "d8361d9c4ba82bd9d9a440cf0b20701aaf90db05d0299eb59ed5388ba5f992ed"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4a13dcaa0314",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-4a13dcaa0314.json",
-          "sha256": "dee02f96e0ef8a62dc316c4ba48d62493769ee4a8804e975a6b82591dc6f1577"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-af041e58b811",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2893273aad54/observation/blepharoplasty-and-blepharoptosis-repair-ca-af041e58b811.json",
-          "sha256": "73d36b574b59c78ec55083fd174995ad5063c0e9f1d90370b63750a05c492bdb"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/observation/blepharoplasty-and-blepharoptosis-repair-ca-e0eae5229d5f.json",
+          "sha256": "99e1aa65a7386b343c69879defd39a2dc5296de7fb845e21811621dd461de48d"
         }
       ]
     },
     {
-      "caseName": "complaint blepharitis alone satisfies layer 2 -> Met",
+      "caseName": "Upper blepharoplasty — required photographs not documented",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "complaint-blepharitis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85",
+      "caseId": "upper-photos-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85.json",
-          "sha256": "99959c666abe4841b6d3fa24f8b7ddb2eb4b2fe70def468ffc910439e8af97f8"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980.json",
+          "sha256": "187c8c1a7d5886318d3f563a4ace16ac17d72fa254ce16c53662bdcfc49ecd93"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-13aa50411530",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b533e1172d86",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-13aa50411530.json",
-          "sha256": "0d87ea3364b41e07409c418147dcb2abad2ab098f158c500463d1b18aaf0f85b"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/observation/blepharoplasty-and-blepharoptosis-repair-ca-b533e1172d86.json",
+          "sha256": "a29aabfc922cc377750ca2fe0e54a8455f44ab04db0cb76b19ea7f6d23f535e6"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5bf1c5fd2e2c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e8aab9bb642a",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-5bf1c5fd2e2c.json",
-          "sha256": "5ba80f00baa9013fc5c418dac05ad9ef2972a7566f7fafd84b86579e0944a084"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/observation/blepharoplasty-and-blepharoptosis-repair-ca-e8aab9bb642a.json",
+          "sha256": "834ded6dc0a24b4f9af5aaa7d2b136573035513857486cd28bb243715862c091"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c0c7386173cc",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-88d59097b5b3",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-c0c7386173cc.json",
-          "sha256": "9b2b54eeb38af0d7936fcf36ad8e7438a641824de396f4387ebf5a01c4a00256"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/observation/blepharoplasty-and-blepharoptosis-repair-ca-88d59097b5b3.json",
+          "sha256": "d44da3c2ce89995b36b93da6525991bae54c12846a165dce748c891058b88f0b"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-28526bf7e6e9",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0110dcf661e6",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-28526bf7e6e9.json",
-          "sha256": "c02dbe3c39df29f5e6f13ee3d285e9e1506d4ac6fa8d1fe8e9a63f2251f42d69"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/observation/blepharoplasty-and-blepharoptosis-repair-ca-0110dcf661e6.json",
+          "sha256": "4779c45c4b114f7aab7761ae55fbcd6bd486a365a5d04dd2c7a3b1f0d5c72609"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5a74451fd097",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bd76ca10d210",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-5a74451fd097.json",
-          "sha256": "05a8c756c72fdd44a572cf35212f83ed592e22cf75abb14cd3736aeeb94e0ea9"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/observation/blepharoplasty-and-blepharoptosis-repair-ca-bd76ca10d210.json",
+          "sha256": "40f3cf13cc5c4f8b6f7c330f3967a8f5eb90ca3c22783a1a010484e0c636c539"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-732d56293979",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-af7c2445595f",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-732d56293979.json",
-          "sha256": "e611de2b941d9f7c5273b380dbdb2131b0e571339d2826327291f1b30cbfb43c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0de3ef59902e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-0de3ef59902e.json",
-          "sha256": "1274957afa23bb12e80a3c8e0224c125a0382e5c3423b94236673457175edfc0"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b915736016eb",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-b915736016eb.json",
-          "sha256": "8ef03cf2859c1f06058e1ab8af4b6d1a264334a8f6238c017d4f7d08daf0e7e6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b9d8825c56e2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5f64050d5d85/observation/blepharoplasty-and-blepharoptosis-repair-ca-b9d8825c56e2.json",
-          "sha256": "0ff0ebcb81d75b2e704b1a06b0ef301682732ab6088b3cd83d598179e764c470"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/observation/blepharoplasty-and-blepharoptosis-repair-ca-af7c2445595f.json",
+          "sha256": "924ad130c0bda8cd66e5cf97386ad4cbe2a97d1dce84914b3e71c1a750fe9f4a"
         }
       ]
     },
     {
-      "caseName": "complaint dermatitis alone satisfies layer 2 -> Met",
+      "caseName": "Ptosis repair — actual-margin MRD exceeds 2.0 mm",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "complaint-dermatitis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6",
+      "caseId": "ptosis-mrd-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6.json",
-          "sha256": "f8cb8a87a80652d5d91cdc3d46d98beb48627423380b10e20cd29beace0941da"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d.json",
+          "sha256": "83393cd3555ec89d9c277a57a9075d49836d9b566ba3054d45881c5b59f8289b"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d14fcbe8081c",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-894c13340097",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-d14fcbe8081c.json",
-          "sha256": "1d06fed822c9300a6994bdd4d6bf3a5997372b6d85d6de368456a44f38f5524e"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/observation/blepharoplasty-and-blepharoptosis-repair-ca-894c13340097.json",
+          "sha256": "6c0ee5e54861e370cfdfe0f325d6d8d52e701ca11aa0e080fdf0f06b5231312a"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-eb0c3d40cc79",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-edd9d0fa9938",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-eb0c3d40cc79.json",
-          "sha256": "5c69369fa1f6ad33f4674b38e4d8f6b358f8f01c2023bd0e65c99a6c40d645d3"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/observation/blepharoplasty-and-blepharoptosis-repair-ca-edd9d0fa9938.json",
+          "sha256": "feac63be3a8c0184581fc99623785599f2903618d3f760305047eb15dc522b04"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0ff061654aa3",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0e1438b42f30",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-0ff061654aa3.json",
-          "sha256": "0b112662aa0bc736ebf507bde507a7515b8d65d1c724e5b5a4399b25d5da6a33"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/observation/blepharoplasty-and-blepharoptosis-repair-ca-0e1438b42f30.json",
+          "sha256": "532438dbf619062308dab031c8dcf93e1e73cbc36c1da0fed5dc4e614313d55e"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-10d0839091c1",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-dab7eaf96a8a",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-10d0839091c1.json",
-          "sha256": "5d663de7470b5f9a73754aa2dc3ab838060b8644c2068444a0c00e4af5a74078"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/observation/blepharoplasty-and-blepharoptosis-repair-ca-dab7eaf96a8a.json",
+          "sha256": "e81f6c4be0f387302ea8f2595595710dd5107be6c63be0bea87ee5478ec53811"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cbd7eab704cd",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7a3ec3edaecc",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-cbd7eab704cd.json",
-          "sha256": "74935e6e25c22bc6df9a5ca50d211afce254098157a0be45511c47d19ac82ff3"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/observation/blepharoplasty-and-blepharoptosis-repair-ca-7a3ec3edaecc.json",
+          "sha256": "9470dca8b71b3a542d80be798c82110c3bf4a04ec1e9f097d1b061a345659579"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-db2e3b180752",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d2981a0fbdab",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-db2e3b180752.json",
-          "sha256": "76bb747e3903e9c3275813812b355ae3b833c9109b596db00db14bf94f2f7787"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-55f22882dccb",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-55f22882dccb.json",
-          "sha256": "679f732ba57dd0872771563b22d481b4486684f94778ab8b9d8801f99780fdd3"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bd801e600259",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-bd801e600259.json",
-          "sha256": "65159d267f4068866c50bda381149f185ccf04bcb926fc26e4e9184b5267b272"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6f6af25f622b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-c87ef0b198c6/observation/blepharoplasty-and-blepharoptosis-repair-ca-6f6af25f622b.json",
-          "sha256": "cfbfcdbc404271eab8fdcace7ac28a7aad42236a73a051e1d166e9047cded6f0"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/observation/blepharoplasty-and-blepharoptosis-repair-ca-d2981a0fbdab.json",
+          "sha256": "e3aa14b22602953798289f65e47618fb663ec7f90797c65b85970e6bd08650e2"
         }
       ]
     },
     {
-      "caseName": "demonstration skin-on-lashes with its lane conformance satisfies layer 3 -> Met",
+      "caseName": "Ptosis repair — required photographs not documented",
       "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-skin-on-lashes-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094",
+      "caseId": "ptosis-photos-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281",
       "artifacts": [
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281",
           "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094.json",
-          "sha256": "9ad1249c718dd3271d27b8fba3a398464412a9a9a59e782a60c04dad97538c8a"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281.json",
+          "sha256": "805cd8145ad246d644ced9cec7830a80d22c07e4fb6579e41dac2c583206159c"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6bc5770a89f6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b13cf95e73fd",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-6bc5770a89f6.json",
-          "sha256": "b5ae2de8b5f87497e7fd480a4004ff3825ccc9627ef0f4b2399e881d27b4c5f0"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/observation/blepharoplasty-and-blepharoptosis-repair-ca-b13cf95e73fd.json",
+          "sha256": "56819621f9a4cd44c77a3cb575b1ee7b1142c7c432be11ffe674334c6db66dcf"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5c1d8556230a",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ba55e2d14fbd",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-5c1d8556230a.json",
-          "sha256": "2fa6a8e881e0ec15277b4243f185421aa9823b34ced2ee11fa9f201ac8c31452"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/observation/blepharoplasty-and-blepharoptosis-repair-ca-ba55e2d14fbd.json",
+          "sha256": "b4710c79c669adfdfde5cf38a19ad65f680eb569bae0ed8205367a61e1010462"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-226cf82ca72a",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a6ccc9744e80",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-226cf82ca72a.json",
-          "sha256": "2954a2cb252d8365e1fb7d531d39106aa118cefa75d442da385fda92f58d2073"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/observation/blepharoplasty-and-blepharoptosis-repair-ca-a6ccc9744e80.json",
+          "sha256": "2c7ae7cab12c5f763fb4308d3927e60d52a96ec76ae85f8befc0b31fb6ddd66a"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-61864bee2281",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fb02a623bc13",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-61864bee2281.json",
-          "sha256": "115e552b2175a44b041266ae56bc3207a2e479421b9f23ccccea714d9283e178"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/observation/blepharoplasty-and-blepharoptosis-repair-ca-fb02a623bc13.json",
+          "sha256": "847ebcc384ae44e334657dad9449d01baf2248304cd4d167d8d09c02e3ba035c"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cd0a93e978f6",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-099d4ddb6382",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-cd0a93e978f6.json",
-          "sha256": "ea71d6dc48ef5211421f30edfbbce9fb0819a6ad54a1d6b32a4a3a062f57cd45"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/observation/blepharoplasty-and-blepharoptosis-repair-ca-099d4ddb6382.json",
+          "sha256": "c5a538f0247e3650218f3bd43a687593b0994627526cc22ea034d418dff69101"
         },
         {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bb708968641b",
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0dff648773bb",
           "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-bb708968641b.json",
-          "sha256": "27d5e5fe1740a3519ce1e00dbb4436985353e50e6714ceddc86f2b397becf576"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c16ceb4da27c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-c16ceb4da27c.json",
-          "sha256": "1d6308bdf9934944ca086511df2148782b2bcc44d8220b015ad55c1f1d44b88d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5ea7288f0c93",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-5ea7288f0c93.json",
-          "sha256": "e91023a4036fa860a020c529e2609a8686d9b5354a737a21b65d0e9be84abc9c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-34c3d2b56c4b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-47649c02f094/observation/blepharoplasty-and-blepharoptosis-repair-ca-34c3d2b56c4b.json",
-          "sha256": "70ef40fd410f67cbed2f865be03571288f38e77d26108d15d2395f116b5945f8"
-        }
-      ]
-    },
-    {
-      "caseName": "demonstration photo-dermatitis with its lane conformance satisfies layer 3 -> Met",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-photo-dermatitis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd.json",
-          "sha256": "a6268e71eb7082972ed8010a040879c18ce0538c8067798dae28a83a91df9268"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-148c38f2d448",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-148c38f2d448.json",
-          "sha256": "ea7c3c758471db39446b7fc1d1ecf90aa89d051f4da226e89ed9df2d5071353a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-95c3904a3e1e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-95c3904a3e1e.json",
-          "sha256": "ce92b2102463897f420685b047b15792f91afb6e600330425ffecdf31afa7de0"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-10aa6b1f6664",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-10aa6b1f6664.json",
-          "sha256": "8dead36c87439787b2437e6ee272e9f56c1e3593162cbcc903b679cee0ee53df"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7d4e9607b5a9",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-7d4e9607b5a9.json",
-          "sha256": "0c7c0c81fdf621b18ac594c784538cc693256994acd60c6457bcc424ceefcae8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cbfe3555a395",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-cbfe3555a395.json",
-          "sha256": "1e72cb1d5293d56202a990238b659619b2e685567366049e837545334391b19c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d6ae8ee9a74f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-d6ae8ee9a74f.json",
-          "sha256": "addb2572e83d97b9234aef783926be4fda69889a31468437f792f84fd63697c6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6d51d669165d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-6d51d669165d.json",
-          "sha256": "f2b313b321955f0234682bc21bf7fa98bb2fad1ce1476436c9c93cd1f10d87b7"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2b7f8775c708",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-2b7f8775c708.json",
-          "sha256": "8cea51738eb93c7d0302ab511d035baa35121b1cd0fe20cf03bf523af5e72c5e"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-dcb64771215d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-bbe86f3ba0dd/observation/blepharoplasty-and-blepharoptosis-repair-ca-dcb64771215d.json",
-          "sha256": "582a3f0c2d7bff3f9392b51e6119d27081163fe5501088c6bc2f0f31a52b3767"
-        }
-      ]
-    },
-    {
-      "caseName": "demonstration photo-prosthesis with its lane conformance satisfies layer 3 -> Met",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-photo-prosthesis-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe.json",
-          "sha256": "8fac0f277c013982ee9d6154a2c3b475fa779cb3cbbc86225c8d7a6adc707068"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1f3405c6c9af",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-1f3405c6c9af.json",
-          "sha256": "34199e4d20b6634de9065a6f68ab9b876e37ab56c00d797cc8218f90a39381d1"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1939cd36c9c0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-1939cd36c9c0.json",
-          "sha256": "10dc3b8295a71c4ad32c9a16371c3fe31678b9d5635e77522beb23dbde810ff5"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-895ebd9468de",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-895ebd9468de.json",
-          "sha256": "6b7ccb911de0a322146b8737337761db9b5ec583776fc3f3e060911f54519b59"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-580266185db8",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-580266185db8.json",
-          "sha256": "02d2c70171e5932649ddc09be7a575683cdc9d46c0c76052d2bc676ba384924f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f245521c65f2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-f245521c65f2.json",
-          "sha256": "f03f2fd34d25e6dc81d1d7ece3a6f81e4ba136f76a08a5df7017152819895089"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-aba2ff077a55",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-aba2ff077a55.json",
-          "sha256": "e385fd12b01cfc63e9d2900789ed8fb8c7ca26e4cd43550205598ab293a0d5f2"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-905399253b53",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-905399253b53.json",
-          "sha256": "b4d6e34f19a43f05b29513726946cfdb205a3f785277d97f0eede1cde28f2388"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f8fb9da6219e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-f8fb9da6219e.json",
-          "sha256": "f1492c1b7b079ac038899e37ae17ba33512be47bdefcf9846c8e92f37e1244bb"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0821f0e9d948",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-8d980d5d13fe/observation/blepharoplasty-and-blepharoptosis-repair-ca-0821f0e9d948.json",
-          "sha256": "56f06b4916848f1f9fca3e37e0d7fa83e9de02e60d33d028b4a43478e5cd8324"
-        }
-      ]
-    },
-    {
-      "caseName": "demonstration vf-12-degree with its lane conformance satisfies layer 3 -> Met",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-vf-12-degree-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29.json",
-          "sha256": "2067d1e7e8ee7643ab70c641e4d41e0cab030690f0f6b99e47662e5b9a11767c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f9bca3434be1",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-f9bca3434be1.json",
-          "sha256": "2a5e42d6504a1eae84adcbdde09770d3f40676d86020b996f945b0ba1767fb74"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bca7f5036687",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-bca7f5036687.json",
-          "sha256": "18b70cdaf5eed3be04622c5c1437d26a132951869f8d8593e10d8352afa3c2a3"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c282232b72e3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-c282232b72e3.json",
-          "sha256": "80d9e4f314eb9f8a74ac5c98bada2beb1eb9b688e5dff7d3fc093b5e3c4bdcd6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e67942eff05d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-e67942eff05d.json",
-          "sha256": "cdd33f923dad07858cda50ed91992ab9f83000774aee67b3cebe20485608545a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1db837548041",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-1db837548041.json",
-          "sha256": "457fe0e67cf76b5bcaedddf24bc219b2e446a75e9eef8604ae15ce30fe4d9d12"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-dcf765ac309d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-dcf765ac309d.json",
-          "sha256": "c37c70c2ddc915bdab93fce166f4383b0f36fa64f50614458b61115adb5d52b9"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c299375f29af",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-c299375f29af.json",
-          "sha256": "a01b7ceb21f50202235ab6f39cf0d35c66cd7e0ca82179bcce779f555996765a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-034ebe4bbce2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-034ebe4bbce2.json",
-          "sha256": "91ff3ef79eae571da86a7aa376cac71707bd73cc2dd4e4bde39a9ac848879d90"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-34d8c0994596",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-400d8f1dbc29/observation/blepharoplasty-and-blepharoptosis-repair-ca-34d8c0994596.json",
-          "sha256": "ac903aaead537695252c02f7b4e9ceee661b60c97540530f271e9109f6f274bb"
-        }
-      ]
-    },
-    {
-      "caseName": "demonstration vf-30-percent with its lane conformance satisfies layer 3 -> Met",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-vf-30-percent-met-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b.json",
-          "sha256": "45a4fe6c0cde5bd661a94cbd79aa27ed5116df7679c69bcdb732dd22d52cd7ab"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a80d734a4f00",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-a80d734a4f00.json",
-          "sha256": "f3e6aee3a610132f2b76ecd1a74910534969d806bcb260e4982b99a20c3db0c4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0006832bc6e2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-0006832bc6e2.json",
-          "sha256": "313580ec8871525f6e23f3ebae46f9c708ea3d39807278029c747c0aaa54ea8f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bc4bcf1f6cec",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-bc4bcf1f6cec.json",
-          "sha256": "58b4ea6b02e92feb19b376111fa9833d3421acafdaa9397812d6eec8fb28ff67"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-22ab132afc24",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-22ab132afc24.json",
-          "sha256": "277226563aee448d9ffd878cff2d03fef404c58875aa6aab6cdbfb10adc135b3"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-88c2e12e9674",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-88c2e12e9674.json",
-          "sha256": "a92e0a95643178bb9a2dae7afc7ad6ec8680879174a7958a5f7fc4ddb87db90b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7bb44b2b58f0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-7bb44b2b58f0.json",
-          "sha256": "7b9303692156b0e967c4fdd2c7539334e93e23a4af0e84ecb471fe8ff02e5039"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-46395484524c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-46395484524c.json",
-          "sha256": "e72587a9a8c231157791fb598973e8e52db2cc48f2ff9473d836c5928f966da0"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-19d80b6ac74e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-19d80b6ac74e.json",
-          "sha256": "cedd36084a334cc4de441d6c8066609429be58755dd2b7c6bcca728c0d06d8ea"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a908a911df61",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b76a651e5c9b/observation/blepharoplasty-and-blepharoptosis-repair-ca-a908a911df61.json",
-          "sha256": "aad5daaac4cafad254f8104a1c7c54474055a45d45b17496a626d9045f8b3419"
-        }
-      ]
-    },
-    {
-      "caseName": "CONFORMANCE DISCRIMINATOR - a photograph SHOWS the skin resting on the eyelashes but does NOT meet the page-3 submission standards -> Unmet. This is the case the old fused Conforming-Photograph-Shows-X concept could not express at all.",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-photograph-non-conforming-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b.json",
-          "sha256": "147a04c07157995b04861c8e042864c2153dd2d19fc2c107eaab834f23287c53"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a1123ecb1ee6",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-a1123ecb1ee6.json",
-          "sha256": "c314844b36b83b5c59a919e632d2041fcea4cca384e3504b9a90f05423a0d95a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-96656f295d82",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-96656f295d82.json",
-          "sha256": "6f7e5121cc44972052751d0b181792791046008e5a0542d372d9e052aabd1257"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-dca619e93653",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-dca619e93653.json",
-          "sha256": "c1edbb59dd413b6b30e39b15670dd57ee70294d9446172e1cc272aa54c3fa70a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1a4e2eae1496",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-1a4e2eae1496.json",
-          "sha256": "8da63f289bc403e9e76691ef19868ed4d0436194e94c576f9f7f40bc33042f8e"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-50d8cc531940",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-50d8cc531940.json",
-          "sha256": "5482d872962b384311e6eedeb0ba4ee9aa05db07db4e221635f8f451975c46be"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ae57071b4514",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-ae57071b4514.json",
-          "sha256": "d172f44d9f93c20dc237bfd791601715cee41b9ab5444b5cf81c84117775e8b3"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9befba42bb8c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-9befba42bb8c.json",
-          "sha256": "853b8f10abde62a3a836583ab233482da0a49cec88e2214de97e5ee84c815025"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-639e77765d60",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-639e77765d60.json",
-          "sha256": "563dad71a51c20647bd84c088425802ee6430ad7cfcad5ef8fe492ea921876ba"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f4c549f9b8ed",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d3792ffdb82b/observation/blepharoplasty-and-blepharoptosis-repair-ca-f4c549f9b8ed.json",
-          "sha256": "48fa295e82357399b5553dbea06f2d9e71927173a674e35ef5b8ff1012ffd9f6"
-        }
-      ]
-    },
-    {
-      "caseName": "CONFORMANCE DISCRIMINATOR - a visual field printout SHOWS 12-degree loss but the examination does NOT meet the page-3 standards -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-visual-field-non-conforming-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4.json",
-          "sha256": "e3e255ab172ae529b30188e7b6d5e4939b5685024564258e484413e31a506ac8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c8806856b225",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-c8806856b225.json",
-          "sha256": "cd904526f49319302fd3f0e712ff5af0c9d2f6c006d5697585cd023ef695711a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-604d9b0e0a7e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-604d9b0e0a7e.json",
-          "sha256": "720578020b9ac24b62cabf0c26295a50499a93e7ec2bb6d289460944a7f4e773"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3677faedad87",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-3677faedad87.json",
-          "sha256": "3aef9a4d7c8bb12013c3d45a7cbd31645874498464449210e97d6f015e600906"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d3ef7746b6ce",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-d3ef7746b6ce.json",
-          "sha256": "22d3859dc30036df5a43a26b15c2804ed80244d7de19e9359d776e7d8e4a40df"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-21a4ed32c882",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-21a4ed32c882.json",
-          "sha256": "524397fa6839076560966403dafb091ec384b1bacd6a52969beb9721106d2c3d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4c9d059efed5",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-4c9d059efed5.json",
-          "sha256": "78d301f3e3192a1433963145524101a96d016030a3bc587add89ccc7e0aa3896"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b2842ba7d84d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-b2842ba7d84d.json",
-          "sha256": "a70122e9b06547cb7818eda8998e5453ac6f46daf8bedcf46d916a42a40ab3e1"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-98c93df20a5a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-98c93df20a5a.json",
-          "sha256": "55f53a3bbdc2761ceb332c3cf7222ef86b2a20a476f371a455f86ac854c0bfee"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a7aef42d58aa",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-5251ddb72ea4/observation/blepharoplasty-and-blepharoptosis-repair-ca-a7aef42d58aa.json",
-          "sha256": "60b299ceb4cd620109acfc0da627e9a17e7d3385270063816c27f5513ab4c3d5"
-        }
-      ]
-    },
-    {
-      "caseName": "CONFORMANCE DISCRIMINATOR (the other direction) - both lanes conform but NEITHER demonstrates a listed finding (none of the listed) -> Unmet. Conformance alone is not evidence.",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "demonstration-conformance-without-any-finding-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03.json",
-          "sha256": "7ec62bffb4de9463a40445ffe37508df0b671cd8a36f1690501ad97696d65241"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0931a4659675",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-0931a4659675.json",
-          "sha256": "6478a971836d79a075b8a02559c8f587bc43cb2b0fd558b0227b72b3209d5463"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8e5e08bfeddb",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-8e5e08bfeddb.json",
-          "sha256": "b8866cbf08beb5b410440aea6a115bcda18ba71b4ae9c87d9035611ad39928c2"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-56269e3d2201",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-56269e3d2201.json",
-          "sha256": "c1ebd619de1f364f491110577e9970513bf963baab43dc5ed23d5284d51ad71c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6abc640df32c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-6abc640df32c.json",
-          "sha256": "87547ad73e0036d1b445624cadf8d05633cff2e81f3b09e07c640c7ed337c8a6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9d12a8c24981",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-9d12a8c24981.json",
-          "sha256": "997f16f38e022a30afc40ab37e9cf3e545ed960e6f3e0b299de4ac01eb196cf2"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7e7f191edc56",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-7e7f191edc56.json",
-          "sha256": "243e0a01003ead7d364d1b795fc877a0f90bbd1b85d6f23f1c6609effd122ed8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-888660bc33c5",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-888660bc33c5.json",
-          "sha256": "ae3b62d8f062c0450e8d0749af0a1d48ca3fc269e4867890d6144b29d781c331"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8ec2d9727c7d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-8ec2d9727c7d.json",
-          "sha256": "f8a87f1611f8709292fea1ea52c0002b46f83efe490d185d12f8d0477cf8fa5c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c171d6504af8",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-f4b9958bad03/observation/blepharoplasty-and-blepharoptosis-repair-ca-c171d6504af8.json",
-          "sha256": "0394ceaab172e7e893cf142b7e925f16bef043bdb8be50c68838316915c1361a"
-        }
-      ]
-    },
-    {
-      "caseName": "blepharoptosis repair with all three layers -> Met",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "blepharoptosis-repair-all-layers-met",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9.json",
-          "sha256": "0a141c96aa30f2027305703fbf4a345db67df0e6405cfe65ab4925b424bde67f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a3102eb437d4",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-a3102eb437d4.json",
-          "sha256": "0b3f9c2ad86e54cfc09b4c8f87ee668eaa76d9822e7322171d270b82aa3d0d39"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d800e878a73d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-d800e878a73d.json",
-          "sha256": "fa5958a810e43fec66bef2e8f89c441934211df266320961887310c2c19d5a84"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c02164d90a01",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-c02164d90a01.json",
-          "sha256": "be8a84b775f42953e42a2d8f8667dc80f7e6247e687a178426cf78795e659565"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-68f007ce07d6",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-68f007ce07d6.json",
-          "sha256": "77f4b9d12db4018527b18d3da19c5c22a7e7974c6667e85d4428a533e1749b0a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d04ad115f138",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-d04ad115f138.json",
-          "sha256": "4b48038b3e8a6e7b230406706e56f62514413df43a8382fd44b82e0db5e9d1b7"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e72fb39361d7",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-e72fb39361d7.json",
-          "sha256": "476b05eeae99db0bb2c09e98a93c4df579680c4bbd2e002fff7840064f3c762c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-be7464e4c10b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-be7464e4c10b.json",
-          "sha256": "6329a590f2fb7672abe56b1b807b8e872283dc8ec2e777caaac080f07e3d156d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9e75b557238c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-9e75b557238c.json",
-          "sha256": "d9ef2aed6ebf1c5245926567a0d32964dab2524c496b59c1e563a6368169adba"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-adec8e5815a7",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-adec8e5815a7.json",
-          "sha256": "22bc2cd09e4f276b77f288b711d2306e0485685cd2f176d7244c7a62252820bd"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-84182b63e3fa",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-84182b63e3fa.json",
-          "sha256": "1376bcee94042df7752b18e9f6736097b7a1e8df89e552e2a726d14005a1aaf4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7ee8609fc529",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-7520792e8be9/observation/blepharoplasty-and-blepharoptosis-repair-ca-7ee8609fc529.json",
-          "sha256": "e1ea12f65e3fe1930761c56348f87577e42f941d6c074e2deb5e5c6c704728e7"
-        }
-      ]
-    },
-    {
-      "caseName": "one requested, no qualifying indication (none of the listed) -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "one-drop-indication-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2.json",
-          "sha256": "e7b52f742623c3ab969f3c61c936b6fa69493b2822250b0330d676f16cc9e21c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bcbb6557d73d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-bcbb6557d73d.json",
-          "sha256": "f036d8f169f00f48b6d6ce102a1108f60af540506b296f5b063a7d5a44fcef03"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3e3b0b61f9d8",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-3e3b0b61f9d8.json",
-          "sha256": "a640aa2b40038719ebedf2993d06ea53f40b40f15ee4932a84e428a8735d5782"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-18ca8d4ff277",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-18ca8d4ff277.json",
-          "sha256": "3336ddf702faa937030ff198a3678397fa1a27c4acac8dc1dca5913f73983b8e"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d876f0adadab",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-d876f0adadab.json",
-          "sha256": "fd306c99b9ad5de656f49a68c7a0362dcb4acbfbb33a6e4b2c3bfedfc4f4cd77"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4bf2d1fc0f76",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-4bf2d1fc0f76.json",
-          "sha256": "0fc6348cb35bcf4fba5dce8a3c5faf38bb4ad0d1d77de98d884688a46ba8d4ae"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7fb967af2d40",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-7fb967af2d40.json",
-          "sha256": "c6ef12d1d49c3e9a56f6158c526a4e623df79f311032c9a8ab77954987639391"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5cee82f7d8b5",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-5cee82f7d8b5.json",
-          "sha256": "b0251886c5755584ff0c94435da382b9ede2fb24ad02576d201910c2e2ecd7b8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-757b9526c698",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-757b9526c698.json",
-          "sha256": "553c99d46c3c12d5657eabc9d3e26ec52c5c2284b3dff40affaf005ac7badc98"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-69547b573f17",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2aaa65c666d2/observation/blepharoplasty-and-blepharoptosis-repair-ca-69547b573f17.json",
-          "sha256": "1d5dcc3bed67d0947c98c82d57bbf126e0d8f64fb027208f96af11b843d36e65"
-        }
-      ]
-    },
-    {
-      "caseName": "one requested, no documented complaint (none of the listed) -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "one-drop-complaint-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d.json",
-          "sha256": "950b3cdce356fb7f3b4fbb19f664923658e9ab22a23658639fb3d13abce5e97a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-85aafa0bcdfa",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-85aafa0bcdfa.json",
-          "sha256": "045185f9f5a98ee4d7523ce7ed934293d483d983fc69707730a36be3f8a87054"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-346226b7cb65",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-346226b7cb65.json",
-          "sha256": "5b7753228054f993004869c2fa16219fc8039aef00807a20e0dbc6053e449312"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c4afb860d0d8",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-c4afb860d0d8.json",
-          "sha256": "1cff942b9dad28a191e34e61fb03e1be6f5f5e36ef7d8f36bd7f9ab9820b2e33"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a32f852de818",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-a32f852de818.json",
-          "sha256": "b14e48ffa8d16ee9c4e056d779fd42f1fffe21d28c37425c192bdf68155aec49"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a12ffcecb4b3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-a12ffcecb4b3.json",
-          "sha256": "815e7b4c202978f7ad3cfdf3066fd1b7e8d540e3e72da1d4ea9fd92371d2c505"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0e87da293a75",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-0e87da293a75.json",
-          "sha256": "6bef74447905dbeab6d7126e54faebe330df350fb07b044562609408bd770d8e"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0067e6207ad7",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-0067e6207ad7.json",
-          "sha256": "c314f6ac46411adc0cc14a55f6c0bfc064b7331917d2087e40cc8acfbcedfcec"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b18bc0bc46bd",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-b18bc0bc46bd.json",
-          "sha256": "53c0f650815247509527d33d448dda996207c9ea20e3ef87b1c6a6504e0a488c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-18589ed49d0e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-765e34fd003d/observation/blepharoplasty-and-blepharoptosis-repair-ca-18589ed49d0e.json",
-          "sha256": "28678d535e057686ea8925eefab266ab94a21559bb20b5bab501d0bf2e148865"
-        }
-      ]
-    },
-    {
-      "caseName": "one requested, no objective demonstration (none of the listed) -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "one-drop-demonstration-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd.json",
-          "sha256": "7af83e7645bb6118e0b1595890984d056fff85be32a185bc621f59b4b732b267"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c5217c2d240f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-c5217c2d240f.json",
-          "sha256": "ae3604ee0bfdf91e412f7a6abe5cdf7e746fb101da543d7d428216b267d7c29c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-aa210abbef45",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-aa210abbef45.json",
-          "sha256": "70da535f23c62b78b78117cb381c2e8f1278205f766acb0ca6cabbfcb4a65b22"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-dee5a6b11f91",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-dee5a6b11f91.json",
-          "sha256": "cc2040edba03703dff9884477e91c1702b0bbd7ed21055d74e2013ddb7d334e0"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f06d82b6a37c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-f06d82b6a37c.json",
-          "sha256": "a410f7942d0d45fc464d41e1360e30d5556a8314a3abec0e4587fc0aad61b416"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0453a51304bd",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-0453a51304bd.json",
-          "sha256": "7c1c2cf89a7e47e7e8fe222286f84e4c0a9d065fdad148c2fb927024ac13cf75"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5e22d5771f22",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-5e22d5771f22.json",
-          "sha256": "3a726d296cb1a80b90fc3a3a856dfcb71a83c56e6245d8ae31949af09ce102ec"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6f5198712ffc",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-6f5198712ffc.json",
-          "sha256": "1698027f6d3b986a060ce3ac9ffca98fb1851fb0c26fc6c52c529b6324068cd9"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d032960c26bd",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-d032960c26bd.json",
-          "sha256": "06891e5484e9bdf8aa280c01ef8ca736bc909c3fd42bb1f038ed2da27264e639"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c16d98334c5b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e43bca1f59fd/observation/blepharoplasty-and-blepharoptosis-repair-ca-c16d98334c5b.json",
-          "sha256": "73e783666ff0316a78c1969201afc42a19bf14837365900b071ae05128c84107"
-        }
-      ]
-    },
-    {
-      "caseName": "requested with nothing documented -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "request-only-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0.json",
-          "sha256": "2455bee70b090fddd110899c4392eeb40452cb20a65b62e9e0cae000a8d52ff7"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c4df93f4a2c1",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-c4df93f4a2c1.json",
-          "sha256": "632f824c4d208287cf5f88fd6f71400e25acb24fd59c4b2aba2336a3c2c62819"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0122f18591a3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-0122f18591a3.json",
-          "sha256": "ae58eee8dec3a41cba4fe47ce62b52c44f0d9370aec66f74d519e2b930ca19d7"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0f22d2d5ed63",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-0f22d2d5ed63.json",
-          "sha256": "0062acd82545c7f53bed5bc993aa67606904f59519fde907a8aff12b68e2f618"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-23443335d9b3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-23443335d9b3.json",
-          "sha256": "a4b70ba6ec45b40a8887b7f4d5b787f18f5ce268a329222bec992946cb207f7f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a86590b6a222",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-a86590b6a222.json",
-          "sha256": "3f051360daa0c13f1c602fee372db27db80b3012cc8f7db2d7f121e2aca1f30b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-29010eda313c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-29010eda313c.json",
-          "sha256": "fbf03af9ef0d0924eeb59e6716481e43d243f7474a8558f2b1d31433123bfc67"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2fb07b1168e3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-2fb07b1168e3.json",
-          "sha256": "9d13a31fe9469983c92ffd5c12600b2215cb47056a1d93f2cceeffec8e9f4934"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c90828c1a344",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-c90828c1a344.json",
-          "sha256": "4d4d0f8fe517198269c15236106f6507947e26ff6e541f3d25a9806262e42b8d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d7a641aa5878",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-50664e06d9d0/observation/blepharoplasty-and-blepharoptosis-repair-ca-d7a641aa5878.json",
-          "sha256": "6c30ec37b545bef5d6c897574558d6e282f9486500729e150d8b584126b871e9"
-        }
-      ]
-    },
-    {
-      "caseName": "both procedures, three layers and both individually documented -> Met",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "both-fully-documented-met",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70.json",
-          "sha256": "abd7080c7649a2833df2d56da6065f0b789af7521979640d6bd12752929b9bdc"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-14139103bb88",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-14139103bb88.json",
-          "sha256": "56217ebc204e6ba7b6189f046e158f5be651f595fde5022e03d27aa3008a4720"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-eacba2429d8c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-eacba2429d8c.json",
-          "sha256": "57e4351f4b6a910b272edf9425757b9ceea311db68364a825e178563e9612609"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5119b918755a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-5119b918755a.json",
-          "sha256": "142218a5fd5a74925a7f6797b61ee482c0e4f03f3ffb0a1186b9072db5699565"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ef8423f59e5e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-ef8423f59e5e.json",
-          "sha256": "b603fe2d24c0cb98d854ec69b38850bea636de9ea0f19ce988f0faa7d6c36fbc"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-92679dd5ca9d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-92679dd5ca9d.json",
-          "sha256": "a2a9cc73723ce506e0af3c09346abdc765cf0c6701a5bb5ca6815e234c5c9954"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-56a8153894d6",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-56a8153894d6.json",
-          "sha256": "72d456de968fae217fe720ebc5554f42821cae627e07fd4030f063a97b8493ea"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e29bd5ef44da",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-e29bd5ef44da.json",
-          "sha256": "3fe8f95b0d794c942082fc0afaf5874a6d8d77cf7db3aa44b6c6f8d6f96717d0"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fea19ffe39f6",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-fea19ffe39f6.json",
-          "sha256": "7cd547c5d411c973a30ebb283430c8ec52cefad56a055dde0961a70335d1bc05"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-76b19be1e0e7",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-76b19be1e0e7.json",
-          "sha256": "7f2e4b5cd570a3f5abec2468a7baa5d47b1aeb776a6f86282ec9739254024d77"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fc385f549c0b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-fc385f549c0b.json",
-          "sha256": "8ef0a81de88d0ce65b71f7ff97cb73c3a547bb9eb67e0178fa954311cdf1f47d"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9dc01ab0c4f2",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-474a8d508c70/observation/blepharoplasty-and-blepharoptosis-repair-ca-9dc01ab0c4f2.json",
-          "sha256": "82fd5f08f561ec0050b0c05b6debbacfbbad29a4527eec7077bde6ebcf8b9ea1"
-        }
-      ]
-    },
-    {
-      "caseName": "both requested, indication missing -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "both-drop-indication-unmet",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c.json",
-          "sha256": "e6e4718ae48942f84b92f57f4882f8f330807a87cdfabbdf2dc9c8cf4c846df6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a8ec86ef4aad",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-a8ec86ef4aad.json",
-          "sha256": "3a7aeb28030a3f6fe972dab47005f7a16faba060b1bc3b501665ea179f561f28"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d2d5f4b6514c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-d2d5f4b6514c.json",
-          "sha256": "a25c7cbce262f74aeb5b03df6a04ffecde263dd892a102ddfccf1faab4000909"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2307aeb6a1f6",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-2307aeb6a1f6.json",
-          "sha256": "d76ed447ec0af8cc37c6e119ae79ad9e97d9d409bdcad06a74dc1f794265fa84"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5192d3d4069b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-5192d3d4069b.json",
-          "sha256": "67001ad3ef1992140aa0611be4b92f85952bc06dc17b8fd65415076ab73e9cf6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-698170ff1d27",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-698170ff1d27.json",
-          "sha256": "6c1753ab0467c60c90d55e6b4e69bad63ffdb27171cf66ea83e63a1bb7728457"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b0ed1d78eb8c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-b0ed1d78eb8c.json",
-          "sha256": "5c73b5ce9d59f6df690b7f189478de02ec915b32e6cd04aec07f4aa29613eafc"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b3523a81600e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-b3523a81600e.json",
-          "sha256": "0b851de53295142a8918405bed37295e2674ed5063d433dcd1a5c729a6627aa5"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d0ab9549ed94",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-d0ab9549ed94.json",
-          "sha256": "86a37f457d8eb06595c7035f3ce5d244c56ca01b02b0952c2ecdb100705e586f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-90440d65e308",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-90440d65e308.json",
-          "sha256": "af92635e3917ec2ec5197d91ac5c61e814df95fae20073cf3afce28415140f7b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7109f7f2302a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-7109f7f2302a.json",
-          "sha256": "6c229a7045351d629e548831c215d294e56dfa0ccce080d2a43d6eb67a0ca2e4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2406ec2137ba",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-0d60a8b5b42c/observation/blepharoplasty-and-blepharoptosis-repair-ca-2406ec2137ba.json",
-          "sha256": "6dd5a450e24ce2583183f7afce0e66c6448c7d80b1ca950224fd95f9f71336d4"
-        }
-      ]
-    },
-    {
-      "caseName": "both requested, complaint missing -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "both-drop-complaint-unmet",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d.json",
-          "sha256": "55489ac623ef54b57a0f19c471d7e34d68646b3c28f3d6767f2156b8bc4f0fc7"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5a4502da4910",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-5a4502da4910.json",
-          "sha256": "d9e70ce6ca4c4d4082bcd333c338419c41f73bd22f6453201b58f624c8719595"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0bf4b15559ee",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-0bf4b15559ee.json",
-          "sha256": "d187f6f0915c2f51e2b5b4cc8c202b234bcd98dcd190fc3579c490b5425f0286"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f89cc723a06c",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-f89cc723a06c.json",
-          "sha256": "7000e268c0d5c623cd11254049dcd73aed3abc28f9421a44c66485a9d28a550b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-0ba9226e3e5a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-0ba9226e3e5a.json",
-          "sha256": "a0a37588cfe40554867afb66a14400f9060833aebe10fc43d4bc357f9781510e"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-45e7b3d4dbee",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-45e7b3d4dbee.json",
-          "sha256": "c4df51c357fb9b37e58fe8fedb7ee10a2a89a30dae1ca76df01f4be9cb1f6603"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f5943d146386",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-f5943d146386.json",
-          "sha256": "ce7e0e76b322a0ef4530a5ea56eb666ae6907bab27b9dea49e7a95264e5e6337"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-51dde5e1a503",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-51dde5e1a503.json",
-          "sha256": "e62af42cd39deec99e66ddbee9eaf1322bcb8764375ddf535d32f31447507be8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8bf98db0e619",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-8bf98db0e619.json",
-          "sha256": "439951d7aecbd4436a8fb2fd9acfee4f1f041cab349935f4f6b3d43c55df1f7a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-48dd758ef21e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-48dd758ef21e.json",
-          "sha256": "94f7c74eccd5adebcaa6f099dd597a486fdc802aa2acbaf8aa23a15003e4ea7c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9b17b5e9e872",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-9b17b5e9e872.json",
-          "sha256": "f3002a0012e360d8f6b7c38f6479ee20f9c12b65d30b25d5da7f98d8aceee8eb"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f2accaf74f0d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-e40d55f8569d/observation/blepharoplasty-and-blepharoptosis-repair-ca-f2accaf74f0d.json",
-          "sha256": "33c23dc3ec6e0892c4ba180f376d7919408727af85d441db69d2939c3a19a23a"
-        }
-      ]
-    },
-    {
-      "caseName": "both requested, demonstration missing -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "both-drop-demonstration-unmet",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223.json",
-          "sha256": "805d16c82d9edc5ea8f7d6e871c9bffc97991a5b37dc689ed0792b0fa23ee9f3"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-5d8d63c02f04",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-5d8d63c02f04.json",
-          "sha256": "52f1d02779f7a25544e4df191d892dab9ba02777154d9fd22e6d36c6f125e557"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d6fda3048eae",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-d6fda3048eae.json",
-          "sha256": "d68c0b603fcfa453c30dea47aadcf70b3f1745398236eb3e0ce5b20230ab33de"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b2584a78fb4e",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-b2584a78fb4e.json",
-          "sha256": "4f3d365c112e4aa972ff5b9e36e777628ba259a1eecb242982db4c4b687b38de"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-41ec766dccf0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-41ec766dccf0.json",
-          "sha256": "0d8446193696213099a95215514bc9f4f574568988111aaa33f5c66a9bf05f94"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1e114a451198",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-1e114a451198.json",
-          "sha256": "3de213dcb9a4fca4e0395e2136a430415845996ea202a3c17fbfbbe6bfa317a5"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b3bcdf9d8279",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-b3bcdf9d8279.json",
-          "sha256": "14acf2a69f55ebf2c353d684e3ff159ea106e873a418a5c2cab924208abefea6"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-df0d9277704f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-df0d9277704f.json",
-          "sha256": "dda11e37745c41bda5265cb99b77c4fa300d6cc20a917d2319a26aae525b775a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-562e8b0658b3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-562e8b0658b3.json",
-          "sha256": "27369a5e1493beb07ec8123d7f2ab06445ec95ea5be8f6d15f18575cfdad6424"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8d209d80fbcf",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-8d209d80fbcf.json",
-          "sha256": "55da77959ba8730564d4aff34e1a7c543feab78138d4bce710cc836d47b8531c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e51bb97bee71",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-e51bb97bee71.json",
-          "sha256": "1732e422f4cb650bbcb6237db11d3bf616af416ab23925a79716e1d0b12470ee"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-abc70dd04d17",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-966d75d07223/observation/blepharoplasty-and-blepharoptosis-repair-ca-abc70dd04d17.json",
-          "sha256": "b5cf13e13d772c21c7c4471d8d4ad9c0c7f7aa2ab7fb4155bbe6337777b6dcea"
-        }
-      ]
-    },
-    {
-      "caseName": "both requested, blepharoplasty-documentation missing -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "both-drop-blepharoplasty-documentation-unmet",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043.json",
-          "sha256": "3de736a612f6c013d8bcdc97174de4afe116e316b49341f64394f5fba4fe61b8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-ac6f8456e52f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-ac6f8456e52f.json",
-          "sha256": "13d288cc013b9940c03f65ad3e0d17686e51b6ba67fd4c96a2647311ff20b3a4"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f4b2f4815e2a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-f4b2f4815e2a.json",
-          "sha256": "a45e36144ec7c10b3932054693cef62b84723e8502217a37fb3045c8b1a65789"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4f7ed46f3b98",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-4f7ed46f3b98.json",
-          "sha256": "11495caa7961009f9eb6076bc138b3de58861560faa5ecd412e00b440f0e03b9"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2044d6654b5a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-2044d6654b5a.json",
-          "sha256": "2906c4caacafce739129af8c55f23acf242cabcfbcc1013ca910f3259444f06f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d3f51de0299d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-d3f51de0299d.json",
-          "sha256": "a99907951f11be9048fb01afbd7efaf9665740ce0259d0caabbf842f98c68694"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bded8b6ff963",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-bded8b6ff963.json",
-          "sha256": "ce438d94627b476d4594d5b1e1ea879f3bce1dc9e0db285b8dc0a35d23525a87"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6a168c5d162b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-6a168c5d162b.json",
-          "sha256": "9c6edee85e474c75e04d10b36520c342f85dd269469770bfe952902cec4c6e48"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9b09be416c0f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-9b09be416c0f.json",
-          "sha256": "e5b07b862aa6e4d4fc4bea781f8af00ba76cba7b4ab55cd8756e0a4c628bbb94"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-73a9a79a7733",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-73a9a79a7733.json",
-          "sha256": "cf8cece164c037afa2f79959d44dd881f477056c9f793168d7ff425fd2e35d2b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3eed46bf199d",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-3eed46bf199d.json",
-          "sha256": "be295e09864501b738fab05fee824fb6f22fe6f4e3ff1a48825d7b13634e51a3"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f85a28f50b51",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-3d4bb84f8043/observation/blepharoplasty-and-blepharoptosis-repair-ca-f85a28f50b51.json",
-          "sha256": "461045d00206f554f354cf17e2f93d0e476992e789e1d6f1028d5f04abb90c1f"
-        }
-      ]
-    },
-    {
-      "caseName": "both requested, ptosis-documentation missing -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "both-drop-ptosis-documentation-unmet",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc.json",
-          "sha256": "aa62fe3cc5dc2f2bae4fb29985ac90ce891fcca41a4beef97add82214ca0833b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9f108f07ede0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-9f108f07ede0.json",
-          "sha256": "eb4a52b0c4d11890666a8918de1908fe8061fd86f17f77a0f548bfe46a8a63db"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-3d6815692c36",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-3d6815692c36.json",
-          "sha256": "4ea40b33fbd2806daba924270b52af745b444e4f91bf08aa2db736de473cdcdd"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-33a432a8a344",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-33a432a8a344.json",
-          "sha256": "ba8951d3ba59852455f97de65466043adfcfdbc28ea702235c352765121143c0"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d3e13dcb937a",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-d3e13dcb937a.json",
-          "sha256": "1676a83e81b43dd4b3cc70998c2bfd3babd37a4147ff3aab04a7acd5607ecb65"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-667b299ec023",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-667b299ec023.json",
-          "sha256": "b8ea8f32af58c7dd559b0487845986cd135c4d1a85a2ec7a2ae944373822716f"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-095debbbae40",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-095debbbae40.json",
-          "sha256": "4ff5beedf4720cbe517eef036b1bc888f271c2bb996a92d66ab899e5216af4aa"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-a29ab83cf46b",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-a29ab83cf46b.json",
-          "sha256": "e7839013dc7ef339cf965f51d1334f368fdf7778ae3d57e78a4a784f60972b74"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6422e3bb8797",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-6422e3bb8797.json",
-          "sha256": "19c753746ba9bd1b44634a4111eb61bb73a7b13cd69638108b226004679d81d5"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-16bdc7ccc093",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-16bdc7ccc093.json",
-          "sha256": "db11bd75c19f8ea40a672d36652ea79c7c9086dcb5361ac22ab11ef0280d3644"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-7a392fd13d8f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-7a392fd13d8f.json",
-          "sha256": "ab786883de617e43ada8adfc32f36efa429de719c3226c86e2acaf91247962e8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-4d232dad2138",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-d7ab9d9eefbc/observation/blepharoplasty-and-blepharoptosis-repair-ca-4d232dad2138.json",
-          "sha256": "34e59660dbb794011d5d0a134969bb3be7eee8763b363fb6a1edbb13e2da41d8"
-        }
-      ]
-    },
-    {
-      "caseName": "neither procedure requested -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "neither-procedure-requested-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be/patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be.json",
-          "sha256": "608c5ca607a909a179f7b2dfccc7d20517bd1e2de4e95d5392d330c591097386"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-fda4823dc96f",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be/observation/blepharoplasty-and-blepharoptosis-repair-ca-fda4823dc96f.json",
-          "sha256": "d2c5cde2c9dc53118d2a57425e7ac049eb00bd4854224d52ccee16c63c17172c"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bc471584a2ae",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-15c758b517be/observation/blepharoplasty-and-blepharoptosis-repair-ca-bc471584a2ae.json",
-          "sha256": "589fbf001fe25df8630e071016d943a97dd1585dd4f2c1b1deb8732e4aaf9110"
-        }
-      ]
-    },
-    {
-      "caseName": "PINNED per customer flag 9e2927f3 (resolved, correct as encoded) - the prosthesis indication with its purpose and matching photograph but no listed complaint -> Unmet",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "prosthesis-indication-no-listed-complaint-unmet-mv",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc.json",
-          "sha256": "651bc728b51b576b5bf324eb654d74b52b42b437e14a356f091604a8b441bc2b"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-984d35e6e2d8",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-984d35e6e2d8.json",
-          "sha256": "07c4f68542eb683e80ab959793d0be11e35751fa55f71b4722085606eac48eeb"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-11c7868fc8c0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-11c7868fc8c0.json",
-          "sha256": "8c71a6afdce01af5932ba9190c26af629ad22dec4da96accefb0d9b4add1d73a"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c8b207511f33",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-c8b207511f33.json",
-          "sha256": "409b27d0dea3ee73e8790d6f70843c8b45a3883be9954b31790870e4f62fec43"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-6499212fa351",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-6499212fa351.json",
-          "sha256": "9763974bae53baf203ae56f66009f1f67149f69b2449533d57defe1d029faf65"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b9b917e2e013",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-b9b917e2e013.json",
-          "sha256": "66ce5a3c299ded5918a823ca6416c078e347a118731b23f79af3f93a69b77684"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-88f1828080a3",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-88f1828080a3.json",
-          "sha256": "64aac259d0e76ebd85a157eeb888b69482fd9867b925fc811cbf94ec2bcfffe8"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-e1210b4a28e0",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-e1210b4a28e0.json",
-          "sha256": "a6ffc9209bf43fa56fa0e868b2018be442530da0a64a31368317255d369507cb"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-be10b60c5b94",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-be10b60c5b94.json",
-          "sha256": "af64055e1fb456c2fbc02b6c3ed97211b75128991de21d96608725abb92858ba"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-19ddb16f3f25",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-9f10cc8dcabc/observation/blepharoplasty-and-blepharoptosis-repair-ca-19ddb16f3f25.json",
-          "sha256": "039ebf862765940d60cf43775a258865eb300bfcbd18cc62692b9f680521d9e7"
-        }
-      ]
-    },
-    {
-      "caseName": "cosmetic-makes-later-inputs-unnecessary",
-      "sourceFile": "src/cel/mv/medical-validation.cel",
-      "caseId": "cosmetic-makes-later-inputs-unnecessary",
-      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b",
-      "artifacts": [
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b",
-          "resourceType": "Patient",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b/patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b.json",
-          "sha256": "a4f838b48d18fb94438c0577638f47087ed93251aa4a3d2504dc069bf1dc4989"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c800a8fa5e21",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b/observation/blepharoplasty-and-blepharoptosis-repair-ca-c800a8fa5e21.json",
-          "sha256": "c292abff13509da75a81f548f50998e6197016f6c6d6083400e8b94d67a91aab"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-bf90b7d066ff",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b/observation/blepharoplasty-and-blepharoptosis-repair-ca-bf90b7d066ff.json",
-          "sha256": "508b13be48517c5a0fe2ee428948179a9236b12d67189366702bb2f288aad352"
-        },
-        {
-          "id": "blepharoplasty-and-blepharoptosis-repair-ca-489793d53641",
-          "resourceType": "Observation",
-          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-cf9fda09c11b/observation/blepharoplasty-and-blepharoptosis-repair-ca-489793d53641.json",
-          "sha256": "7157e78ac71b2bf4da0add43302dbc44256c560ae026374e6ad3796ceb701436"
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/observation/blepharoplasty-and-blepharoptosis-repair-ca-0dff648773bb.json",
+          "sha256": "3f08dae24f6495ac6754b42bb7a737cfe2efbd85f97bf279684cbbd797d64d8a"
         }
       ]
     }

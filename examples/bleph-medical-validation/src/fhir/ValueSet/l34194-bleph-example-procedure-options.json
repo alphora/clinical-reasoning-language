@@ -1,0 +1,66 @@
+{
+  "resourceType": "ValueSet",
+  "id": "l34194-bleph-example-procedure-options",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/ValueSet/l34194-bleph-example-procedure-options",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairProcedureOptions",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2025-10-16T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "compose": {
+    "include": [
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "concept": [
+          {
+            "code": "upper-blepharoplasty",
+            "display": "Upper blepharoplasty"
+          },
+          {
+            "code": "blepharoptosis-repair",
+            "display": "Blepharoptosis repair"
+          }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2025-10-16T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "upper-blepharoplasty",
+        "display": "Upper blepharoplasty"
+      },
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "blepharoptosis-repair",
+        "display": "Blepharoptosis repair"
+      }
+    ]
+  }
+}

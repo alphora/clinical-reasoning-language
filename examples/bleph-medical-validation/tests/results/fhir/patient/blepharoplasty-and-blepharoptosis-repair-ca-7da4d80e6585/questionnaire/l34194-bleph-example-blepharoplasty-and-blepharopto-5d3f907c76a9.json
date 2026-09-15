@@ -1,0 +1,106 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-5d3f907c76a9",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-library",
+      "valueCanonical": "http://example.org/crl/Library/L34194BlephExampleInterface"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+      "extension": [
+        {
+          "url": "name",
+          "valueCoding": {
+            "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+            "code": "patient",
+            "display": "Patient"
+          }
+        },
+        {
+          "url": "type",
+          "valueCode": "Patient"
+        }
+      ]
+    }
+  ],
+  "url": "http://example.org/crl/Questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-8808a421597f-blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585",
+  "version": "0.0.0-blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585",
+  "status": "active",
+  "item": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+          "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose"
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.subject"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.subject"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.effective[x]"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.authored"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+          "valueExpression": {
+            "name": "CosmeticSurgicalPurpose",
+            "language": "text/cql-identifier",
+            "expression": "Cosmetic Surgical Purpose",
+            "reference": "http://example.org/crl/Library/L34194BlephExampleInferences"
+          }
+        }
+      ],
+      "linkId": "1",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose",
+      "text": "Is this procedure solely cosmetic, with no functional benefit?",
+      "type": "group",
+      "required": false,
+      "repeats": false,
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/cql-expression",
+                "expression": "%CosmeticSurgicalPurpose.value"
+              }
+            }
+          ],
+          "linkId": "1.1",
+          "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.value[x]",
+          "text": "Cosmetic Surgical Purpose",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        }
+      ]
+    }
+  ]
+}

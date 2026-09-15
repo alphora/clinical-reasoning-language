@@ -1,0 +1,84 @@
+{
+  "resourceType": "ValueSet",
+  "id": "l34194-bleph-example-functional-complaint-options",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/ValueSet/l34194-bleph-example-functional-complaint-options",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairFunctionalComplaintOptions",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2025-10-16T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "compose": {
+    "include": [
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "concept": [
+          {
+            "code": "reading",
+            "display": "Visual interference affecting reading"
+          },
+          {
+            "code": "driving",
+            "display": "Visual interference affecting driving"
+          },
+          {
+            "code": "other-daily-activity",
+            "display": "Another daily activity affected by the eyelid-related visual deficit"
+          },
+          {
+            "code": "none",
+            "display": "No documented functional deficit affecting daily activities"
+          }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2025-10-16T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "reading",
+        "display": "Visual interference affecting reading"
+      },
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "driving",
+        "display": "Visual interference affecting driving"
+      },
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "other-daily-activity",
+        "display": "Another daily activity affected by the eyelid-related visual deficit"
+      },
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "none",
+        "display": "No documented functional deficit affecting daily activities"
+      }
+    ]
+  }
+}

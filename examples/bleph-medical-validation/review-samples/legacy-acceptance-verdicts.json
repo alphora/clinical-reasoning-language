@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "byCaseId": {
+    "cosmetic-outranks-documented-unmet": "pass",
+    "cosmetic-both-procedures-unmet": "pass"
+  }
+}

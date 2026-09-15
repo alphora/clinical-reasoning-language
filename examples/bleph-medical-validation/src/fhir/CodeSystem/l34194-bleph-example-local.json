@@ -1,0 +1,69 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "l34194-bleph-example-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/CodeSystem/l34194-bleph-example-local",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairLocal",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2025-10-16T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "procedure-under-review",
+      "display": "Procedure Under Review"
+    },
+    {
+      "code": "solely-cosmetic-without-functional-benefit",
+      "display": "Cosmetic Surgical Purpose"
+    },
+    {
+      "code": "functional-complaint-affecting-daily-activities",
+      "display": "Documented Patient Complaint"
+    },
+    {
+      "code": "individual-procedure-necessity-documented",
+      "display": "Individual Procedure Necessity Documented"
+    },
+    {
+      "code": "upper-eyelid-skin-finding",
+      "display": "Upper Eyelid Skin Finding"
+    },
+    {
+      "code": "true-mrd-at-most-2-mm-with-relaxed-brows",
+      "display": "Ptosis Margin Requirement Met"
+    },
+    {
+      "code": "upper-blepharoplasty-photographs-documented",
+      "display": "Upper Blepharoplasty Photographs Documented"
+    },
+    {
+      "code": "ptosis-photographs-documented",
+      "display": "Ptosis Photographs Documented"
+    }
+  ]
+}

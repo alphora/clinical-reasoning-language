@@ -1,12 +1,12 @@
 {
-  "name": "mcpm-bleph",
+  "name": "l34194-bleph-example",
   "version": "0.0.0",
   "private": true,
   "crl": {
     "name": "Blepharoplasty And Blepharoptosis Repair",
     "version": "1.0.0",
-    "date": "2020-08-01",
-    "canonicalBase": "http://iehp.org/crl",
+    "date": "2025-10-16",
+    "canonicalBase": "http://example.org/crl",
     "sharedLibraries": [
       "Medical Policy Determination"
     ],

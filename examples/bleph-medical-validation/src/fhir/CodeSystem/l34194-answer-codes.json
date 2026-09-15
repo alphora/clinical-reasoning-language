@@ -1,0 +1,73 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "l34194-answer-codes",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+  "version": "0.0.0",
+  "name": "L34194AnswerCodes",
+  "title": "l34194-answer-codes",
+  "description": "l34194-answer-codes",
+  "status": "draft",
+  "experimental": true,
+  "publisher": "unknown",
+  "date": "2025-10-16T00:00:00.000Z",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "blepharoptosis-repair",
+      "display": "Blepharoptosis repair"
+    },
+    {
+      "code": "driving",
+      "display": "Visual interference affecting driving"
+    },
+    {
+      "code": "medial-lateral-obstruction",
+      "display": "Medial or lateral redundant tissue obscures the corresponding line of sight"
+    },
+    {
+      "code": "neither",
+      "display": "Neither qualifying skin finding is present"
+    },
+    {
+      "code": "none",
+      "display": "No documented functional deficit affecting daily activities"
+    },
+    {
+      "code": "other-daily-activity",
+      "display": "Another daily activity affected by the eyelid-related visual deficit"
+    },
+    {
+      "code": "pseudo-mrd-at-most-2-mm",
+      "display": "Overhanging skin causes pseudo-MRD of 2.0 mm or less"
+    },
+    {
+      "code": "reading",
+      "display": "Visual interference affecting reading"
+    },
+    {
+      "code": "upper-blepharoplasty",
+      "display": "Upper blepharoplasty"
+    }
+  ]
+}

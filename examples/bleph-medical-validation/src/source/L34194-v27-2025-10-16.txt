@@ -1,0 +1,97 @@
+# L34194 — Blepharoplasty, Eyelid Surgery, and Brow Lift
+CMS MCD version 27; Noridian; revision effective 2025-10-16.
+Plain-text extraction of named policy sections; original HTML is preserved alongside.
+
+## National coverage policy [lblCmsNationalCoveragePolicy]
+Title XVIII of the Social Security Act, §1862(a)(1)(A) allows coverage and payment for only those services that are considered to be medically reasonable and necessary for the diagnosis or treatment of illness or injury or to improve the functioning of a malformed body member.
+Title XVIII of the Social Security Act, §1833(e), prohibits Medicare payment for any claim, which lacks the necessary information to process the claim.
+Title XVIII of the Social Security Act, §1862(a)(10), prohibits payment for cosmetic surgery; procedures performed only to approve appearances without a functional benefit are not covered by Medicare, except as required for the prompt repair of accidental injury or for improvement of the functioning of a malformed body member.
+CMS Manual System, Pub. 100-02, Medicare Benefit Policy Manual, Chapter 16, §20, Services not reasonable and necessary.
+CMS Manual System, Pub. 100-02, Medicare Benefit Policy Manual, Chapter 16, §120, Cosmetic Surgery.
+
+## Coverage indications, limitations and medical necessity [lblCoverageIndication]
+Introductory Definitions
+Dermatochalasis: excess skin with loss of elasticity that is usually the result of the aging process.
+Blepharochalasis: excess skin associated with chronic recurrent eyelid edema that physically stretches the skin.
+Blepharoptosis: drooping of the upper eyelid related to the position of the eyelid margin with respect to the visual axis
+Pseudoptosis (“false ptosis”): For the purposes of this policy, the specific circumstance where the eyelid margin is in an appropriate anatomic position with respect to the visual axis but the amount of excessive skin from dermatochalasis or blepharochalasis is so great as to overhang the eyelid margin so as to become a “pseudo” lid margin. [Note: other causes of pseudoptosis are not the subject of this policy unless specifically referenced.]
+Brow ptosis: drooping of the eyebrows to such an extent that excess tissue is pushed into the upper eyelid that may cause mechanical blepharoptosis and/or dermatochalasis
+Blepharoplasty: removal of eyelid skin, fat, and or muscle
+Blepharoptosis repair: restoring the eyelid margin to its normal anatomic position.
+Brow ptosis repair: restoring the eyebrow tissues to their normal anatomic position.
+Upper Blepharoplasty, Blepharoptosis Repair, and Brow Ptosis Repair (Brow Lift)
+Blepharoplasty, blepharoptosis repair, and brow ptosis repair (brow lift) are surgeries that may be functional (i.e., to improve abnormal function) and therefore reasonable and necessary, or cosmetic (i.e., to enhance appearance).
+For the purposes of this policy, these surgeries (either individually or in the minimum combination required to achieve a satisfactory surgical outcome) are functional when overhanging skin or upper lid position secondary to dermatochalasis, blepharochalasis, blepharoptosis, or pseudoptosis is sufficiently low to produce a visually-significant field restriction considered by this policy to be approximately 30 degrees or less from fixation. Published literature correlates this amount of field restriction with a Margin Reflex Distance (see below) of 2.0 mm or less.
+This policy is not intended to cover reconstructive surgery, which is done to improve function or approximate a normal appearance in circumstances of congenital defects, developmental abnormalities, trauma, infection, tumors, or diseases not specifically referenced as included. Examples of such surgeries are (but not limited to):
+- ectropion or entropion repairs.
+- repairs to address ocular exposure.
+- repairs to address difficulty fitting an ocular prosthesis
+- primary essential idiopathic blepharospasm (uncontrollable spasms of the periorbital muscles) that is debilitating for which all other treatments have failed or are contraindicated.
+- prompt repair of an accidental injury
+Note, however, the fact that this policy excludes reconstructive surgery does not relieve the physician of the obligation to document in the medical record reasonable evidence defending the medical necessity of a given procedure, including but not limited to an appropriate patient complaint that would impact their ability to perform tasks of daily living (or, in the absence of a specific complaint, a statement that the repair is needed to prevent anticipated future damage to ocular structures), an appropriate physical exam delineating the anatomical issues to be addressed, appropriate supplemental testing, appropriate photographic documentation clearly demonstrating to a qualified third-party the anatomical issues to be addressed, and appropriate operative notes and consents.
+Lower Eyelid Blepharoplasty
+Lower eyelid blepharoplasty is almost never functional in nature and is considered a non-covered procedure under this policy. Appeals to this statement may be considered on a case-by-case basis.
+Coverage when a Noncovered Procedure is Performed with a Covered Procedure
+When a noncovered cosmetic surgical procedure is performed in the same operative session as a covered surgical procedure, benefits will be provided for the covered procedure only. For example, if dermatochalasis would be resolved sufficiently by brow ptosis repair alone, an upper lid blepharoplasty in addition would be considered cosmetic. Similarly, if a visual field deficit would be resolved sufficiently by upper lid blepharoplasty alone (for tissue hanging over the lid margin), a blepharoptosis repair in addition would be considered cosmetic.
+Documentation Requirements
+Reasonably complete information fulfilling the criteria in Section A (Patient Complaints and Physical Signs), and Section B (Photographs) as delineated below must be adequately documented in the patient’s medical records to demonstrate the reasonableness and necessity of the procedure(s) performed.
+In general and where applicable, clinical notes, and physical findings rather than formal visual field testing, should support a decrease in the superior field of vision and/or peripheral vision. While they may be performed to demonstrate to the patient (if needed) the potential for improvement, or if required by the prevailing standard of care, this policy does not consider the visual field testing in documenting a procedure as reasonable and necessary. Exceptions may be considered on appeal (see below).
+If two (or more) surgeries are planned, each must be individually documented. This may (sometimes, but not necessarily) require multiple sets of photographs.
+The medical record should also clearly indicate a statement that the patient desires surgical correction, that the risks, benefits, and alternatives have been explained, and that a reasonable expectation exists that the surgery will significantly improve functional status of the patient.
+When requested documentation does not meet the criteria for the service rendered or the documentation does not establish the medical necessity for the services, (i.e., illegible or incomplete) such services will be denied as not reasonable and necessary.
+Section A. Patient Complaints and Physical Signs
+A functional deficit or disturbance secondary to eyelid and/or brow abnormalities must be documented, such as interference with vision or visual field that impacts an activity of daily living (such as difficulty reading or driving).
+In addition, the documentation should show that the eye being considered for surgery has physical signs consistent with the functional deficit or abnormality.
+For Blepharoptosis Repair
+- A margin reflex distance (MRD sometimes referred to as MRD1)) of 2.0 mm or less. The MRD is a measurement from the corneal light reflex to the upper eyelid margin (NOT any overhanging skin
+that may be present causing pseudoptosis) with the brows relaxed, and
+- If applicable, the presence of Herring's effect (related to equal innervation to both upper eyelids) defending bilateral surgery when only the more ptotic eye clearly meets the MRD criteria (i.e., if lifting the more ptotic lid with tape or by instillation of phenylephrine drops into the superior fornix causes the less ptotic lid to drop downward and meet the strict criteria, the less ptotic lid is also a candidate for surgical correction.
+For Upper Blepharoplasty and/or Brow Ptosis Repair:
+- Redundant eyelid tissue hanging over the eyelid margin resulting in pseudoptosis where the “pseudo” margin produces a central "pseudo-MRD" of 2.0 mm or less, or
+- Redundant eyelid tissue predominantly medially or laterally that clearly obscures the line of sight in corresponding gaze.
+In the expected to be rare circumstance where a patient would fail the MRD criterion for a given surgery but the provider feels that visual field testing would, despite that fact, support performance of surgery for a functional reason, this can be considered on appeal.
+If an anatomic abnormality of the eye (such as an eccentric or elongated pupil) makes the MRD either difficult to establish or meaningless for this purpose, it is expected the surgeon will include a statement outlining his or her rationale that an equivalent standard has been met.
+Section B Photographs
+Photographs are required to support upper eyelid surgery as reasonable and necessary.
+The “physical signs” documented in Section A must be clearly represented in photographs of the structures of interest and the photographs must be of good quality and of sufficient size and detail as to make those structures easily recognizable.
+The patient’s head and the camera must be in parallel planes, not tilted so as not to distort the appearance of any relevant finding (e.g., a downward head tilt might artificially reduce the apparent measurement of a MRD).
+Unless medial/lateral gaze is required to demonstrate a specific deficit, photos should be with gaze in the primary position, looking straight ahead.
+Oblique photos are only necessary if needed to better demonstrate a finding not clearly shown by other requested photos.
+Digital or film photographs are acceptable, and may be submitted electronically where possible. Photographs must be identified with the beneficiary’s name and the date.
+For Blepharoptosis Repair
+- Photographs of both eyelids in the frontal (straight-ahead) position should demonstrate the MRD outlined in Section A. If the eyelid obstructs the pupil, there is a clear-cut indication for surgery. (For reference, the colored part of the eye is about 11 mm in diameter, so the distance between the light reflex and the lid would need to be about one fifth that distance or less for the MRD to be 2.0 mm or less.)
+- In the special case of documenting the need for bilateral surgery because of Herring’s law, two photos are needed:One showing both eyes of the patient at rest demonstrating the above MRD criterion in the more ptotic eye, and another showing both eyes of the patient with the more ptotic eyelid raised to a height restoring a normal visual field, resulting in increased ptosis (meeting the above MRD standard) in the less ptotic eye.
+NOTE: Reviewers will assume the accepted average of 11 mm of corneal diameter to assess measurements in photographs. If a patient’s corneal diameter deviates from this by more than 0.5 mm, this should be clearly documented in the record so appropriate adjustments can be made. Alternatively, an accurate millimeter rule can be taped along the brow, on the cheek, or elsewhere in the photo (approximately in the corneal plane) to facilitate such measurements.
+For Upper Lid Blepharoplasty
+- Photographs of the affected eyelid(s) in both frontal (straight ahead) and lateral (from the side) positions demonstrate the physical signs in Section A. Oblique photos are only necessary if needed to better demonstrate a finding not clearly shown by frontal and lateral photos.
+For Brow Ptosis Repair
+- One frontal (straight ahead) photograph should document drooping of a brow or brows and the appropriate other criteria in Section A. If the goal of the procedure is improvement of dermatochalasis, a second photograph should document such improvement by manual elevation of brow(s). If a single frontal photograph that includes the brow(s) would render other structures too small to evaluate, additional (overlapping to the degree possible) photos should be taken of needed structures to ensure all required criteria can be reasonably demonstrated and evaluated.
+NOTE: If both a blepharoplasty and a ptosis repair are planned, both must be individually documented. This may (sometimes, but not necessarily) require two sets of photographs: showing a pseudo-MRD of 2.0 mm or less secondary to the redundant skin (and its correction by taping), AND an MRD of 2.0 mm or less secondary to the blepharoptosis.
+
+## Associated information / Other requirements [lblAssociatedInformation]
+Other requirements
+The medical record documentation must support the medical necessity of the services as directed in this policy.
+All documentation must be maintained in the patient’s medical record and available to the contractor upon request.
+Every page of the record must be legible and include appropriate patient identification information (e.g., complete name, dates of service(s)).
+Documentation must support CMS ‘signature requirements’ as described in the Medicare Program Integrity Manual (Pub. 100-08), Chapter 3.
+A pre-operative exam and operative report must be available.
+The submitted medical record must support the use of the selected ICD10-CM code(s). The submitted CPT/HCPCS code must describe the service performed.
+
+## Sources of information [lblSourcesOfInformation]
+1. Ho SF, Morawski A, Sampath R and Burns J. Modified visual field test for ptosis surgery (Leicester Peripheral Field Test). Eye. 2011; 25:365–369; doi:10.1038/eye.2010.210
+2. Cetinkaya Am Kersten RC. Surgical Outcomes in Patients with Bilateral Ptosis and Hering's Dependence. Ophthalmology. Feb 2012; 119(2);376-81.
+3. Rogers AG, Khan-Lim D, Manners, RM. Does Upper Lid Blepharoplasty Improve Contrast Sensitivity? Ophthal Plast Reconstr Surg. 2012;28(3):163-5.
+4. Federici T, Meyer DR, Lininger LL. Correlation of the vision-related functional impairment associated with blepharoptosis and the impact of blepharoptosis surgery. Ophthalmology. 1999;106:1705–1712
+5. American Society of Ophthalmic Plastic and Reconstructive Surgery, Functional Ptosis Repair Position Statement, 2006
+In addition to the 30 degree standard, the ASOPRS policy also allows “A difference of at least 12 degrees between the resting field and the field performed with manual elevation of the eyelid margin."
+6. Small R, Sabates NR, Burrows D. The measurement and definition of ptosis. Ophthal Plast Reconstr Surg. 1989;5 (3:171–175)
+7.Cahill KV, Bradley EA, Meyer DR, Custer PL, Holck DE, Marcet MM, Mawn LA. Functional Indications for Upper Eyelid Ptosis and Blepharoplasty Surgery. A Report by the American Academy of Ophthalmology. Ophthalmology, 2011; 118:2510-2517.
+
+## Related local coverage documents [lblRelatedLocal]
+Articles
+A57190 - Billing and Coding: Blepharoplasty, Eyelid Surgery, and Brow Lift
+
+## Related national coverage documents [lblRelatedNational]
+NCDs
+N/A
+

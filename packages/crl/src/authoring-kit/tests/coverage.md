@@ -1,5 +1,47 @@
 # Kit evidence ledger
 
+## Maintenance — L34194 example and criterion border
+
+Baseline: `9208fe17c46ad0c9480c7a9d6df8e0e24ac72255` (last completed audit).
+Reviewed target: pending the source commits and separate metadata stamp.
+Kit schema remains `2.4`; content hash remains
+`4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`.
+The complete changed-path inventory is [maintenance-l34194-paths.txt](maintenance-l34194-paths.txt).
+This is a bounded maintenance delta, not a new full test census or a clinical certification.
+
+| Changed assertion, input, or implementation | Disposition and evidence limits |
+| --- | --- |
+| `examples/bleph-medical-validation/src/{source,refined-source,anchor-source,provenance}/**`; README | **Existing guidance sufficient**, source fidelity and verification. Versioned L34194 v27/R7 source, structured refinement, canonical DOCX-derived anchor and source attribution accompany a light ordinary upper-blepharoplasty/ptosis example. Scope is one procedure/eye per assessment. Strict final provenance passes with explicit scope waivers. This is source attribution and bounded review, not complete LCD implementation or human MV sign-off. |
+| Example CRL, CEL and configured package; `mvWorkspaceFixture.test.mjs`, “L34194 cases select the correct procedure evidence and preserve unanswered states” (`@kit mv-case-authoring:l34194-example`) | **Existing guidance sufficient**, `mv-case-authoring`, `cel-cases`, `named-answer-options`, `criterion`, `guard-or-vs-sibling-or`. Actual example uses eight answerable inputs, three criteria, shared cosmetic/functional checks and procedure-specific findings/photos. The owning test runs 16 MV plus30 regression controls, asserts46 passes/14 expected pauses, both positive evidence routes and a closed two-code procedure domain. Earlier unknown gates pause before later negative evidence; a false conjunction operand can determine its own criterion despite an unknown sibling. These are authored sequencing choices, not a language change or a guarantee of native question suppression. |
+| Same owner, “the policy shares common checks before selecting procedure-specific evidence” (`@kit branch-guards:l34194-shared-checks`) | **Existing guidance sufficient**, `branch-guards`, `guard-or-vs-sibling-or`. Exact emitted PlanDefinition requires one occurrence of each guard, procedure evidence under the common gate, both applicability conditions and correct negations on the common/otherwise branches, and no Coalesce. Assertions also pin the shared rejection's source union and four MV references. CRE rows cover cosmetic exclusion with otherwise qualifying evidence, rejection before procedure selection, false/unknown common operands, and earlier unanswered gates. Structural assertions do not alone prove execution. |
+| Same owner, “procedure selection uses recency and rejects ambiguous or unrecognized answers” | **Existing guidance sufficient**, selected-publication identity/selection. Actual graph mutations test a newer ptosis answer, tied different answers and a foreign code. CRE accepts the newer value and refuses ambiguous/invalid selection without an activity. Native coverage comes from the authored CEL controls, not these in-memory mutations. |
+| Example `src/{cql,fhir}/**`, `tests/{data,results}/**`; same owner, “the Bleph MV example is discoverable and its native forms match its MV cases”, “the L34194 native delivery stays bound to its source snapshot and emitted patient data”, “the Bleph example includes the complete matching FHIR definition set” | **Existing guidance sufficient**, `verify-loop` and `mv-case-authoring`. Eight CQL files and26 FHIR definitions match actual two-lane emission. Sixteen native Q/QR pairs have correct suite membership, output hashes, installed CRL5.4.2 provenance and pinned engine identity; normalized source/config and emitted patient resources are bound by assertions. Fresh native execution separately passed all46 cases, including14 pauses, with exact disposition/route and typed answer comparisons. Evidence consists of45 cases plus one added cosmetic-precedence probe with byte-identical emitted FHIR/CQL. This is concrete example evidence, not universal emitter conformance. |
+| Same owner, debugger/workspace test and demonstration flag/review test; example review samples and MV flags | **Not author-facing language semantics.** Workspace entry remains runnable; a labeled KE flag exercises inspection/resolution, while saved verdict samples remain outside active MV state. No human approval was synthesized. Frozen acceptance fixture and unrelated working-tree files are outside this change. |
+| `crl-vscode/src/flowPaneHtml.ts` | **Not author-facing language semantics.** Remove the expanded criterion header's transparent stroke override so its neutral border remains. Existing selected-path treatment is unchanged. All92 existing tree-rendering tests and extension build/typecheck pass. This is the operator's visual tweak; it needs no new behavior suite. |
+| Prior audit/coverage finalization and root/core/extension versions plus lockfile | **Not author-facing semantics.** Baseline-to-HEAD delta inspected: prior metadata stamp and5.4.2 version changes only; no dependency or kit content change. |
+
+Two new owning tags are listed above; no existing tags removed or changed.
+All eight fixture tests are dispositioned, including unchanged workspace coverage.
+No grammar, compiler, runtime, MCP contract, kit teaching or reference artifact changed.
+Existing kit proof tiers remain intact. The delivered kit does not embed this example's source.
+
+Review: substantive source plan/code covered in rounds763–768; final767/768
+native reviews0critical/0important/0nit. External767 incomplete; external768
+completed1critical/5important/3nits plus scope note. Lead dispositions Accept4,
+Refine5, Reject1 after verifying findings; ordered partial-data behavior retained,
+precedence/guard/provenance assertions added, scope rationale clarified. No unrun
+re-review claimed. Mechanical border and evidence-record edits need no new panel.
+Validation: all46 CRE/native cases,16 native form pairs,8 focused fixture tests,
+strict provenance,92 tree tests, core/extension builds and typechecks pass.
+Installed5.4.2 MV verified both procedure routes and their six questions, separate
+Result Questionnaire and populated saved FHIR form. Kit retrieval/export identity
+matches schema2.4/hash4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff
+in the actual MCP full response; all188 kit/reference/retrieval/export tests pass.
+The connected installed MCP carries its earlier audit metadata; it is not upgraded
+by this source commit. Export identity is checked again after the metadata stamp.
+Staged authored/generated text passes whitespace checks with CRLF accepted;
+downloaded CMS source whitespace is retained verbatim and excluded from that check.
+
 ## Maintenance — MV result order and runnable Bleph workspace (5.4.2)
 
 Baseline: `badef3ce5f10c1a5d09e657371ced6c7576392e4` (last completed kit audit).

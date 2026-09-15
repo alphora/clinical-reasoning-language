@@ -1,0 +1,25 @@
+{
+  "documentId": "L34194",
+  "title": "Blepharoplasty, Eyelid Surgery, and Brow Lift",
+  "publisher": "Noridian Healthcare Solutions, LLC via CMS Medicare Coverage Database",
+  "mcdVersion": 27,
+  "revision": "R7",
+  "revisionEffectiveDate": "2025-10-16",
+  "cmsUpdatedOn": "2025-10-08",
+  "retrievedAtUtc": "2026-09-15T06:24:55.847195+00:00",
+  "sourceUrl": "https://www.cms.gov/medicare-coverage-database/view/lcd.aspx?lcdid=34194&ver=27",
+  "originalHtml": "L34194-v27-2025-10-16.html",
+  "originalHtmlSha256": "872c0aed9b7ce77c482e4b06e4518fea80cf8ff85b5960bf4cde9df8f60c5006",
+  "textExtract": "L34194-v27-2025-10-16.txt",
+  "textExtractSha256": "3d409436513396ae6851d40960ebabc4d896ba5abac728712a87ba71e002f41d",
+  "extractedHtmlIds": [
+    "lblCmsNationalCoveragePolicy",
+    "lblCoverageIndication",
+    "lblAssociatedInformation",
+    "lblSourcesOfInformation",
+    "lblRelatedLocal",
+    "lblRelatedNational"
+  ],
+  "extraction": "HTMLParser text from named HTML elements; whitespace normalized; links retained in original HTML. Not the existing MV anchor-source.",
+  "relatedArticleUrl": "https://www.cms.gov/medicare-coverage-database/view/article.aspx?articleId=57190&ver=11"
+}

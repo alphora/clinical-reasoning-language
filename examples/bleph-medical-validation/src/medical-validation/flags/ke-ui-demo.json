@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "ke-ui-demo",
+  "category": "extraction",
+  "tag": "customer-confirmable",
+  "gist": "UI test: inspect the read-only KE flag",
+  "description": "Demonstration flag added at the operator's request to test Medical Validation controls. This is not a clinical finding. Only the KE marker should be yellow while open. Medical Validation may inspect and resolve this authoring flag, but cannot edit its content or delete it.",
+  "status": "open",
+  "fields": {},
+  "anchor": {
+    "scope": "concept",
+    "name": "Cosmetic Surgical Purpose",
+    "library": "Blepharoplasty And Blepharoptosis Repair",
+    "label": "Cosmetic Surgical Purpose"
+  },
+  "createdAt": "2026-09-13T00:00:00.000Z"
+}
