@@ -3,9 +3,9 @@
 ## Maintenance — MV result order and runnable Bleph workspace (5.4.2)
 
 Baseline: `badef3ce5f10c1a5d09e657371ced6c7576392e4` (last completed kit audit).
-Reviewed implementation target: `d3492ccb0302d33b47f264b957d96e5e5ccaab56`. This maintenance preserves kit schema
+Reviewed implementation target: `9208fe17c46ad0c9480c7a9d6df8e0e24ac72255`. This maintenance preserves kit schema
 `2.4` and content hash `4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`.
-The following metadata commit supplies the resolved target in the audit stamp.
+Finalized by the separate metadata stamp; kit teaching and content identity are unchanged.
 
 | Changed assertions, inputs, and implementation | Disposition and evidence limits |
 | --- | --- |
