@@ -3,7 +3,8 @@
 ## Maintenance — L34194 example and criterion border
 
 Baseline: `9208fe17c46ad0c9480c7a9d6df8e0e24ac72255` (last completed audit).
-Reviewed target: pending the source commits and separate metadata stamp.
+Reviewed target: `85e11736c904729710a0839befdda0f0fdf12b3c`.
+Finalized in a separate metadata stamp after the example and UI commits.
 Kit schema remains `2.4`; content hash remains
 `4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff`.
 The complete changed-path inventory is [maintenance-l34194-paths.txt](maintenance-l34194-paths.txt).
