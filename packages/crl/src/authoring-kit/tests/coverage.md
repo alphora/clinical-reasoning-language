@@ -2,7 +2,7 @@
 
 ## Maintenance - public MCP guidance and delivery pins
 
-Baseline: `d9a4115593064d2cd5e406a8f6199c3ebca93398` (reviewed kit2.5 content). Target: pending the guidance commit below.
+Baseline: `d9a4115593064d2cd5e406a8f6199c3ebca93398` (reviewed kit2.5 content). Reviewed target: `6e861e1a77cfa6c4cf8f0a6495ccfd1171bf0722`; finalized in the separate metadata stamp.
 Kit remains schema2.5/hash90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96.
 All subsequent paths inspected: the prior audit/ledger stamp is metadata-only; the maintenance inventory rename reflects the selected6.0.0 release number.
 `mcp/server.ts` generate_provenance description now matches verify-loop's actual reached-pause evidence rule. Existing guidance is sufficient; this corrects a stale delivery copy, not runtime semantics. The core tools/list contract rejects both stale blanket no-action exclusions and requires actual evaluated-unknown evidence. Its new assertion failed against the old bundle and the complete MCP integration test now passes against the corrected one.
