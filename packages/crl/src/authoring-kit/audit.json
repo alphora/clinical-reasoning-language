@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "85e11736c904729710a0839befdda0f0fdf12b3c",
-  "auditedSchemaVersion": "2.4",
-  "auditedContentHash": "4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff",
-  "scope": "Kit schema 2.4 maintenance from 9208fe17c46ad0c9480c7a9d6df8e0e24ac72255 through 85e11736c904729710a0839befdda0f0fdf12b3c. Complete delta reviewed: L34194 light Bleph example with source/provenance, 16 MV cases and 30 regression controls, matching CQL/FHIR/native forms, fixture assertions and expanded criterion header borders; intervening release/audit metadata also inspected. Existing guidance suffices; no language, compiler, runtime, dependency or kit teaching change. Reviews763-768 and the coverage ledger record bounded findings and dispositions. All46 CRE/native cases pass, including14 pauses; 16 native Q/QR pairs, strict provenance, 8 fixture tests, 92 tree tests, 188 kit tests and builds/typechecks pass. Actual MCP full content matches the unchanged kit hash, with installed audit metadata distinguished from source. Native evidence is scoped to these example cases; no complete LCD conformance or human clinical approval is asserted.",
+  "auditedRevision": "d9a4115593064d2cd5e406a8f6199c3ebca93398",
+  "auditedSchemaVersion": "2.5",
+  "auditedContentHash": "90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96",
+  "scope": "Kit schema 2.5 maintenance from 85e11736c904729710a0839befdda0f0fdf12b3c through d9a4115593064d2cd5e406a8f6199c3ebca93398. Complete changed-path delta reviewed: native UTF-8, owned process cleanup, bounded timeout and compatible failed-case retry; actual reached-pause correspondence and authoritative stable-ID flags; extension packaging/placement, CLI/MCP and metadata guidance. Five owning tags added, none removed. Reviews770-777 converged on the native arm; external review unavailable after automatic approval rejection. Owning tests, actual native timeout/retry/UTF-8/process and pause answer/clear evidence, browser placement and both built MCP entry points support the bounded claims recorded in the ledger. No new grammar, native selected-publication delegation support, clinical certification or automatic flag migration is asserted. Installed delivery remains a release gate.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

@@ -3,7 +3,7 @@
 ## Maintenance - native reliability, pause correspondence and stable concept flags
 
 Baseline: `85e11736c904729710a0839befdda0f0fdf12b3c`.
-Reviewed target: pending this content commit; finalized in the separate metadata stamp.
+Reviewed target: `d9a4115593064d2cd5e406a8f6199c3ebca93398`; finalized in this separate metadata stamp.
 Kit schema: `2.5`; content hash: `90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96`.
 Complete changed-path inventory: [maintenance-5.5.0-paths.txt](maintenance-5.5.0-paths.txt).
 The intervening 82443d8b audit/ledger delta was inspected and is metadata-only.
