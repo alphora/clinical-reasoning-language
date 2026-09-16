@@ -19,15 +19,7 @@ export const APPLY_OPERATION = "applyR5" as const;
 export interface JvmBounds {
   /** Max heap. A cap is mandatory: the crash that motivated this contract was an unbounded heap. */
   maxHeapMb: number;
-  /**
-   * WHOLE-BATCH wall timeout in ms.
-   *
-   * ⚠ THERE IS DELIBERATELY NO PER-CASE TIMEOUT. A hung case cannot be reliably interrupted inside a
-   * shared JVM — `Future.cancel` does not stop CQL/HAPI computation — so process-tree kill is the only
-   * real enforcement, and it necessarily takes the rest of the batch with it. Pretending to offer a
-   * per-case timeout would be a contract we cannot honour; the manifest expresses the consequence
-   * instead (`timeout` for the offender, `not-run` for everything unreached).
-   */
+  /** Per-case wall timeout in ms. Historical property name retained for callers. */
   batchTimeoutMs: number;
   /** Max bytes retained from each of stdout/stderr. Beyond this the TAIL is kept — errors land last. */
   maxCapturedBytes: number;
@@ -108,11 +100,7 @@ export function parseJavaMajor(versionOutput: string): number | undefined {
  * and version rather than falling through silently, because "no Java found" would be a lie that sends a
  * KE to install a second copy.
  */
-export function resolveJava(
-  env: NodeJS.ProcessEnv,
-  isWindows: boolean,
-  probe: (javaExe: string) => string | undefined,
-): JavaResolution {
+function javaCandidates(env: NodeJS.ProcessEnv, isWindows: boolean) {
   const exe = isWindows ? "java.exe" : "java";
   const candidates: { javaExe: string; source: "JAVA_HOME" | "PATH" }[] = [];
   const home = env.JAVA_HOME?.trim();
@@ -125,9 +113,36 @@ export function resolveJava(
     const c = path.join(dir, exe);
     if (existsSync(c)) candidates.push({ javaExe: c, source: "PATH" });
   }
+  return candidates;
+}
+
+export function resolveJava(
+  env: NodeJS.ProcessEnv,
+  isWindows: boolean,
+  probe: (javaExe: string) => string | undefined,
+): JavaResolution {
+  const candidates = javaCandidates(env, isWindows);
   let tooOld: { javaExe: string; major: number } | undefined;
   for (const c of candidates) {
     const major = parseJavaMajor(probe(c.javaExe) ?? "");
+    if (major === undefined) continue;
+    if (major >= MIN_JAVA_MAJOR) return { ok: true, ...c, major };
+    tooOld ??= { javaExe: c.javaExe, major };
+  }
+  if (tooOld) return { ok: false, reason: "too-old", ...tooOld, required: MIN_JAVA_MAJOR };
+  return { ok: false, reason: "not-found" };
+}
+
+/** Async discovery for bounded native execution; synchronous API remains available. */
+export async function resolveJavaAsync(
+  env: NodeJS.ProcessEnv,
+  isWindows: boolean,
+  probe: (javaExe: string) => Promise<string | undefined>,
+): Promise<JavaResolution> {
+  const candidates = javaCandidates(env, isWindows);
+  let tooOld: { javaExe: string; major: number } | undefined;
+  for (const c of candidates) {
+    const major = parseJavaMajor((await probe(c.javaExe)) ?? "");
     if (major === undefined) continue;
     if (major >= MIN_JAVA_MAJOR) return { ok: true, ...c, major };
     tooOld ??= { javaExe: c.javaExe, major };
@@ -266,4 +281,14 @@ export function assertSafeWorkingDir(dir: string, repoRoot: string): void {
       `Refusing to run a producer inside packages/ ("${dir}") — scratch there pollutes other sessions' test gate.`,
     );
   }
+}
+
+/** Validate before emission or native launch; Node timers must not overflow to 1ms. */
+export function resultBounds(bounds: JvmBounds = DEFAULT_BOUNDS, caseTimeoutMs?: number): JvmBounds {
+  const value = { ...bounds, batchTimeoutMs: caseTimeoutMs ?? bounds.batchTimeoutMs };
+  for (const [name, n] of Object.entries(value)) {
+    const max = name === "maxCapturedBytes" ? 268435456 : 2147483647;
+    if (!Number.isSafeInteger(n) || n <= 0 || n > max) throw new Error(`${name} must be an integer from 1 to ${max}.`);
+  }
+  return value;
 }

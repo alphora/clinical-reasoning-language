@@ -572,3 +572,48 @@ For installation instructions and full details, see [crl-vscode/README.md](https
 
 This project is licensed under the Apache License 2.0.
 See the LICENSE file for details.
+
+
+### Native execution bounds
+
+`crl-emit-results --case-timeout-ms 900000` and MCP `emit_results` with
+`caseTimeoutMs: 900000` allow fifteen minutes per case. The default is 600000
+milliseconds. Values must be positive integers no larger than 2147483647.
+`crl-run-regression --native` accepts the same CLI option.
+
+Native runs remain isolated by case. On Windows, process ownership requires
+Windows 10 / Windows Server 2016 or newer and Windows PowerShell. CRL assigns the
+launcher and descendants to an owned Job Object before they run, and confirms
+that the job is empty when stopping it. An unconfirmed cleanup stops the queue,
+records unreached cases as `not-run`, and prevents another run in that server.
+Only one native producer invocation runs at a time in a server process.
+
+Package callers must now **await `produceRegressionResults(...)`**. Its return is
+`Promise<ProduceOutcome>`. The internal `produceResults` and `runOneCase` helpers
+are asynchronous too. Exported synchronous `resolveJava` remains available;
+`resolveJavaAsync` supports bounded discovery. `bounds.batchTimeoutMs` is retained
+as a compatibility field and denotes a per-case timeout; `caseTimeoutMs` takes
+precedence when supplied.
+
+### Retrying native cases
+
+Use CLI `crl-emit-results --retry-failed` or MCP `emit_results` with
+`retryFailed: true` to retain compatible successful outputs and retry other cases.
+Changed case inputs or missing/damaged result files also rerun. A changed model,
+engine, driver, CRL producer, or effective Java runtime requires a full run.
+Older manifests without retry fingerprints require one full run first.
+
+For regression, use `crl-run-regression --native --retry-from <manifest>`
+(or `produceRegressionResults({ ..., retryFrom })`). This reuses the earlier
+regression scratch destination; it cannot target the policy's MV results.
+
+Retry replays the original CEL input clock. Retained successes remain historical
+results, with their original `producedAt`; rerun cases use the live engine clock.
+The manifest reports the current invocation in `generatedAt`, the CEL clock in
+`provenance.inputClock`, and retained rows as `reused: true`. Run without retry
+when a fresh evaluation of every case is required. This is result retention, not
+compiled-CQL caching.
+
+CLI SIGINT/SIGTERM and MCP shutdown await owned-process cleanup. On POSIX,
+forcibly killing the Node owner (for example SIGKILL) cannot run that cleanup;
+Windows additionally detects owner loss through the Job Object supervisor.

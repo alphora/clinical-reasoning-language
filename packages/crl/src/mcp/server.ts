@@ -22,7 +22,7 @@ import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
-import { produceResults } from "../results/produce";
+import { produceResults, shutdownProducer } from "../results/produce";
 import { ENGINE_JAR_SOURCE, engineJarHelp } from "../results/spawn";
 import { RESULT_USE_CASES, isResultUseCase } from "../results/useCases";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
@@ -815,6 +815,8 @@ export function createServer(): McpServer {
             "ABSOLUTE output root the tests/results tree hangs from. Defaults to the project root " +
               "(nearest package.json). Must be absolute: the MCP server's working directory is not your workspace.",
           ),
+        retryFailed: z.boolean().optional().describe("Retain compatible successful native results and retry remaining cases."),
+        caseTimeoutMs: z.number().int().min(1).max(2147483647).optional().describe("Per-case timeout in milliseconds; default 600000."),
         prune: z
           .boolean()
           .optional()
@@ -831,9 +833,9 @@ export function createServer(): McpServer {
           ),
       },
     },
-    (args) =>
+    (args, extra) =>
       emitResults(
-        args as {
+        { ...args, signal: extra.signal } as {
           celPath: string;
           crlPath: string;
           useCase: string;
@@ -841,6 +843,9 @@ export function createServer(): McpServer {
           jarSha256?: string;
           outRoot?: string;
           prune?: boolean;
+          retryFailed?: boolean;
+          caseTimeoutMs?: number;
+          signal?: AbortSignal;
         },
       ),
   );
@@ -1720,7 +1725,7 @@ function runAuthoringKit(args: unknown): {
  * the boundary is a convention, not an enforced one. A workspace can
  * supply arguments; it cannot supply the environment the server was launched with.
  */
-function emitResults(args: {
+async function emitResults(args: {
   celPath: string;
   crlPath: string;
   useCase: string;
@@ -1728,7 +1733,10 @@ function emitResults(args: {
   jarSha256?: string;
   outRoot?: string;
   prune?: boolean;
-}): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+  retryFailed?: boolean;
+  caseTimeoutMs?: number;
+  signal?: AbortSignal;
+}): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   const err = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
 
   for (const [k, v] of [
@@ -1783,7 +1791,7 @@ function emitResults(args: {
   const resultsRoot = resolveEmitOutput("results", args.celPath, args.outRoot);
   if (!resultsRoot.ok) return err(resultsRoot.reason);
 
-  const outcome = produceResults({
+  const outcome = await produceResults({
     celPath: args.celPath,
     crlPath: args.crlPath,
     useCase: args.useCase,
@@ -1791,6 +1799,9 @@ function emitResults(args: {
     jarPath: args.jarPath,
     jarSha256: args.jarSha256,
     prune: args.prune,
+    caseTimeoutMs: args.caseTimeoutMs,
+    retryFailed: args.retryFailed,
+    signal: args.signal,
     crlVersion: CRL_PACKAGE_VERSION,
   });
 
@@ -2210,7 +2221,12 @@ export async function main(): Promise<void> {
   // The host shuts us down by closing stdin (EOF) or signalling. The transport
   // does not exit on its own (it listens only for stdin 'data'/'error'), so
   // wire explicit teardown to avoid a lingering process.
-  const exit = () => process.exit(0);
+  let exiting = false;
+  const exit = async () => {
+    if (exiting) return; exiting = true;
+    await shutdownProducer();
+    process.exit(0);
+  };
   process.stdin.on("end", exit);
   process.on("SIGTERM", exit);
   process.on("SIGINT", exit);

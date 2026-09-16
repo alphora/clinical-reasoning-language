@@ -45,8 +45,8 @@ afterEach(() => {
   for (const directory of files.roots.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
-function produce(prune?: boolean) {
-  const result = produceResults({
+async function produce(prune?: boolean) {
+  const result = await produceResults({
     celPath: root, crlPath: path.join(root, "policy.crl"),
     outRoot: root, useCase: "prior-auth", crlVersion: "test", jarPath: "unused.jar", prune,
   });
@@ -58,8 +58,8 @@ function produce(prune?: boolean) {
 
 describe("producer cleanup after committing an empty manifest", () => {
   // @kit emitted-trees-are-ours:results-prune
-  it("deletes superseded Q and QR by default and preserves unowned types", () => {
-    const result = produce();
+  it("deletes superseded Q and QR by default and preserves unowned types", async () => {
+    const result = await produce();
     expect(result.pruned).toEqual([staleQ, staleQr].sort());
     expect(result.orphaned).toEqual([foreign]);
     expect(existsSync(path.join(root, staleQ))).toBe(false);
@@ -68,17 +68,17 @@ describe("producer cleanup after committing an empty manifest", () => {
   });
 
   // @kit emitted-trees-are-ours:results-retain
-  it("prune:false retains and reports superseded Q and QR", () => {
-    const result = produce(false);
+  it("prune:false retains and reports superseded Q and QR", async () => {
+    const result = await produce(false);
     expect(result.pruned).toEqual([]);
     expect(result.orphaned).toEqual([staleQ, staleQr, foreign].sort());
     for (const relative of [staleQ, staleQr, foreign]) expect(existsSync(path.join(root, relative))).toBe(true);
   });
 
   // @kit emitted-trees-are-ours:results-removal-failure
-  it("reports a failed removal while pruning the other owned files", () => {
+  it("reports a failed removal while pruning the other owned files", async () => {
     files.refuseRemoval = path.join(root, staleQr);
-    const result = produce();
+    const result = await produce();
     expect(result.pruned).toEqual([staleQ]);
     expect(result.orphaned).toEqual([staleQr, foreign].sort());
     expect(existsSync(path.join(root, staleQr))).toBe(true);

@@ -189,9 +189,9 @@ async function build() {
   // THIS dist/ dir. 4.114.0 shipped `emit_results` with the driver in neither the vsix nor the npm
   // tarball, so the tool required a class no user could obtain; copying it beside the core .cql is
   // the same lesson as #187, one directory deeper. Fail loud rather than ship the tool broken again.
-  const DRIVER_ASSET = path.join("driver", "ApplyDriver.class");
-  {
-    const src = path.resolve(__dirname, "../crl/dist/results/driver/ApplyDriver.class");
+  for (const driverFile of ["ApplyDriver.class", "windows-owned-process.ps1"]) {
+    const DRIVER_ASSET = path.join("driver", driverFile);
+    const src = path.resolve(__dirname, "../crl/dist/results/driver", driverFile);
     if (!fs.existsSync(src)) {
       throw new Error(
         `Compiled driver missing at ${src} — core's copy-catalog build step did not run. ` +

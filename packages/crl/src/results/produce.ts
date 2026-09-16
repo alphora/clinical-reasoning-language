@@ -28,11 +28,15 @@ import {
   defaultEngineJarPath,
   engineJarFetchCommand,
   engineJarHelp,
-  resolveJava,
+  resolveJavaAsync,
+  resultBounds,
   verifyJar,
   type JvmBounds,
 } from "./spawn";
+import { runOwnedProcess } from "./ownedProcess";
 import { driverReady } from "./driver";
+import { digest, runtimeFingerprint } from "./runtimeFingerprint";
+import { caseKey, readRetry, reusableCase, preflightOutputs, regressionRetryRoot, excludeMvDestination, canonicalOutputRoot } from "./retry";
 import { isImplementedUseCase, type ResultUseCase } from "./useCases";
 
 export interface ProduceRequest {
@@ -63,6 +67,10 @@ export interface ProduceRequest {
   /** ⚠ OPTIONAL. Omitted → the sha256 this build pins. Pass one only to pin something else. */
   jarSha256?: string;
   bounds?: JvmBounds;
+  caseTimeoutMs?: number;
+  /** Retain compatible successful rows; retry the remaining cases. */
+  retryFailed?: boolean;
+  signal?: AbortSignal;
   crlVersion: string;
 }
 
@@ -99,30 +107,76 @@ export type ProduceOutcome =
  * Refuses rather than degrades at each precondition, because every one of them, when skipped, produced a
  * plausible-looking empty success in an earlier cut of this code.
  */
-export function produceResults(req: ProduceRequest): ProduceOutcome {
-  return produceSuiteResults(req, "mv");
+let running = false;
+let quarantined = false;
+let shuttingDown = false;
+let activeAbort: AbortController | undefined;
+let activeWork: Promise<ProduceOutcome> | undefined;
+
+/** Cancel only for server lifecycle shutdown. Per-request cancellation uses req.signal. */
+export async function shutdownProducer(): Promise<void> {
+  shuttingDown = true;
+  activeAbort?.abort();
+  await activeWork;
+}
+async function guardedProduction(req: Omit<ProduceRequest, "outRoot" | "celPath">, make: () => ProduceRequest, purpose: "mv" | "regression"): Promise<ProduceOutcome> {
+  if (quarantined) return { ok: false, reason: "Native cleanup was not confirmed; restart this server after checking its reported process failure." };
+  if (running || shuttingDown) return { ok: false, reason: "Native producer is busy or shutting down." };
+  if (req.signal?.aborted) return { ok: false, reason: "Native production cancelled." };
+  running = true;
+  const controller = new AbortController(); activeAbort = controller;
+  const cancel = () => controller.abort();
+  req.signal?.addEventListener("abort", cancel, { once: true });
+  if (req.signal?.aborted) cancel();
+  const work = (async (): Promise<ProduceOutcome> => {
+    try {
+      const bounds = resultBounds(req.bounds, req.caseTimeoutMs);
+      if (controller.signal.aborted) return { ok: false, reason: "Native production cancelled." };
+      return await produceSuiteResults({ ...make(), bounds, signal: controller.signal }, purpose);
+    } catch (error) { return { ok: false, reason: String(error) }; }
+    finally {
+      req.signal?.removeEventListener("abort", cancel);
+      activeAbort = undefined;
+      if (!quarantined) running = false;
+    }
+  })();
+  activeWork = work;
+  return work;
 }
 
-/** Engineering runs reuse the producer in a newly created temporary directory. */
-export function produceRegressionResults(req: Omit<ProduceRequest, "outRoot" | "celPath"> & { projectPath: string }): ProduceOutcome {
-  const outRoot = mkdtempSync(path.join(tmpdir(), "crl-regression-"));
-  return produceSuiteResults({ ...req, celPath: req.projectPath, outRoot }, "regression");
+export function produceResults(req: ProduceRequest): Promise<ProduceOutcome> {
+  return guardedProduction(req, () => req, "mv");
+}
+
+/** Public API is asynchronous: await completion, including owned-process cleanup. */
+export function produceRegressionResults(req: Omit<ProduceRequest, "outRoot" | "celPath"> & { projectPath: string; retryFrom?: string }): Promise<ProduceOutcome> {
+  return guardedProduction(req, () => {
+    if (req.retryFailed && !req.retryFrom) throw new Error("Regression retry requires retryFrom.");
+    return { ...req, celPath: req.projectPath, retryFailed: Boolean(req.retryFrom),
+      outRoot: req.retryFrom ? regressionRetryRoot(req.retryFrom) : mkdtempSync(path.join(tmpdir(), "crl-regression-")) };
+  }, "regression");
 }
 
 // REFACTOR:grounded: case-set selection is the only difference between these operations.
-function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regression"): ProduceOutcome {
+async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regression"): Promise<ProduceOutcome> {
   if (!isImplementedUseCase(req.useCase)) return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
+  req = { ...req, outRoot: canonicalOutputRoot(req.outRoot) };
   const selection = resolveCelSuite(req.celPath, purpose);
   if (!selection.ok) return { ok: false, reason: "Invalid CEL suite", detail: selection.diagnostics.map(d => d.message) };
   try {
     const suite = selection.suite;
     if (suite.policyPath && canonicalizeFsPath(req.crlPath) !== canonicalizeFsPath(suite.policyPath)) return { ok: false, reason: "crlPath must be the policy covered by every selected CEL file." };
-    const emission = emitCelSuite(suite);
+    if (purpose === "regression" && req.retryFailed) excludeMvDestination(req.outRoot, suite.projectRoot);
+    const previous = req.retryFailed ? readRetry(req.outRoot, purpose, req.useCase) : undefined;
+    const emission = emitCelSuite(suite, previous ? new Date(previous.provenance.inputClock!) : undefined);
     if (emission.result.diagnostics.some(d => d.severity === "error")) return { ok: false, reason: "CEL suite did not emit completely", detail: emission.result.diagnostics.map(d => d.message) };
-    const result = suite.files.length ? produceCandidate(req, suite, emission) : emptyResult(req, suite, emission);
+    preflightOutputs(req.outRoot, purpose, []);
+    if (previous && !suite.files.length) throw new Error("Cannot retry an empty suite; run without retry.");
+    const result = suite.files.length ? await produceCandidate(req, suite, emission, previous) : emptyResult(req, suite, emission);
     if (!result.ok) return result;
     mkdirSync(path.dirname(result.manifestPath), { recursive: true });
     writeFileSync(result.manifestPath, JSON.stringify(result.manifest, null, 2) + "\n");
+    if (quarantined) return result; // Account for every case, but do not prune after uncertain cleanup.
     // Existing results-tree cleanup, once for the complete selected case set.
     const scan = scanOrphans(req.outRoot, result.manifest);
     const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
@@ -144,7 +198,7 @@ function emptyResult(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmi
   return { ok: true, manifest: { schemaVersion: 1, celLibrary: suite.purpose, useCase: req.useCase, generatedAt: emission.clock, provenance: { crlVersion: req.crlVersion }, cases: [] }, manifestPath: path.join(req.outRoot, suiteResultsManifestPath(suite.purpose)), notEmitted: [], pruned: [], orphaned: [], skippedLinks: [], failed: 0, java: { exe: "not invoked (empty suite)", major: 0 }, engineJar: { path: "not invoked (empty suite)", defaulted: req.jarPath === undefined } };
 }
 
-function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission): ProduceOutcome {
+async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission, previous?: ProducerManifest): Promise<ProduceOutcome> {
   if (!isImplementedUseCase(req.useCase)) {
     return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
   }
@@ -203,14 +257,15 @@ function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSui
   // ⚠ The verified jar IS the jar executed — it goes on `-cp` directly. The classpath-containment
   // check this replaces existed only because the user supplied a separate classpath that need not
   // have contained it, which made `producerJarSha256` a claim about an artifact that never ran.
-  const probe = (exe: string): string => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
-    const r = spawnSync(exe, ["-version"], { encoding: "utf8" });
-    // ⚠ `java -version` writes to STDERR.
-    return (r.stderr ?? "") + (r.stdout ?? "");
+  const probe = async (exe: string): Promise<string | undefined> => {
+    if (req.signal?.aborted || quarantined) return undefined;
+    const result = await runOwnedProcess(exe, ["-version"], { timeoutMs: 15000, maxBytes: 65536, signal: req.signal });
+    if (!result.cleanupConfirmed) quarantined = true;
+    return result.failure || result.status !== 0 ? undefined : result.stderr + result.stdout;
   };
-  const java = resolveJava(process.env, process.platform === "win32", probe);
+  const java = await resolveJavaAsync(process.env, process.platform === "win32", probe);
+  if (quarantined) return { ok: false, reason: "Java discovery cleanup could not be confirmed; native execution stopped." };
+  if (req.signal?.aborted) return { ok: false, reason: "Native production cancelled during Java discovery." };
   if (!java.ok) {
     return {
       ok: false,
@@ -258,6 +313,17 @@ function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSui
   }
   const planDefinitionId = String(roots[0].id);
 
+  preflightOutputs(req.outRoot, suite.purpose, inputs);
+  const runtime = await runtimeFingerprint(java.javaExe, jarPath, req.bounds ?? DEFAULT_BOUNDS, req.signal);
+  if (!runtime.cleanupConfirmed) quarantined = true;
+  if (!runtime.sha256) return { ok: false, reason: runtime.reason ?? "Native runtime probe failed." };
+  const definitionClosureSha256 = digest({ defs, cql: Object.entries(cql).sort(([a],[b]) => a.localeCompare(b)) });
+  const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: jarCheck.sha256 });
+  if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
+      previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {
+    return { ok: false, reason: "Cannot retry: definitions or runtime changed. Run without retry." };
+  }
+  const prior = new Map(previous?.cases.map(c => [caseKey(c), c]) ?? []);
   // ⚠ Build inputs go to scratch, never into the results tree.
   const scratch = mkdtempSync(path.join(tmpdir(), "crl-produce-"));
 
@@ -265,9 +331,10 @@ function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSui
     schemaVersion: 1,
     celLibrary: suite.purpose,
     useCase: req.useCase,
-    generatedAt: emission.clock,
+    generatedAt: new Date().toISOString(),
     provenance: {
       crlVersion: req.crlVersion, producerJarSha256: jarCheck.sha256,
+      inputClock: emission.clock, runtimeSha256, definitionClosureSha256,
     },
     cases: [],
   };
@@ -275,6 +342,15 @@ function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSui
   let failed = 0;
   try {
   for (const input of inputs) {
+    const inputSha256 = digest({ input, planDefinitionId });
+    const retained = reusableCase(req.outRoot, prior.get(caseKey(input)), inputSha256);
+    if (retained) { manifest.cases.push(retained); continue; }
+    if (quarantined || req.signal?.aborted) {
+      manifest.cases.push({ sourceFile: input.sourceFile, caseId: input.caseId, caseName: input.caseName,
+        compartmentDir: `patient/${input.compartmentId}`, state: "not-run",
+        reason: quarantined ? "Queue stopped: previous owned-process cleanup unconfirmed." : "Production cancelled before this case." });
+      failed++; continue;
+    }
     const repo = buildEngineRepoBundle({
       definitions: defs as never,
       cqlByLibraryFile: cql,
@@ -297,9 +373,11 @@ function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSui
     const repoPath = path.join(scratch, `${input.compartmentId}.json`);
     writeFileSync(repoPath, JSON.stringify(repo.bundle));
 
-    const entry = runOneCase(
+    const producedAt = new Date().toISOString();
+    const entry = await runOneCase(
       {
         javaExe: java.javaExe,
+        signal: req.signal,
         engineJarPath: jarPath, // the VERIFIED jar, and nothing else, is what runs
         bounds: req.bounds ?? DEFAULT_BOUNDS,
         planDefinitionId,
@@ -312,8 +390,11 @@ function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSui
         repoPath,
       },
     );
+    if (entry.cleanupUncertain) quarantined = true;
     entry.sourceFile = input.sourceFile;
     entry.caseId = input.caseId;
+    entry.inputSha256 = inputSha256;
+    entry.producedAt = producedAt;
     manifest.cases.push(entry);
     if (entry.state !== "generated" && entry.state !== "no-questionnaire") failed++;
   }

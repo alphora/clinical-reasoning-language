@@ -51,6 +51,7 @@
     "dist/**/*.cql",
     "dist/**/*.java",
     "dist/**/*.class",
+    "dist/**/*.ps1",
     "README.md"
   ],
   "publishConfig": {

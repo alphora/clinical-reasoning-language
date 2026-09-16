@@ -82,6 +82,10 @@ await client.connect(transport);
 try {
   await check("MCP tools: 20 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
     const { tools } = await client.listTools();
+    const native = tools.find(t => t.name === "emit_results").inputSchema.properties;
+    assert.equal(native.retryFailed.type, "boolean");
+    assert.equal(native.caseTimeoutMs.type, "integer");
+    assert.equal(native.caseTimeoutMs.minimum, 1);
     const descriptions = tools.map(t => t.description ?? "").join("\n");
     assert.doesNotMatch(descriptions, /asserted-only|never evaluates `code is`|sanctioned patient-age both-rep carve-out/);
     const names = tools.map((t) => t.name).sort();
@@ -265,6 +269,11 @@ try {
     assert.equal(search.results[0].id, "rule:named-answer-options");
     const entry = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "entry", id: search.results[0].id } })).content[0].text);
     assert.equal(entry.fullContentHash, kit.fullContentHash);
+    const retrySearch = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "search", query: "retryFailed" } })).content[0].text);
+    assert.equal(retrySearch.results[0].id, "rule:produce-results");
+    const retryEntry = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: { view: "entry", id: "rule:produce-results" } })).content[0].text);
+    assert.match(JSON.stringify(retryEntry), /historical results/);
+    assert.equal(retryEntry.fullContentHash, kit.fullContentHash);
     const artifact = entry.entries.find(e => e.id === "artifact:named-answer-reference.crl").content;
     assert.ok(artifact.requires.crl.canonicalBase);
     assert.ok(entry.entries.some(e => e.id === "artifact:named-answer-terms.crl"));
@@ -288,8 +297,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.4");
-    assert.equal(kit.contentHash, "4275ddb15f678fdf9a912e9812f1345ca195749a802dd327f2b99f4f1652c0ff");
+    assert.equal(kit.schemaVersion, "2.5");
+    assert.equal(kit.contentHash, "894a16117bdd3c53dc89ac7f676997d47ce0b7a01d02963c38b233c0db6262b9");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 17);
     assert.equal(kit.dispositionModel.categories.length, 3);

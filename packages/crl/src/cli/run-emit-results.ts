@@ -9,6 +9,7 @@
  * MeasureReport. The use case is an argument, not a tool.
  */
 import path from "node:path";
+import { installNativeSignals } from "./nativeSignals";
 
 // ⚠ THIS FILE PARSES FLAGS AND REPORTS. It once imported twenty more symbols — the emitters, the
 // bundler, the JVM resolver — from when it orchestrated the run itself. They outlived that job and
@@ -53,6 +54,8 @@ FLAGS:
   --cel <file>         An MV CEL file or policy directory; selects all MV files. Required.
   --crl <file>         The CRL library the suite covers. Required.
   --use-case <name>    ${RESULT_USE_CASES.join(" | ")}. Required.
+  --retry-failed       Retain compatible successes from the previous run; retry other cases.
+  --case-timeout-ms <ms> Per-case timeout (default 600000; positive integer).
   --jar <path>         Engine jar. OPTIONAL — uses this build's identified cache.
                        ${engineJarHelp().join("\n                       ")}
                        Fetch: ${engineJarFetchCommand()}
@@ -74,6 +77,8 @@ EXIT CODES:
 `;
 
 interface Args {
+  caseTimeoutMs?: number;
+  retryFailed?: boolean;
   cel?: string; crl?: string; useCase?: string; jar?: string; jarSha?: string;
   out?: string; enable: boolean; prune: boolean;
 }
@@ -96,15 +101,18 @@ function parseArgs(argv: string[]): Args {
     else if (f === "--use-case") a.useCase = need(i++, f);
     else if (f === "--jar") a.jar = need(i++, f);
     else if (f === "--jar-sha256") a.jarSha = need(i++, f);
+    else if (f === "--case-timeout-ms") a.caseTimeoutMs = Number(need(i++, f));
     else if (f === "--out") a.out = need(i++, f);
     else if (f === "--enable") a.enable = true;
+    else if (f === "--retry-failed") a.retryFailed = true;
     else if (f === "--no-prune") a.prune = false;
     else { process.stderr.write(`unknown flag ${f}\n`); process.exit(1); }
   }
   return a;
 }
 
-function main(): void {
+const lifecycle = installNativeSignals();
+async function main(): Promise<void> {
   const a = parseArgs(process.argv.slice(2));
   if (!a.cel || !a.crl || !a.useCase) {
     process.stderr.write("--cel, --crl and --use-case are required\n");
@@ -146,17 +154,20 @@ function main(): void {
   // ⭐ ONE PIPELINE. The MCP `emit_results` tool calls this same function; this file only parses flags and
   // reports. Two entry points each orchestrating emit → bundle → spawn → write is how a helper ends up
   // right and a caller wrong, with the helper's tests green throughout.
-  const outcome = produceResults({
+  const outcome = await produceResults({
     celPath: a.cel,
+    retryFailed: a.retryFailed,
     crlPath: a.crl,
     useCase: a.useCase,
     outRoot: outRoot.root,
     jarPath: a.jar,
     jarSha256: a.jarSha,
     prune: a.prune,
+    caseTimeoutMs: a.caseTimeoutMs,
     crlVersion: CRL_VERSION,
   });
 
+  if (lifecycle.interrupted) return;
   if (!outcome.ok) {
     for (const d of outcome.detail ?? []) process.stderr.write(`  ${d}
 `);
@@ -174,6 +185,7 @@ function main(): void {
       c.state.padEnd(18) +
         " " +
         c.caseName +
+        (c.reused ? " [retained]" : "") +
         (c.artifacts?.length ? ` (${c.artifacts.length} artifact)` : "") +
         (c.reason ? ` — ${c.reason}` : "") +
         "\n",

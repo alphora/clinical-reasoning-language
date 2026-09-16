@@ -17,7 +17,7 @@
  */
 
 import { uniqueCapSlug } from "../fhir-emitter/slug";
-import { spawnSync } from "node:child_process";
+import { runOwnedProcess } from "./ownedProcess";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -25,7 +25,7 @@ import path from "node:path";
 import { caseResultsTypeDir } from "./useCases";
 import { parseDriverStdout } from "./repoBundle";
 import type { ProducerCaseEntry, ProducerCaseState } from "./manifest";
-import { capTail, jvmFlags, type JvmBounds } from "./spawn";
+import { jvmFlags, type JvmBounds } from "./spawn";
 import { driverArgs, driverReady } from "./driver";
 
 export interface RunOneCase {
@@ -38,6 +38,7 @@ export interface RunOneCase {
 
 export interface RunContext {
   javaExe: string;
+  signal?: AbortSignal;
   /** ⚠ ONE JAR PATH, not a classpath. Nothing is extracted and the caller composes nothing. */
   engineJarPath: string;
   bounds: JvmBounds;
@@ -140,7 +141,7 @@ export function classify(
 }
 
 /** Run one case. Bounded, isolated, and it writes nothing unless the engine produced something. */
-export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
+export async function runOneCase(ctx: RunContext, c: RunOneCase): Promise<ProducerCaseEntry> {
   const ready = driverReady();
   if (!ready.ok) {
     return {
@@ -150,7 +151,7 @@ export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
       reason: `the shipped driver class is missing at ${ready.expectedAt}`,
     };
   }
-  const proc = spawnSync(
+  const proc = await runOwnedProcess(
     ctx.javaExe,
     driverArgs({
       jvmFlags: jvmFlags(ctx.bounds),
@@ -161,17 +162,18 @@ export function runOneCase(ctx: RunContext, c: RunOneCase): ProducerCaseEntry {
       subjectReference: c.subjectReference,
     }),
     {
-      timeout: ctx.bounds.batchTimeoutMs,
-      maxBuffer: ctx.bounds.maxCapturedBytes * 4,
-      encoding: "buffer",
-      // ⚠ NEVER "inherit": under MCP the parent's stdout is the JSON-RPC transport, and the driver's
-      // stdout carries a third-party `kotlin-logging` banner regardless.
-      stdio: ["ignore", "pipe", "pipe"],
+      timeoutMs: ctx.bounds.batchTimeoutMs,
+      maxBytes: ctx.bounds.maxCapturedBytes,
+      signal: ctx.signal,
     },
   );
-  const stdout = capTail([proc.stdout ?? Buffer.alloc(0)], ctx.bounds.maxCapturedBytes);
-  const stderr = capTail([proc.stderr ?? Buffer.alloc(0)], ctx.bounds.maxCapturedBytes);
-  const timedOut = proc.error !== undefined && /ETIMEDOUT|timed? ?out/i.test(String(proc.error));
+  const { stdout, stderr } = proc;
+  const timedOut = proc.failure === "timeout";
+  if (proc.failure && !timedOut) return {
+    caseName: c.caseName, compartmentDir: `patient/${c.compartmentId}`, state: "failed",
+    reason: `${proc.failure}${describeStderr(stderr)}`,
+    ...(!proc.cleanupConfirmed ? { cleanupUncertain: true } : {}),
+  };
 
   const params = parseDriverStdout(stdout);
   const results = params ? extractResults(params) : {};
@@ -281,7 +283,7 @@ export function normalizePersistedPair(
   // It is not even stable WITHIN one run: our own fixture emits 10.56.41, 10.56.54 and 10.57.02 for
   // three cases of a single invocation, because each `$apply` reads the clock as it runs.
   //
-  // The run time is not lost — the manifest records `generatedAt` ONCE for the run, which is where a
+  // The run time is not lost — the manifest records `producedAt` for each executed case, which is where a
   // fact about the run belongs, rather than restamped into 88 artifacts that did not change.
   // This is the same defect as the versioned `QR.questionnaire` reference, in the two fields that
   // fix did not reach.

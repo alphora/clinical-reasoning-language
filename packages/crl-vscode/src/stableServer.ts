@@ -26,6 +26,7 @@ export const STABLE_SERVER_ASSETS = [
   "CaseFeatureCommon.cql",
   "FHIRHelpers.cql",
   join("driver", "ApplyDriver.class"),
+  join("driver", "windows-owned-process.ps1"),
 ] as const;
 
 /**

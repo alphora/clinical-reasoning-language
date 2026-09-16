@@ -64,3 +64,9 @@ for (const f of EXPECTED) {
   console.log("copied driver ApplyDriver.class -> dist/results/driver/ApplyDriver.class");
   console.log("copied driver ApplyDriver.java -> dist/results/driver/ApplyDriver.java");
 }
+
+{
+  const src = join(here, "..", "src", "results", "driver", "windows-owned-process.ps1");
+  const dst = join(here, "..", "dist", "results", "driver", "windows-owned-process.ps1");
+  mkdirSync(dirname(dst), { recursive: true }); copyFileSync(src, dst);
+}

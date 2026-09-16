@@ -40,13 +40,9 @@ export type ProducerCaseState =
   | "populate-degraded"
   /** The engine run failed or its expected output was absent or unreadable. */
   | "failed"
-  /** The batch JVM was killed on the whole-batch timeout while this case was running. */
+  /** The case reached its wall timeout and owned-process cleanup was confirmed. */
   | "timeout"
-  /**
-   * ⚠ The batch died before reaching this case. A hung case cannot be interrupted inside a shared JVM —
-   * process-tree kill is the only real enforcement and it takes the rest of the batch with it. Without
-   * this state those cases are indistinguishable from "never eligible".
-   */
+  /** Queue stopped before this case could run. */
   | "not-run";
 
 /** One generated file, identified well enough to verify rather than trust. */
@@ -79,6 +75,12 @@ export interface ProducerCaseEntry {
   actualDisposition?: string;
   /** Why, for every non-`generated` state. Always present when the state is not `generated`. */
   reason?: string;
+  /** The queue/server must stop: owned-process cleanup could not be confirmed. */
+  cleanupUncertain?: boolean;
+  inputSha256?: string;
+  /** Actual execution time; preserved when retry retains this result. */
+  producedAt?: string;
+  reused?: boolean;
 }
 
 export interface ProducerManifest {
@@ -97,6 +99,9 @@ export interface ProducerManifest {
     producerJarSha256?: string;
     /** Digest over the emitted definition closure (PD + Libraries + SDs + CodeSystems). */
     definitionClosureSha256?: string;
+    /** CEL replay clock, separate from live JVM execution time. */
+    inputClock?: string;
+    runtimeSha256?: string;
   };
   cases: ProducerCaseEntry[];
 }

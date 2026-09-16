@@ -42,6 +42,22 @@ import org.opencds.cqf.fhir.utility.repository.InMemoryFhirRepository;
 
 public class ApplyDriver {
     public static void main(String[] args) throws Exception {
+        if (args.length > 0 && "--runtime-info".equals(args[0])) {
+            String[] values = {
+                System.getProperty("java.version"), System.getProperty("java.runtime.version"),
+                System.getProperty("java.vendor"), System.getProperty("java.vm.name"),
+                java.time.ZoneId.systemDefault().getId(), java.util.TimeZone.getDefault().getID(),
+                java.util.Locale.getDefault().toLanguageTag(),
+                java.util.Locale.getDefault(java.util.Locale.Category.DISPLAY).toLanguageTag(),
+                java.util.Locale.getDefault(java.util.Locale.Category.FORMAT).toLanguageTag()
+            };
+            String line = "CRL_RUNTIME_INFO:" + java.util.Arrays.stream(values)
+                .map(value -> java.util.Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8)))
+                .collect(java.util.stream.Collectors.joining(".")) + "\n";
+            System.out.write(line.getBytes(StandardCharsets.UTF_8));
+            System.out.flush();
+            return;
+        }
         if (args.length < 3) {
             System.err.println("usage: ApplyDriver <repo.json> <planDefinitionId> <Patient/id>");
             System.exit(1);
@@ -83,6 +99,10 @@ public class ApplyDriver {
         // Consequences the caller MUST handle, not this file:
         //   - locate the JSON rather than assuming stdout starts with it;
         //   - never let this child's stdout reach an MCP parent's, where it is the JSON-RPC transport.
-        System.out.println(ctx.newJsonParser().setPrettyPrint(false).encodeResourceToString(result));
+        // REFACTOR:grounded: JSON crosses a UTF-8 byte boundary, independent of the JVM's console charset.
+        // Preserve the current stream: reflective batch callers route it to per-case bounded captures.
+        String json = ctx.newJsonParser().setPrettyPrint(false).encodeResourceToString(result);
+        System.out.write((json + "\n").getBytes(StandardCharsets.UTF_8));
+        System.out.flush();
     }
 }
