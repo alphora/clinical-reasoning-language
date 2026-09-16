@@ -87,6 +87,8 @@ try {
     assert.equal(native.caseTimeoutMs.type, "integer");
     assert.equal(native.caseTimeoutMs.minimum, 1);
     const descriptions = tools.map(t => t.description ?? "").join("\n");
+    assert.match(tools.find(t => t.name === "generate_provenance").description, /actual evaluated unknown condition can ground an Awaiting input path/);
+    assert.doesNotMatch(descriptions, /Pauses and other cases with no produced action currently remain unchecked|no\/unresolved decision, no produced action,/);
     assert.doesNotMatch(descriptions, /asserted-only|never evaluates `code is`|sanctioned patient-age both-rep carve-out/);
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -298,7 +300,7 @@ try {
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
     assert.equal(kit.schemaVersion, "2.5");
-    assert.equal(kit.contentHash, "894a16117bdd3c53dc89ac7f676997d47ce0b7a01d02963c38b233c0db6262b9");
+    assert.equal(kit.contentHash, "90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 17);
     assert.equal(kit.dispositionModel.categories.length, 3);

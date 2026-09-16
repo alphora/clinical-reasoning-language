@@ -18,7 +18,7 @@ packages/crl/src/authoring-kit/index.ts
 packages/crl/src/authoring-kit/navigation.ts
 packages/crl/src/authoring-kit/tests/authoring-kit.test.ts
 packages/crl/src/authoring-kit/tests/coverage.md
-packages/crl/src/authoring-kit/tests/maintenance-5.5.0-paths.txt
+packages/crl/src/authoring-kit/tests/maintenance-6.0.0-paths.txt
 packages/crl/src/cli/nativeSignals.ts
 packages/crl/src/cli/run-emit-results.ts
 packages/crl/src/cli/run-regression.ts

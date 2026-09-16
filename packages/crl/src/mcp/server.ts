@@ -1006,9 +1006,9 @@ export function createServer(): McpServer {
         "(X fired in ≥2 distinct subs), or `cel-result-run-mismatch` (the run produced no X, or the chained case's run " +
         'path is unavailable/ungroundable), or `unfrozen-case`. "disposition-path" instead renders the CEL and ' +
         "emits one cluster per distinct RUN PATH (decision-node refs ONLY) + one policy-owned-leaf coverage cluster — a " +
-        "scaffold whose grounded, frozen, uniquely identified and successfully rendered cases can satisfy the correspondence check before source attribution. Check generation diagnostics and FINAL validation; success alone does not clear the gate. Pauses and other cases with no produced action currently remain unchecked by correspondence. Preserve those tests and record the limitation. A same-lib inlined `use decision` chain RESOLVES (the run path is " +
+        "scaffold whose grounded, frozen, uniquely identified and successfully rendered cases can satisfy the correspondence check before source attribution. Check generation diagnostics and FINAL validation; success alone does not clear the gate. An actual evaluated unknown condition can ground an Awaiting input path even with no produced action. An expected pause alone is not evidence: execution errors, unresolved entered decisions and ungroundable paths remain unchecked. A same-lib inlined `use decision` chain RESOLVES (the run path is " +
         "decomposed into each sub's standalone rows — #175); a case that can't be path-clustered (unfrozen, name-collision, " +
-        "no/unresolved decision, no produced action, a run error, or an unresolved/ungroundable path, including across libraries) is surfaced " +
+        "no/unresolved decision, neither a produced action nor an actual grounded pause, a run error, or an unresolved/ungroundable path, including across libraries) is surfaced " +
         "as a deferred-disposition-path diagnostic, never silently dropped. Changing clusterBy is a STRUCTURAL mode switch, " +
         "not a safe `existingArtifact` regen (a cross-mode merge orphans the prior mode's clusters).",
       inputSchema: {
