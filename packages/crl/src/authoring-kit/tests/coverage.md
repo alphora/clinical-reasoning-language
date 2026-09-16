@@ -2,7 +2,7 @@
 
 ## Maintenance - release test integration
 
-Baseline: `6e861e1a77cfa6c4cf8f0a6495ccfd1171bf0722`; reviewed target: pending the test-maintenance commit.
+Baseline: `6e861e1a77cfa6c4cf8f0a6495ccfd1171bf0722`; reviewed target: `510c931f2323c89f9822592e01668112dd6ff795` (finalized by the separate metadata stamp).
 Kit schema2.5 and hash90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96 are unchanged.
 Complete delta inspected: prior audit metadata, `crl-vscode/src/cockpitWebviewScript.test.mjs`, `flagPlacement.ts` (comments only), `mvWorkspaceFixture.test.mjs`, this ledger and maintenance inventory.
 **Existing guidance sufficient:** removed one redundant source-regex rollup check and one obsolete stored-name regex. `flagPlacement.test.mjs` already asserts resolved rename/replacement identities and folded/expanded rollups; actual host coverage remains. Corrected matching comments reflect that same behavior. No runtime code changes.
