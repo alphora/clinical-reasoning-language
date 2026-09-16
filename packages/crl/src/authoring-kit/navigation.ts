@@ -17,7 +17,7 @@ const ALIASES: Record<string, string[]> = {
   "chaining-necessity": ["shared continuation", "internal helper", "remaining interview", "use decision"],
   "guards": ["guard", "only if"],
   "branch-guards": ["pause", "unknown", "null", "missing answer", "explicit false"],
-  "review-flags": ["narrative completeness", "source fidelity", "narrative coverage"],
+  "review-flags": ["narrative completeness", "source fidelity", "narrative coverage", "renamed concept", "stable ID", "flag placement", "orphaned flag"],
   "pa-disposition-set": ["authorization determination", "coverage determination", "recommendation", "approve deny", "PA without configuration"],
   "configure-dispositions": ["crl.dispositions", "missing configuration", "empty vocabulary"],
   "terminology-forms": ["codes", "terminology", "code system", "valueset is", "external ValueSet"],
@@ -25,7 +25,7 @@ const ALIASES: Record<string, string[]> = {
   "cel-cases": ["test cases", "CEL", "data", "expected activity", "multiple results", "multiple assertions", "cre-multiple-result-assertions"],
   "mv-case-authoring": ["MV CEL", "medical validation cases", "off path data", "regression suite", "Result Questionnaire", "selected route"],
   "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change"],
-  "produce-results": ["emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
+  "produce-results": ["retryFailed", "retry failed cases", "caseTimeoutMs", "native timeout", "retry-from", "emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
   "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine"],
 };
 

@@ -1,5 +1,50 @@
 # Kit evidence ledger
 
+## Maintenance - native reliability, pause correspondence and stable concept flags
+
+Baseline: `85e11736c904729710a0839befdda0f0fdf12b3c`.
+Reviewed target: pending this content commit; finalized in the separate metadata stamp.
+Kit schema: `2.5`; content hash: `90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96`.
+Complete changed-path inventory: [maintenance-5.5.0-paths.txt](maintenance-5.5.0-paths.txt).
+The intervening 82443d8b audit/ledger delta was inspected and is metadata-only.
+Five owning tags were added; none removed. Unchanged tags retain their owning assertions.
+The changed kit identity pin, version assertion and retrieval aliases are delivery evidence, not new language semantics.
+All changed runtime tests, helper/packaging dependencies, metadata documentation, host placement tests and CLI/MCP surfaces are dispositioned below. No grammar, reference-example inputs or dependency versions changed in this audit interval. The earlier L34194 example audit remains separately bounded below.
+
+### Pause correspondence and stable concept flags
+
+| Changed implementation / owning assertion | Disposition and bounds |
+| --- | --- |
+| `provenance/runPath.ts`, `generate.ts`, `correspondenceCheck.ts`; `tests/pause-correspondence.test.ts`, `@kit provenance-pause-paths` | **Kit updated**, verify-loop. Actual authored Record Boolean cases exercise root/shared-decision pause, wrong expectation, independent action+pause and multiple frontiers; generated clusters round trip through actual FINAL correspondence without waived errors. Corrupted lighting still yields bleed/miss; missing rows, unfrozen/colliding cases, discarded unknowns, invalidation and unresolved entered decisions refuse. Settled compound guards do not create pauses. This proves CRE-to-cockpit correspondence, not full source attribution, native equivalence or clinical review. Selected-publication cross-library delegation remains an explicit runtime error; its negative control must not be promoted to pause support. |
+| `tests/cross-lib-chain.test.ts` unresolved-target expectation | **Existing guidance sufficient**: still unchecked and blocked; reason is now precise `unresolved-decision` instead of generic `no-produced-action`. Existing completed-path IDs and delegation behavior retained by broader provenance tests. |
+| `meta/conceptIdentity.ts`, `flags/buildFlagDraft.ts`, `mvFlagAnchor.ts`, `mvFlag.ts`; flag tests, `@kit durable-concept-flags`; `provenance/crlConceptLayer.ts` and its tests | **Kit updated**, review-flags and metadata-model/registry. Creation captures authored ID, rejects empty/repeated/same-source duplicate IDs; inventory carries ID/invalid metadata through the complete concept layer, including unrendered concepts. Unique ID resolves current concept after rename/move without rewriting anchor/history. Missing/ambiguous ID does not bind old-name replacement. Legacy ID-less matching still uses unique library/name and does not depend on unrelated malformed IDs. Generated dedup stable through rename, different for replacement ID; explicit keys unchanged. General split/merge migration and automatic identity backfill are not implemented. |
+| `crl-vscode/{flagPlacement,correspondenceCockpit}.ts`; `flagPlacement.test.mjs`, `flagWorkflowHost.test.mjs` | **Kit updated**, review-flags placement claim. Actual host ID projection/resolve callback drives badges and drawer gids. Direct multi-occurrence and folded Criterion rollups use resolved current identity; flag status/category/history preserved. Full-index duplicate ID is rejected even if duplicate is unrendered. |
+| `authoring-kit/navigation.ts`, content hash pin | **Kit updated** retrieval for renamed concept / stable ID / flag placement / orphaned flag. No syntax or emitted clinical semantics changed. |
+
+Two owning tags added; no tags removed. Plan review776 accepted two important findings, no critical/nit. Code review777 accepted two important findings: host error visibility/recovery and exact-tag identity parsing. Both have owning regression assertions. Actual pinned native engine produced named unanswered A/B with no actions at the two pauses and exact MET with true A+B at completion. Actual renderer/browser confirmed renamed-ID KE/MV placement and independent yellow/green status colors. Native complete-QR submission/clear also passed (A true/B unknown -> B true/MET -> B cleared/no action), using a timeline strictly after the day-precision source fact. Core and bundled extension MCP entry points return the exact updated kit hash and capture/deduplicate stable IDs across rename while preserving the original stored anchor, including an unrelated @id-source tag. This does not claim native support for the cross-library negative control or source attribution completion. Prior runtime work and unrelated files are preserved.
+
+### Native runtime reliability and retry
+
+| Change | Disposition and evidence |
+| --- | --- |
+| `results/driver/ApplyDriver.java`, class/build metadata; `scripts/native-acceptance/unicode.cjs` | **Kit updated**, `produce-results`: explicit UTF-8 output. Actual pinned engine/Java 23 baseline corrupts non-ASCII question and coded answer under Windows-1252; fixed raw/saved Q/QR preserves them. Two reflective batch captures remain isolated;4096-byte output cap fails rather than leaks/truncates success. Java 17 class/API floor verified; Java 17 runtime not executed. No new clinical semantic claim. |
+| `ownedProcess.ts`, Windows helper, `spawn.ts`, `runProducer.ts`, producer lifecycle; ownedProcess/Posix/suiteProduction/nativeSignals tests; `lifecycle.cjs` | **Kit updated**, one active producer, bounded timeouts and uncertain-cleanup restart. Ten actual Windows tests cover launcher/descendant lifetime, timeout/cancel/startup/owner-loss, sentinel isolation, quoting, overflow and missing executable. Mocked POSIX grace and double-signal tests cover sequencing; actual Ubuntu four CLI signal combinations terminate owned descendants. Actual MCP EOF terminates active ApplyDriver. SIGKILL owner-loss remains a stated POSIX limitation. Request-local cancellation does not cancel an unrelated accepted invocation. |
+| `retry.ts`, runtimeFingerprint, producer/manifest; `retry.test.ts`, `runtimeFingerprint.test.ts`, `retry.cjs` | **Kit updated**, `produce-results:compatible-retry` and `produce-results:runtime-compatibility`. Four failure states retry, same-named distinct files remain distinct; unchanged outputs preserve bytes/mtime/producedAt; damaged artifacts/changed data rerun, removed cases prune. Old/duplicate/global model/runtime mismatches refuse. Linked output paths refuse before case invocation; arbitrary manifest paths are not followed. Effective Java timezone affects fingerprint even with identical caller environment/version. Real native generated/timeout/generated becomes all generated with one case invocation; repeat invokes zero cases. Historical retention is explicitly not fresh evaluation or clinical correctness. |
+| Regression `retryFrom`, CLI `--retry-from`; retry tests | **Kit updated**, `mv-case-authoring:regression-retry-isolation`: reuse previous regression scratch, refuse copied regression manifest in policy MV destination and destinations with an MV manifest. Default remains a fresh temporary run. No ownership registry or transaction/recovery framework. |
+| CLI/MCP `caseTimeoutMs`/`retryFailed`; README; kit index/navigation | **Kit updated**, `produce-results` and aliases. Default 600000 ms; positive integer bound; operational timeout can increase onretry. Separate inputClock, invocation generatedAt, per-case producedAt/reused. Public produceRegressionResults becomes awaitable. Source documentation mirrors the options; bundled/installed delivery is a separate release gate. |
+| package allowlist/copy-catalog/esbuild/stableServer | **Not author-facing language semantics**: ship Windows helper beside driver in core and extension staging. Existing stable-server tests (4) passed. No new dependency. |
+| produceCleanup and existing suite/prune assertions | **Existing guidance sufficient**, `emitted-trees-are-ours`; existing output ownership and complete accounting remain. Linked write destinations now refuse rather than write through; stale unowned links are reported, never followed. |
+| JFR measurement | **Not author-facing semantics**. One tiny named-answer fixture:19.66 s,98/253 execution samples contain compiler/parser frames. Not exact phase timing or per-library compile counts; no cache implemented or promised. |
+| Unrelated local release skill, AGENTS, mail-context, Bleph review record | **Outside this task; preserved**. Not included in runtime/kit audit certification or release claims. |
+
+Alias-root correction: fresh regression and retry work through a linked temporary-directory parent; links beneath the chosen root still refuse.
+Core/extension clean builds, 271 focused runtime/kit tests before that correction, 38 affected tests afterward, core MCP smoke and 36 bundled MCP/staging tests pass.
+
+Three owning tags added; no tags removed. No grammar/CRL/CEL authoring syntax, emitted clinical meaning, reference fixtures, dependency versions or MV clinical verdicts changed.
+Reviews 770-774 cover plan/UTF8/lifecycle; retry code 775 converged (one important root-alias finding accepted and verified). Native-only after external review request was blocked before execution by automatic approval review; no external convergence claimed.
+
+
+
 ## Maintenance — L34194 example and criterion border
 
 Baseline: `9208fe17c46ad0c9480c7a9d6df8e0e24ac72255` (last completed audit).
