@@ -10,7 +10,7 @@ import {flagCloseEligibility} from './flagCloseEligibility.ts';
 // Execute the actual private host handlers with controlled disk reads and modal completion.
 // VS Code refuses native modal dialogs in extension-test hosts.
 const source=ts.createSourceFile('cockpit.ts',readFileSync(fileURLToPath(new URL('./correspondenceCockpit.ts',import.meta.url)),'utf8'),ts.ScriptTarget.Latest,true);
-const names=['writeFlagStatus','saveFlagEdit','deleteFlagFromDrawer','nodeFlagAction','openNodeFlags'];const bodies=new Map();
+const names=['writeFlagStatus','saveFlagEdit','deleteFlagFromDrawer','nodeFlagAction','openNodeFlags','reloadReviewFlags','flagPlacementFor','gidsForFlag'];const bodies=new Map();
 function visit(node){if(ts.isFunctionDeclaration(node)&&names.includes(node.name?.text))bodies.set(node.name.text,node.getText(source));ts.forEachChild(node,visit);}visit(source);
 function harness(category,confirm){
  let current={id:'f',category,tag:'other',gist:'Flag',status:'open',fields:{},anchor:{scope:'concept',name:'Q',label:'Q'},createdAt:'2026-09-12'};
@@ -23,7 +23,7 @@ function harness(category,confirm){
   reloadReviewFlags:noop,renderTreeChrome:noop,driveFlagBadges:noop,postFlagDrawer:noop,openFlagActionView:noop,closeFlagActionView:noop,
   flagDisplayNameOf:()=> 'Other',vscode:{workspace:{isTrusted:false},window:{showWarningMessage:async()=>{counts.confirm++;confirm?.(()=>{current={...current,category:'extraction'};});return 'Delete flag';}}},
  });
- for(const name of names)vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,context);
+ for(const name of names.slice(0,5))vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,context);
  return {context,counts,notes,get:()=>current,setCategory:value=>{current={...current,category:value};}};
 }
 test('host rejects forged edit and delete against authoring records',async()=>{
@@ -63,4 +63,27 @@ test('node flag controls open disjoint categories and only MV can create',async(
  c.flagsByGid.set('gid',[ke]);await c.nodeFlagAction('node','gid',1,'validation');assert.equal(created.length,1);
  c.flagsByGid.set('gid',[]);await c.nodeFlagAction('node','gid',1,'extraction');assert.equal(created.length,1);assert.match(notes.at(-1),/no KE flags/);
  await c.nodeFlagAction('node','gid',0,'validation');assert.equal(created.length,1);
+});
+
+
+test('actual host propagates authored concept IDs into badge placement and drawer navigation',async()=>{
+ const {resolveAnchor}=await import('../../crl/src/flags/mvFlagAnchor.ts');
+ const {computeFlagPlacement}=await import('./flagPlacement.ts');
+ const flag={id:'f',anchor:{scope:'concept',name:'Old',library:'OldLib',entityId:'stable',label:'Old'}};
+ const tree={conceptOccurrences:[{gid:'current',lib:'L',name:'New'},{gid:'replacement',lib:'OldLib',name:'Old'}],criterionOccurrences:[]};
+ const c=vm.createContext({mode:'medical-validation',currentCel:'policy',findPolicySrc:()=>'/policy/src',readdirSync:()=>[],join:(...s)=>s.join('/'),
+  crlStructure:[],conceptLayer:[{lib:'L',name:'New',id:'stable'},{lib:'OldLib',name:'Old',id:'other'}],
+  flagStoreDir:()=>'/flags',loadStoredFlags:()=>({flags:[flag]}),hasLegacyFlagStore:()=>({present:false}),
+  flagsList:[],flagStateError:false,flagStoreWarning:false,flagStateNote:undefined,anchorCtx:undefined,
+  computeFlagPlacement,resolveAnchor,views:new Map([['tree',tree]])});
+ for(const name of ['reloadReviewFlags','flagPlacementFor','gidsForFlag'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
+ c.reloadReviewFlags();assert.equal(c.anchorCtx.concepts[0].id,'stable');
+ assert.deepEqual([...c.gidsForFlag(flag)],['current']);
+ c.conceptLayer.push({lib:'Unrendered',name:'Duplicate',id:'stable'});c.reloadReviewFlags();
+ assert.deepEqual([...c.gidsForFlag(flag)],[]);
+ c.conceptLayer.pop();c.conceptLayer.push({lib:'L',name:'Broken',idInvalid:true});flag.status='resolved';c.reloadReviewFlags();
+ assert.equal(c.flagStateError,true);assert.match(c.flagStateNote,/identity metadata is invalid/);
+ assert.deepEqual([...c.gidsForFlag(flag)],[]);
+ c.conceptLayer.pop();c.reloadReviewFlags();
+ assert.equal(c.flagStateError,false);assert.equal(c.flagStateNote,undefined);assert.deepEqual([...c.gidsForFlag(flag)],['current']);
 });

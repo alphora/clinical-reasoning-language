@@ -1152,11 +1152,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // ── the anchor context (badge placement + reveal classification match a flag's stored target against the CURRENT structure) ──
     anchorCtx = {
       decisions: crlStructure,
-      concepts: conceptLayer.map((c) => ({ name: c.name, lib: c.lib })),
+      concepts: conceptLayer.map((c) => ({ name: c.name, lib: c.lib, ...(c.id ? { id: c.id } : {}), ...(c.idInvalid ? { idInvalid: c.idInvalid } : {}) })),
       // I1: union the decision libs + concept libs + the parsed library names, so a library-scope flag whose library has no
       // decisions/concepts in scope still resolves live (its name is in `libraries`).
       libraries: [...new Set([...crlStructure.map((d) => d.lib), ...conceptLayer.map((c) => c.lib), ...libNames])],
     };
+    // A malformed identity index is unavailable evidence, not an empty badge set.
+    // Surface it even for resolved flags so completion cannot silently ignore it.
+    const anchorError = flagsList.map(f => resolveAnchor(f.anchor, anchorCtx)).find(r => r.state === "error");
+    if (anchorError?.state === "error") {
+      flagStateError = true;
+      flagStateNote = flagStateNote ?? anchorError.reason;
+    }
   }
 
   const flagNote = (m: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${m}`, 3000);
@@ -1700,6 +1707,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       (a) => {
         const cls = resolveAnchor(a, anchorCtx); // decision OCCURRENCE → the ONE live keyed node (moved/orphan → undefined)
         return cls.state === "live" && cls.nodeKey ? tree.anchors[cls.nodeKey]?.scrollTo : undefined;
+      },
+      (a) => {
+        const cls = resolveAnchor(a, anchorCtx);
+        return cls.state === "live" ? cls.concept : undefined;
       },
     );
   }

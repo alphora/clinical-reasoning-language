@@ -4,7 +4,7 @@
 // design test list (impl review 357 [important]).
 import assert from "node:assert/strict";
 
-import { computeFlagPlacement, conceptFlagTargetsForGids, summarizeFlagBadges } from "./flagPlacement.ts";
+import { computeFlagPlacement as placeResolved, conceptFlagTargetsForGids, summarizeFlagBadges } from "./flagPlacement.ts";
 
 test("badge status and authoring step stay paired in mixed groups",()=>{
   const summaries=summarizeFlagBadges(new Map([
@@ -36,6 +36,9 @@ const concept = (name, library) => ({ scope: "concept", name, library, label: `t
 const decObject = (name, library) => ({ scope: "decision", name, library, label: `decision ${name}` });
 const decOccurrence = (name, library, occurrenceKey) => ({ scope: "decision", name, library, occurrenceKey, label: `${name} node` });
 
+// Existing fixtures use ID-less names; identity tests below use the real resolver.
+const computeFlagPlacement = (flags, sub, decisions, occurrence) => placeResolved(flags, sub, decisions, occurrence,
+  a => a.library ? {lib: a.library, name: a.name} : undefined);
 const NO_DECISION = () => [];
 const NO_OCCURRENCE = () => undefined;
 
@@ -166,4 +169,24 @@ test("hidden helper display placement preserves separate creation identity and o
  const r=computeFlagPlacement(flags,{conceptOccurrences:occurrences,criterionOccurrences:[]},NO_DECISION,NO_OCCURRENCE);
  assert.deepEqual(r.gids,['criterion']);assert.deepEqual(r.byGid.get('criterion'),flags);assert.ok(!occurrences.find(o=>o.gid==='criterion'));
  assert.equal(flags[0].anchor.name,'A');assert.equal(flags[1].anchor.name,'B');
+});
+
+
+test("authoritative concept resolution drives every occurrence and folded rollup without changing stored flags", async () => {
+  const {resolveAnchor} = await import('../../crl/src/flags/mvFlagAnchor.ts');
+  const a = {...concept('Old','OldLib'), entityId:'stable'};
+  const open = mk(a,{id:'ke',status:'open'});open.category='extraction';
+  const done = mk(a,{id:'mv',status:'resolved'}), original=JSON.stringify([open,done]);
+  const sub={conceptOccurrences:[{gid:'one',lib:'NewLib',name:'New'}, {gid:'two',lib:'NewLib',name:'New'}, {gid:'replacement',lib:'OldLib',name:'Old'}],
+    criterionOccurrences:[{gid:'fold',collapsed:true,bodyConcepts:[{lib:'NewLib',name:'New'}]},{gid:'unfold',collapsed:false,bodyConcepts:[{lib:'NewLib',name:'New'}]}]};
+  const context={decisions:[],libraries:['NewLib','OldLib'],concepts:[{lib:'NewLib',name:'New',id:'stable'},{lib:'OldLib',name:'Old',id:'replacement'}]};
+  const resolve=a=>{const r=resolveAnchor(a,context);return r.state==='live'?r.concept:undefined;};
+  const placed=placeResolved([open,done],sub,NO_DECISION,NO_OCCURRENCE,resolve);
+  assert.deepEqual([...placed.gids].sort(),['fold','one','two']);
+  assert.deepEqual(placed.byGid.get('fold').map(f=>f.id),['ke','mv']);
+  assert.equal(JSON.stringify([open,done]),original);
+  context.concepts[0].id='removed';
+  assert.deepEqual(placeResolved([open],sub,NO_DECISION,NO_OCCURRENCE,resolve).gids,[]);
+  context.concepts[0].id='stable';context.concepts.push({lib:'Hidden',name:'Unrendered',id:'stable'});
+  assert.deepEqual(placeResolved([open],sub,NO_DECISION,NO_OCCURRENCE,resolve).gids,[]);
 });

@@ -1,8 +1,8 @@
 // Todo 2 (disc 356/357) — the PURE flag→node placement pass shared by `driveFlagBadges` (which gids to LIGHT) and the
 // node-filtered flag entry (`flagsByGid`: WHICH flags belong to each gid). Extracted from the cockpit so the reverse-map
 // assembly — dedup, order, the collapsed-criterion rollup, and the moved-occurrence exclusion — is node-testable without vscode
-// (impl review 357 [important]). No `vscode` import. The two crlStructure/`resolveAnchor`-dependent lookups (decision-object
-// segments, live-occurrence gid) are CALLBACKS supplied by the host — both are separately unit-tested — so this module is a
+// (impl review 357 [important]). No `vscode` import. The crlStructure/`resolveAnchor`-dependent lookups (decision-object
+// segments, live-occurrence gid, and resolved concept identity) are CALLBACKS supplied by the host — the host wiring is separately tested — so this module is a
 // pure function of plain data.
 
 import type { MvFlag, MvFlagAnchor } from "@smile-digital-health/crl";
@@ -77,6 +77,7 @@ export function computeFlagPlacement(
   substrate: FlagPlacementSubstrate,
   decisionObjectGids: (anchor: MvFlagAnchor) => readonly string[],
   occurrenceGid: (anchor: MvFlagAnchor) => string | undefined,
+  resolveConcept: (anchor: MvFlagAnchor) => { lib: string; name: string } | undefined,
 ): FlagPlacementResult {
   const gids = new Set<string>();
   const byGid = new Map<string, MvFlag[]>();
@@ -87,12 +88,15 @@ export function computeFlagPlacement(
     else if (!b.some((x) => x.id === f.id)) b.push(f);
   };
 
+  const conceptTargets = new Map<MvFlag, { lib: string; name: string } | undefined>();
+  for (const f of flags) if (f.anchor.scope === "concept") conceptTargets.set(f, resolveConcept(f.anchor));
   let unplaced = 0;
   for (const f of flags) {
     const a = f.anchor;
     let matched: readonly string[] = [];
     if (a.scope === "concept") {
-      matched = substrate.conceptOccurrences.filter((o) => o.name === a.name && o.lib === a.library).map((o) => o.flagGid ?? o.gid);
+      const target = conceptTargets.get(f);
+      if (target) matched = substrate.conceptOccurrences.filter((o) => o.name === target.name && o.lib === target.lib).map((o) => o.flagGid ?? o.gid);
     } else if (a.scope === "decision") {
       if (a.occurrenceKey) {
         const g = occurrenceGid(a);
@@ -111,7 +115,10 @@ export function computeFlagPlacement(
     for (const occ of substrate.criterionOccurrences) {
       if (!occ.collapsed) continue;
       const bodyKeys = new Set(occ.bodyConcepts.map((bc) => conceptKey(bc.lib, bc.name)));
-      for (const f of conceptFlags) if (bodyKeys.has(conceptKey(f.anchor.library, f.anchor.name))) place(occ.gid, f);
+      for (const f of conceptFlags) {
+        const target = conceptTargets.get(f);
+        if (target && bodyKeys.has(conceptKey(target.lib, target.name))) place(occ.gid, f);
+      }
     }
   }
 
