@@ -60,13 +60,13 @@ export function conceptFlagTargetsForGids(
  * `driveFlagNodeHighlight` passes a single flag regardless of status (a resolved flag's drawer still lights its node). Do NOT
  * add an `isOpen` filter here — that would silently kill the resolved-flag highlight (disc 359 [important]).
  *
- * Matching (unchanged from the prior `driveFlagBadges` inline pass — Claude verified equivalence):
- *  - concept scope → every `conceptOccurrences` entry with the same `(lib, name)` (NEVER name alone — cross-lib collisions).
+ * Matching:
+ *  - concept scope → resolve the current identity, then every `conceptOccurrences` entry with that `(lib, name)` (NEVER name alone — cross-lib collisions).
  *  - decision scope + `occurrenceKey` → the ONE live gid from `occurrenceGid(anchor)` (undefined ⇒ moved/removed ⇒ `unplaced++`).
  *  - decision scope, no key (a decision-OBJECT flag) → every segment gid from `decisionObjectGids(anchor)`.
  *  - library scope / a concept drawn nowhere → no per-node gid (the start-badge count is the catch-all); NOT counted `unplaced`
  *    (only a genuine moved OCCURRENCE dilutes that signal).
- *  - a COLLAPSED criterion rolls each CONCEPT flag whose `(lib,name)` is in its `bodyConcepts` onto its own gid (so a flag on a
+ *  - a COLLAPSED criterion rolls each CONCEPT flag whose resolved `(lib,name)` is in its `bodyConcepts` onto its own gid (so a flag on a
  *    concept referenced only inside a folded body isn't invisible) — applies to whatever `flags` are passed (resolved included).
  *
  * Bucket ordering: each bucket is in `flags` order WITHIN each phase — the per-flag matching loop first, then the rollup — so

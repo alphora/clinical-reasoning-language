@@ -4,6 +4,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { resolveCelSuite, findPolicySrc, emitCrlTwoLane, coerceFlag, isValidFlagId, runCel } from '@smile-digital-health/crl';
 
 const root = resolve(fileURLToPath(new URL('../../../', import.meta.url)));
@@ -110,7 +111,7 @@ test('the Bleph demo flag is valid and historical verdicts stay outside active M
  const sample=JSON.parse(readFileSync(join(example,'review-samples/legacy-acceptance-verdicts.json'),'utf8'));
  assert.equal(sample.schemaVersion,2);
  assert.equal(Object.keys(sample.byCaseId).length,2);
- assert.ok(!existsSync(join(example,'src/medical-validation/bleph-medical-validation.json')));
+ assert.equal(execFileSync('git', ['ls-files', '--', 'examples/bleph-medical-validation/src/medical-validation/bleph-medical-validation.json'], {cwd: root, encoding: 'utf8'}).trim(), '', 'human MV state is not shipped in the tracked example');
 });
 
 

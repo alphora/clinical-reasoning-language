@@ -1,5 +1,14 @@
 # Kit evidence ledger
 
+## Maintenance - release test integration
+
+Baseline: `6e861e1a77cfa6c4cf8f0a6495ccfd1171bf0722`; reviewed target: pending the test-maintenance commit.
+Kit schema2.5 and hash90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96 are unchanged.
+Complete delta inspected: prior audit metadata, `crl-vscode/src/cockpitWebviewScript.test.mjs`, `flagPlacement.ts` (comments only), `mvWorkspaceFixture.test.mjs`, this ledger and maintenance inventory.
+**Existing guidance sufficient:** removed one redundant source-regex rollup check and one obsolete stored-name regex. `flagPlacement.test.mjs` already asserts resolved rename/replacement identities and folded/expanded rollups; actual host coverage remains. Corrected matching comments reflect that same behavior. No runtime code changes.
+**Existing guidance sufficient:** example test now checks active human review state is untracked, allowing local reviewer use without packaging their verdicts. The tracked historical sample/demo flag assertions remain. This is repository-content evidence, not human approval or new clinical evidence.
+**Not author-facing:** prior audit and inventory edits are metadata. No owning tags or kit content changed. Review779 converged0/0/0 native-only. Core5009 passed32 skipped plus realMCP; corrected complete extension1279 passed3 expected-fail. Earlier environmental and obsolete-assertion failures are retained in release logs, not counted as passing runs.
+
 ## Maintenance - public MCP guidance and delivery pins
 
 Baseline: `d9a4115593064d2cd5e406a8f6199c3ebca93398` (reviewed kit2.5 content). Reviewed target: `6e861e1a77cfa6c4cf8f0a6495ccfd1171bf0722`; finalized in the separate metadata stamp.

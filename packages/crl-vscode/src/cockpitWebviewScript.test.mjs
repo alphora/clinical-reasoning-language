@@ -814,22 +814,16 @@ check("#224 Slice 2b host: persistMv marries the 3rd map (default = current) so 
   assert.match(COCKPIT_SRC, /composeSidecar\(nextByCaseId, nextNotes, nextCriterionVerdicts\)/);
   assert.match(COCKPIT_SRC, /criterionVerdicts = nextCriterionVerdicts/);
 });
-check("#224 Slice 2b-2: a body-concept OPEN flag rolls up onto a COLLAPSED criterion box (matched by (lib,name)) — in the pure placement module", () => {
-  // the rollup moved to flagPlacement.ts (Todo 2, disc 357) + is executably tested in flagPlacement.test.mjs; lock the logic here
-  assert.match(FLAGPLACEMENT_SRC, /concept scope[\s\S]*?conceptOccurrences[\s\S]*?\(lib, name\)/); // concept match by (lib,name)
-  assert.match(FLAGPLACEMENT_SRC, /if \(!occ\.collapsed\) continue;/); // expanded → body concepts render their own badges
-  // per-flag rollup via place(occ.gid, f) — a Set of keys couldn't record WHICH flag lit the rollup gid
-  assert.match(FLAGPLACEMENT_SRC, /for \(const f of conceptFlags\) if \(bodyKeys\.has\([\s\S]*?\)\) place\(occ\.gid, f\)/);
-});
+// Concept placement and collapsed rollups are exercised behaviorally in flagPlacement.test.mjs,
+// including authoritative renamed identities, replacement names, expanded bodies and status preservation.
 check("#224 Slice 2b host: loadReviewSidecar loads criterionVerdictsByKey + resets it on retarget; the tree ack re-drives the chips", () => {
   assert.match(COCKPIT_SRC, /criterionVerdicts = sidecar\.criterionVerdictsByKey \?\? \{\}/);
   assert.match(COCKPIT_SRC, /criterionVerdicts = \{\}; \/\/ #224 ii\.3 Slice 2b: reset/);
   assert.match(COCKPIT_SRC, /driveCriterionVerdicts\(\);/);
 });
-check("#203 host: driveFlagBadges — per-node ⚑ by (lib,name)/anchors + the START-NODE COUNT badge (chrome mirror, catch-all); open-only", () => {
+check("#203 host: driveFlagBadges — per-node ⚑ by resolved anchors + the START-NODE COUNT badge (chrome mirror, catch-all); open-only", () => {
   assert.match(COCKPIT_SRC, /function driveFlagBadges\(\)/);
   assert.match(COCKPIT_SRC, /flagsList\.filter\(\(f\) => isOpen\(f\)\)/); // #212 S3: open-only over MvFlags (matches the gate)
-  assert.match(FLAGPLACEMENT_SRC, /o\.name === a\.name && o\.lib === a\.library/); // (lib,name) off the anchor — now in the pure placement module
   assert.match(COCKPIT_SRC, /crlStructure\.find\(\(sc\) => sc\.decision === a\.name && sc\.lib === a\.library\)/); // decision by (lib,name) — the host callback
   // the start-node COUNT badge replaces the old orphans→⚑ path: post the total open/resolved counts + the start gid
   assert.doesNotMatch(COCKPIT_SRC, /orphans > 0 && crlStructure\.length > 0/); // the Slice-A orphan→⚑ path is GONE (one implementation)

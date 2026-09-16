@@ -1,9 +1,11 @@
 packages/crl-vscode/esbuild.js
+packages/crl-vscode/src/cockpitWebviewScript.test.mjs
 packages/crl-vscode/src/correspondenceCockpit.ts
 packages/crl-vscode/src/flagPlacement.test.mjs
 packages/crl-vscode/src/flagPlacement.ts
 packages/crl-vscode/src/flagWorkflowHost.test.mjs
 packages/crl-vscode/src/mcp-server.test.mjs
+packages/crl-vscode/src/mvWorkspaceFixture.test.mjs
 packages/crl-vscode/src/stableServer.ts
 packages/crl/README.md
 packages/crl/package.json
