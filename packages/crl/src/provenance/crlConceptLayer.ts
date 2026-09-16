@@ -1,3 +1,4 @@
+import { conceptIdentity } from "../meta/conceptIdentity";
 import { readFiniteAnswerMembers } from "../emit/answerDomain";
 import { createPresentationCatalog, type PresentationText } from "../emit/presentation";
 /**
@@ -25,6 +26,9 @@ import type { LibInfo } from "./indexer";
 export type ConceptDefinitionKind = "defined-as" | "definition-is" | "coded-from";
 
 export interface CrlConceptNode {
+  /** Authored stable metadata identity, independent of the current display name. */
+  id?: string;
+  idInvalid?: true;
   nodeKey: string; // === indexer concept key === decision-row concept refKey (the cross-pane join)
   name: string;
   lib: string;
@@ -177,7 +181,10 @@ export function buildCrlConceptLayer(
         }
       }
 
+      const identity = conceptIdentity(c.meta);
       out.push({
+        ...(identity.kind === "id" ? { id: identity.id } : {}),
+        ...(identity.kind === "invalid" ? { idInvalid: true as const } : {}),
         nodeKey: nodeKey(conceptDeclRef(lib, c.name)),
         name: c.name,
         lib,

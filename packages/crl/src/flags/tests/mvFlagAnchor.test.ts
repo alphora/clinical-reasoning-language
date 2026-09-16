@@ -65,8 +65,8 @@ test("concept-scope: an AMBIGUOUS @id (>1 match) → orphaned, never a fallback 
   expect(resolveAnchor({ scope: "concept", name: "C", library: "L", entityId: "id1", label: "x" } as MvFlagAnchor, dupIdCtx)).toEqual({ state: "orphaned" });
 });
 
-test("concept-scope: an @id that no longer exists falls back to (name, library)", () => {
-  expect(resolveAnchor({ scope: "concept", name: "C", library: "L", entityId: "goneId", label: "x" } as MvFlagAnchor, ctx).state).toBe("live");
+test("concept-scope: an @id that no longer exists cannot bind a replacement with the old name", () => {
+  expect(resolveAnchor({ scope: "concept", name: "C", library: "L", entityId: "goneId", label: "x" } as MvFlagAnchor, ctx).state).toBe("orphaned");
 });
 
 test("concept-scope: a (name, library) multi-match → orphaned", () => {
@@ -82,4 +82,21 @@ test("partial ctx (an array not yet populated) → error, NOT a crash and NOT a 
   ]) {
     expect(resolveAnchor(anchor({}), partial as unknown as AnchorContext).state).toBe("error");
   }
+});
+
+
+test("a renamed ID anchor exposes the actual resolved concept without rewriting the anchor", () => {
+  const a = anchor({scope: "concept", name: "Old", library: "OldLib", entityId: "id1"});
+  const before = JSON.stringify(a);
+  expect(resolveAnchor(a, ctx)).toEqual({state: "live", concept: ctx.concepts[0]});
+  expect(JSON.stringify(a)).toBe(before);
+});
+test("invalid identity metadata makes the concept index unavailable rather than guessing", () => {
+  expect(resolveAnchor(anchor({scope: "concept", name: "C", entityId: "id1"}),
+    {...ctx, concepts: [...ctx.concepts, {name: "Broken", lib: "L", idInvalid: true}]}).state).toBe("error");
+});
+
+
+test("legacy name matching does not depend on unrelated identity metadata", () => {
+  expect(resolveAnchor(anchor({scope:"concept",name:"C"}), {...ctx, concepts:[...ctx.concepts,{lib:"L",name:"Broken",idInvalid:true}]}).state).toBe("live");
 });

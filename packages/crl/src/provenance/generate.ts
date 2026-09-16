@@ -58,7 +58,7 @@ import {
   type ProvenanceIndex,
   type ProvNodeRef,
 } from "./indexer";
-import { producedRuntimePathRefs, type MinimalViewNode, type RuntimePathRef } from "./runPath";
+import { executionRuntimePaths, type MinimalViewNode, type RuntimePathRef } from "./runPath";
 import { isStrictAncestor } from "./validators";
 
 // ── public shape ──────────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ const ctxKey = (lib: string, name: string): string => JSON.stringify([lib, name]
 
 /** #172 todo-3 [critical, Claude-7]: harvest the distinct `(lib, decision)` pairs the RUN PATH reaches across every
  *  rendered scenario — the authority for "what fired", spanning shared chains `decisionReachability` skips at the shared
- *  boundary (indexer.ts:513 doesn't recurse a declared-shared target). Uses the SAME `producedRuntimePathRefs` primitive
+ *  boundary (indexer.ts:513 doesn't recurse a declared-shared target). Uses the SAME `executionRuntimePaths` primitive
  *  the gate + classify use (no drift). Only GROUNDED refs contribute (a gapped path carries no usable decision); the
  *  covered decision's own lib is the root for the decompose. A failed render contributes nothing (the structural scaffold
  *  still emits). The covered decisions are seeded separately by the caller, so this returns the SUPERSET incl. them — the
@@ -182,11 +182,9 @@ function runPathReachedDecisions(
     if (sv.decision === null || !sv.decision.resolved) continue;
     const decision = sv.decision.name;
     const lib = sv.decision.libraryName ?? "";
-    const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], {
-      lib,
-      decision,
-    });
-    for (const p of paths) {
+    const execution = executionRuntimePaths(sv, { lib, decision });
+    if (execution.kind === "unchecked") continue;
+    for (const p of execution.paths) {
       if (p.gaps.length > 0) continue; // a gapped path carries no groundable decision identity
       for (const ref of p.refs) {
         const k = ctxKey(ref.lib, ref.decision);
@@ -591,6 +589,7 @@ interface ComparableCase {
   refs: RuntimePathRef[];
   /** the produced action terminals (one per produced action) — only for #174-faithful display-id derivation (FIX 5). */
   producedTerminals: RuntimePathRef[];
+  pausedTerminals: RuntimePathRef[];
 }
 
 /** Canonical, deterministic key for one decomposed run-path ref (the grouping + dedup unit). */
@@ -708,13 +707,14 @@ function classifyScenarioRunPath(
   // where the generator is more permissive than the validator.
   const lib = sv.decision.libraryName ?? "";
 
-  // The chain-aware run path (#175, disc 151 Fork B): the SAME `producedRuntimePathRefs` primitive the FINAL gate
+  // The chain-aware run path (#175, disc 151 Fork B): the SAME `executionRuntimePaths` primitive the FINAL gate
   // (correspondenceCheck.ts) consumes — ONE call site, no drift (disc 151 ref 3), so a generated disposition-path
   // scaffold round-trips clean through the gate. It re-roots a deep inlined same-lib `use decision` run path into
   // ordered STANDALONE-local refs (one per delegation frame), reducing to the covered decision's ancestor chain for a
   // non-chained case.
-  const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], { lib, decision });
-  if (paths.length === 0) return { kind: "deferred", reason: "no-produced-action" };
+  const execution = executionRuntimePaths(sv, { lib, decision });
+  if (execution.kind === "unchecked") return { ...execution, kind: "deferred" };
+  const paths = execution.paths;
 
   // deferred-disposition-path/unmapped (mirror correspondenceCheck's honesty gate, disc 151 ref 5): a path is
   // un-clusterable (DEFER, never a defaulted/guessed scaffold) iff ANY of —
@@ -733,12 +733,15 @@ function classifyScenarioRunPath(
   // display-id derivation for a NON-chained path (FIX 5 byte-stability; see dispositionPathId) AND, in default mode, to
   // match a chained `D is X` branch result against the SUB-decision its disposition actually fired in (disc 154).
   const producedTerminals: RuntimePathRef[] = [];
+  const pausedTerminals: RuntimePathRef[] = [];
   for (const p of paths) {
     if (p.gaps.length > 0) {
       unmapped.push(...p.gaps);
       continue;
     }
-    if (p.refs.length > 0) producedTerminals.push(p.refs[p.refs.length - 1]);
+    if (p.refs.length > 0) {
+      (p.endpoint === "produced" ? producedTerminals : pausedTerminals).push(p.refs[p.refs.length - 1]);
+    }
     for (const ref of p.refs) {
       const cite = `${ref.lib}::${ref.decision}#${ref.nodeId}`;
       if (index.nodeKindOf(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId)) === undefined) {
@@ -762,6 +765,7 @@ function classifyScenarioRunPath(
       lib,
       refs: [...refsByKey.values()].sort((a, b) => (refKey(a) < refKey(b) ? -1 : refKey(a) > refKey(b) ? 1 : 0)),
       producedTerminals,
+      pausedTerminals,
     },
   };
 }
@@ -833,13 +837,15 @@ function buildDispositionPathClusters(
     refs: RuntimePathRef[];
     /** the produced terminals of the FIRST case in the group — only for the #174-faithful display id (FIX 5). */
     producedTerminals: RuntimePathRef[];
+    pausedTerminals: RuntimePathRef[];
     caseIds: Set<string>;
   }
   const groups = new Map<string, Group>();
   for (const c of comparable) {
     // GROUP on the full decomposed REF SET (canonical, spanning every delegation frame's decision), NOT the covered
     // decision's deep nodeIds — two cases share a disposition cluster iff their entire re-rooted run path matches.
-    const canonicalKey = JSON.stringify([c.lib, c.decision, c.refs.map(refKey)]);
+    const canonicalKey = JSON.stringify([c.lib, c.decision, c.refs.map(refKey),
+      [...new Set(c.producedTerminals.map(refKey))].sort(), [...new Set(c.pausedTerminals.map(refKey))].sort()]);
     let g = groups.get(canonicalKey);
     if (!g) {
       g = {
@@ -848,6 +854,7 @@ function buildDispositionPathClusters(
         decision: c.decision,
         refs: c.refs,
         producedTerminals: c.producedTerminals,
+        pausedTerminals: c.pausedTerminals,
         caseIds: new Set(),
       };
       groups.set(canonicalKey, g);
@@ -863,7 +870,9 @@ function buildDispositionPathClusters(
   );
   const usedIds = new Map<string, number>();
   for (const g of sortedGroups) {
-    const base = dispositionPathId(g.lib, g.decision, g.refs, g.producedTerminals);
+    const base = g.pausedTerminals.length
+      ? `cluster:${sanitizeIdSeg(g.lib)}:${sanitizeIdSeg(g.decision)}:pause-${createHash("sha256").update(g.canonicalKey).digest("hex").slice(0, 16)}`
+      : dispositionPathId(g.lib, g.decision, g.refs, g.producedTerminals);
     const n = (usedIds.get(base) ?? 0) + 1;
     usedIds.set(base, n);
     const id = n === 1 ? base : `${base}-${n}`;
@@ -906,7 +915,7 @@ function refToProv(ref: CrlNodeRef): ProvNodeRef {
  *  the full path), so NO additional ancestorChain expansion is applied. */
 function buildDispositionCluster(
   id: string,
-  g: { lib: string; decision: string; refs: RuntimePathRef[]; caseIds: Set<string> },
+  g: { lib: string; decision: string; refs: RuntimePathRef[]; caseIds: Set<string>; pausedTerminals: RuntimePathRef[] },
   celFileName: string,
   policyLib: string | null,
   ctxByName: Map<string, DispoDecisionCtx>,
@@ -935,8 +944,9 @@ function buildDispositionCluster(
     )
     .map((sn) => actionTargetName(sn))
     .filter((t): t is string => t !== undefined);
-  const label =
-    targets.length > 0 ? `${g.decision} → ${[...new Set(targets)].sort().join(" + ")}` : g.decision;
+  const outcomes = [...new Set(targets)].sort();
+  if (g.pausedTerminals.length) outcomes.push("Awaiting input");
+  const label = outcomes.length ? `${g.decision} → ${outcomes.join(" + ")}` : g.decision;
 
   const cel: CelNodeRef[] = sortCelRefs(
     [...g.caseIds].map((caseId) => ({
@@ -1167,7 +1177,7 @@ function processCelCase(
     } else if (rf.value.type === "CELPauseResult") {
       diagnostics.push({
         kind: "unsupported-cel-result",
-        message: `CEL case ${celCase.name} expects decision "${rf.leafName}" to pause; pause-to-cluster attribution is not supported yet.`,
+        message: `CEL case ${celCase.name} expects decision "${rf.leafName}" to pause; pause-to-cluster attribution requires clusterBy:"disposition-path" to preserve the partial path.`,
         caseId: celCase.caseId,
       });
     } else {

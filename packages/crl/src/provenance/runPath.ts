@@ -1,3 +1,5 @@
+import type { ScenarioViewModel, ViewNode } from "../cre/viewModel";
+
 /**
  * Shared "run path" primitives — the ONE definition of "what a CEL case's run path is", consumed by BOTH the
  * provenance↔cockpit correspondence check (correspondenceCheck.ts) AND the disposition-path scaffold generator
@@ -5,9 +7,10 @@
  * let the two drift, so the round-trip (generate a disposition-path scaffold → the FINAL gate verifies it) would no
  * longer be honest. The util imports nothing from either consumer (no cycle).
  *
- * A case's run path is: collectProduced (the produced-action ViewNodes in the scenario tree) → for each, the inclusive
- * `/`-prefix ancestor chain of its decision-local nodeId. ViewNode is DUCK-TYPED here (the scenario VM contract) so
- * this module's only `cre` coupling stays structural.
+ * A comparable execution path reaches a produced action or an evaluated unknown condition.
+ * executionRuntimePaths admits those endpoints only when execution has no errors or unresolved
+ * entered delegation. The shared decomposer returns their inclusive standalone-local ancestor
+ * chains; expected CEL results never substitute for execution evidence.
  *
  * #175 (disc 151, Fork B) adds the CHAIN-AWARE decomposer: a same-lib `use decision` is INLINED by the CRE under the
  * caller's nodeId (deep `.../action[0]/.../action[0]` ids that span multiple decisions), but provenance/structure
@@ -268,4 +271,56 @@ export function runtimeNodePathRefs(
 ): ProducedRunPath | undefined {
   const paths = decomposePaths(tree, root, (n) => n.nodeId === targetNodeId);
   return paths.length === 0 ? undefined : paths[0];
+}
+
+/** CRE correspondence endpoints; a reached pause is distinct from a production. */
+export interface ExecutionRunPath extends ProducedRunPath {
+  endpoint: "produced" | "pause";
+}
+export type ExecutionRunPaths =
+  | { kind: "comparable"; paths: ExecutionRunPath[]; producedCount: number; pausedCount: number }
+  | { kind: "unchecked"; reason: "run-error" | "unresolved-decision" | "no-produced-action"; details?: string[] };
+
+/** Shared admission for checking and scaffolding. An expected result supplies no
+ * execution evidence. A successful sibling cannot hide a broken delegation. */
+export function executionRuntimePaths(
+  scenario: Pick<ScenarioViewModel, "tree" | "status" | "discardedUnknown">,
+  root: { lib: string; decision: string },
+): ExecutionRunPaths {
+  if (scenario.status === "error" || scenario.discardedUnknown) {
+    return { kind: "unchecked", reason: "run-error",
+      ...(scenario.discardedUnknown ? { details: ["Reached evaluation discarded unknown evidence."] } : {}) };
+  }
+  const unresolved: string[] = [], invalid: string[] = [];
+  const inspect = (nodes: ViewNode[]): void => {
+    for (const n of nodes) {
+      if (!n.evaluated) continue;
+      if (n.invalidated || n.publicationErrors?.length) invalid.push(n.nodeId);
+      if (n.kind === "action" && n.action?.actionKind === "use-decision" &&
+          !n.guardedOut && !n.action.expanded) unresolved.push(n.nodeId);
+      inspect(n.children ?? []);
+    }
+  };
+  inspect(scenario.tree);
+  if (invalid.length) return { kind: "unchecked", reason: "run-error", details: invalid };
+  if (unresolved.length) return { kind: "unchecked", reason: "unresolved-decision", details: unresolved };
+  const produced = producedRuntimePathRefs(scenario.tree, root);
+  // Unknown operands of settled guards and unreached branches are not endpoints.
+  const pauseNodes = new Set<MinimalViewNode>();
+  const collect = (nodes: ViewNode[]): void => {
+    for (const n of nodes) {
+      if (!n.evaluated) continue;
+      if (n.kind === "when" && n.unknown === true) { pauseNodes.add(n); continue; }
+      collect(n.children ?? []);
+    }
+  };
+  collect(scenario.tree);
+  const paused = decomposePaths(scenario.tree, root, n => pauseNodes.has(n));
+  const paths: ExecutionRunPath[] = [
+    ...produced.map(p => ({ ...p, endpoint: "produced" as const })),
+    ...paused.map(p => ({ ...p, endpoint: "pause" as const })),
+  ];
+  return paths.length
+    ? { kind: "comparable", paths, producedCount: produced.length, pausedCount: paused.length }
+    : { kind: "unchecked", reason: "no-produced-action" };
 }

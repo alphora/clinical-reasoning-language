@@ -380,3 +380,22 @@ describe("value from — instantiated vs reference terminology", () => {
     expect(opts.has(by.get("Wraps Reference")!.nodeKey)).toBe(false);
   });
 });
+
+
+test("concept inventory carries authored identities, including unreachable library concepts and invalid metadata", () => {
+  const src = T.replace('concept "A":', 'concept "A": - meta is `@id: stable-a`.');
+  const extra = U.replace('concept "Q":', 'concept "Q": - meta is `@id: stable-q`.');
+  const layer = buildCrlConceptLayer(graphFrom(src, CEL, [entry(extra, "u.crl", "local")]));
+  expect(layer.find(c => c.name === "A")).toMatchObject({id: "stable-a"});
+  expect(layer.find(c => c.name === "Q")).toMatchObject({id: "stable-q"});
+  expect(layer.find(c => c.name === "B")?.id).toBeUndefined();
+  const invalid = T.replace('concept "A":', 'concept "A": - meta is `@id: one`. - meta is `@id: two`.');
+  expect(buildCrlConceptLayer(graphFrom(invalid, CEL)).find(c => c.name === "A")).toMatchObject({idInvalid: true});
+});
+
+
+test("unrelated @id-source notes do not poison the concept identity index",()=>{
+  const src=T.replace('concept "A":','concept "A": - meta is `@id-source: provenance`. - meta is `@id: stable`.');
+  const a=buildCrlConceptLayer(graphFrom(src,CEL)).find(c=>c.name==="A")!;
+  expect(a.id).toBe("stable");expect(a.idInvalid).toBeUndefined();
+});

@@ -115,3 +115,40 @@ test("a tag ALIAS canonicalizes through the full seam (over-reach-to-fix → fid
   if (!r.ok) return;
   expect(r.flag.tag).toBe("fidelity-defect");
 });
+
+
+// @kit: durable-concept-flags -- authored identities survive rename; no guessed fallback.
+const identified = (name: string, id: string) => `library "L". concept "${name}":
+- type is Observation. - code is \`c\`. - meta is \`@id: ${id}\`.`;
+const flagFor = (source: string, name: string, fields?: Record<string,string>) =>
+  validateAndBuildMvFlagDraft(source, {kind: "concept", name}, {tag: "validation-concern", gist: "Check", fields});
+test("captures authored @id and preserves generated dedup identity across a rename", () => {
+  const old = flagFor(identified("Old", "stable"), "Old"), renamed = flagFor(identified("New", "stable"), "New"), replacement = flagFor(identified("Old", "replacement"), "Old");
+  expect(old.ok && renamed.ok && replacement.ok).toBe(true);
+  if (!old.ok || !renamed.ok || !replacement.ok) return;
+  expect(old.flag.anchor.entityId).toBe("stable");
+  expect(renamed.flag.anchor.entityId).toBe("stable");
+  expect(old.flag.dedupKey).toBe(renamed.flag.dedupKey);
+  expect(old.flag.dedupKey).not.toBe(replacement.flag.dedupKey);
+  const explicit = flagFor(identified("New", "stable"), "New", {key: "authored-key"});
+  expect(explicit.ok && explicit.flag.dedupKey).toBe("authored-key");
+});
+test.each([
+  identified("C", ""),
+  identified("C", "one") + ' - meta is `@id: two`.',
+  identified("C", "one") + ' concept "Other": - type is Observation. - code is `o`. - meta is `@id: one`.',
+])("refuses an empty, repeated or duplicate authored identity", source => {
+  const result = flagFor(source, "C");
+  expect(result).toMatchObject({ok: false, reason: "invalid-value"});
+});
+
+
+test.each([false,true])("a distinct @id-source tag is not identity metadata (with ID: %s)", withId => {
+  const source=CONCEPT+' - meta is `@id-source: provenance`.'+(withId?' - meta is `@id: stable`.':'');
+  const result=flagFor(source,"C");
+  expect(result.ok).toBe(true);
+  if(result.ok)expect(result.flag.anchor.entityId).toBe(withId?"stable":undefined);
+});
+test("a malformed exact @id attempt cannot silently become a name-only anchor",()=>{
+  expect(flagFor(CONCEPT+' - meta is `@id missing-colon`.','C')).toMatchObject({ok:false,reason:"invalid-value"});
+});

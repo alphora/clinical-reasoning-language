@@ -2,7 +2,7 @@
  * Provenance↔cockpit CORRESPONDENCE check (#170) — the authoritative, NON-structural gate folded into the FINAL
  * `validate_provenance`. Per CEL case it asserts the cockpit's LIT decision-row set (the REAL `crlRevealMaps`
  * resolution — `crlAnchorsForUnits(unitsForCase(...))`, NOT a structural reimplementation) equals the case's RUN
- * PATH (the produced-action ancestor chain from the scenario VM). EXTRA lit ⇒ bleed (an untaken branch/cell lit);
+ * PATH (the produced-action and reached-pause ancestor chains from the scenario VM). EXTRA lit ⇒ bleed (an untaken branch/cell lit);
  * MISSING ⇒ the path under-lights. Green ⇒ the cockpit lights exactly each case's path.
  *
  * Why the REAL resolution and not the structural string-invariant: a cluster citing a CONCEPT ref resolves (per the
@@ -11,7 +11,7 @@
  * Running the cockpit's OWN code is the only thing that cannot drift from what the cockpit shows.
  *
  * A green gate MUST mean "checked": every case that cannot be compared (no frozen id, name collision, no decision,
- * unresolved decision, no produced disposition, a run error, or a runtime node with no structure row) is reported as
+ * unresolved decision, no produced action or reached pause, a run error, or a runtime node with no structure row) is reported as
  * an explicit `unchecked` result — never silently skipped. A wholesale FAILED scenario render (no cases at all) is
  * itself reported `render-failed` so FINAL can never green-pass having verified nothing.
  */
@@ -19,7 +19,7 @@ import { caseViewKey } from "../cre/viewModel";
 import type { CockpitModel } from "./cockpitModel";
 import type { ProvNodeRef } from "./indexer";
 import { buildCrlRevealMaps, crlAnchorsForUnits, unitsForCase } from "./revealMaps";
-import { producedRuntimePathRefs, type MinimalViewNode } from "./runPath";
+import { executionRuntimePaths } from "./runPath";
 
 export type CorrespondenceUncheckedReason =
   | "render-failed"
@@ -141,20 +141,18 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
       continue;
     }
 
-    // The chain-aware run path (#175, disc 151 Fork B): ONE ProducedRunPath per produced action. The decomposer
+    // The chain-aware run path (#175, disc 151 Fork B): ONE path per produced action or reached pause. The decomposer
     // re-roots a deep inlined same-lib `use decision` run-path (`.../action[0]/when[0]/.../action[0]` spanning
     // Main→Sub1→…) into ordered STANDALONE-local refs — one per delegation frame — so each grounds against the
     // standalone structure index (`idToKey`, which inventories EVERY decision standalone, sub-decisions included). For a
     // non-chained case the decomposition reduces to the old inclusive ancestor chain (back-compat), so those cases are
     // byte-unchanged. generate.ts derives the SAME path via the SAME primitive (disc 151 ref 3, no drift).
-    const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], {
-      lib,
-      decision: dec,
-    });
-    if (paths.length === 0) {
-      results.push({ kind: "unchecked", caseName, reason: "no-produced-action" });
+    const execution = executionRuntimePaths(sv, { lib, decision: dec });
+    if (execution.kind === "unchecked") {
+      results.push({ ...execution, caseName });
       continue;
     }
+    const paths = execution.paths;
 
     // expected = union over EVERY produced action's decomposed standalone refs → row nodeKeys. The honesty invariant
     // (disc 151 ref 5, MACHINE-CHECKABLE): route to `unmapped-runtime-node` iff a path's `gaps` is non-empty (the
@@ -206,7 +204,7 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
         lib,
         bleed: bleed.map(decodeRef),
         miss: miss.map(decodeRef),
-        producedCount: paths.length,
+        producedCount: execution.producedCount,
       });
     }
     // else: clean (push nothing) — the cockpit lights exactly this case's path.

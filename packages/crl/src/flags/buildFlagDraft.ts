@@ -4,6 +4,7 @@
 // validation to the PURE `validateFlagFields` (flagVocab), then builds the `MvFlag` DIRECTLY (no `.crl` write, no legacy
 // `FlagInstance` adapter). `createFlag` / `legacyToMvFlag` are no longer involved (deleted in 4b).
 import { createHash, randomUUID } from "node:crypto";
+import { conceptIdentity } from "../meta/conceptIdentity";
 
 import type { CRL } from "../ast/types";
 import { buildCRL } from "../index"; // buildCRL is DEFINED in the barrel; a runtime-only call, cycle-safe (same as the old createFlag import)
@@ -29,7 +30,10 @@ export type BuildFlagResult =
 function contentDedupKey(flag: MvFlag): string {
   const a = flag.anchor;
   const fields = Object.entries(flag.fields).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
-  return "d-" + createHash("sha1").update(JSON.stringify([a.scope, a.name, a.library ?? "", a.occurrenceKey ?? "", flag.tag, flag.gist, fields])).digest("hex");
+  const identity = a.scope === "concept" && a.entityId
+    ? [a.scope, { entityId: a.entityId }]
+    : [a.scope, a.name, a.library ?? "", a.occurrenceKey ?? ""];
+  return "d-" + createHash("sha1").update(JSON.stringify([...identity, flag.tag, flag.gist, fields])).digest("hex");
 }
 
 /** A human label that survives orphaning ("this flag was about X"). A decision-occurrence flag appends the node signature. */
@@ -59,6 +63,7 @@ export function validateAndBuildMvFlagDraft(
 
   // 3. Confirm the target declaration EXISTS and pin the anchor's library (a `.crl` declares exactly one library).
   let libraryName: string | undefined;
+  let entityId: string | undefined;
   if (target.kind === "library") {
     if (!ast.library || ast.library.name !== target.name) return { ok: false, reason: "decl-not-found", message: `no library "${target.name}" in this source` };
     libraryName = ast.library.name;
@@ -67,6 +72,20 @@ export function validateAndBuildMvFlagDraft(
     if (target.library !== undefined && ast.library?.name !== target.library) return { ok: false, reason: "decl-not-found", message: `no library "${target.library}" in this source` };
     const decl = ast.statements.find((s) => s.type === astType && (s as { name?: string }).name === target.name);
     if (!decl) return { ok: false, reason: "decl-not-found", message: `no ${target.kind} "${target.name}" in this source` };
+    if (decl.type === "Concept") {
+      const identity = conceptIdentity(decl.meta);
+      if (identity.kind === "invalid")
+        return { ok: false, reason: "invalid-value", message: "The target concept must have one nonempty, valid @id or no @id." };
+      if (identity.kind === "id") {
+        entityId = identity.id;
+        const sameId = ast.statements.filter(s => s.type === "Concept").filter(c => {
+          const other = conceptIdentity(c.meta);
+          return other.kind === "id" && other.id === entityId;
+        });
+        if (sameId.length !== 1)
+          return { ok: false, reason: "invalid-value", message: "The target concept @id is ambiguous in this source." };
+      }
+    }
     libraryName = ast.library?.name ?? target.library;
   }
 
@@ -79,6 +98,7 @@ export function validateAndBuildMvFlagDraft(
 
   const anchor: MvFlagAnchor = { scope: target.kind, name: target.name, label: buildLabel(target.name, occurrenceKey) };
   if (libraryName) anchor.library = libraryName;
+  if (entityId) anchor.entityId = entityId;
   if (occurrenceKey) anchor.occurrenceKey = occurrenceKey;
 
   const fields: Record<string, string> = {};

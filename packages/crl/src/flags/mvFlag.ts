@@ -20,7 +20,7 @@ export type MvFlagScope = "concept" | "decision" | "library";
 
 /** The ORIGINAL target the flag is about — ALWAYS retained (self-describing). `library` is required to resolve a
  *  concept/decision anchor safely (cross-lib same-name collisions); a resolver treats its absence as unresolvable. `entityId`
- *  = the concept `@id` when available (resolve by id first, then name+library — rename-safe). `occurrenceKey`
+ *  = the concept `@id` when available (resolve by id when present, otherwise name+library — rename-safe). `occurrenceKey`
  *  (`<nodeId>~<signature>`) addresses a specific decision leaf/`when` node — meaningful ONLY for `scope==="decision"`. */
 export interface MvFlagAnchor {
   scope: MvFlagScope;

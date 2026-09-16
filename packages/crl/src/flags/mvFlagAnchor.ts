@@ -20,6 +20,7 @@ export interface AnchorConceptRef {
   name: string;
   lib: string;
   id?: string;
+  idInvalid?: true;
 }
 /** The current CRL structure the resolver matches against. `undefined` (passed by the caller) means the source is
  *  unparseable / the index is unavailable → every anchor resolves to `error` (gate blocked). */
@@ -30,7 +31,7 @@ export interface AnchorContext {
 }
 
 export type AnchorResolution =
-  | { state: "live"; ref?: OccurrenceRef; nodeKey?: string }
+  | { state: "live"; ref?: OccurrenceRef; nodeKey?: string; concept?: AnchorConceptRef }
   | { state: "orphaned" }
   | { state: "error"; reason: string };
 
@@ -58,14 +59,13 @@ export function resolveAnchor(anchor: MvFlagAnchor, ctx: AnchorContext | undefin
     return { state: "live" }; // decision-scope (no specific node)
   }
 
-  // scope === "concept" — resolve by @id first (rename-safe), else (name, library); missing library / 0 / >1 ⇒ orphaned.
-  if (anchor.entityId) {
-    const byId = ctx.concepts.filter((c) => c.id !== undefined && c.id === anchor.entityId);
-    if (byId.length === 1) return { state: "live" };
-    if (byId.length > 1) return { state: "orphaned" }; // ambiguous @id ⇒ orphaned (never guess, never fall back to a weaker name match)
-    // byId.length === 0: the id no longer exists (deleted/recreated/older record) → fall through to the (name, library) match.
-  }
-  if (!anchor.library) return { state: "orphaned" };
-  const byName = ctx.concepts.filter((c) => c.name === anchor.name && c.lib === anchor.library);
-  return byName.length === 1 ? { state: "live" } : { state: "orphaned" };
+  // A supplied durable ID is authoritative. Only older ID-less anchors use names.
+  if (anchor.entityId && ctx.concepts.some(c => c.idInvalid))
+    return { state: "error", reason: "CRL concept identity metadata is invalid" };
+  const matches = anchor.entityId
+    ? ctx.concepts.filter(c => c.id === anchor.entityId)
+    : anchor.library ? ctx.concepts.filter(c => c.name === anchor.name && c.lib === anchor.library) : [];
+  return matches.length === 1
+    ? { state: "live", concept: matches[0] }
+    : { state: "orphaned" };
 }

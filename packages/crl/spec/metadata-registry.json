@@ -123,7 +123,7 @@
         "cql": false,
         "fhir": false
       },
-      "notes": "Stable concept identifier. Durable metadata should key on @id so a concept rename does not orphan its tags. Rename/split/merge handling is a known v1 gap."
+      "notes": "Stable concept identifier. Store flags capture a unique @id and resolve it after a rename or library move without rewriting their history. Missing or ambiguous supplied IDs do not fall back to names. ID-less flags still use library/name; general metadata split/merge migration is not provided."
     },
     {
       "id": "description",

@@ -90,7 +90,7 @@ The extraction tags are `customer-confirmable`, `internal-inconsistency`, `open-
 
 ## Stable identity (recommended)
 
-Metadata is keyed on the concept name by default. To make durable metadata survive renames, attach an optional `@id` and key tags on it. Rename / split / merge handling is a known v1 gap; `@id` is the operator-recommended hedge until a fuller story exists.
+Metadata is keyed on the concept name by default. Attach an optional unique `@id` to give a concept durable identity. Store flag creation captures it as `anchor.entityId`; flag resolution and tree placement follow the same ID after a concept rename or library move. A missing or ambiguous supplied ID is unresolved, without name fallback. ID-less legacy flags still use the unique library/name pair. Stored anchors and review history are not rewritten. General metadata split/merge migration remains outside this behavior; do not reuse an ID for a different concept.
 
 ## Design decisions (settled)
 

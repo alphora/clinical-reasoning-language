@@ -480,21 +480,21 @@ describe("#172 todo-3 — honesty: an UNRESOLVED cross-lib target defers (never 
   it("the disposition-path scaffold defers the unresolved case (no disposition cluster) and the gate is not a false green", () => {
     const r = generateProvenanceFiles(fx.celPath, fx.anchorPath, { clusterBy: "disposition-path" });
     const disposition = r.artifact.clusters.filter((c) => !c.id.endsWith(":coverage"));
-    // the unresolved target produces no disposition → no produced action → deferred (no disposition cluster).
+    // the entered unresolved target cannot supply a grounded execution path → no produced action → deferred (no disposition cluster).
     expect(disposition).toEqual([]);
     const deferred = r.diagnostics.filter((d) => d.kind === "deferred-disposition-path");
     expect(deferred).toHaveLength(1);
-    // no-produced-action (the unresolved use-decision never determined a recommendation) — an honest defer, not a green.
-    expect(deferred[0].reason).toBe("no-produced-action");
+    // unresolved-decision (the unresolved use-decision never determined a recommendation) — an honest defer, not a green.
+    expect(deferred[0].reason).toBe("unresolved-decision");
 
     const artPath = path.join(fx.root, "art.json");
     writeFileSync(artPath, JSON.stringify(r.artifact, null, 2) + "\n");
-    // The FINAL gate: the case has no produced action → unchecked (no-produced-action) → a cockpit-correspondence finding
+    // The FINAL gate: the case has no produced action → unchecked (unresolved-decision) → a cockpit-correspondence finding
     // (a green that means "checked nothing" is impossible — the unchecked case surfaces). NOT a false clean pass.
     const findings = validateProvenanceFiles(artPath, fx.celPath, fx.anchorPath, "final").findings;
     const corr = findings.filter((f) => f.kind === "cockpit-correspondence");
     expect(corr).toHaveLength(1);
-    expect(corr[0].message).toMatch(/unchecked.*no-produced-action/);
+    expect(corr[0].message).toMatch(/unchecked.*unresolved-decision/);
   });
 });
 
