@@ -1,6 +1,6 @@
-## Maintenance - release 6.3.0 (reviewed content pending commit)
+## Maintenance - release 6.3.0
 
-Baseline: `510c931f2323c89f9822592e01668112dd6ff795`. Target: pending reviewed content commit; finalize the literal SHA in the separate stamp commit. Kit schema2.9, content hash `46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826`. Complete changed-path inventory: [maintenance-6.3.0-paths.txt](maintenance-6.3.0-paths.txt). The earlier pending2.6–2.8 records below retain intermediate evidence; this section consolidates the release interval.
+Baseline: `510c931f2323c89f9822592e01668112dd6ff795`. Target: `3bf25ef2420f7d52d39161292973333860827f26`. Audit metadata is committed separately. Kit schema2.9, content hash `46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826`. Complete changed-path inventory: [maintenance-6.3.0-paths.txt](maintenance-6.3.0-paths.txt). The earlier pending2.6–2.8 records below retain intermediate evidence; this section consolidates the release interval.
 
 All paths in the inventory were reviewed against the saved audit, including old/new root goldens, untracked shared fixtures/helpers, CLI/MCP guidance, tests and UI. The intervening6.0 release bump/lock and prior audit metadata add no language behavior. No dependency addition or native engine/driver change. Goldens are expectations, not semantic authority. Operator requirements and CRL north star govern.
 
