@@ -145,7 +145,8 @@ export function valueReadValueTypes(
 /** The value types that are NOT admitted on `Observation.value[x]` in R4 — exported so a test can pin the
  *  complement (`conceptValueTypes − OBSERVATION_VALUE_X`) and break loudly when the grammar value-type set
  *  grows without an R4-legality decision. */
-export const OBSERVATION_VALUE_X_EXCLUDED: readonly ConceptValueType[] = ["date", "Attachment"];
+// REFACTOR:grounded (#322): text normalizes to string in the AST; it is not a FHIR wire type.
+export const OBSERVATION_VALUE_X_EXCLUDED: readonly ConceptValueType[] = ["date", "Attachment", "text"];
 
 /** The resource types this model knows about — exported so a test can pin the model's keyset against
  *  `RESOURCE_EMIT_REGISTRY` ∪ {Patient} in BOTH directions (a future stray row, e.g. `Encounter`, would silently

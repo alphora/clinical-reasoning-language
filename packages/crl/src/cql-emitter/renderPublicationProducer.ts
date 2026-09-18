@@ -12,6 +12,7 @@ export const PUBLICATION_PRODUCER_FUNCTIONS = Object.freeze({
   interpret: `${PUBLICATION_PRODUCER_PREFIX}Interpret`,
   classify: `${PUBLICATION_PRODUCER_PREFIX}Classify`,
   candidate: `${PUBLICATION_PRODUCER_PREFIX}Candidate`,
+  hasValue: `${PUBLICATION_PRODUCER_PREFIX}HasValue`,
 });
 
 /** Prepared finite pairs only: no terminology-provider call, stub, name lookup or pattern scan. */
@@ -37,7 +38,7 @@ export function renderAnswerClassification(value: string, domain: string, qualif
 }
 
 /** One identical parameterized constructor for coded/uncoded, unknown/known and dated/undated producers. */
-export function renderPublicationProducerHelpers(): string {
+export function renderPublicationProducerHelpers(includeHasValue = false): string {
   const n = PUBLICATION_PRODUCER_FUNCTIONS;
   const q = (name: string): string => `"${name}"`;
   const result = PUBLICATION_SELECTION_RESULT_CQL_TYPE;
@@ -57,6 +58,28 @@ define function ${q(n.construct)}(code FHIR.CodeableConcept, datum System.Boolea
       else { FHIR.Reference { reference: FHIR.string { value: 'Observation/' + operand.id.value } } }
   }
 
+${includeHasValue ? `/* REFACTOR:grounded (#322): selected value presence is total; failed envelopes remain errors. */
+define function ${q(n.hasValue)}(operand ${result}, producerId System.String, code FHIR.CodeableConcept,
+  profile System.String, valueType System.String, subjectReference System.String):
+  if operand.state = 'failed' then
+    Message(null as ${candidate}, true, operand.failureCode, 'Error', operand.failureMessage)
+  else Tuple {
+    key: if operand.state != 'selected' then producerId + ':missing'
+      else ToString(Length(producerId)) + ':' + producerId + ToString(Length(operand.selected.key)) + ':' + operand.selected.key,
+    contributorId: producerId,
+    arm: 'inferred',
+    retrievedInputIdentity: null as System.String,
+    resource: ${q(n.construct)}(code,
+      if operand.state != 'selected' then false
+      else if valueType = 'boolean' then (operand.selected.resource.value as FHIR.boolean).value is not null
+      else if valueType = 'string' then (operand.selected.resource.value as FHIR.string).value is not null
+      else if valueType = 'dateTime' then (operand.selected.resource.value as FHIR.dateTime).value is not null
+      else operand.selected.resource.value is not null,
+      profile, operand.selected.resource, subjectReference),
+    validity: operand.selected.validity
+  }
+
+` : ""}\
 define function ${q(n.recognized)}(value FHIR.CodeableConcept, domain ${PUBLICATION_CODE_TABLE_TYPE}):
   value.coding C where exists (domain D where D.system = C.system.value and D.code = C.code.value)
 

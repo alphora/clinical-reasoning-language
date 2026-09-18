@@ -65,9 +65,7 @@ FLAGS:
                        (nearest package.json) — writes <root>/tests/results/fhir/patient/…
                        Pass any other path to write elsewhere; the layout under it is identical.
   --enable             Opt in to running a JVM. Without it, nothing runs.
-  --no-prune           Keep superseded Questionnaire/QuestionnaireResponse files that this run
-                       did not write. They are reported either way; by default they are deleted,
-                       because a stale pair from a renamed case is shown to reviewers as real.
+
   --help               Show this message and exit 0.
 
 EXIT CODES:
@@ -105,7 +103,7 @@ function parseArgs(argv: string[]): Args {
     else if (f === "--out") a.out = need(i++, f);
     else if (f === "--enable") a.enable = true;
     else if (f === "--retry-failed") a.retryFailed = true;
-    else if (f === "--no-prune") a.prune = false;
+    else if (f === "--no-prune") throw new Error("--no-prune is no longer supported; generated output is replaced. Use Git or a scratch output root.");
     else { process.stderr.write(`unknown flag ${f}\n`); process.exit(1); }
   }
   return a;

@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "coded-question-coverage-determination",
+  "id": "coded-question",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/coded-question/PlanDefinition/coded-question-coverage-determination",
+  "url": "http://example.org/crl/coded-question/PlanDefinition/coded-question",
   "version": "1.0.0",
   "name": "CodedQuestionReferenceCoverageDetermination",
   "title": "Coverage Determination",

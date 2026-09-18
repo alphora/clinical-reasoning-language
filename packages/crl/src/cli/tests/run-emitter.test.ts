@@ -11,7 +11,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize } from "node:path";
 
@@ -209,3 +209,33 @@ describe("CLI dispatch matrix — output layout convention", () => {
 // Suppress unused-import warning for readFileSync — kept for future shape tests
 // when a clean two-lane CRL fixture lands.
 void readFileSync;
+
+
+it("writes admitted unmatched FHIR output and returns its semantic warning", () => {
+  const {outDir,cleanup}=makeOutDir("unmatched-output");
+  try {
+    writeFileSync(join(outDir,"package.json"),JSON.stringify({name:"warning-policy",version:"1.0.0",crl:{canonicalBase:"http://example.org/warning",date:"2026-09-17"}}));
+    const source='library "Warning".\nterminology "Review Codes":\n- valueset is `http://example.org/review`.\nactivity "Human Review":\n- request CPGCommunicationRequest.\n- with "Review Codes".\n';
+    const input=join(outDir,"policy.crl");writeFileSync(input,source);
+    const result=runCli(["--path",input,"--target","fhir-def","--out-dir",outDir]);
+    expect(result.exitCode,result.stderr).toBe(2);
+    expect(result.stderr).toContain("unsupported-communication-with-terminology");
+    expect(result.stderr).not.toContain("Failed to write");
+    expect(existsSync(join(outDir,"src/fhir/ActivityDefinition/warning-policy-human-review.json"))).toBe(true);
+  } finally {cleanup();}
+}, 120_000);
+
+// @kit emit-output-root:ambiguous-preflight
+it("two independent roots refuse before replacing either existing generated lane", () => {
+  const { outDir, cleanup } = makeOutDir("ambiguous-roots");
+  try {
+    writeFileSync(join(outDir,"package.json"),JSON.stringify({name:"two-roots",version:"1.0.0",crl:{canonicalBase:"https://example.org/two",date:"2026-09-17"}}));
+    const source = 'library "Two". concept "A": - type is Observation. - code is `a`. activity "Review": - request CPGCommunicationRequest. - with `REVIEW`. decision "One": first: - when "A" then recommend activity "Review". decision "Two": first: - when "A" then recommend activity "Review".';
+    const input = join(outDir,"policy.crl");writeFileSync(input,source);
+    for (const lane of ["cql","fhir"]) { mkdirSync(join(outDir,"src",lane),{recursive:true});writeFileSync(join(outDir,"src",lane,"keep.txt"),lane+" prior bytes"); }
+    const result=runCli(["--path",input,"--target","fhir-def","--out-dir",outDir]);
+    expect(result.exitCode,result.stderr).toBe(1);
+    expect(result.stderr).toContain("ambiguous-policy-entrypoint");
+    for (const lane of ["cql","fhir"]) expect(readFileSync(join(outDir,"src",lane,"keep.txt"),"utf8")).toBe(lane+" prior bytes");
+  } finally { cleanup(); }
+},120_000);

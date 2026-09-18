@@ -75,11 +75,11 @@ describe("splitOrphans", () => {
   const qr = `${RESULTS_ROOT}/patient/c/questionnaireresponse/b.json`;
   const foreign = `${RESULTS_ROOT}/patient/c/somethingelse/c.json`;
 
-  it("prunes only the resource types the use case owns", () => {
+  it("prunes every stale type in generated output", () => {
     const { prunable, reportOnly } = splitOrphans([q, qr, foreign], "prior-auth");
-    expect(prunable).toEqual([q, qr]);
-    // Deleting a file we do not understand is worse than leaving it, permanently.
-    expect(reportOnly).toEqual([foreign]);
+    expect(prunable).toEqual([q, qr, foreign]);
+    // Generated output has no custom-file exemption.
+    expect(reportOnly).toEqual([]);
   });
 
   // ⚠ Ownership is decided by the TYPE DIRECTORY, never the filename — filenames are precisely what
@@ -89,9 +89,9 @@ describe("splitOrphans", () => {
     expect(splitOrphans([oddly], "prior-auth").prunable).toEqual([oddly]);
   });
 
-  it("a different use case owns different types", () => {
+  it("replacement has no custom-type exception in any use case", () => {
     const report = `${RESULTS_ROOT}/patient/c/measurereport/m.json`;
-    expect(splitOrphans([report, q], "measure")).toEqual({ prunable: [report], reportOnly: [q] });
+    expect(splitOrphans([report, q], "measure")).toEqual({ prunable: [report, q], reportOnly: [] });
   });
 });
 

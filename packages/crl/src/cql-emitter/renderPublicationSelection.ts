@@ -9,6 +9,8 @@ export const PUBLICATION_SELECTION_CQL_PREFIX = "__CRL_PublicationSelection_v1_"
 export const PUBLICATION_NATIVE_VALIDITY = `${PUBLICATION_SELECTION_CQL_PREFIX}NativeValidity`;
 export const PUBLICATION_LOCAL_BOOLEAN_CANDIDATE = `${PUBLICATION_SELECTION_CQL_PREFIX}LocalBooleanCandidate`;
 export const PUBLICATION_LOCAL_CODEABLE_CANDIDATE = `${PUBLICATION_SELECTION_CQL_PREFIX}LocalCodeableCandidate`;
+export const PUBLICATION_LOCAL_DATETIME_CANDIDATE = `${PUBLICATION_SELECTION_CQL_PREFIX}LocalDateTimeCandidate`;
+export const PUBLICATION_LOCAL_STRING_CANDIDATE = `${PUBLICATION_SELECTION_CQL_PREFIX}LocalStringCandidate`;
 export const PUBLICATION_LOCAL_QUANTITY_CANDIDATE = `${PUBLICATION_SELECTION_CQL_PREFIX}LocalQuantityCandidate`;
 export const PUBLICATION_SERVICE_REQUEST_CANDIDATE = `${PUBLICATION_SELECTION_CQL_PREFIX}ServiceRequestCandidate`;
 
@@ -36,10 +38,10 @@ export const PUBLICATION_CANDIDATE_CQL_TYPE =
 export const PUBLICATION_SELECTION_RESULT_CQL_TYPE = `Tuple { state System.String, failureCode System.String, failureMessage System.String, conceptId System.String, selected ${PUBLICATION_CANDIDATE_CQL_TYPE}, affected List<${PUBLICATION_CANDIDATE_CQL_TYPE}> }`;
 
 /** Native-model adapter, not a raw-FHIR accessor. CQFramework discards sub-ms/leap detail upstream. */
-export function renderPublicationCandidateHelpers(includeQuantity = false): string {
+export function renderPublicationCandidateHelpers(includeQuantity = false, includeString = false, includeDateTime = false): string {
   const fail = (code: string, text: string): string =>
     `Message(null as ${PUBLICATION_CANDIDATE_CQL_TYPE}, true, '${code}', 'Error', conceptId + ': ${text}')`;
-  const localCandidate = (candidateName: string, fhirValueType: "boolean" | "CodeableConcept" | "Quantity"): string => `define function "${candidateName}"(O FHIR.Observation, contributorId System.String, conceptId System.String):
+  const localCandidate = (candidateName: string, fhirValueType: "boolean" | "string" | "dateTime" | "CodeableConcept" | "Quantity"): string => `define function "${candidateName}"(O FHIR.Observation, contributorId System.String, conceptId System.String):
   if O.status.value is null or not (O.status.value in { ${PUBLICATION_OBSERVATION_STATUSES.map(cqlStringLiteral).join(", ")} }) then
     ${fail("publication-invalid-status", "Expected a present, valid FHIR Observation status")}
   else if O.status.value in { 'entered-in-error', 'cancelled' } then
@@ -76,6 +78,8 @@ define function "${PUBLICATION_NATIVE_VALIDITY}"(D System.DateTime):
 ${localCandidate(PUBLICATION_LOCAL_BOOLEAN_CANDIDATE, "boolean")}
 
 ${localCandidate(PUBLICATION_LOCAL_CODEABLE_CANDIDATE, "CodeableConcept")}
+${includeDateTime ? "\n" + localCandidate(PUBLICATION_LOCAL_DATETIME_CANDIDATE, "dateTime") : ""}\
+${includeString ? "\n" + localCandidate(PUBLICATION_LOCAL_STRING_CANDIDATE, "string") : ""}\
 ${includeQuantity ? "\n" + localCandidate(PUBLICATION_LOCAL_QUANTITY_CANDIDATE, "Quantity") + "\n" : ""}\
 
 /* REFACTOR:grounded (#320, review 564): explicit supported source state; no exclusion or false fallback. */

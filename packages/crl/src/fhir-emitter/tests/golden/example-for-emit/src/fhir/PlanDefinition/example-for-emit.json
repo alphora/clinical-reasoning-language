@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-for-emit-implanted-pellet-hrt-coverage-determination",
+  "id": "example-for-emit",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-implanted-pellet-hrt-coverage-determination",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit",
   "version": "0.0.0",
   "name": "ExampleForEmitImplantedPelletHrtCoverageDetermination",
   "title": "Implanted Pellet HRT Coverage Determination",

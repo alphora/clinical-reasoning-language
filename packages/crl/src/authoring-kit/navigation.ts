@@ -5,6 +5,7 @@ export type KitContent = Omit<AuthoringKit, "contentHash" | "navigation" | "audi
 
 /** Authored discovery terms, hashed with the kit. Retired spellings lead to current guidance. */
 const ALIASES: Record<string, string[]> = {
+  "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start"],
   "concept-form": ["concept", "case feature", "Scalar", "remove scalar", "Observation", "code is", "absence", "completeness", "evidence completeness"],
   "value-type": ["value type is", "boolean", "Quantity", "CodeableConcept"],
   "publication-selection": ["shape reduction is", "most recent", "override", "local external inferred", "recency"],
@@ -17,7 +18,7 @@ const ALIASES: Record<string, string[]> = {
   "chaining-necessity": ["shared continuation", "internal helper", "remaining interview", "use decision"],
   "guards": ["guard", "only if"],
   "branch-guards": ["pause", "unknown", "null", "missing answer", "explicit false"],
-  "review-flags": ["narrative completeness", "source fidelity", "narrative coverage", "renamed concept", "stable ID", "flag placement", "orphaned flag"],
+  "review-flags": ["narrative completeness", "source fidelity", "narrative coverage", "renamed concept", "stable ID", "flag placement", "orphaned flag", "flag description", "short flag title", "accept KE flag", "reject KE flag"],
   "pa-disposition-set": ["authorization determination", "coverage determination", "recommendation", "approve deny", "PA without configuration"],
   "configure-dispositions": ["crl.dispositions", "missing configuration", "empty vocabulary"],
   "terminology-forms": ["codes", "terminology", "code system", "valueset is", "external ValueSet"],
@@ -32,7 +33,9 @@ const ALIASES: Record<string, string[]> = {
 // These are learning prerequisites, not see-also links. Optional worked examples
 // belong in rule.ref; retain an artifact here only when needed to explain the
 // rule's contract. Artifact-to-rule prerequisites supply each example's context.
+// REFACTOR:grounded (#322): typed intake teaching is discoverable with its prerequisites.
 const RELATED: Record<string, string[]> = {
+  "text-answers": ["rule:concept-form", "rule:publication-selection", "rule:concept-presentation"],
   "mv-case-authoring": ["rule:cel-cases", "rule:verify-loop", "rule:produce-results", "rule:emit-output-root"],
   "mv-wording-patches": ["rule:concept-presentation", "rule:mv-case-authoring", "rule:produce-results", "rule:verify-loop"],
   "guards": ["rule:branch-guards", "rule:decision-composition"],
@@ -54,6 +57,7 @@ const RELATED: Record<string, string[]> = {
 
 /** Direct examples need their semantic guidance as well as runnable files/configuration. */
 const EXAMPLE_RULES: Record<string, string[]> = {
+  "datetime-answer": ["text-answers", "value-type", "concept-form"],
   "source-field-order": ["concept-form"],
   "quantity-declaration": ["value-type", "concept-form"],
   "quantity-answer": ["cel-cases", "cel-quantity"],
@@ -72,6 +76,7 @@ const EXAMPLE_RULES: Record<string, string[]> = {
 };
 
 const ARTIFACT_RULES: Record<string, string[]> = {
+  "intake-reference": ["text-answers", "cel-cases", "verify-loop"],
   "shared-continuation-reference": ["chaining-necessity", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],
   "reused-condition-reference": ["criterion", "decision-composition", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],
   "selection-reference": ["publication-selection"],

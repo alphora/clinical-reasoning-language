@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { dirname, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { writeTwoLane, EmitWriteError } from "../emit-writers";
+import { writeTwoLane, writeCqlLibraries, EmitWriteError } from "../emit-writers";
 import { CEL_DATA_MANIFEST, writeEmitResult } from "../cel/emitter";
 import type { EmitCrlTwoLaneResult } from "../emit-two-lane";
 import type { EmitResult } from "../cel/emitter/types";
@@ -80,7 +80,7 @@ describe("writeTwoLane", () => {
     expect(existsSync(join(dir, "escape.cql"))).toBe(false);
   });
 
-  it("on a mid-LOOP FHIR failure, EmitWriteError.partial enumerates BOTH lanes' files already written", () => {
+  it("rejects an invalid second-lane path before replacing either lane", () => {
     const two = makeTwo(
       [{ outputFilename: "Good.cql", cql: "library Good\n" }],
       [
@@ -98,12 +98,12 @@ describe("writeTwoLane", () => {
     }
     expect(err).toBeInstanceOf(EmitWriteError);
     const partial = (err as EmitWriteError).partial;
-    expect(partial.cql).toEqual([join(dir, "cql", "Good.cql")]);
+    expect(partial.cql).toEqual([]);
     // The FHIR file that DID land is enumerated — the accounting the fix restores
     // (a hardcoded `fhir: []` here was the round-2 [critical]).
-    expect(partial.fhir).toEqual([join(dir, "fhir", "Library", "good.json")]);
-    expect(existsSync(join(dir, "cql", "Good.cql"))).toBe(true);
-    expect(existsSync(join(dir, "fhir", "Library", "good.json"))).toBe(true);
+    expect(partial.fhir).toEqual([]);
+    expect(existsSync(join(dir, "cql", "Good.cql"))).toBe(false);
+    expect(existsSync(join(dir, "fhir", "Library", "good.json"))).toBe(false);
     expect(existsSync(join(dir, "escape.json"))).toBe(false);
   });
 });
@@ -180,12 +180,12 @@ describe("writeEmitResult (CEL) — absolute manifest + containment", () => {
     expect(existsSync(keep), "a failed call destroyed pre-existing data").toBe(true);
   });
 
-  // The wipe owns `patient/` and nothing else: a sibling file in the same out dir is not ours.
-  it("wipes ONLY patient/ — anything else in the out dir survives", () => {
+  // The complete CEL output directory is generated, including arbitrary sibling files.
+  it("wipes the complete output directory — arbitrary siblings are removed", () => {
     const sibling = join(dir, "not-ours.json");
     writeFileSync(sibling, "{}", "utf8");
     writeEmitResult(makeResult("patient/c1/observation", "obs-1"), dir);
-    expect(existsSync(sibling)).toBe(true);
+    expect(existsSync(sibling)).toBe(false);
   });
 
   // `written` means RESOURCE paths. A consumer counting or mirroring it must not silently acquire the
@@ -303,4 +303,65 @@ describe("writeEmitResult (CEL) — absolute manifest + containment", () => {
     expect(sink, "a rejected result wrote a partial tree").toEqual([]);
     expect(existsSync(join(dir, "patient", "l", "c", "observation", "good.json"))).toBe(false);
   });
+});
+
+
+describe("complete CRL replacement", () => {
+  // @kit emitted-trees-are-ours:crl-replacement
+  it("removes old roots and custom files while preserving authored siblings; empty emit clears both lanes", () => {
+    writeFileSync(join(dir, "policy.crl"), "authored");
+    writeTwoLane(makeTwo([{outputFilename:"Old.cql",cql:"old"}], [{resourceType:"PlanDefinition",relativePath:"PlanDefinition/policy-intake.json",resource:{id:"policy-intake"}}]),dir);
+    writeFileSync(join(dir,"fhir","custom.txt"),"custom");
+    const written=writeTwoLane(makeTwo([{outputFilename:"New.cql",cql:"new"}], [{resourceType:"PlanDefinition",relativePath:"PlanDefinition/policy.json",resource:{id:"policy"}}]),dir);
+    expect(written.fhir).toEqual([join(dir,"fhir","PlanDefinition","policy.json")]);
+    for(const file of ["cql/Old.cql","fhir/PlanDefinition/policy-intake.json","fhir/custom.txt"]) expect(existsSync(join(dir,file))).toBe(false);
+    expect(readFileSync(join(dir,"policy.crl"),"utf8")).toBe("authored");
+    writeTwoLane(makeTwo([],[]),dir);
+    expect(existsSync(written.cql[0])).toBe(false); expect(existsSync(written.fhir[0])).toBe(false);
+  });
+
+  it("preserves both previous lanes when a later FHIR entry fails preflight", () => {
+    const old=writeTwoLane(makeTwo([{outputFilename:"Old.cql",cql:"old"}], [{resourceType:"Library",relativePath:"Library/old.json",resource:{id:"old"}}]),dir);
+    expect(()=>writeTwoLane(makeTwo([{outputFilename:"New.cql",cql:"new"}], [{resourceType:"Library",relativePath:"../escape.json",resource:{}}]),dir)).toThrow(/traversal/);
+    for(const file of [...old.cql,...old.fhir]) expect(existsSync(file)).toBe(true);
+  });
+
+  it("standalone CQL replaces only its own directory", () => {
+    writeFileSync(join(dir,"authored.crl"),"source");
+    mkdirSync(join(dir,"cql"));writeFileSync(join(dir,"cql","custom.txt"),"old");
+    writeCqlLibraries([{outputFilename:"New.cql",cql:"new"}],join(dir,"cql"));
+    expect(existsSync(join(dir,"cql","custom.txt"))).toBe(false);
+    expect(existsSync(join(dir,"authored.crl"))).toBe(true);
+  });
+});
+
+
+it("preserves the caller admission of unmatched output with no hard errors", () => {
+  const two=makeTwo([{outputFilename:"Valid.cql",cql:"library Valid"}],[]);
+  two.success=false;two.cql.success=true;
+  two.fhir.unmatched=[{kind:"unresolved-concept",name:"Unresolved"}] as never;
+  expect(writeTwoLane(two,dir).cql).toEqual([join(dir,"cql","Valid.cql")]);
+});
+
+it.each(["duplicate","file-directory"])("CEL %s collision preserves prior generated output", (kind) => {
+  const keep=join(dir,"keep.json");writeFileSync(keep,"previous");
+  const resource={resourceType:"Observation",id:"a",outputPath:"patient/c/observation",body:{resourceType:"Observation",id:"a"}};
+  const second=kind==="duplicate" ? resource : {...resource,id:"child",outputPath:"patient/c/observation/a.json"};
+  const result={diagnostics:[],emittedCases:[{caseName:"Case",caseSlug:"case",librarySlug:"lib",compartmentDir:"patient/c",resources:[resource,second]}]} as EmitResult;
+  expect(()=>writeEmitResult(result,dir)).toThrow(/collision/);
+  expect(readFileSync(keep,"utf8")).toBe("previous");
+});
+
+// @kit emitted-trees-are-ours:linked-root
+it("allows a linked ancestor while refusing a linked generated boundary", () => {
+  const real = join(dir, "real"), alias = join(dir, "alias");
+  mkdirSync(real);
+  symlinkSync(real, alias, process.platform === "win32" ? "junction" : "dir");
+  const out = join(alias, "nested", "cql");
+  writeCqlLibraries([{ outputFilename: "A.cql", cql: "library A" }], out);
+  expect(readFileSync(join(real, "nested", "cql", "A.cql"), "utf8")).toBe("library A");
+  const linkedOutput = join(dir, "linked-output");
+  symlinkSync(join(real, "nested", "cql"), linkedOutput, process.platform === "win32" ? "junction" : "dir");
+  expect(() => writeCqlLibraries([], linkedOutput)).toThrow(/Linked generated output boundary/);
+  expect(readFileSync(join(real, "nested", "cql", "A.cql"), "utf8")).toBe("library A");
 });

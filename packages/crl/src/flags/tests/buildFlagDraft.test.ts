@@ -2,8 +2,8 @@
 import { validateAndBuildMvFlagDraft } from "../buildFlagDraft";
 
 const CONCEPT = 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.';
-const build = (over: { tag?: string; gist?: string; fields?: Record<string, string> } = {}, id = () => "fixed-id", now = () => "2026-07-14T00:00:00.000Z") =>
-  validateAndBuildMvFlagDraft(CONCEPT, { kind: "concept", name: "C" }, { tag: over.tag ?? "validation-concern", gist: over.gist ?? "looks off", fields: over.fields }, id, now);
+const build = (over: { tag?: string; gist?: string; description?: string; fields?: Record<string, string> } = {}, id = () => "fixed-id", now = () => "2026-07-14T00:00:00.000Z") =>
+  validateAndBuildMvFlagDraft(CONCEPT, { kind: "concept", name: "C" }, { tag: over.tag ?? "validation-concern", gist: over.gist ?? "looks off", fields: over.fields, description: over.description }, id, now);
 
 test("a valid draft → a complete MvFlag (concept anchor, canonical tag, host-injected id/createdAt, a dedupKey)", () => {
   const r = build();
@@ -151,4 +151,28 @@ test.each([false,true])("a distinct @id-source tag is not identity metadata (wit
 });
 test("a malformed exact @id attempt cannot silently become a name-only anchor",()=>{
   expect(flagFor(CONCEPT+' - meta is `@id missing-colon`.','C')).toMatchObject({ok:false,reason:"invalid-value"});
+});
+
+// @kit review-flags:description
+test("description is free-form detail normalized without changing creation-time retry identity", () => {
+  const detail = "Source `quote`; first line\nSecond line";
+  const plain = build();
+  const described = build({ description: `  ${detail}  ` });
+  const changed = build({ description: "Reworded detail" });
+  const blank = build({ description: " \n " });
+  expect(plain.ok && described.ok && changed.ok && blank.ok).toBe(true);
+  if (!plain.ok || !described.ok || !changed.ok || !blank.ok) return;
+  expect(described.flag.description).toBe(detail);
+  expect(blank.flag).not.toHaveProperty("description");
+  expect(described.flag.dedupKey).toBe(plain.flag.dedupKey);
+  expect(changed.flag.dedupKey).toBe(plain.flag.dedupKey);
+  const explicit = build({ description: detail, fields: { key: "owned-key" } });
+  expect(explicit.ok && explicit.flag.dedupKey).toBe("owned-key");
+});
+test("description rejects nontext SDK values and directs misplaced fields to the top-level parameter", () => {
+  const invalid = build({ description: 42 as unknown as string });
+  expect(invalid).toMatchObject({ ok: false, reason: "invalid-value" });
+  const misplaced = build({ fields: { description: "detail" } });
+  expect(misplaced).toMatchObject({ ok: false, reason: "invalid-value" });
+  if (!misplaced.ok) expect(misplaced.message).toContain("top-level `description`");
 });

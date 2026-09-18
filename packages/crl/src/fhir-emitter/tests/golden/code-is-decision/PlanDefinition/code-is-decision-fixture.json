@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "code-is-decision-fixture-triage-crohns",
+  "id": "code-is-decision-fixture",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision/PlanDefinition/code-is-decision-fixture-triage-crohns",
+  "url": "http://example.org/crl/code-is-decision/PlanDefinition/code-is-decision-fixture",
   "version": "1.0.0",
   "name": "CodeIsDecisionTriageCrohns",
   "title": "Triage Crohns",

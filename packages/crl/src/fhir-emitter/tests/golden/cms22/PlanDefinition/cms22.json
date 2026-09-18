@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "cms22-cms22-bp-control-strategy",
+  "id": "cms22",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-cms22-bp-control-strategy",
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22",
   "version": "1.0.0",
   "name": "Cms22StrategyCms22BpControlStrategy",
   "title": "CMS22 BP Control Strategy",

@@ -1,3 +1,4 @@
+import { isValidFhirTemporal } from "../cel/temporal";
 import type { Concept, CRL, Location, ReferenceName } from "../ast/types";
 import { bmiRetirementReason } from "../template-match/bmiPublication";
 import type { CRLError } from "../types/errors";
@@ -39,7 +40,14 @@ export interface PublicationDescriptor {
   readonly sources?: readonly PublicationSource[];
 }
 
-export type PublicationValueType = "boolean" | "CodeableConcept" | "Quantity";
+export type PublicationValueType = "boolean" | "string" | "dateTime" | "CodeableConcept" | "Quantity";
+// REFACTOR:grounded (#322): presence is defined only for these answer types.
+export interface PublicationHasValueProducer {
+  readonly kind: "hasValue";
+  readonly producerId: string;
+  readonly operand: QualifiedConceptIdentity;
+  readonly operandValueType: "boolean" | "string" | "dateTime" | "CodeableConcept";
+}
 export interface PublicationCode { readonly system: string; readonly code: string }
 export interface PublicationMembershipProducer {
   readonly kind: "membership";
@@ -62,7 +70,7 @@ export interface PublicationBMIProducer {
   readonly operands: readonly [QualifiedConceptIdentity, QualifiedConceptIdentity];
   readonly validityOperand: 0 | 1;
 }
-export type PublicationProducer = PublicationMembershipProducer | PublicationThresholdProducer | PublicationBMIProducer;
+export type PublicationProducer = PublicationMembershipProducer | PublicationThresholdProducer | PublicationBMIProducer | PublicationHasValueProducer;
 export function publicationProducerOperands(p: PublicationProducer | undefined): readonly QualifiedConceptIdentity[] {
   return p === undefined ? [] : p.kind === "bodyMassIndex" ? p.operands : [p.operand];
 }
@@ -76,6 +84,29 @@ export function readPublicationThreshold(concept: Readonly<Concept>): { operand:
   if (operand.type !== "ConceptRefArg" || threshold.type !== "QuantityArg") return undefined;
   return { operand: operand.library === undefined ? operand.value : { type: "QualifiedReference", libraryName: operand.library, name: operand.value, location: operand.location },
     threshold: { value: threshold.value, unit: threshold.unit }, location: call.location };
+}
+
+// REFACTOR:grounded (#322): only the exact unary selected-value presence form is admitted.
+export function readPublicationHasValue(concept: Readonly<Concept>): { operand: ReferenceName; location: Location } | undefined {
+  if (concept.definition?.type !== "DefinitionIsDefinition") return undefined;
+  const call = matchNarrative(concept.definition.body);
+  if (!call.known || call.pattern !== "HasValue" || call.args.length !== 1) return undefined;
+  const operand = call.args[0];
+  if (operand.type !== "ConceptRefArg") return undefined;
+  return { operand: operand.library === undefined ? operand.value : { type: "QualifiedReference", libraryName: operand.library, name: operand.value, location: operand.location }, location: call.location };
+}
+
+// REFACTOR:grounded (#322, review783): inspect syntax tokens, including pipelines/projections,
+// never words inside quoted names. No unsupported occurrence may fall through to the legacy catalog.
+export function publicationHasValueFormError(concept: Readonly<Concept>): string | undefined {
+  const contains = (node: unknown): boolean => {
+    if (Array.isArray(node)) return node.some((_, i) => ["has", "a", "value"].every((word, j) => node[i + j]?.type === "NWord" && node[i + j].value.toLowerCase() === word)) || node.some(contains);
+    return node !== null && typeof node === "object" && Object.values(node).some(contains);
+  };
+  const projection = (concept.representations ?? []).some(r => contains(r.valueProjection));
+  if (!projection && !contains(concept.definition)) return undefined;
+  if (!projection && readPublicationHasValue(concept) !== undefined && concept.shapeReduction !== undefined && concept.shape === "Record" && concept.conceptType === "Observation" && concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean") return undefined;
+  return 'Has-value requires an exact definition on a Record/Observation/boolean with separate shape reduction is most recent; it is not a pipeline or projection stage.';
 }
 
 export function hasLocalPublicationContribution(descriptor: PublicationDescriptor): descriptor is PublicationDescriptor & {
@@ -145,18 +176,20 @@ export function publicationAdmissionReason(concept: Readonly<Concept>): string |
   if (concept.shapeReduction === undefined) return "No shape reduction was authored.";
   if (concept.shape !== "Record") return "This shape reduction currently requires explicit `shape is Record`.";
   // REFACTOR:grounded (#320, plan587): a selected measurement retains its Quantity and metadata.
-  if (concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || !["boolean", "CodeableConcept", "Quantity"].includes(concept.valueTypes[0]))
-    return "This publication slice supports Observation with exactly one boolean, CodeableConcept or Quantity value type.";
+  if (concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || !["boolean", "string", "dateTime", "CodeableConcept", "Quantity"].includes(concept.valueTypes[0]))
+    return "This publication slice supports Observation with exactly one boolean, text (FHIR string), dateTime, CodeableConcept or Quantity value type.";
+  const hasValue = readPublicationHasValue(concept);
   const membership = readPublicationMembership(concept);
   const threshold = readPublicationThreshold(concept);
   const bmi = readPublicationBMI(concept);
   if (concept.code !== undefined && concept.code.trim().length === 0) return "A local `code is` must be nonempty.";
   // REFACTOR:grounded (#320, plan585): an age calculation needs no invented answer identity.
-  if (concept.code === undefined && membership === undefined && threshold === undefined && bmi === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
-  if (concept.definition !== undefined && membership === undefined && threshold === undefined && bmi === undefined)
-    return "Supported production is selected-value membership, quantity threshold, or body mass index with an explicit validity operand; other definitions cannot be ignored.";
+  if (concept.code === undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
+  if (concept.definition !== undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined)
+    return "Supported production is selected-value presence, selected-value membership, quantity threshold, or body mass index with an explicit validity operand; other definitions cannot be ignored.";
   const sourceReason = publicationSourceAdmissionReason(concept);
   if (sourceReason !== undefined) return sourceReason;
+  if (hasValue !== undefined && concept.valueTypes[0] !== "boolean") return "Has-value produces an Observation with a boolean value.";
   if (membership !== undefined && concept.valueTypes[0] !== "boolean") return "Membership produces an Observation with a boolean value.";
   if (threshold !== undefined && concept.valueTypes[0] !== "boolean") return "A quantity comparison produces an Observation with a boolean value.";
   if (bmi !== undefined && concept.valueTypes[0] !== "Quantity") return "Body mass index produces an Observation with a Quantity value.";
@@ -325,6 +358,20 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         producer = Object.freeze({ kind: "membership", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["membership", 0]]))}`,
           operand: prepared.identity, domain, qualifying: normalized(qualifying) });
       }
+      // REFACTOR:grounded (#322): resolve the selected operand in its owning scope, never raw retrieval.
+      const presence = readPublicationHasValue(concept);
+      if (presence !== undefined) {
+        if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");
+        const operand = declarations.lookupConcept(library.sourceIdentity, presence.operand, presence.location);
+        if (operand.kind !== "hit") return fail("Has-value operand cannot resolve.", presence.location, "publication-reference-resolution");
+        if (operand.node.shapeReduction === undefined) return fail("Has-value requires an explicitly selected Record operand.", presence.location, "publication-has-value-operand-unsupported");
+        const prepared = prepare(operand.library, operand.node);
+        if (prepared === undefined) return fail("Has-value operand preparation failed.", presence.location, "publication-dependency-failed");
+        if (prepared.valueType !== "boolean" && prepared.valueType !== "string" && prepared.valueType !== "dateTime" && prepared.valueType !== "CodeableConcept")
+          return fail("Has-value supports selected boolean, text, dateTime or CodeableConcept answers; complex-value presence is not defined for this type.", presence.location, "publication-has-value-operand-unsupported");
+        producer = Object.freeze({ kind: "hasValue", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["hasValue", 0]]))}`,
+          operand: prepared.identity, operandValueType: prepared.valueType });
+      }
       const comparison = readPublicationThreshold(concept);
       if (comparison !== undefined) {
         if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");
@@ -378,6 +425,8 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
   // REFACTOR:grounded (#320, plan595): prepared closures reject old BMI even when no publication was declared.
   for (const library of declarations.getLibraries()) for (const concept of library.ast.statements) {
     if (concept.type !== "Concept") continue;
+    const presenceError = publicationHasValueFormError(concept);
+    if (presenceError !== undefined) { diagnostics.push(diagnostic(presenceError, concept.location, "publication-unsupported-form")); continue; }
     const retirement = bmiRetirementReason(concept);
     if (retirement !== undefined) {
       const item = diagnostic(`${library.libraryName} (${library.sourceIdentity}): ${retirement}`, concept.location, "emit-bmi-form-retired");
@@ -446,11 +495,13 @@ export function publicationResourceError(descriptor: PublicationDescriptor, reso
     return fail("publication-invalid-status", "Expected a present, valid FHIR Observation status.");
   if (resource.status === "entered-in-error" || resource.status === "cancelled")
     return fail("publication-invalidated-record", "Explicitly invalidated or cancelled candidates need an authored eligibility policy.");
-  const choice = `value${descriptor.valueType === "boolean" ? "Boolean" : descriptor.valueType}`;
+  const choice = `value${descriptor.valueType === "boolean" ? "Boolean" : descriptor.valueType === "string" ? "String" : descriptor.valueType === "dateTime" ? "DateTime" : descriptor.valueType}`;
   const value = resource[choice];
   if (Object.keys(resource).some((key) => /^_?value[A-Z]/.test(key) && key !== choice &&
-      !(descriptor.valueType === "boolean" && key === "_valueBoolean")) ||
+      !(["boolean", "string", "dateTime"].includes(descriptor.valueType) && key === `_${choice}`)) ||
       (value != null && (descriptor.valueType === "boolean" ? typeof value !== "boolean"
+        : descriptor.valueType === "string" ? typeof value !== "string" || value.length === 0
+        : descriptor.valueType === "dateTime" ? typeof value !== "string" || !isValidFhirTemporal(value)
         : typeof value !== "object" || Array.isArray(value))))
     return fail("publication-invalid-value", `A present answer must be a FHIR ${descriptor.valueType}; absence remains unknown.`);
   if (descriptor.valueType === "Quantity") {

@@ -35,7 +35,7 @@ import {
 } from "../template-match/operandConstraints";
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
-import { publicationAdmissionReason, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
+import { publicationAdmissionReason, readPublicationHasValue, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
 import { readPublicationBMI } from "../emit/publicationBMI";
 import type {
   UseSiteOperandUntypedWarning,
@@ -231,6 +231,15 @@ export class UseSiteTypeValidator {
     }
     // REFACTOR:grounded (#320, review 562): the only admitted producer consumes a selected coded
     // publication. Domain/classification is resolved once in raw preparation, not by legacy pipelines.
+    // REFACTOR:grounded (#322): has-value consumes an explicitly selected answer, not a legacy Boolean facade.
+    const presence = concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined ? readPublicationHasValue(concept) : undefined;
+    if (presence !== undefined) {
+      const name = getRefName(presence.operand);
+      const resolved = resolveLib(name, getRefLibrary(presence.operand) ?? undefined, ctx)?.types.concepts.get(name);
+      if (resolved !== undefined && (resolved.publication === undefined || publicationAdmissionReason(resolved.publication) !== undefined || !["boolean", "string", "dateTime", "CodeableConcept"].includes(resolved.publication.valueTypes[0])))
+        errors.push(publicationContextMismatch(concept.name, name, "has-value requires a selected boolean, text, dateTime or CodeableConcept publication", presence.location, attribution));
+      return;
+    }
     const membership = concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined
       ? readPublicationMembership(concept) : undefined;
     if (membership !== undefined) {

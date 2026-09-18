@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-bothrep-implanted-pellet-hrt-coverage-determination",
+  "id": "example-direct",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-implanted-pellet-hrt-coverage-determination",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct",
   "version": "0.0.0",
-  "name": "BothRepresentationImplantedPelletHrtCoverageDetermination",
-  "title": "Implanted Pellet HRT Coverage Determination",
+  "name": "DirectCodeIsQualifyingDiagnosisCoverageDetermination",
+  "title": "Qualifying Diagnosis Coverage Determination",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Implanted Pellet HRT Coverage Determination",
+  "description": "Qualifying Diagnosis Coverage Determination",
   "type": {
     "coding": [
       {
@@ -44,12 +44,12 @@
     ]
   },
   "library": [
-    "http://example.org/hcsc/rx501-007/Library/ExampleBothrepInterface"
+    "http://example.org/hcsc/rx501-007/Library/ExampleDirectInterface"
   ],
   "action": [
     {
-      "title": "Implanted Pellet HRT Coverage Determination",
-      "description": "Implanted Pellet HRT Coverage Determination",
+      "title": "Qualifying Diagnosis Coverage Determination",
+      "description": "Qualifying Diagnosis Coverage Determination",
       "code": [
         {
           "coding": [
@@ -68,8 +68,8 @@
       ],
       "action": [
         {
-          "title": "Implanted Estrogen Or Estradiol Pellets",
-          "description": "Implanted Estrogen Or Estradiol Pellets",
+          "title": "Qualifying Diagnosis",
+          "description": "Qualifying Diagnosis",
           "code": [
             {
               "coding": [
@@ -85,31 +85,19 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Implanted Estrogen Or Estradiol Pellets"
+                "expression": "Qualifying Diagnosis"
               }
             }
           ],
           "input": [
             {
-              "type": "Observation",
+              "type": "Condition",
               "profile": [
-                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-or-estradiol-pellets"
-              ]
-            },
-            {
-              "type": "Observation",
-              "profile": [
-                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-pellets"
-              ]
-            },
-            {
-              "type": "Observation",
-              "profile": [
-                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estradiol-pellets"
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-not-certify-deny-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-certify-approve-recommendation"
         },
         {
           "title": "otherwise",
@@ -124,7 +112,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-certify-approve-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-not-certify-deny-recommendation"
         }
       ]
     }

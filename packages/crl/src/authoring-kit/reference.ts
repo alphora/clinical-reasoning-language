@@ -489,13 +489,8 @@ first:
 - when "Age 18 Or Older" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".
 
-decision "Pediatric Eligibility Determination":
-first:
-- when "Patient Under Twenty One Years" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
-
-// Neutral disposition text — the SAME two activities serve BOTH decisions, so the payload
-// must not name a specific population (a pediatric approval must not read "adult").
+// The under-21 declaration above is an alternative projection example. Use it as the
+// guard in this single policy decision when that is the intended eligibility question.
 activity "Approve":
 - request CPGCommunicationRequest.
 - with \`Eligibility: APPROVE — age criterion met.\`.
@@ -583,18 +578,14 @@ concept "Patient Under Six Months":
   - type is Patient.
   - value projection is age today under 6 months.
 
-// Synthetic consumers keep the publication dependencies in the emitted closure.
-// These illustrate threshold evaluation, not clinical recommendations.
+// The single synthetic consumer illustrates BMI threshold evaluation, not clinical recommendations.
 decision "BMI Threshold Demonstration":
 first:
 - when "High BMI" then recommend activity "Threshold Met".
 - otherwise then recommend activity "Threshold Not Met".
 
-decision "Infant Age Demonstration":
-first:
-- when "Patient Under Six Months" then recommend activity "Threshold Met".
-- otherwise then recommend activity "Threshold Not Met".
-
+// The uncoded infant-age declaration above illustrates a separate projection. It is not
+// a second policy entry point; replace the guard when authoring that independent example.
 activity "Threshold Met":
 - request CPGCommunicationRequest.
 - with \`Synthetic demonstration: threshold met.\`.

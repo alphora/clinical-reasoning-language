@@ -12,7 +12,7 @@ import {
 } from "../ast/types";
 import { isPureQuestionConcept } from "../template-match/recencyValueConcept";
 import { bmiRetirementReason } from "../template-match/bmiPublication";
-import { isLocalBooleanPublication, publicationAdmissionReason } from "../emit/publicationProgram";
+import { isLocalBooleanPublication, publicationAdmissionReason, publicationHasValueFormError } from "../emit/publicationProgram";
 
 import type { SourceContext } from "../imports/scopes";
 
@@ -152,6 +152,12 @@ export class ReductionShapeValidator {
         concept.valueDomain.location, attribution, errors, "error");
     }
     // REFACTOR:grounded (#320, plan595): retired BMI gets migration guidance even without shape reduction.
+    // REFACTOR:grounded (#322): presence has no legacy scalar/pipeline realization.
+    const presenceError = publicationHasValueFormError(concept);
+    if (presenceError !== undefined) {
+      this.warn("publication-unsupported-form", concept.name, presenceError, concept.location, attribution, errors, "error");
+      return;
+    }
     const bmiRetirement = bmiRetirementReason(concept);
     if (bmiRetirement !== undefined) {
       this.warn("bmi-form-retired", concept.name, bmiRetirement, concept.location, attribution, errors, "error");

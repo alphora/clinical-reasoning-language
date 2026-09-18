@@ -1,3 +1,4 @@
+import { clearGeneratedDirectory } from "../generated-output";
 /**
  * ⭐⭐ THE ONE PRODUCTION PIPELINE. The CLI and the MCP tool are both thin wrappers over this.
  *
@@ -43,13 +44,7 @@ export interface ProduceRequest {
   celPath: string;
   crlPath: string;
   useCase: ResultUseCase;
-  /**
-   * Delete superseded Questionnaire/QuestionnaireResponse files this run did not write. Default TRUE.
-   *
-   * The results tree is regenerated output, so a stale artifact in it is superseded by definition —
-   * and a stale one is not inert: a renamed CEL case leaves a complete pair behind that the viewer
-   * offers a medical reviewer as a real case. Only types this use case OWNS are ever removed.
-   */
+  /** Deprecated: false is refused. Normal runs replace tests/results; explicit retry retains verified successes. */
   prune?: boolean;
   /** Artifact root the `tests/results/` tree hangs from. */
   outRoot: string;
@@ -82,9 +77,9 @@ export type ProduceOutcome =
       manifestPath: string;
       /** Compatibility field: empty on success; incomplete suite emission returns ok:false before production. */
       notEmitted: string[];
-      /** Q/QR this run DELETED from the results tree. Empty when `prune: false`. */
+      /** Q/QR this run DELETED from the results tree. Normal replacement precedes production; this lists post-run stale files removed during retry. */
       pruned: string[];
-      /** Unclaimed files LEFT alone: types we do not own, or a delete that failed. */
+      /** Unclaimed files left after a failed removal. */
       orphaned: string[];
       /** Symlinks found under the results tree and deliberately not followed. */
       skippedLinks: string[];
@@ -160,6 +155,7 @@ export function produceRegressionResults(req: Omit<ProduceRequest, "outRoot" | "
 // REFACTOR:grounded: case-set selection is the only difference between these operations.
 async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regression"): Promise<ProduceOutcome> {
   if (!isImplementedUseCase(req.useCase)) return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
+  if (req.prune === false) return { ok: false, reason: "prune:false is no longer supported. Generated output is replaced; use Git for recovery or an explicit scratch output root." };
   req = { ...req, outRoot: canonicalOutputRoot(req.outRoot) };
   const selection = resolveCelSuite(req.celPath, purpose);
   if (!selection.ok) return { ok: false, reason: "Invalid CEL suite", detail: selection.diagnostics.map(d => d.message) };
@@ -172,6 +168,8 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
     if (emission.result.diagnostics.some(d => d.severity === "error")) return { ok: false, reason: "CEL suite did not emit completely", detail: emission.result.diagnostics.map(d => d.message) };
     preflightOutputs(req.outRoot, purpose, []);
     if (previous && !suite.files.length) throw new Error("Cannot retry an empty suite; run without retry.");
+    if (req.signal?.aborted || quarantined) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
+    if (!suite.files.length) clearGeneratedDirectory(path.join(req.outRoot, "tests/results"));
     const result = suite.files.length ? await produceCandidate(req, suite, emission, previous) : emptyResult(req, suite, emission);
     if (!result.ok) return result;
     mkdirSync(path.dirname(result.manifestPath), { recursive: true });
@@ -182,11 +180,11 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
     const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
     // Report superseded per-file manifests; readers use only the returned suite manifest.
     for (const name of readdirSync(path.dirname(result.manifestPath))) {
-      if (/^questionnaire-manifest-.*\.json$/.test(name) && name !== path.basename(result.manifestPath)) reportOnly.push(`tests/results/${name}`);
+      if (/^questionnaire-manifest-.*\.json$/.test(name) && name !== path.basename(result.manifestPath)) prunable.push(`tests/results/${name}`);
     }
     const pruned: string[] = [];
     for (const rel of prunable) {
-      if (req.prune === false || !isInsideResultsTree(req.outRoot, rel)) { reportOnly.push(rel); continue; }
+      if (!isInsideResultsTree(req.outRoot, rel) && !/^tests\/results\/questionnaire-manifest-[^/]+\.json$/.test(rel)) { reportOnly.push(rel); continue; }
       try { rmSync(path.join(req.outRoot, rel)); pruned.push(rel); }
       catch { reportOnly.push(rel); }
     }
@@ -323,6 +321,8 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
       previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {
     return { ok: false, reason: "Cannot retry: definitions or runtime changed. Run without retry." };
   }
+  if (req.signal?.aborted || quarantined) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
+  if (!previous) clearGeneratedDirectory(path.join(req.outRoot, "tests/results"));
   const prior = new Map(previous?.cases.map(c => [caseKey(c), c]) ?? []);
   // ⚠ Build inputs go to scratch, never into the results tree.
   const scratch = mkdtempSync(path.join(tmpdir(), "crl-produce-"));

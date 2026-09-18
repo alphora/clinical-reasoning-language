@@ -53,16 +53,16 @@ beforeEach(() => {
 afterEach(() => { for (const p of roots.splice(0)) rmSync(p, { recursive: true, force: true }); });
 const request = () => ({ celPath: join(root, "src/cel/mv/a.cel"), crlPath: join(root, "src/crl/policy.crl"), outRoot: root, useCase: "prior-auth" as const, crlVersion: "test", jarPath: "fake.jar" });
 
-it("publishes two same-name MV cases once, preserves foreign types and verifies manifest-bound reading", async () => {
+it("publishes two same-name MV cases once, replaces all generated files and verifies manifest-bound reading", async () => {
   put("tests/results/questionnaire-manifest-old-library.json", "{}");
   put("tests/results/fhir/patient/old/observation/keep.json", "user");
   put("tests/results/fhir/patient/old/questionnaire/old.json", "old");
   const result = await produceResults(request()); expect(result.ok).toBe(true); if (!result.ok) throw new Error(result.reason);
-  expect(result.orphaned).toContain("tests/results/questionnaire-manifest-old-library.json");
+  expect(existsSync(join(root,"tests/results/questionnaire-manifest-old-library.json"))).toBe(false);
   expect(engine.calls).toBe(2); expect(result.manifest.cases.map(c => c.caseId)).toEqual(["a", "b"]);
   expect(result.manifest).toMatchObject({ schemaVersion: 1, celLibrary: "mv" });
   expect(existsSync(join(root, "tests/results/fhir/patient/old/questionnaire/old.json"))).toBe(false);
-  expect(readFileSync(join(root, "tests/results/fhir/patient/old/observation/keep.json"), "utf8")).toBe("user");
+  expect(existsSync(join(root, "tests/results/fhir/patient/old/observation/keep.json"))).toBe(false);
   expect(readSuiteResult(request().celPath, result.manifest.cases[0].compartmentDir)).toMatchObject({ q: { resourceType: "Questionnaire" }, qr: { resourceType: "QuestionnaireResponse" } });
   const artifact = result.manifest.cases[0].artifacts![0]; writeFileSync(join(root, artifact.path), "{}");
   expect(readSuiteResult(request().celPath, result.manifest.cases[0].compartmentDir).lookedFor).toContain("identity differs");
@@ -142,10 +142,12 @@ it("accounts for cleanup uncertainty, skips pruning, and quarantines subsequent 
   expect(await produceResults(request())).toMatchObject({ok:true,failed:0});
   put("tests/results/fhir/patient/stale/questionnaire/stale.json", "{}");
   engine.calls=0; engine.uncertainAt=2;
+  engine.inputChanged=()=>put("tests/results/during-run.txt","keep after cleanup uncertainty");
   const result=await produceResults(request()); expect(result.ok).toBe(true); if(!result.ok) throw Error(result.reason);
   expect(result.manifest.cases.map(c=>c.state)).toEqual(["generated","failed","not-run"]);
   expect(result.failed).toBe(2); expect(result.pruned).toEqual([]);
-  expect(existsSync(join(root,"tests/results/fhir/patient/stale/questionnaire/stale.json"))).toBe(true);
+  expect(existsSync(join(root,"tests/results/fhir/patient/stale/questionnaire/stale.json"))).toBe(false);
+  expect(existsSync(join(root,"tests/results/during-run.txt"))).toBe(true);
   expect(JSON.parse(readFileSync(result.manifestPath,"utf8")).cases[1].cleanupUncertain).toBe(true);
   expect(await produceResults(request())).toMatchObject({ok:false,reason:expect.stringContaining("cleanup was not confirmed")});
   expect(engine.calls).toBe(2);

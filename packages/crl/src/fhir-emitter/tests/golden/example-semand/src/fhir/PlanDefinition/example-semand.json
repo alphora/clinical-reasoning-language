@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-direct-qualifying-diagnosis-coverage-determination",
+  "id": "example-semand",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-qualifying-diagnosis-coverage-determination",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand",
   "version": "0.0.0",
-  "name": "DirectCodeIsQualifyingDiagnosisCoverageDetermination",
-  "title": "Qualifying Diagnosis Coverage Determination",
+  "name": "SemAndIntersectAAndBCoverageDetermination",
+  "title": "A And B Coverage Determination",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Qualifying Diagnosis Coverage Determination",
+  "description": "A And B Coverage Determination",
   "type": {
     "coding": [
       {
@@ -44,12 +44,12 @@
     ]
   },
   "library": [
-    "http://example.org/hcsc/rx501-007/Library/ExampleDirectInterface"
+    "http://example.org/hcsc/rx501-007/Library/ExampleSemandInterface"
   ],
   "action": [
     {
-      "title": "Qualifying Diagnosis Coverage Determination",
-      "description": "Qualifying Diagnosis Coverage Determination",
+      "title": "A And B Coverage Determination",
+      "description": "A And B Coverage Determination",
       "code": [
         {
           "coding": [
@@ -68,8 +68,8 @@
       ],
       "action": [
         {
-          "title": "Qualifying Diagnosis",
-          "description": "Qualifying Diagnosis",
+          "title": "A And B",
+          "description": "A And B",
           "code": [
             {
               "coding": [
@@ -85,7 +85,7 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Qualifying Diagnosis"
+                "expression": "A And B"
               }
             }
           ],
@@ -93,11 +93,17 @@
             {
               "type": "Condition",
               "profile": [
-                "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-a"
+              ]
+            },
+            {
+              "type": "Condition",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b"
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-certify-approve-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-certify-approve-recommendation"
         },
         {
           "title": "otherwise",
@@ -112,7 +118,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-not-certify-deny-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-not-certify-deny-recommendation"
         }
       ]
     }

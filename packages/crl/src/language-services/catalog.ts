@@ -74,6 +74,7 @@ export const CONCEPT_VALUETYPES = [
   "Ratio",
   "SampledData",
   "string",
+  "text", // REFACTOR:grounded (#322): author-facing string alias, normalized by the parser.
   "time",
 ] as const;
 

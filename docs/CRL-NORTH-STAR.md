@@ -138,6 +138,14 @@ touching it; new authoring uses the replacement. A criterion may negate the sele
 publication aliases and concept-space composition remain unsupported and are diagnosed explicitly.
 New authoring and kit examples use explicit selected Record publications. General Scalar and implicit-default compiler paths still exist; that implementation debt does not authorize teaching them as the current contract. Full compiler retirement remains #320 work.
 
+Text intake uses explicit selected Record/Observation publications; `text` is an author-facing alias for FHIR `string`.
+The separate `"Answer" has a value` producer publishes a Boolean about the selected answer slot, not a
+clinical determination or dataset completeness. It preserves false and recognized coded Unknown/N/A as
+answered; absent records or absent primitive values yield false without inventing validity. This bounded
+producer admits selected Boolean, string, dateTime and domain-interpreted CodeableConcept operands; it is not a
+legacy pipeline or projection stage. Errors propagate. See [typed intake answers](typed-intake-answers.md)
+for the request/clear contract and native FHIR parser boundary.
+
 Quantity measurements can use explicit Record/Observation publication with `shape reduction is most recent`.
 An Observation source preserves its Quantity and effectiveDateTime while projecting the analytical identity.
 A local code adds an answer representation; an uncoded source calculation does not invent a question.
@@ -371,7 +379,15 @@ Gather and emit the required structure for a valid resource, satisfying its decl
 Current extraction uses fixed/pattern values for some defaults because alternatives failed in measured
 engine runs. That workaround does not settle which fields should be answerable with defaults; #290
 tracks completeness work. Do not turn an extraction limitation into a permanent authoring restriction. Canonical identity must be explicit and consistent; do not invent a fallback
-canonical base. These are behavioral safeguards, not endorsement of every current classifier or test.
+canonical base. Operator-confirmed policy entry points use the exact validated package policy ID:
+`<canonicalBase>/PlanDefinition/<policy-id>` and the generated
+`<canonicalBase>/Questionnaire/<policy-id>`. Decision wording does not alter these URLs.
+Supporting definitions retain distinct IDs. Multiple root decisions in one policy are an emission error;
+terminology-only libraries need no root. Successful emission replaces the complete generated output directories after preflight, including
+custom files there; Git owns recovery. CRL owns src/cql and src/fhir, CEL owns tests/data/fhir, and normal
+native results own tests/results. Authored sibling directories are not output. Explicit failed-case retry
+retains verified successful results. No obsolete root file may remain alongside the current one.
+These are behavioral safeguards, not endorsement of every current classifier or test.
 See `docs/emit-189-casefeature-completeness.md` for implementation detail to reassess and
 `tmp/NOTES-apply-null-behavior.md` for dated engine/$extract evidence. Engine-specific limits, repeating
 items, and populated false values need verification against the actual shipped artifacts.

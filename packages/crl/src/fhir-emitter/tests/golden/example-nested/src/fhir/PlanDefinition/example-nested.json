@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-nested-top-coverage-determination",
+  "id": "example-nested",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-top-coverage-determination",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested",
   "version": "0.0.0",
   "name": "NestedDefinedAsTopCoverageDetermination",
   "title": "Top Coverage Determination",

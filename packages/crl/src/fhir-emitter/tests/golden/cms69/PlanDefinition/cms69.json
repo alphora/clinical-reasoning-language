@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "cms69-cms69-bmi-screening-strategy",
+  "id": "cms69",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-cms69-bmi-screening-strategy",
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69",
   "version": "1.0.0",
   "name": "Cms69StrategyCms69BmiScreeningStrategy",
   "title": "CMS69 BMI Screening Strategy",

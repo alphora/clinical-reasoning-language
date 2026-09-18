@@ -1,3 +1,4 @@
+import { isValidFhirTemporal } from "../temporal";
 import { collectDecisionArmsTransitive } from "../../ast/decisionArms";
 import { buildGlobalDecisionMap, makeResolveDecision } from "../../ast/decisionResolver";
 import type { LibAwareDecisionResolver } from "../../ast/decisionSpine";
@@ -790,6 +791,17 @@ function validateBooleanValueRules(
   if (publication !== undefined) {
     if (!valueField) {
       warnings.push(warn("publication-unanswered-fact", `Fact "${f.name}" supplies an unanswered Record for "${libName}"."${declName}". If selected, its unknown value can displace an older answer and pause a required branch.`, db.location, fp));
+      return;
+    }
+    // REFACTOR:grounded (#322): present text is preserved, never coerced from Boolean/numeric data.
+    if (publication.valueType === "dateTime") {
+      const value = celValueScalar(valueField.value);
+      if (typeof value !== "string" || !isValidFhirTemporal(value)) errors.push(err("invalid-date", `Fact "${f.name}" requires a valid FHIR dateTime: a calendar date or a timestamp with seconds and timezone.`, valueField.location, fp));
+      return;
+    }
+    if (publication.valueType === "string") {
+      const value = celValueScalar(valueField.value);
+      if (typeof value !== "string" || value.length === 0) errors.push(err("value-reading-assertion-needs-text", `Fact "${f.name}" requires a text value; omit value is for an unanswered record.`, valueField.location, fp));
       return;
     }
     if (publication.valueType === "CodeableConcept") {

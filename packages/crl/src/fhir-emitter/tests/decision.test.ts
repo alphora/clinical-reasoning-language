@@ -674,7 +674,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     expect(errors).toEqual([]);
     expect(resources).toHaveLength(2);
     const byId = new Map(resources.map((r) => [(r.resource as { id: string }).id, r.resource as Record<string, unknown>]));
-    const rootR = byId.get("lib-root")!;
+    const rootR = byId.get("lib")!;
     const subR = byId.get("lib-sub")!;
     expect((rootR.meta as { profile: string[] }).profile).toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
     expect((subR.meta as { profile: string[] }).profile).not.toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
@@ -690,7 +690,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     const { resources } = emitDecisionPlanDefinitionsForLibrary(
       [root, sub], [activity("A")], [concept("C1"), concept("C2")], "Lib", METADATA, { clock: FIXED_CLOCK },
     );
-    const rootR = (resources.find((r) => (r.resource as { id: string }).id === "lib-root")!.resource as Record<string, unknown>);
+    const rootR = (resources.find((r) => (r.resource as { id: string }).id === "lib")!.resource as Record<string, unknown>);
     const action = (rootR.action as Array<Record<string, unknown>>)[0]!;
     expect(action.definitionCanonical).toBe(planDefinitionCanonicalUrl(METADATA, "Sub"));
   });
@@ -737,13 +737,14 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
   });
 
   it("intra-Decision slug collision: two decisions slugify identically → slug-collision + skip both", () => {
+    const root = decision("Entry", [when("C", leaf(useDec("Foo Bar"))), otherwise(leaf(useDec("foo bar")))]);
     const a = decision("Foo Bar", [when("C", leaf(recommend("X")))]);
     const b = decision("foo bar", [when("C", leaf(recommend("X")))]);
     const { resources, errors } = emitDecisionPlanDefinitionsForLibrary(
-      [a, b], [activity("X")], [concept("C")], "Lib", METADATA, { clock: FIXED_CLOCK },
+      [root, a, b], [activity("X")], [concept("C")], "Lib", METADATA, { clock: FIXED_CLOCK },
     );
     expect(errors.some((e) => e.kind === "slug-collision")).toBe(true);
-    expect(resources).toHaveLength(0);
+    expect(resources.every((r) => r.sourceName === "Entry")).toBe(true);
   });
 
   it("same-library qualified ref `\"Lib\".\"C\"` is treated as local (matches validator)", () => {
@@ -784,17 +785,14 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     // Root references `"OtherLib"."Sub"` (foreign), and local `Sub` has
     // no incoming refs. Pre-fix bug: foreign edge stripped → recorded
     // phantom Root→Sub edge → local Sub misclassified as sub-decision.
-    // Post-fix: both Root and Sub classified as roots.
+    // Both are roots: the foreign edge cannot turn the local Sub into a supporting decision.
     const root = decision("Root", [when("C", leaf(useDec({ libraryName: "OtherLib", name: "Sub" })))]);
     const sub = decision("Sub", [when("C", leaf(recommend("X")))]);
-    const { resources } = emitDecisionPlanDefinitionsForLibrary(
+    const { resources, errors } = emitDecisionPlanDefinitionsForLibrary(
       [root, sub], [activity("X")], [concept("C")], "Lib", METADATA, { clock: FIXED_CLOCK },
     );
-    // Local Sub should be classified as a Strategy (no incoming local refs).
-    const subResource = resources.find((r) => (r.resource as { id: string }).id === "lib-sub");
-    expect(subResource).toBeDefined();
-    const subProfiles = (subResource!.resource as { meta: { profile: string[] } }).meta.profile;
-    expect(subProfiles).toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
+    expect(resources).toEqual([]);
+    expect(errors.find((e) => e.kind === "ambiguous-policy-entrypoint")?.message).toMatch(/Root.*Sub/);
   });
 
   it("libraryName contract: when slug ≠ name (`\"My Library\"` vs `my-library`), qualified ref still resolves locally", () => {
@@ -1480,4 +1478,28 @@ const refQC = (libraryName: string, name: string): BranchCondition => ({
   type: "BranchConditionRef",
   ref: { type: "QualifiedReference", libraryName, name, location: LOC },
   location: LOC,
+});
+
+
+describe("policy entry-point identity", () => {
+  // @kit emit-output-root:policy-canonical
+  it.each(["Intake", "Renamed entry", "\u5165\u53e3"])("uses the exact policy ID independently of root name %s", (name) => {
+    const metadata = { ...METADATA, name: "admin001-001" };
+    const { resource, errors } = emitDecisionPlanDefinition(
+      decision(name, [when("C", leaf(recommend("A")))]), "Lib", metadata,
+      RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    expect(errors.filter((e) => e.kind === "non-ascii-slug-fallback")).toEqual([]);
+    expect(resource?.relativePath).toBe("PlanDefinition/admin001-001.json");
+    expect(resource?.resource).toMatchObject({ id: "admin001-001", url: `${metadata.canonicalBase}/PlanDefinition/admin001-001`, title: name });
+  });
+
+  it("refuses two independent roots instead of choosing one", () => {
+    const result = emitDecisionPlanDefinitionsForLibrary(
+      [decision("First", [when("C", leaf(recommend("A")))]), decision("Second", [when("C", leaf(recommend("A")))])],
+      [activity("A")], [concept("C")], "Lib", METADATA,
+    );
+    expect(result.resources).toEqual([]);
+    expect(result.errors.find((e) => e.kind === "ambiguous-policy-entrypoint")?.message).toMatch(/First.*Second/);
+  });
 });

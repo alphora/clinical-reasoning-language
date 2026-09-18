@@ -30,11 +30,11 @@
  */
 
 import { buildCRL } from "../index";
-import { publicationProducerOperands, prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
+import { publicationHasValueFormError, readPublicationHasValue, publicationProducerOperands, prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
 import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
 import { renderPublicationBMIHelpers, BMI_CQL } from "./renderPublicationBMI";
 import { renderPublicationQuantityHelpers, renderPublicationThresholdHelpers, QUANTITY_CQL, PUBLICATION_OBSERVATION_QUANTITY_CANDIDATE } from "./renderPublicationQuantity";
-import { PUBLICATION_LOCAL_QUANTITY_CANDIDATE } from "./renderPublicationSelection";
+import { PUBLICATION_LOCAL_QUANTITY_CANDIDATE, PUBLICATION_LOCAL_STRING_CANDIDATE, PUBLICATION_LOCAL_DATETIME_CANDIDATE } from "./renderPublicationSelection";
 import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
 import { AGE_CQL, AGE_CQL_PREFIX, renderPublicationAgeHelpers } from "./renderPublicationAge";
 import { hasAgeSource } from "../emit/publicationAge";
@@ -1247,7 +1247,7 @@ class Emitter {
         });
       }
       const quantities = this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "Quantity");
-      sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers(quantities));
+      sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers(quantities, this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "string"), this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "dateTime")));
       if (quantities) sections.push(renderPublicationQuantityHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && ["quantityThreshold", "bodyMassIndex"].includes(s.__publication.descriptor.producer?.kind ?? "")))
         sections.push(renderPublicationThresholdHelpers());
@@ -1257,7 +1257,7 @@ class Emitter {
         sections.push(renderPublicationAgeHelpers());
       if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
         (s.__publication.descriptor.producer !== undefined || s.__publication.descriptor.valueDomain !== undefined)))
-        sections.push(renderPublicationProducerHelpers());
+        sections.push(renderPublicationProducerHelpers(this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.producer?.kind === "hasValue")));
     }
 
     const concepts = this.ast.statements
@@ -2443,7 +2443,7 @@ class Emitter {
       if (c.definition?.type !== "DefinedAsDefinition" || c.definition.body.type !== "DefinedAsBareRef")
         throw new Error(`Publication "${c.name}" has no generated local retrieve reference.`);
       const target = this.renderPublicationReference(c.definition.body.ref);
-      const adapter = descriptor.valueType === "boolean" ? PUBLICATION_LOCAL_BOOLEAN_CANDIDATE : descriptor.valueType === "Quantity" ? PUBLICATION_LOCAL_QUANTITY_CANDIDATE : PUBLICATION_LOCAL_CODEABLE_CANDIDATE;
+      const adapter = descriptor.valueType === "boolean" ? PUBLICATION_LOCAL_BOOLEAN_CANDIDATE : descriptor.valueType === "string" ? PUBLICATION_LOCAL_STRING_CANDIDATE : descriptor.valueType === "dateTime" ? PUBLICATION_LOCAL_DATETIME_CANDIDATE : descriptor.valueType === "Quantity" ? PUBLICATION_LOCAL_QUANTITY_CANDIDATE : PUBLICATION_LOCAL_CODEABLE_CANDIDATE;
       candidates = `((${target}) O return all ${cqlIdent(adapter)}(O, ${cqlStringLiteral(descriptor.localContributorId)}, ${cqlStringLiteral(descriptor.conceptId)}))`;
     }
     // REFACTOR:grounded (#320, review 564): source rows join the same final candidate selector.
@@ -2487,6 +2487,8 @@ class Emitter {
       const profile = descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl);
       const produced = producer.kind === "bodyMassIndex"
         ? `${cqlIdent(BMI_CQL.candidate)}(${operands[0]}, ${operands[1]}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
+        : producer.kind === "hasValue"
+        ? `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.hasValue)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${cqlStringLiteral(producer.operandValueType)}, 'Patient/' + Patient.id.value)`
         : producer.kind === "quantityThreshold"
         ? `${cqlIdent(QUANTITY_CQL.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${producer.threshold.value.toFixed(8)}, ${cqlStringLiteral(producer.threshold.unit)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`
         : `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${renderPublicationCodeTable(producer.domain)}, ${renderPublicationCodeTable(producer.qualifying)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`;
@@ -2500,6 +2502,12 @@ class Emitter {
   }
 
   private emitConceptBody(c: Concept, def: ConceptDefinition): string {
+    // REFACTOR:grounded (#322): direct emit cannot route has-value to an undefined legacy helper.
+    if (publicationHasValueFormError(c) !== undefined || (readPublicationHasValue(c) !== undefined && c.__publication === undefined)) {
+      this.emitErrors.push({ type: "Validation", kind: "publication-unsupported-form", line: c.location.start.line, column: c.location.start.column,
+        message: "Has-value requires an explicitly selected Record/Observation/boolean publication." });
+      return "null /* invalid has-value publication; emit fails */";
+    }
     if (c.__publication !== undefined && c.__publication.role !== "retrieve") {
       return `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.record)}(${cqlIdent(publicationEnvelopeName(c.name))})`;
     }
@@ -4636,6 +4644,12 @@ class Emitter {
   }
 
   private emitPatternCall(call: CanonicalPatternCall, localUnionRef?: string): string {
+    // REFACTOR:grounded (#322, review783): publication-only producer; no generic CRLCommon helper exists.
+    if (call.pattern === "HasValue") {
+      this.emitErrors.push({ type: "Validation", kind: "publication-unsupported-form", line: call.location.start.line, column: call.location.start.column,
+        message: "Has-value requires an exact definition on an explicitly selected Record publication; it is not a pipeline or projection stage." });
+      return "null /* unsupported has-value context; emit fails */";
+    }
     // Synthetic patterns (not catalog entries — they represent CQL keyword
     // operators) emit as CQL syntax instead of CRLCommon calls.
     if (call.pattern === "StartOf") {

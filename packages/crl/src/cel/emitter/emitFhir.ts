@@ -1,3 +1,4 @@
+import { isValidFhirTemporal } from "../temporal";
 import { answerTerminologyResolver } from "../../emit/answerDomain";
 import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
 import { ageMethod, hasAgeSource } from "../../emit/publicationAge";
@@ -967,6 +968,25 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
       return undefined;
     }
     const publication = publicationLookup?.kind === "publication" ? publicationLookup.descriptor : undefined;
+    // REFACTOR:grounded (#322): backstop callers that emit without a separate validation call.
+    if (publication?.valueType === "dateTime") {
+      const vf = fact.body.find((b): b is CELValueField => b.type === "CELValueField");
+      const value = vf === undefined ? undefined : celValueScalar(vf.value);
+      if (vf !== undefined && (typeof value !== "string" || !isValidFhirTemporal(value))) {
+        ctx.publicationFailed = true;
+        ctx.diagnostics.push({ kind: "invalid-date", severity: "error", message: `Fact "${factName}" requires a valid FHIR dateTime: a calendar date or a timestamp with seconds and timezone.`, caseSlug: ctx.caseSlug, factName, filePath: ctx.graph.filePath });
+        return undefined;
+      }
+    }
+    if (publication?.valueType === "string") {
+      const vf = fact.body.find((b): b is CELValueField => b.type === "CELValueField");
+      const value = vf === undefined ? undefined : celValueScalar(vf.value);
+      if (vf !== undefined && (typeof value !== "string" || value.length === 0)) {
+        ctx.publicationFailed = true;
+        ctx.diagnostics.push({ kind: "value-reading-assertion-needs-text", severity: "error", message: `Fact "${factName}" requires text; omit value is for an unanswered record.`, caseSlug: ctx.caseSlug, factName, filePath: ctx.graph.filePath });
+        return undefined;
+      }
+    }
     if (publication?.valueType === "boolean" || (publication === undefined && isValueReadingBooleanConcept(targetConcept, siblings))) {
       const vf = fact.body.find((b): b is CELValueField => b.type === "CELValueField");
       // REFACTOR:grounded (#320): a new publication can retain an unanswered record. A present
@@ -1197,7 +1217,8 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
         resourceBody.valueQuantity = { value: v.value };
         break;
       case "string":
-        resourceBody.valueString = v.value;
+        if (publication?.valueType === "dateTime") resourceBody.valueDateTime = v.value;
+        else resourceBody.valueString = v.value;
         break;
     }
   }

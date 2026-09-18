@@ -1,6 +1,6 @@
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { produceBMICandidate } from "../emit/publicationBMI";
-import { publicationProducerOperands } from "../emit/publicationProgram";
+import { publicationHasValueFormError, publicationProducerOperands } from "../emit/publicationProgram";
 /**
  * CRE — CRL Clinical Reasoning Engine (#115), v1.
  *
@@ -120,6 +120,7 @@ import {
 } from "../emit/publicationProgram";
 import { selectPublicationCandidate, type PublicationCandidate } from "../emit/publicationSelection";
 import { interpretPublicationCodeableValue } from "../emit/publicationDomain";
+import { produceHasValueCandidate } from "../emit/publicationHasValue";
 import { produceMembershipCandidate } from "../emit/publicationProducer";
 import { adaptObservationPublicationCandidate, adaptServiceRequestPublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
 import { readPolicyId } from "../fhir-emitter/metadata";
@@ -984,6 +985,7 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     const selectedOperands = operands.map(p => p?.state === "selected" ? p.candidate : undefined);
     const produced = descriptor.producer.kind === "bodyMassIndex"
       ? produceBMICandidate(descriptor, selectedOperands[0], selectedOperands[1], ctx.publicationSubjectReference)
+      : descriptor.producer.kind === "hasValue" ? produceHasValueCandidate(descriptor, selectedOperands[0], ctx.publicationSubjectReference)
       : produceMembershipCandidate(descriptor, selectedOperands[0], ctx.publicationSubjectReference);
     if (produced.kind === "error") return fail(produced.code, produced.message);
     if (produced.kind === "candidate") {
@@ -1050,6 +1052,11 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   ctx.stack.add(id);
   const cyclesBefore = ctx.cycleHits;
   const entry = ctx.concepts.get(id);
+  // REFACTOR:grounded (#322): unsupported presence syntax is an error even in legacy-only evaluation.
+  const presenceError = entry === undefined ? undefined : publicationHasValueFormError(entry.node);
+  if (presenceError !== undefined) {
+    ctx.stack.delete(id); ctx.runtimeError = true; ctx.diagnostics.push(`publication-unsupported-form: ${presenceError}`); return { sat: null };
+  }
   if (entry?.node.shapeReduction !== undefined) {
     const result = evaluatePublication(entry, ctx);
     ctx.stack.delete(id);

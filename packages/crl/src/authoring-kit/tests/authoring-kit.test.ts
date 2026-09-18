@@ -111,7 +111,7 @@ describe("authoring-kit — reference artifacts", () => {
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
       /- value projection is age today at least 18 years\./,
     );
-    // #215 upper bound: the pediatric `under 21` both-rep concept + decision must survive.
+    // #215 upper bound: retain the pediatric projection as an alternate single-root guard.
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/concept "Patient Under Twenty One Years":/);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `under-21`\./);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
@@ -120,7 +120,7 @@ describe("authoring-kit — reference artifacts", () => {
     // Both concepts carry the Patient/birthDate posrep carrier.
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).not.toMatch(/value element is|value type is date/);
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(
-      /when "Patient Under Twenty One Years" then recommend activity "Approve"/,
+      /when "Age 18 Or Older" then recommend activity "Approve"/,
     );
     // REFACTOR:grounded (#320, plan583): both use explicit Record publication; persistence is permitted.
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL.match(/shape reduction is most recent/g) ?? []).toHaveLength(2);
@@ -311,7 +311,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.5");
+    expect(kit.schemaVersion).toBe("2.9");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -346,6 +346,8 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(names).toEqual([
       "disposition-arbitration-reference.cel",
       "disposition-arbitration-reference.crl",
+      "intake-reference.cel",
+      "intake-reference.crl",
       "named-answer-reference.cel",
       "named-answer-reference.crl",
       "named-answer-terms.crl",
@@ -447,7 +449,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
-    expect(crePairs.length).toBe(7); // includes the shared selection test input
+    expect(crePairs.length).toBe(8); // includes the shared selection test input
     for (const crl of crePairs) {
       const base = crl.name.replace(/\.crl$/, "");
       const cel = byName.get(`${base}.cel`);
@@ -651,8 +653,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.5");
-    expect(kit.contentHash).toBe("90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96");
+    expect(kit.schemaVersion).toBe("2.9");
+    expect(kit.contentHash).toBe("46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {
@@ -924,6 +926,7 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
       "library",
       "tag",
       "gist",
+      "description",
       "fields",
       "status",
     ]);

@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "code-is-decision-vs-fixture-triage-crohns",
+  "id": "service-request",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/PlanDefinition/code-is-decision-vs-fixture-triage-crohns",
+  "url": "http://example.org/endoluminal-ablation/PlanDefinition/service-request",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVsTriageCrohns",
-  "title": "Triage Crohns",
+  "name": "EndoluminalAblationCoverageEndoluminalAblationCoverage",
+  "title": "Endoluminal Ablation Coverage",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Triage Crohns",
+  "description": "Endoluminal Ablation Coverage",
   "type": {
     "coding": [
       {
@@ -44,12 +44,12 @@
     ]
   },
   "library": [
-    "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInterface"
+    "http://example.org/endoluminal-ablation/Library/ServiceRequestInterface"
   ],
   "action": [
     {
-      "title": "Adult Patient",
-      "description": "Adult Patient",
+      "title": "Endoluminal Ablation Coverage",
+      "description": "Endoluminal Ablation Coverage",
       "code": [
         {
           "coding": [
@@ -60,27 +60,16 @@
           ]
         }
       ],
-      "condition": [
+      "extension": [
         {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "Adult Patient"
-          }
-        }
-      ],
-      "input": [
-        {
-          "type": "Observation",
-          "profile": [
-            "http://example.org/crl/code-is-decision-vs/StructureDefinition/code-is-decision-vs-fixture-adult-patient"
-          ]
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
         }
       ],
       "action": [
         {
-          "title": "Referral Reason",
-          "description": "Referral Reason",
+          "title": "Requested Service Is Covered",
+          "description": "Requested Service Is Covered",
           "code": [
             {
               "coding": [
@@ -96,11 +85,43 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Referral Reason"
+                "expression": "Requested Service Is Covered"
               }
             }
           ],
-          "definitionCanonical": "http://example.org/crl/code-is-decision-vs/PlanDefinition/code-is-decision-vs-fixture-refer-to-gi-recommendation"
+          "input": [
+            {
+              "type": "Observation",
+              "profile": [
+                "http://example.org/endoluminal-ablation/StructureDefinition/service-request-requested-service"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/endoluminal-ablation/PlanDefinition/service-request-approve-endoluminal-ablation-recommendation"
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/endoluminal-ablation/PlanDefinition/service-request-deny-endoluminal-ablation-recommendation",
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-expression",
+                "expression": "not \"ServiceRequestInterface\".\"Requested Service Is Covered\""
+              }
+            }
+          ]
         }
       ]
     }

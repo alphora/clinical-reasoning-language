@@ -743,7 +743,8 @@ export class CRLAstBuilder
     for (const vtl of valueTypeLines) {
       try {
         const tok = vtl.CONCEPT_VALUE_TYPE();
-        if (tok) valueTypes.push(tok.text as ConceptValueType);
+        // REFACTOR:grounded (#322): normalize the author alias once; emitted types remain FHIR types.
+        if (tok) valueTypes.push((tok.text === "text" ? "string" : tok.text) as ConceptValueType);
       } catch {
         // skip malformed valuetype line; lexer should have already reported
       }
@@ -1141,7 +1142,8 @@ export class CRLAstBuilder
       for (const vtl of rb.valueTypeLine?.() ?? []) {
         try {
           const tok = vtl.CONCEPT_VALUE_TYPE();
-          if (tok) valueTypes.push(tok.text as ConceptValueType);
+          // REFACTOR:grounded (#322): normalize the author alias once; emitted types remain FHIR types.
+        if (tok) valueTypes.push((tok.text === "text" ? "string" : tok.text) as ConceptValueType);
         } catch {
           // skip malformed value-type line
         }
@@ -1197,7 +1199,7 @@ export class CRLAstBuilder
     const typeLine = body?.parameterTypeLine?.();
     const typeToken = typeLine?.PARAMETER_TYPE?.();
     const rawText = typeToken?.text ?? "";
-    let parameterType = rawText;
+    let parameterType = rawText === "text" ? "string" : rawText; // REFACTOR:grounded (#322): same type alias.
     // The lexer error path stores a JSON envelope as the token text when
     // the type name isn't in the allowlist. Try/catch + reportError
     // mirrors how `parseConceptTypes` handles InvalidConceptType.

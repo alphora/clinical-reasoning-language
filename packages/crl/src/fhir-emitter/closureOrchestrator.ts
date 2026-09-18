@@ -76,6 +76,7 @@ import { emitOwnedValueSetCodeSystems, namedAnswerSet } from "./namedAnswerSet";
 import type { NamedAnswerSet } from "./namedAnswerSet";
 import {
   emitDecisionPlanDefinition,
+  ambiguousPolicyEntrypoint,
   type ActivityResolver,
   type CaseFeatureInputResolver,
   type ConceptResolver,
@@ -191,6 +192,7 @@ function makeResolversForSourceLibrary(
   sourceLibraryName: string,
   index: AllLibrariesIndex,
   cycleMemberKeys: Set<string>,
+  rootKeys: ReadonlySet<string>,
   metadata: CpgMetadata,
 ): {
   conceptResolver: ConceptResolver;
@@ -235,13 +237,13 @@ function makeResolversForSourceLibrary(
       if (!index.decisions.get(targetLib)?.has(targetName)) return null;
       // R1 — policy-id base (single per-closure policy id; cross-library decision
       // targets share it, matching the emitter's `decisionId`).
-      return `${metadata.canonicalBase}/PlanDefinition/${decisionIdForLib(metadata, targetName)}`;
+      return `${metadata.canonicalBase}/PlanDefinition/${decisionId(metadata, targetName, rootKeys.has(key))}`;
     }
     const name = getRefName(normalized);
     const key = qualifiedKey([sourceLibraryName, name]);
     if (cycleMemberKeys.has(key)) return null;
     if (!index.decisions.get(sourceLibraryName)?.has(name)) return null;
-    return `${metadata.canonicalBase}/PlanDefinition/${decisionIdForLib(metadata, name)}`;
+    return `${metadata.canonicalBase}/PlanDefinition/${decisionId(metadata, name, rootKeys.has(key))}`;
   };
 
   const terminologyResolver: TerminologyResolver = (ref) => {
@@ -267,10 +269,6 @@ import { tarjanSCC } from "./tarjan";
 // DELEGATE to the per-emit-module exported id helpers (was a mirrored expression) so
 // the resolver-produced `definitionCanonical` byte-equals the emitter-produced `url`
 // by construction — a mirror can silently diverge; a delegation cannot.
-function decisionIdForLib(metadata: CpgMetadata, decisionName: string): string {
-  return decisionId(metadata, decisionName);
-}
-
 function recommendationIdForLib(metadata: CpgMetadata, activityName: string): string {
   return recommendationId(metadata, activityName);
 }
@@ -1247,6 +1245,11 @@ export function emitFhirDefClosure(
   // Closure-level Decision classification + cycle detection.
   const classification = classifyClosureDecisions(libraries, index);
   errors.push(...classification.errors);
+  const ambiguity = ambiguousPolicyEntrypoint([...classification.rootKeys].map((key) => {
+    const [library, name] = JSON.parse(key) as [string, string];
+    return `"${library}"."${name}"`;
+  }));
+  if (ambiguity) return { success: false, resources: [], errors: [...errors, ambiguity], unmatched };
 
   // Per-library emit (1-4) + per-decision emit with closure-aware resolvers.
   for (const lib of libraries) {
@@ -1264,6 +1267,7 @@ export function emitFhirDefClosure(
       lib.libraryName,
       index,
       classification.cycleMemberKeys,
+      classification.rootKeys,
       metadata,
     );
 

@@ -55,3 +55,12 @@ first:
   - otherwise then recommend activity "Deny".
   end.
 - otherwise then recommend activity "Deny".
+
+// Synthetic common applicability for this cross-lane emission test: one policy entry point.
+// Each helper retains its original guard shape and exclusion assertions.
+decision "Guard Shapes":
+any:
+- when "Gate" then use decision "AndPrior".
+- when "Gate" then use decision "NotOrPrior".
+- when "Gate" then use decision "MixedOrPrior".
+- when "Gate" then use decision "NestedPrior".

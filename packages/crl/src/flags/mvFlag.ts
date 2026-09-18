@@ -12,9 +12,9 @@ export type MvFlagStatus = "open" | "resolved";
 /** The status lifecycle a flag SURFACE (cockpit / MCP tool) types against — an alias of `MvFlagStatus`, re-homed here from the
  *  deleted `rewriteMetaStatus` (#212 step 4) so both callers keep the `FlagStatus` name without depending on `.crl` refactors. */
 export type FlagStatus = MvFlagStatus;
-/** Step PROVENANCE (the review STEP it belongs to, NOT the author): `extraction` = raised at KE-authoring time; `validation` =
- *  raised at MV-review time. Not "who" — the #210 cockpit agent files `validation` flags autonomously. The concern TYPE is the
- *  `tag` (+ its `displayName` for the human MV Types); this axis stays orthogonal to it. Both are MV concerns. */
+/** Current workflow ownership, not the author: `extraction` belongs to KE; `validation` belongs to MV.
+ *  Accepting a KE flag changes category to validation while preserving its concern tag and content.
+ *  New flags start in their tag's default category; agents can also file MV flags. */
 export type MvFlagCategory = "extraction" | "validation";
 export type MvFlagScope = "concept" | "decision" | "library";
 
@@ -79,8 +79,8 @@ export function coerceFlag(parsed: unknown): MvFlag | undefined {
   const gist = typeof o.gist === "string" ? o.gist : undefined; // gist may be empty-ish? require present string
   const createdAt = str(o.createdAt);
   if (id === undefined || tag === undefined || gist === undefined || createdAt === undefined) return undefined;
-  // category is PROVENANCE, not gate-safety: absent ⇒ default `validation` (the common MV-origin case); but a PRESENT value
-  // outside the enum is a corruption we won't silently relabel (would lose extraction provenance) ⇒ structurally invalid.
+  // category is workflow ownership, not gate-safety: absent ⇒ default `validation` (the common MV-origin case); but a PRESENT value
+  // outside the enum is a corruption we won't silently relabel (would lose workflow ownership) ⇒ structurally invalid.
   const category: MvFlagCategory | undefined =
     o.category === undefined ? "validation" : o.category === "extraction" || o.category === "validation" ? o.category : undefined;
   if (category === undefined) return undefined;

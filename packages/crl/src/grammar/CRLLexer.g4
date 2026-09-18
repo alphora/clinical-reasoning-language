@@ -344,6 +344,7 @@ CONCEPT_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
+// REFACTOR:grounded (#322): text is the author alias for FHIR string in value and parameter type lists.
 mode VALUE_TYPE_MODE;
 // CONCEPT_VALUE_TYPE possibilities (case sensitive)
 CONCEPT_VALUE_TYPE
@@ -361,6 +362,7 @@ CONCEPT_VALUE_TYPE
             'Ratio',
             'SampledData',
             'string',
+            'text',
             'time'
         ];
         if (!validTypes.includes(this.text)) {
@@ -530,6 +532,7 @@ PARAMETER_TYPE
             'Ratio',
             'SampledData',
             'string',
+            'text',
             'time'
         ];
         if (!validTypes.includes(this.text)) {

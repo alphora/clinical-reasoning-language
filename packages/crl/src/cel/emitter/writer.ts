@@ -1,5 +1,6 @@
+import { clearGeneratedDirectory, planGeneratedWrites } from "../../generated-output";
 import { createHash } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import * as path from "path";
 
 import type { EmitResult } from "./types";
@@ -63,32 +64,9 @@ function planWrites(result: EmitResult, baseAbs: string): PlannedWrite[] {
   return plan;
 }
 
-/**
- * ⭐⭐ WIPE THE COMPARTMENT TREE. The CEL data tree is ours.
- *
- * ⚠ OPERATOR RULING: "we own the cel folders too so we should delete everything then populate."
- * `<out>/patient/` is generated output, so anything in it this emit did not produce is superseded.
- * Do not hand-author there.
- *
- * WHY A WIPE RATHER THAN AN OVERWRITE, measured in the field: a CEL suite went 47 → 48 cases with 12
- * case ids renamed, and the old compartments simply stayed — 60 directories and 964 stale files for a
- * 48-case suite, because overwriting leaves a renamed case's entire directory behind.
- *
- * ⭐ AND THE COST IS NOT LOCAL. The knowledge engineer's downstream mirror-and-prune reported `0 pruned`
- * and was CORRECT — the stale directories were in its SOURCE, so it copied all 964 into the published
- * artifact and certified them. A non-pruning generator does not merely leave junk in its own output: it
- * converts every downstream consumer's correct prune into a no-op, silently, because "source and
- * destination agree" is exactly what a mirror is supposed to report.
- *
- * ⚠ THE OLD MANIFEST GOES WITH IT. If a write fails after this point, NO manifest is the honest state —
- * leaving the previous one would have it certify a tree that was just deleted, which is the same
- * manufactured confidence one level in.
- */
+/** The complete CEL FHIR output directory is generated. Git owns recovery. */
 function wipeCompartmentTree(baseAbs: string): void {
-  // `maxRetries` is for Windows: an AV scanner or the indexer holding a handle yields a transient
-  // EPERM/ENOTEMPTY on a recursive delete, and this tree reaches ~1000 files in the field.
-  rmSync(path.join(baseAbs, CEL_COMPARTMENT_ROOT), { recursive: true, force: true, maxRetries: 3 });
-  rmSync(path.join(baseAbs, CEL_DATA_MANIFEST), { force: true, maxRetries: 3 });
+  clearGeneratedDirectory(baseAbs);
 }
 
 /**
@@ -146,7 +124,7 @@ function writeDataManifest(result: EmitResult, plan: PlannedWrite[], baseAbs: st
  * nothing at all. The root `outDir` is created up front (matching the CLI) so a zero-resource result
  * still materializes the directory.
  *
- * ⚠ `<outDir>/patient/` is WIPED and repopulated, and a `cel-data-manifest.json` is left beside it.
+ * ⚠ `<outDir>/` is WIPED and repopulated, and a `cel-data-manifest.json` is left beside it.
  * See `wipeCompartmentTree` for why a wipe rather than an overwrite.
  */
 export function writeEmitResult(result: EmitResult, outDir: string, sink?: string[]): string[] {
@@ -155,7 +133,9 @@ export function writeEmitResult(result: EmitResult, outDir: string, sink?: strin
   mkdirSync(baseAbs, { recursive: true });
 
   // ⚠ PLAN AND VALIDATE FIRST. Nothing is deleted until every target is known-good.
+  if (result.diagnostics.some((d) => d.severity === "error")) throw new Error("Cannot write unsuccessful CEL emission");
   const plan = planWrites(result, baseAbs);
+  planGeneratedWrites(baseAbs, plan.map((w) => ({ path: path.relative(baseAbs, w.file), bytes: w.bytes })));
 
   wipeCompartmentTree(baseAbs);
 

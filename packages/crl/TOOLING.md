@@ -64,7 +64,7 @@ A single CLI binary (`crl-emit`) dispatches all three emit paths by the input fi
 
 ## Installation
 
-The package is publicly available from npm: `npm install @smile-digital-health/crl@5.3.0`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL 5.2 changes generated retrieval-library identities to `LocalElements`/`ExternalElements`. Regenerate CQL and FHIR together and replace the previous generated-file inventory, preserving independently authored files; the emitter does not automatically prune obsolete artifacts. Use an exact dependency version when upgrades require coordinated replacement, and consult the [5.2.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.2.0). CRL/CEL syntax is unchanged by 5.2. Upgrading from 5.0.0 also requires the authoring-kit API changes in the [5.1.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.1.0). Older content may need the earlier CRL5 language migration.
+Install the matching release from npm: `npm install @smile-digital-health/crl@6.3.0`. The VSIX, release tarball and contributor checkout below are additional delivery options. CRL 5.2 changes generated retrieval-library identities to `LocalElements`/`ExternalElements`. Regenerate CQL and FHIR together. CRL 6.3 replaces the complete generated `src/cql` and `src/fhir` directories after preflight, including custom files; use Git for recovery. CEL emission similarly replaces `tests/data/fhir`, and ordinary native runs replace `tests/results`. Explicit failed-case retries retain verified successful results. Use an exact dependency version when upgrades require coordinated replacement, and consult the [5.2.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.2.0). CRL/CEL syntax is unchanged by 5.2. Upgrading from 5.0.0 also requires the authoring-kit API changes in the [5.1.0 migration notes](https://github.com/alphora/clinical-reasoning-language/releases/tag/v5.1.0). Older content may need the earlier CRL5 language migration.
 
 ### Option A — VS Code extension (vsix) — for interactive authoring + MCP
 
@@ -390,7 +390,8 @@ A typical clinical artifact project has authored CRL/CEL sources plus generated 
 | Path | Contents | How it gets there |
 |---|---|---|
 | `src/crl/*.crl` | CRL libraries (authored) | hand-authored |
-| `src/cel/*.cel` | CEL case-example libraries (authored) | hand-authored |
+| `src/cel/mv/*.cel` | Human Medical Validation examples | hand-authored |
+| `src/cel/regression/*.cel` | Engineering regression controls | hand-authored |
 | `src/cql/<library>.cql` | Emitted CQL libraries | CQL lane of `--target fhir-def`, or `--target cql` |
 | `src/fhir/<ResourceType>/<id>.json` | Emitted FHIR Definition resources (ValueSet / Library / ActivityDef / PlanDef) | FHIR lane of `--target fhir-def` |
 | `tests/data/fhir/patient/<compartmentId>/<lowercase-type>/<id>.json` | Emitted FHIR instance resources per CEL case | `crl-emit` on a `.cel` file |

@@ -100,7 +100,7 @@ describe("CRL → FHIR golden regression (locked truth-set examples)", () => {
       //     order) against the golden's.
       const pdDir = path.join(fhirDir, "PlanDefinition");
       const coverageFile = existsSync(pdDir)
-        ? readdirSync(pdDir).find((f) => f.endsWith("-coverage-determination.json"))
+        ? readdirSync(pdDir).find((f) => { const pd = JSON.parse(readFileSync(path.join(pdDir, f), "utf8")); return pd.type?.coding?.some((c: { code?: string }) => c.code === "workflow-definition"); })
         : undefined;
       it("decision PlanDefinition input[] matches (inference order)", () => {
         expect(coverageFile).toBeDefined();

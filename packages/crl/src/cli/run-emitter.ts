@@ -7,7 +7,7 @@ import { CAPABILITY_ORDER } from "../fhir-emitter";
 import type { Capability } from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
 import { emitCrlTwoLane } from "../emit-two-lane";
-import { writeTwoLane, EmitWriteError } from "../emit-writers";
+import { writeTwoLane, writeCqlLibraries, EmitWriteError } from "../emit-writers";
 import { resolveEmitOutput, LANE_PRODUCES, type EmitLane } from "../emit-layout";
 
 type TargetMode = "cql" | "fhir-def" | undefined;
@@ -356,23 +356,12 @@ for (const entry of result.cqlByLibrary) {
 }
 
 try {
-  mkdirSync(outDirResolved, { recursive: true });
-} catch (e) {
-  process.stderr.write(
-    `Failed to create output directory "${outDirResolved}": ${(e as Error).message}\n`,
-  );
-  process.exit(1);
-}
-
-for (const entry of result.cqlByLibrary) {
-  const outPath = path.join(outDirResolved, entry.outputFilename);
-  try {
-    writeFileSync(outPath, entry.cql, "utf-8");
+  for (const outPath of writeCqlLibraries(result.cqlByLibrary.map((entry) => ({ outputFilename: entry.outputFilename, cql: entry.cql })), outDirResolved)) {
     process.stdout.write(`wrote ${outPath}\n`);
-  } catch (e) {
-    process.stderr.write(`Failed to write ${outPath}: ${(e as Error).message}\n`);
-    process.exit(1);
   }
+} catch (e) {
+  process.stderr.write(`Failed to replace CQL output: ${(e as Error).message}\n`);
+  process.exit(1);
 }
 
 // REFACTOR:grounded (#320, review 562): a finite domain with no negative member

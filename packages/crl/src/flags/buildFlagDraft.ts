@@ -33,7 +33,9 @@ function contentDedupKey(flag: MvFlag): string {
   const identity = a.scope === "concept" && a.entityId
     ? [a.scope, { entityId: a.entityId }]
     : [a.scope, a.name, a.library ?? "", a.occurrenceKey ?? ""];
-  return "d-" + createHash("sha1").update(JSON.stringify([...identity, flag.tag, flag.gist, fields])).digest("hex");
+  const content: unknown[] = [...identity, flag.tag, flag.gist, fields];
+  // Description is mutable detail, not retry identity; keep creation-time keys compatible.
+  return "d-" + createHash("sha1").update(JSON.stringify(content)).digest("hex");
 }
 
 /** A human label that survives orphaning ("this flag was about X"). A decision-occurrence flag appends the node signature. */
@@ -115,6 +117,7 @@ export function validateAndBuildMvFlagDraft(
     anchor,
     createdAt: "", // host-stamped below
   };
+  if (vf.description) base.description = vf.description;
   if (suppliedDedup) base.dedupKey = suppliedDedup;
 
   const dedupKey = base.dedupKey ?? contentDedupKey(base);

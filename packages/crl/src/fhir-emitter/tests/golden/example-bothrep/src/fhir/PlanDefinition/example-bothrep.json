@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "service-request-endoluminal-ablation-coverage",
+  "id": "example-bothrep",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/endoluminal-ablation/PlanDefinition/service-request-endoluminal-ablation-coverage",
-  "version": "1.0.0",
-  "name": "EndoluminalAblationCoverageEndoluminalAblationCoverage",
-  "title": "Endoluminal Ablation Coverage",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep",
+  "version": "0.0.0",
+  "name": "BothRepresentationImplantedPelletHrtCoverageDetermination",
+  "title": "Implanted Pellet HRT Coverage Determination",
   "status": "draft",
   "experimental": true,
-  "date": "2020-01-01T00:00:00.000Z",
+  "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Endoluminal Ablation Coverage",
+  "description": "Implanted Pellet HRT Coverage Determination",
   "type": {
     "coding": [
       {
@@ -44,12 +44,12 @@
     ]
   },
   "library": [
-    "http://example.org/endoluminal-ablation/Library/ServiceRequestInterface"
+    "http://example.org/hcsc/rx501-007/Library/ExampleBothrepInterface"
   ],
   "action": [
     {
-      "title": "Endoluminal Ablation Coverage",
-      "description": "Endoluminal Ablation Coverage",
+      "title": "Implanted Pellet HRT Coverage Determination",
+      "description": "Implanted Pellet HRT Coverage Determination",
       "code": [
         {
           "coding": [
@@ -68,8 +68,8 @@
       ],
       "action": [
         {
-          "title": "Requested Service Is Covered",
-          "description": "Requested Service Is Covered",
+          "title": "Implanted Estrogen Or Estradiol Pellets",
+          "description": "Implanted Estrogen Or Estradiol Pellets",
           "code": [
             {
               "coding": [
@@ -85,7 +85,7 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Requested Service Is Covered"
+                "expression": "Implanted Estrogen Or Estradiol Pellets"
               }
             }
           ],
@@ -93,11 +93,23 @@
             {
               "type": "Observation",
               "profile": [
-                "http://example.org/endoluminal-ablation/StructureDefinition/service-request-requested-service"
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-or-estradiol-pellets"
+              ]
+            },
+            {
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-pellets"
+              ]
+            },
+            {
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estradiol-pellets"
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/endoluminal-ablation/PlanDefinition/service-request-approve-endoluminal-ablation-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-not-certify-deny-recommendation"
         },
         {
           "title": "otherwise",
@@ -112,16 +124,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/endoluminal-ablation/PlanDefinition/service-request-deny-endoluminal-ablation-recommendation",
-          "condition": [
-            {
-              "kind": "applicability",
-              "expression": {
-                "language": "text/cql-expression",
-                "expression": "not \"ServiceRequestInterface\".\"Requested Service Is Covered\""
-              }
-            }
-          ]
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-certify-approve-recommendation"
         }
       ]
     }

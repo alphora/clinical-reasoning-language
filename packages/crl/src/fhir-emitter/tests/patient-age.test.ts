@@ -37,7 +37,7 @@ describe("patient-age publication FHIR artifacts", () => {
     // The decision PlanDefinition carries an action.input referencing that SD.
     const pd = r.resources.find(
       (res) =>
-        res.relativePath === "PlanDefinition/patient-age-adult-eligibility-determination.json",
+        res.relativePath === "PlanDefinition/patient-age.json",
     );
     expect(pd).toBeDefined();
     const inputs: unknown[] = [];

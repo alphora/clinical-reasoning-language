@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-semand-a-and-b-coverage-determination",
+  "id": "code-is-decision-vs-fixture",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-a-and-b-coverage-determination",
-  "version": "0.0.0",
-  "name": "SemAndIntersectAAndBCoverageDetermination",
-  "title": "A And B Coverage Determination",
+  "url": "http://example.org/crl/code-is-decision-vs/PlanDefinition/code-is-decision-vs-fixture",
+  "version": "1.0.0",
+  "name": "CodeIsDecisionVsTriageCrohns",
+  "title": "Triage Crohns",
   "status": "draft",
   "experimental": true,
-  "date": "2026-01-01T00:00:00.000Z",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "A And B Coverage Determination",
+  "description": "Triage Crohns",
   "type": {
     "coding": [
       {
@@ -44,12 +44,12 @@
     ]
   },
   "library": [
-    "http://example.org/hcsc/rx501-007/Library/ExampleSemandInterface"
+    "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInterface"
   ],
   "action": [
     {
-      "title": "A And B Coverage Determination",
-      "description": "A And B Coverage Determination",
+      "title": "Adult Patient",
+      "description": "Adult Patient",
       "code": [
         {
           "coding": [
@@ -60,16 +60,27 @@
           ]
         }
       ],
-      "extension": [
+      "condition": [
         {
-          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
-          "valueString": "any"
+          "kind": "applicability",
+          "expression": {
+            "language": "text/cql-identifier",
+            "expression": "Adult Patient"
+          }
+        }
+      ],
+      "input": [
+        {
+          "type": "Observation",
+          "profile": [
+            "http://example.org/crl/code-is-decision-vs/StructureDefinition/code-is-decision-vs-fixture-adult-patient"
+          ]
         }
       ],
       "action": [
         {
-          "title": "A And B",
-          "description": "A And B",
+          "title": "Referral Reason",
+          "description": "Referral Reason",
           "code": [
             {
               "coding": [
@@ -85,40 +96,11 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "A And B"
+                "expression": "Referral Reason"
               }
             }
           ],
-          "input": [
-            {
-              "type": "Condition",
-              "profile": [
-                "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-a"
-              ]
-            },
-            {
-              "type": "Condition",
-              "profile": [
-                "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b"
-              ]
-            }
-          ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-certify-approve-recommendation"
-        },
-        {
-          "title": "otherwise",
-          "description": "otherwise",
-          "code": [
-            {
-              "coding": [
-                {
-                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-                  "code": "guideline-based-care"
-                }
-              ]
-            }
-          ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-not-certify-deny-recommendation"
+          "definitionCanonical": "http://example.org/crl/code-is-decision-vs/PlanDefinition/code-is-decision-vs-fixture-refer-to-gi-recommendation"
         }
       ]
     }

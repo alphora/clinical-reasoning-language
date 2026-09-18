@@ -56,32 +56,29 @@ async function produce(prune?: boolean) {
   return result;
 }
 
-describe("producer cleanup after committing an empty manifest", () => {
+describe("complete result replacement", () => {
   // @kit emitted-trees-are-ours:results-prune
-  it("deletes superseded Q and QR by default and preserves unowned types", async () => {
+  it("replaces all generated files even for an empty suite", async () => {
+    writeFileSync(path.join(root,"tests/results/custom.txt"),"custom");
+    writeFileSync(path.join(root,"tests/results/questionnaire-manifest-old.json"),"{}");
     const result = await produce();
-    expect(result.pruned).toEqual([staleQ, staleQr].sort());
-    expect(result.orphaned).toEqual([foreign]);
-    expect(existsSync(path.join(root, staleQ))).toBe(false);
-    expect(existsSync(path.join(root, staleQr))).toBe(false);
-    expect(existsSync(path.join(root, foreign))).toBe(true);
+    expect(result.orphaned).toEqual([]);
+    for(const relative of [staleQ,staleQr,foreign,"tests/results/custom.txt","tests/results/questionnaire-manifest-old.json"]) expect(existsSync(path.join(root,relative))).toBe(false);
+    expect(existsSync(path.join(root,"src/crl"))).toBe(true);
   });
 
   // @kit emitted-trees-are-ours:results-retain
-  it("prune:false retains and reports superseded Q and QR", async () => {
-    const result = await produce(false);
-    expect(result.pruned).toEqual([]);
-    expect(result.orphaned).toEqual([staleQ, staleQr, foreign].sort());
-    for (const relative of [staleQ, staleQr, foreign]) expect(existsSync(path.join(root, relative))).toBe(true);
+  it("refuses the obsolete preservation option before changing output", async () => {
+    const result=await produceResults({celPath:root,crlPath:path.join(root,"policy.crl"),outRoot:root,useCase:"prior-auth",crlVersion:"test",prune:false});
+    expect(result).toMatchObject({ok:false,reason:expect.stringContaining("no longer supported")});
+    for(const relative of [staleQ,staleQr,foreign]) expect(existsSync(path.join(root,relative))).toBe(true);
   });
 
   // @kit emitted-trees-are-ours:results-removal-failure
-  it("reports a failed removal while pruning the other owned files", async () => {
-    files.refuseRemoval = path.join(root, staleQr);
-    const result = await produce();
-    expect(result.pruned).toEqual([staleQ]);
-    expect(result.orphaned).toEqual([staleQr, foreign].sort());
-    expect(existsSync(path.join(root, staleQr))).toBe(true);
-    expect(existsSync(path.join(root, staleQ))).toBe(false);
+  it("fails visibly when the output directory cannot be replaced", async () => {
+    files.refuseRemoval=path.join(root,"tests/results");
+    const result=await produceResults({celPath:root,crlPath:path.join(root,"policy.crl"),outRoot:root,useCase:"prior-auth",crlVersion:"test"});
+    expect(result).toMatchObject({ok:false,reason:expect.stringContaining("simulated removal failure")});
+    expect(existsSync(path.join(root,staleQr))).toBe(true);
   });
 });

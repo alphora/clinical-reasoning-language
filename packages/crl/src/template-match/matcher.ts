@@ -713,6 +713,11 @@ const existsThis: PatternMatcher = (els, loc) => {
  * ⚠ The two operands are in DIFFERENT namespaces (concept, then terminology) and are told apart by
  * POSITION. See `terminologyRefArg`.
  */
+// REFACTOR:grounded (#322): exact presence predicate, not Boolean truth or clinical existence.
+const conceptHasValue: PatternMatcher = (els, loc) => {
+  if (els.length !== 4 || !isConceptRef(els[0]) || !isWord(els[1], "has") || !isWord(els[2], "a") || !isWord(els[3], "value")) return null;
+  return makeCall("HasValue", [conceptRefArg(els[0])], loc);
+};
 const conceptInTerminology: PatternMatcher = (els, loc) => {
   if (els.length !== 3) return null;
   if (!isConceptRef(els[0])) return null;
@@ -1134,6 +1139,7 @@ const PATTERNS: PatternMatcher[] = [
   first,                           // 2
   lastBare,                        // 2 (after lastOnDayOf / lastWithinBeforeStartOf)
   mostRecentThisStage,             // 3 — `most recent this` as a pipeline stage
+  conceptHasValue,
   conceptInTerminology,            // 3 — `"X" in "VS"`, the CONCEPT-LEVEL membership predicate
   conceptInQualifying,             // 3 — `"X" in qualifying`, the INLINE-OPTIONS subset predicate (#189)
   existsThis,                      // 2 — the existence PROJECTION (value-blind)

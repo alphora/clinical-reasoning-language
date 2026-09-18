@@ -504,14 +504,14 @@ formatter. CQL declarations, includes, filenames, FHIR Library identities and
 dependency references use the same resulting name. Decisions and activities also
 emit definitional FHIR, with executable expressions linked to the CQL Libraries.
 
-When upgrading an artifact set, re-emit its complete closure into a fresh output
-directory, validate it, and replace the previous generated set together. Update
-other deployed callers of renamed libraries in the same deployment. The writer
-does not automatically prune obsolete CRL-generated files: use the previous
-emission's exact file inventory to remove those files, preserving hand-authored
-files. Do not identify obsolete files by a suffix search; long generated names
-can be shortened with a hash. Copying the new files over the old directory alone
-can leave stale libraries available to the engine.
+When upgrading an artifact set, re-emit its complete closure and deploy CQL and
+FHIR together. After preflight succeeds, the writers replace the complete
+`src/cql` and `src/fhir` output directories, including custom files. CEL emission
+replaces `tests/data/fhir`; ordinary native runs replace `tests/results`.
+Use Git to preserve or recover previous output. Explicit failed-case retries
+retain verified successful results. Update other deployed callers of renamed
+libraries in the same deployment. Filesystem failures can leave partial output;
+do not target the same output directory from concurrent calls.
 
 #### Diagnostic kinds
 

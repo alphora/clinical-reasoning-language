@@ -1,10 +1,11 @@
 // REFACTOR:grounded (review642): the served example context is the emission gate's input.
+// REFACTOR:grounded (#322): intake references form a complete standalone synthetic project.
 import { ANSWER_EXAMPLE_BASE } from "./answerExample";
 import type { ArtifactRequirements } from "./types";
 
 export function artifactRequirements(name: string): ArtifactRequirements {
   const base = name.replace(/\.(crl|cel)$/, "");
-  const paired = ["selection-reference", "named-answer-reference", "pa-determination-reference",
+  const paired = ["intake-reference", "selection-reference", "named-answer-reference", "pa-determination-reference",
     "source-delegated-decision-reference", "disposition-arbitration-reference",
     "reused-condition-reference", "shared-continuation-reference"].includes(base);
   const artifacts = paired ? [`artifact:${base}.${name.endsWith(".crl") ? "cel" : "crl"}`] : [];

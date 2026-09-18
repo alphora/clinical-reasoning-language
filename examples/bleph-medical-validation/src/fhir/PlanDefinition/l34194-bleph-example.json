@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-8808a421597f",
+  "id": "l34194-bleph-example",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
@@ -26,7 +26,7 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/PlanDefinition/l34194-bleph-example-blepharoplasty-and-blepharopto-8808a421597f",
+  "url": "http://example.org/crl/PlanDefinition/l34194-bleph-example",
   "version": "0.0.0",
   "name": "BlepharoplastyAndBlepharoptosisRepairBlepharoplastyAndBlepharoptosisRepairCoverageDetermination",
   "title": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",

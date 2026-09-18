@@ -353,6 +353,8 @@ const CATALOG: Readonly<Record<string, PatternEntry>> = {
   // present-but-empty `CodeableConcept` (both MEASURED). The lowering guards; the totality classification
   // is occurrence-sensitive (over a QUESTION it inherits unknown, over EVIDENCE it is boundary-totalized)
   // and is NOT decided by this table.
+  // REFACTOR:grounded (#322): selected-value presence has its own publication producer.
+  HasValue: { returnShape: "boolean", slot: "any", stage: { grounded: false }, realization: "native" },
   Membership: {
     returnShape: "boolean",
     slot: "any",

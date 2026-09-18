@@ -213,17 +213,24 @@ const CQF_APPLICABILITY_BEHAVIOR_EXT =
 export function planDefinitionCanonicalUrl(
   metadata: CpgMetadata,
   decisionName: string,
+  isRoot = false,
 ): string {
-  return `${metadata.canonicalBase}/PlanDefinition/${decisionId(metadata, decisionName)}`;
+  return `${metadata.canonicalBase}/PlanDefinition/${decisionId(metadata, decisionName, isRoot)}`;
 }
 
-// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the decision-name slug
-// is the suffix. #237/T1 — one exported id helper (the closure orchestrator imports
-// THIS instead of mirroring the expression), collision-safe via `uniqueCapSlug` over
-// the component-wise `rawSlug` composite (NOT a whole-composite `rawSlug`, which
-// would collapse an empty-strip name's `"unnamed"` fallback).
-export function decisionId(metadata: CpgMetadata, decisionName: string): string {
-  return uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(decisionName)}`);
+// REFACTOR:grounded - the policy entry point has the exact validated package identity.
+// Supporting decisions retain their collision-safe name suffix and distinct canonical.
+export function decisionId(metadata: CpgMetadata, decisionName: string, isRoot = false): string {
+  return isRoot ? policyIdBase(metadata) : uniqueCapSlug(`${policyIdBase(metadata)}-${rawSlug(decisionName)}`);
+}
+
+export function ambiguousPolicyEntrypoint(roots: ReadonlyArray<string>): CRLError | undefined {
+  if (roots.length <= 1) return undefined;
+  return {
+    type: "Validation",
+    kind: "ambiguous-policy-entrypoint",
+    message: `Policy has multiple root decisions: ${roots.join(", ")}. A policy must have one entry-point decision for its policy-ID PlanDefinition URL. Connect supporting decisions with 'use decision', or put independent policies in separate packages.`,
+  };
 }
 
 /**
@@ -238,6 +245,7 @@ function makeResolversFromClosure(
   activities: ReadonlyArray<Activity>,
   decisions: ReadonlyArray<Decision>,
   skippedDecisionNames: ReadonlySet<string>,
+  rootNames: ReadonlySet<string>,
 ): {
   conceptResolver: ConceptResolver;
   activityResolver: ActivityResolver;
@@ -266,7 +274,7 @@ function makeResolversFromClosure(
     if (isQualifiedRef(normalized)) return null;
     const name = getRefName(normalized);
     if (!decisionByName.has(name) || skippedDecisionNames.has(name)) return null;
-    return planDefinitionCanonicalUrl(metadata, name);
+    return planDefinitionCanonicalUrl(metadata, name, rootNames.has(name));
   };
 
   return { conceptResolver, activityResolver, decisionResolver };
@@ -384,7 +392,7 @@ export function emitDecisionPlanDefinition(
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
 
-  if (/[^\x00-\x7F]/.test(decision.name)) {
+  if (!isRoot && /[^\x00-\x7F]/.test(decision.name)) {
     errors.push({
       type: "Validation",
       kind: "non-ascii-slug-fallback",
@@ -394,7 +402,7 @@ export function emitDecisionPlanDefinition(
     });
   }
 
-  const id = decisionId(metadata, decision.name);
+  const id = decisionId(metadata, decision.name, isRoot);
   const computableName = pascalCaseName(`${slugify(libraryName)} ${slugify(decision.name)}`);
   const title = decision.name;
   const description = decision.name;
@@ -506,7 +514,7 @@ export function emitDecisionPlanDefinition(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = planDefinitionCanonicalUrl(metadata, decision.name);
+  const url = planDefinitionCanonicalUrl(metadata, decision.name, isRoot);
   // #186 — `library[]` → the Interface re-export Library (its identity `S`) for a
   // decision-bearing split source, else the source-name-keeping Root (`undefined`).
   const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
@@ -1776,6 +1784,8 @@ export function emitDecisionPlanDefinitionsForLibrary(
   // 1. Dependency-graph classification + cycle detection.
   const classification = classifyAndDetectCycles(decisions, libraryName);
   errors.push(...classification.errors);
+  const ambiguity = ambiguousPolicyEntrypoint([...classification.rootNames]);
+  if (ambiguity) return { resources: [], errors: [...errors, ambiguity], unmatched };
 
   // 2. `empty-strategy-entrypoint` — only when acyclic with no root.
   //    Per round-5 gpt55 I1: suppress when cycle errors already
@@ -1800,12 +1810,13 @@ export function emitDecisionPlanDefinitionsForLibrary(
     activities,
     decisions,
     classification.cycleMembers,
+    classification.rootNames,
   );
 
   // 4. Intra-Decision slug collision detection.
   const slugMap = new Map<string, Decision[]>();
   for (const d of liveDecisions) {
-    const id = decisionId(metadata, d.name);
+    const id = decisionId(metadata, d.name, classification.rootNames.has(d.name));
     const existing = slugMap.get(id) ?? [];
     existing.push(d);
     slugMap.set(id, existing);
@@ -1824,7 +1835,7 @@ export function emitDecisionPlanDefinitionsForLibrary(
 
   // 5. Emit one PlanDef per non-skipped, non-colliding decision.
   for (const d of liveDecisions) {
-    const id = decisionId(metadata, d.name);
+    const id = decisionId(metadata, d.name, classification.rootNames.has(d.name));
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const isRoot = classification.rootNames.has(d.name);
     const r = emitDecisionPlanDefinition(

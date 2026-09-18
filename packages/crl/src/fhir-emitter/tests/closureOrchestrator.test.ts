@@ -1,5 +1,6 @@
+import { tmpdir } from "node:os";
 // REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -265,7 +266,7 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(fe.valueExpression?.expression).toBe("Cov Records");
     // The decision PlanDefinition IS emitted and its input profile resolves to the emitted Cov SD.
     const decisionPd = result.resources.some((r) =>
-      r.relativePath.includes("PlanDefinition/decision-when-reduction-cov-determination"),
+      r.relativePath.includes("PlanDefinition/decision-when-reduction.json"),
     );
     expect(decisionPd).toBe(true);
     expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
@@ -281,7 +282,7 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     expect(result.success).toBe(false);
     expect(result.errors.some((e) => e.kind === "unsupported-casefeature-reduction")).toBe(true);
     const decisionPd = result.resources.some((r) =>
-      r.relativePath.includes("PlanDefinition/decision-when-named-reduction-cov-determination"),
+      r.relativePath.includes("PlanDefinition/decision-when-named-reduction.json"),
     );
     expect(decisionPd).toBe(false);
   });
@@ -309,7 +310,7 @@ describe("closureOrchestrator — #189: unactivated reductions fail the FHIR lan
     const fe = sd.extension.find((e) => e.url === CPG_FEATURE_EXPRESSION_EXT)!;
     expect(fe.valueExpression?.expression).toBe("Cov Records");
     const decisionPd = result.resources.some((r) =>
-      r.relativePath.includes("PlanDefinition/decision-when-alias-to-reduction-cov-determination"),
+      r.relativePath.includes("PlanDefinition/decision-when-alias-to-reduction.json"),
     );
     expect(decisionPd).toBe(true);
     expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
@@ -1674,4 +1675,18 @@ describe("applyLibraryIdentityInvariant (Inv 6 — #186 identity agreement)", ()
     const errors = applyLibraryIdentityInvariant([root, goodLib], METADATA, new Set([S]));
     expect(errors).toEqual([]); // only S is enforced; the Root is skipped
   });
+});
+
+
+it("refuses ambiguous policy roots through the full closure emitter", () => {
+  const root=mkdtempSync(join(tmpdir(),"canonical-roots-"));
+  try {
+    writeFileSync(join(root,"package.json"),JSON.stringify({name:"policy",version:"1.0.0",crl:{canonicalBase:"http://example.org/policy"}}));
+    const file=join(root,"policy.crl");
+    writeFileSync(file,'library "Policy".\nactivity "Done": - request CPGCommunicationRequest.\nconcept "C": - type is Observation. - value type is boolean. - definition is documented.\ndecision "One": first: - when "C" then recommend activity "Done". - otherwise then recommend activity "Done".\ndecision "Two": first: - when "C" then recommend activity "Done". - otherwise then recommend activity "Done".');
+    const result=emitFhirDefFromPath(file);
+    expect(result.success).toBe(false);
+    expect(result.resources).toEqual([]);
+    expect(result.errors.find((e)=>e.kind==="ambiguous-policy-entrypoint")?.message).toMatch(/One.*Two/);
+  } finally { rmSync(root,{recursive:true,force:true}); }
 });

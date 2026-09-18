@@ -8,7 +8,7 @@
 // PURE by construction: imports only the record model (`mvFlag`) — NEVER the barrel (`../index` would cycle: index → flagVocab
 // → index) and never the `.crl` registry/parser.
 //
-// Two axes, kept orthogonal: `category` = step PROVENANCE (extraction = KE-authoring-time; validation = MV-review-time) — NOT
+// Two axes, kept orthogonal: `category` = default workflow for new flags (extraction = KE; validation = MV; accepting a KE record transfers it to MV) — NOT
 // "who" (the #210 cockpit agent files validation-category flags autonomously). `tag` = WHAT (the human MV Type, for the four
 // `displayName`d validation tags; the AI's finer authoring vocabulary, for the extraction tags). The optional `kind` on
 // validation-concern is AI-only finer metadata — descriptive, never gate/label-affecting.
@@ -62,6 +62,8 @@ export interface CreateFlagTarget {
 export interface CreateFlagInput {
   tag: string;
   gist: string;
+  /** Plain-text source detail, reasoning, consequence, and review question; separate from the short gist. */
+  description?: string;
   /** extra `; key value` fields (e.g. `direction`, `ref`, `assumption`, `key`); registry-required ones are enforced. */
   fields?: Record<string, string>;
   /** the `; status` value; defaults to `open`. */
@@ -240,7 +242,7 @@ const BARE_IDENT = /^[a-z][a-z0-9-]*$/; // a field key is a bare lowercase ident
 export type FlagFieldsFailure = "unknown-tag" | "missing-field" | "invalid-value";
 
 export type ValidateFlagFieldsResult =
-  | { ok: true; canon: string; category: MvFlagCategory; gist: string; status: FlagStatus; fields: Record<string, string> }
+  | { ok: true; canon: string; category: MvFlagCategory; gist: string; description?: string; status: FlagStatus; fields: Record<string, string> }
   | { ok: false; reason: FlagFieldsFailure; message: string };
 
 /** Validate an author's flag draft (tag known+canonical / gist required+sanitized / required fields present / every provided
@@ -256,7 +258,13 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   if (gist === "") return { ok: false, reason: "invalid-value", message: "a gist is required" };
   if (hasForbiddenGistChars(gist)) return { ok: false, reason: "invalid-value", message: "the gist must not contain a backtick or `;` (a `;` starts a field)" };
 
+  if (input.description !== undefined && typeof input.description !== "string")
+    return { ok: false, reason: "invalid-value", message: "description must be plain text" };
+  const description = input.description?.trim();
+
   const provided = input.fields ?? {};
+  if (Object.prototype.hasOwnProperty.call(provided, "description"))
+    return { ok: false, reason: "invalid-value", message: "use top-level `description`, not `fields.description`" };
   // `status` is set from the top-level `status` param, never from `fields` — reject a `fields.status` explicitly rather than
   // silently dropping it (a caller who put status there would otherwise get an unexpectedly-open flag).
   if (Object.prototype.hasOwnProperty.call(provided, "status")) {
@@ -293,5 +301,5 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   const status = (input.status ?? "open").trim() || "open";
   if (status !== "open" && status !== "resolved") return { ok: false, reason: "invalid-value", message: "status must be one of: open, resolved" };
 
-  return { ok: true, canon, category: def.category, gist, status, fields };
+  return { ok: true, canon, category: def.category, gist, ...(description ? { description } : {}), status, fields };
 }

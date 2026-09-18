@@ -193,7 +193,7 @@ describe("#224 iii.1 — per-action guard emit (self-qualified, guard-only conce
       expect(result.success).toBe(true);
       const resources = result.resources.map((r) => r.resource as Record<string, any>);
       // (a) the negated applicability condition, library-qualified to the Interface + Coalesce.
-      const pd = resources.find((r) => r.resourceType === "PlanDefinition" && String(r.id).includes("policydec"));
+      const pd = resources.find((r) => r.resourceType === "PlanDefinition" && r.id === "policy");
       const conds: any[] = [];
       const stack = [...(pd!.action ?? [])];
       while (stack.length) {
@@ -232,7 +232,7 @@ describe("#236 — criterion guard emits a define reference + the atom-closure i
       expect(result.success).toBe(true);
       const resources = result.resources.map((r) => r.resource as Record<string, any>);
       const pd = resources.find(
-        (r) => r.resourceType === "PlanDefinition" && String(r.id).includes("policydec"),
+        (r) => r.resourceType === "PlanDefinition" && r.id === "policy",
       );
       // The guarded action references the CRITERION by name (a `text/cql-identifier` define
       // reference), NOT the inlined body concept "Gate Concept".

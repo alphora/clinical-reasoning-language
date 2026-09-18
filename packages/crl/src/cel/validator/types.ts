@@ -55,6 +55,7 @@ export type CELValidationErrorKind =
   // A fact populating a recognized value-reading boolean concept supplies a non-boolean value. Omitted values
   // remain allowed (unknown); no boolean is manufactured. Wrong-code facts are handled by membership diagnostics.
   | "value-reading-assertion-needs-boolean"
+  | "value-reading-assertion-needs-text"
   // A locally coded boolean fact supplies a value outside this validator's recognized value-reading forms. WARNING:
   // The current classifier is broader than presence-only forms: unrecognized answer/merge forms can also reach it.
   // The message must therefore be conditional: preserve an explicit false answer; for existence-only computations,
