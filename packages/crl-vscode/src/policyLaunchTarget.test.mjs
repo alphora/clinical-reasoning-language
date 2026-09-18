@@ -103,6 +103,15 @@ check("regression file and folder selections cannot silently retarget MV", root 
   }
 });
 
+check("KELP opens only the MV suite when regression and error controls are present", root => {
+  const { mvEntityFolder, celPaths } = makePolicy(root, "mixed", [
+    "cel/mv/mv.cel", "cel/regression/regression.cel", "cel/regression/errors.cel",
+  ]);
+  // Invalid engineering controls must not enter MV selection or validation.
+  writeFileSync(celPaths[2], "intentionally invalid regression control");
+  assert.deepEqual(resolveLaunchTarget(uri(mvEntityFolder)), { kind: "cel", celPath: celPaths[0] });
+});
+
 check("candidates come from src/cel/ — a stray .cel elsewhere under src/ is not a launch target", (root) => {
   const { src, celPaths, mvEntityFolder } = makePolicy(root, "stray", ["cel/mv/real.cel"]);
   // A generated/backup .cel sitting in a sibling entity folder must not become a candidate — it would either be offered

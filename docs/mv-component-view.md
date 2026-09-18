@@ -78,11 +78,16 @@ The policy-wide flag summary and list include both categories. A rollup that
 cannot create flags shows only KE when it contains KE flags and no MV flags.
 Workflow category, rather than the human or AI creator, controls this distinction.
 
-Authoring flag content is read-only in MV. Resolve and Reopen remain available,
-alongside inspect, Details, issue links and Close. Edit and Delete are unavailable,
-and host handlers reject those writes against the current stored record. MV-review
-flags remain editable regardless of who created them. The KE authoring tools
-retain their existing write capabilities.
+Open KE flags offer **Accept flag** and **Reject flag**. Accept transfers the existing
+record to MV and keeps it open, preserving its ID, content, references, and target.
+The KE marker disappears and the MV flag takes its place. Reject closes the KE flag
+without creating an MV flag; the closed KE flag can be reopened. The drawer shows
+current Workflow (KE or MV), rather than treating category as immutable origin.
+
+KE content remains read-only until accepted. Accepted flags use the existing MV
+actions; a retained authoring tag keeps its description-only edit form. Details,
+issue links and Close remain available. The KE authoring tools retain their
+existing write capabilities.
 
 Disclosure updates preserve tree chrome and restore the clicked control inside
 the same render transaction, before painting. Selection replay does not pan the

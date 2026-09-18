@@ -1369,11 +1369,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   /** Flip a store flag's status (#212 S3, store-only). Read-modify-write: re-read the CURRENT on-disk `<id>.json` by id and
-   *  merge ONLY status+editedAt (so an edit to gist/fields/anchor/description that landed BEFORE this re-read is preserved; a
+   *  merge status+editedAt (and category when accepting a KE flag) (so an edit to gist/fields/anchor/description that landed BEFORE this re-read is preserved; a
    *  record deleted out from under us is reported stale, never resurrected). Last-writer-wins — the JSON store has no lock/etag,
    *  so an edit landing between this re-read and the save is lost (inherent). A corrupt store (loadFlags `warning`) BLOCKS the
    *  write — don't advance state while flag state is partially unknown. Reloads + repaints EXPLICITLY (the watcher also fires). */
-  async function writeFlagStatus(flag: MvFlag, next: FlagStatus, ver: number, cel: string | undefined): Promise<void> {
+  async function writeFlagStatus(flag: MvFlag, next: FlagStatus, ver: number, cel: string | undefined, decision?: "accept" | "reject"): Promise<void> {
     const stale = (m: string): void => {
       reloadReviewFlags();
       renderTreeChrome();
@@ -1387,34 +1387,32 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (loaded.warning) return stale("flag store unreadable — repair the corrupt record first"); // a partially-unknown store must not be written into (parity with the MCP tool)
     const current = loaded.flags.find((f) => f.id === flag.id);
     if (!current) return stale("the flag changed on disk — reopen it");
-    if (current.status === next) {
-      // already at the target (a concurrent toggle won the race) — refresh so the list reflects disk; no redundant write.
-      reloadReviewFlags();
-      renderTreeChrome();
-      driveFlagBadges();
-      return;
-    }
+    if (current.category !== flag.category || current.status !== flag.status) return stale("the flag changed on disk — reopen it");
+    if (decision && (!isAuthoringFlag(current) || current.status !== "open")) return stale("the KE flag changed — reopen it");
+    if (!decision && isAuthoringFlag(current) && next === "resolved") return flagNote("Accept or reject the KE flag");
+    const category = decision === "accept" ? "validation" : current.category;
     try {
-      saveFlag(dir, { ...current, status: next, editedAt: new Date().toISOString() });
+      saveFlag(dir, { ...current, category, status: next, editedAt: new Date().toISOString() });
     } catch (e) {
       return flagNote(`could not write the flag: ${e instanceof Error ? e.message : String(e)}`);
     }
     reloadReviewFlags();
     renderTreeChrome(); // EXPLICIT refresh (the store watcher also fires — belt and suspenders)
     driveFlagBadges();
-    flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
+    flagNote(decision === "accept" ? "flag accepted for Medical Validation" : decision === "reject" ? "KE flag rejected" : next === "resolved" ? "flag resolved" : "flag reopened");
   }
 
-  /** The action drawer's Resolve/Reopen. Single-flight (a rapid 2nd click must not overlap the write). Writes via
+  /** The action drawer's Accept/Reject and Resolve/Reopen. Single-flight (a rapid 2nd click must not overlap the write). Writes via
    *  `writeFlagStatus` (which reloads `flagsList` on every path), then reconciles the drawer against the refreshed list
    *  (`refreshFlagActionDrawer` re-finds by id → replaces the captured record + re-renders, or closes if gone) — so the button
    *  flips off the FRESH status, never the pre-write snapshot. */
-  async function flagActionToggle(): Promise<void> {
+  async function flagActionToggle(decision?: "accept" | "reject"): Promise<void> {
     const view = flagActionView;
     if (!view || flagActionBusy) return;
     flagActionBusy = true;
     try {
-      await writeFlagStatus(view.flag, view.flag.status === "resolved" ? "open" : "resolved", view.ver, view.cel);
+      const next = decision === "accept" ? "open" : decision === "reject" ? "resolved" : view.flag.status === "resolved" ? "open" : "resolved";
+      await writeFlagStatus(view.flag, next, view.ver, view.cel, decision);
     } finally {
       flagActionBusy = false;
     }
@@ -2683,6 +2681,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "flagDraftCancel") {
       settleDrawer({ status: "cancelled", reason: "cancelled" }); // #210 (disc 239): the human cancelled the agent's request
       closeFlagDrawer();
+    } else if (msg.type === "flagActionAccept") {
+      void flagActionToggle("accept");
+    } else if (msg.type === "flagActionReject") {
+      void flagActionToggle("reject");
     } else if (msg.type === "flagActionToggle") {
       void flagActionToggle(); // the action drawer's Resolve/Reopen (host acts on the host-captured flagActionView.flag — the msg carries no id)
     } else if (msg.type === "flagActionIssue") {
@@ -3158,14 +3160,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  await, which precedes any picker), released only by its owner. */
   let untargetedEpoch: number | undefined;
 
-  /** Resolve the .cel to open a panel on (#156 slice 3, shared by BOTH commands). If the active editor is a `.cel`, use
+  /** Resolve the .cel to open a panel on (#156 slice 3, shared by BOTH commands). If the active editor is an MV `.cel`, use
    *  it (preserves the long-standing focused-`.cel` behavior). Otherwise scan the workspace for MV `.cel`
    *  files under `src/cel/mv` for which `findPolicySrc` succeeds and quick-pick
    *  one. Returns the chosen path, or undefined when cancelled / none found. */
   async function pickCelForPanel(epoch: number): Promise<string | undefined> {
     const ed = vscode.window.activeTextEditor;
     if (ed && ed.document.uri.scheme === "file" && ed.document.uri.fsPath.toLowerCase().endsWith(".cel")) {
-      return ed.document.uri.fsPath; // sync fast-path — no re-entrancy window
+      const target = resolveLaunchTarget(ed.document.uri);
+      if (target.kind === "cel") return target.celPath; // only a valid MV suite can take the fast path
     }
     // FIX 7 (false-negative boundary): the 500 cap is applied by findFiles BEFORE the policy filter, so in a workspace
     // with >500 .cel files the cap could fill with non-policy files and miss policy-shaped ones. The content project is
@@ -3178,14 +3181,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Policy roots may have provenance or the src/crl + src/cel layout. Sort for a stable list.
     const policyCels = [...new Map(uris.map(u => { const src = findPolicySrc(u.fsPath); return [src, u.fsPath] as const; }).filter(([src]) => src !== undefined)).values()].sort();
     if (policyCels.length === 0) {
-      void vscode.window.showInformationMessage("CRL: no Medical Validation CEL files found under src/cel/mv/. Open the policy workspace; keep engineering cases under src/cel/regression/.");
+      void vscode.window.showInformationMessage("CRL: no Medical Validation cases found under src/cel/mv/. Open a policy workspace containing MV cases.");
       return undefined;
     }
     const items = policyCels.map((p) => {
       const rel = vscode.workspace.asRelativePath(p, false);
       return { label: basename(dirname(findPolicySrc(p)!)), description: rel, value: p };
     });
-    return pickCel(items, "Pick a policy .cel to open");
+    return pickCel(items, "Pick a policy for Medical Validation");
   }
 
   /** The ONE cancellable QuickPick used by both pick paths. `showQuickPick` cannot be dismissed programmatically, so a
@@ -4404,7 +4407,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // parse-failed BEFORE any issue POST, so a form error never orphans a GitHub issue. Keep the drawer open on failure.
       // (Discard the built draft; the real record is built AFTER the POST, with the `ref`, so its dedupKey reflects the
       // persisted content — gpt55 [critical]: a single pre-POST build would bake a stale dedupKey.)
-      const dry = validateAndBuildMvFlagDraft(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields, status: "open" });
+      const dry = validateAndBuildMvFlagDraft(doc.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, description: stub, fields, status: "open" });
       if (!dry.ok) return fail(`flag not added: ${dry.message}`);
       // Block BEFORE the issue POST if the store is already partially unreadable — don't file a GitHub issue + write a new
       // record while another corrupt record keeps flag state unknown (parity with the MCP tool; gpt55/Claude). The drawer
@@ -4488,7 +4491,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // — that would strand a created issue). S4 swaps the seam's validator; the cockpit is then untouched.
       const doc2 = await vscode.workspace.openTextDocument(decl.filePath);
       const withRef = ref ? { ...fields, ref } : fields;
-      const built = validateAndBuildMvFlagDraft(doc2.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, fields: withRef, status: "open" });
+      const built = validateAndBuildMvFlagDraft(doc2.getText(), { kind: target.kind, name: target.name, library: target.lib }, { tag, gist: summary, description: stub, fields: withRef, status: "open" });
       if (!built.ok) {
         closeFlagDrawer();
         const note = ref ? `issue ${ref} created but the flag couldn't be validated (${built.message}) — try again` : `flag not added: ${built.message}`;
@@ -4502,10 +4505,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         flagNote(note);
         return { ok: false, note, ref };
       }
-      // Re-layer the drawer's multi-line `stub` as `description` — the seam doesn't carry it (it takes only tag/gist/fields),
-      // and the store CAN hold it (unlike the lean `.crl` tag), so the #203 GAP-2 note isn't lost when no issue is created.
-      const desc = stub.trim();
-      const flag: MvFlag = { ...built.flag, ...(desc ? { description: desc } : {}) };
+      const flag = built.flag; // the shared builder preserves Description and includes it in generated retry identity
       try {
         saveFlag(storeDir, flag);
       } catch (e) {
@@ -6142,8 +6142,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(grp){for(const c of grp.querySelectorAll('[data-flag-field]')){const k=c.getAttribute('data-flag-field');const val=c.value;if(val&&val.trim()!=='')fields[k]=val;}}` +
   `return{tag:tg,summary:su?su.value:'',stub:st?st.value:'',fields:fields};}` +
   `fld.addEventListener('click',(e)=>{` +
-  `const ac=e.target.closest&&e.target.closest('[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-edit],[data-flag-action-delete],[data-flag-action-close]');` +
-  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':ac.hasAttribute('data-flag-action-edit')?'flagActionEdit':ac.hasAttribute('data-flag-action-delete')?'flagActionDelete':'flagActionClose'});return;}` +
+  `const ac=e.target.closest&&e.target.closest('[data-flag-action-accept],[data-flag-action-reject],[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-edit],[data-flag-action-delete],[data-flag-action-close]');` +
+  `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-accept')?'flagActionAccept':ac.hasAttribute('data-flag-action-reject')?'flagActionReject':ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':ac.hasAttribute('data-flag-action-edit')?'flagActionEdit':ac.hasAttribute('data-flag-action-delete')?'flagActionDelete':'flagActionClose'});return;}` +
   // Todo 3: the edit form's Cancel/✕ + Save carry DISTINCT `data-flag-edit-*` intents (checked BEFORE the create close/insert,
   // whose handlers no-op when only flagEditDraft is set). Save reuses flagCollect().
   `const ec=e.target.closest&&e.target.closest('[data-flag-edit-cancel]');` +

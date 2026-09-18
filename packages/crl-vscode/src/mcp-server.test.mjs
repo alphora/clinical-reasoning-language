@@ -8,7 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import assert from "node:assert/strict";
 import { getAuthoringKit } from "../../crl/dist/authoring-kit/index.js";
 import { renderAuthoringKitMarkdown } from "../../crl/dist/authoring-kit/export.js";
-import { readFileSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -157,16 +157,16 @@ check("authoring_kit delivers raw audited Markdown through MCP", async () => {
     }
   });
 
-check("authoring_kit full exports all 13 artifacts and determination guidance", async () => {
+check("authoring_kit full exports all 19 artifacts and determination guidance", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { view: "full" } });
     assert.ok(!r.isError);
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.5");
-    assert.equal(kit.contentHash, "90ea3fe4dc8f1a0e0234f42a4150be82f9b47e7a202a01bdf9f9715395388b96");
+    assert.equal(kit.schemaVersion, "2.9");
+    assert.equal(kit.contentHash, "46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826");
     assert.equal(kit.fullContentHash, kit.contentHash);
-    assert.equal(kit.referenceArtifacts.length, 17);
+    assert.equal(kit.referenceArtifacts.length, 19);
     assert.equal(kit.dispositionModel.categories.length, 3);
     assert.equal(kit.useCase, undefined);
     const crl = kit.referenceArtifacts.find(a => a.name === "selection-reference.crl").source;
@@ -539,4 +539,35 @@ check("CLI and extension MCP servers expose the identical tool set (drift guard)
     } finally {
       await cliClient.close();
     }
+  });
+
+// @kit review-flags:description
+check("bundled create_flag persists Description separately and preserves retry identity", async () => {
+    const root = mkdtempSync(join(tmpdir(), "flag-description-"));
+    const src = join(root, "src");
+    mkdirSync(join(src, "crl"), { recursive: true });
+    mkdirSync(join(src, "cel"));
+    const crlPath = join(src, "crl", "policy.crl");
+    writeFileSync(crlPath, 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.');
+    const detail = "Source `quote`; context\nWhat should apply?";
+    const args = { path: crlPath, kind: "concept", name: "C", tag: "open-fork", gist: "Eligibility question", description: `  ${detail}  ` };
+    const call = async (a) => JSON.parse((await client.callTool({ name: "create_flag", arguments: a })).content[0].text);
+    const a = await call(args);
+    assert.equal(a.success, true);
+    assert.equal(a.flag.description, detail);
+    const disk = JSON.parse(readFileSync(join(src, "medical-validation", "flags", `${a.flag.id}.json`), "utf8"));
+    assert.equal(disk.description, detail);
+    assert.equal(disk.gist, args.gist);
+    const retry = await call({ ...args, description: "Reworded detail" });
+    assert.equal(retry.deduped, true);
+    assert.equal(retry.flag.id, a.flag.id);
+    assert.equal(retry.flag.description, detail);
+    const blank = await call({ ...args, gist: "Blank description", description: " \n " });
+    assert.equal(blank.success, true);
+    assert.ok(!Object.hasOwn(blank.flag, "description"));
+    const misplaced = await call({ ...args, fields: { description: "misplaced" } });
+    assert.equal(misplaced.success, false);
+    assert.match(misplaced.message, /top-level `description`/);
+    const invalid = await client.callTool({ name: "create_flag", arguments: { ...args, description: 42 } });
+    assert.equal(invalid.isError, true, "MCP schema rejects nonstring input before domain validation");
   });

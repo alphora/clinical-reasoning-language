@@ -898,7 +898,7 @@ check("#212 S3: writeFlagStatus is STORE-ONLY (no origin dispatch) — read-modi
   assert.match(m[1], /const loaded = loadStoredFlags\(dir\)/);
   assert.match(m[1], /if \(loaded\.warning\) return stale\(/); // a partially-unknown store must not be written into (MCP parity)
   assert.match(m[1], /loaded\.flags\.find\(\(f\) => f\.id === flag\.id\)/); // re-read the current record by id
-  assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT
+  assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, category, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT
 });
 // (design 354) `revealFlag` DELETED — "Reveal in source" only re-opened the `.cel` (near-useless); the non-modal action drawer
 // + the anchor signature it renders are the legibility replacement. Its removal is locked by the "'Reveal in source' is GONE" test.
@@ -973,11 +973,11 @@ check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/
   assert.match(m[1], /catch \(e\)[\s\S]*?issue not created — \$\{e\.message\}/); // outer catch surfaces the RAW github message
   assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
   // #212 S3: the write goes to the `medical-validation/flags/` STORE via the SHARED seam (validateAndBuildMvFlagDraft — the same path the MCP
-  // tool uses; it host-injects id/createdAt/dedupKey). Built AFTER the POST, with the `ref`. `description` re-layered from stub.
+  // tool uses; it host-injects id/createdAt/dedupKey). Built AFTER the POST, with the `ref`. description normalized by the shared builder in BOTH pre-POST and final calls.
   assert.match(m[1], /const built = validateAndBuildMvFlagDraft\(doc2\.getText\(\)/); // the final build (with ref)
-  assert.match(m[1], /const flag: MvFlag = \{ \.\.\.built\.flag, \.\.\.\(desc \? \{ description: desc \} : \{\}\) \}/); // re-layer the multi-line note
-  assert.match(m[1], /const desc = stub\.trim\(\)/); // the drawer note persists as MvFlag.description (not lost when no issue)
   assert.doesNotMatch(m[1], /legacyToMvFlag|createFlag\(/); // the inline createFlag+legacyToMvFlag is GONE (in the seam now)
+  assert.equal((m[1].match(/description: stub/g) ?? []).length, 2);
+  assert.match(m[1], /const flag = built\.flag/);
   assert.match(m[1], /saveFlag\(storeDir, flag\)/);
   assert.doesNotMatch(m[1], /new vscode\.WorkspaceEdit\(\)/); // no more `.crl` text splice on create
   assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
@@ -1406,11 +1406,11 @@ check("flag-action drawer: refreshFlagActionDrawer re-finds by id, RE-STAMPS ver
 });
 
 check("flag-action drawer: Resolve/Reopen is single-flight, writes via writeFlagStatus, then reconciles off the FRESH status", () => {
-  const m = COCKPIT_SRC.match(/async function flagActionToggle\(\): Promise<void> \{([\s\S]*?)\n  \}/);
+  const m = COCKPIT_SRC.match(/async function flagActionToggle\(decision\?: "accept" \| "reject"\): Promise<void> \{([\s\S]*?)\n  \}/);
   assert.ok(m, "flagActionToggle body");
   assert.match(m[1], /if \(!view \|\| flagActionBusy\) return;/, "single-flight guard");
   assert.match(m[1], /flagActionBusy = true;/);
-  assert.match(m[1], /await writeFlagStatus\(view\.flag, view\.flag\.status === "resolved" \? "open" : "resolved", view\.ver, view\.cel\);/);
+  assert.match(m[1], /await writeFlagStatus\(view\.flag, next, view\.ver, view\.cel, decision\);/);
   assert.match(m[1], /refreshFlagActionDrawer\(\);/, "reconcile AFTER the write so the button flips off fresh status");
 });
 
@@ -1451,7 +1451,7 @@ check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMe
 check("flag-action drawer: the webview listener posts DISTINCT data-flag-action-* intents (no create-drawer collision) + carries no id", () => {
   // Todo 3 adds data-flag-action-edit; Todo 4 adds data-flag-action-delete to the action set.
   assert.match(SCRIPT, /\[data-flag-action-toggle\],\[data-flag-action-issue\],\[data-flag-action-edit\],\[data-flag-action-delete\],\[data-flag-action-close\]/);
-  assert.match(SCRIPT, /type:ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':ac\.hasAttribute\('data-flag-action-edit'\)\?'flagActionEdit':ac\.hasAttribute\('data-flag-action-delete'\)\?'flagActionDelete':'flagActionClose'/);
+  assert.match(SCRIPT, /ac\.hasAttribute\('data-flag-action-toggle'\)\?'flagActionToggle':ac\.hasAttribute\('data-flag-action-issue'\)\?'flagActionIssue':ac\.hasAttribute\('data-flag-action-edit'\)\?'flagActionEdit':ac\.hasAttribute\('data-flag-action-delete'\)\?'flagActionDelete':'flagActionClose'/);
   // the create-drawer close intent must still be distinct (matches data-flag-close/cancel only)
   assert.match(SCRIPT, /closest\('\[data-flag-close\],\[data-flag-cancel\]'\)/);
 });
@@ -1728,4 +1728,18 @@ check("delete: closeIssueAsNotPlanned — warning fail-closed, resurrection + sh
   // the partial-close warning is PERSISTENT + its Open-issue recovery is bound to the CAPTURED cel (not the live currentCel)
   assert.match(COCKPIT_SRC, /function reportPartialClose\(issueNo: number, cel: string \| undefined, why: string\): void \{[\s\S]*?showWarningMessage\([\s\S]*?`Open issue #\$\{issueNo\}`\)[\s\S]*?openIssueNumber\(issueNo, cel\)/);
   assert.match(COCKPIT_SRC, /async function openIssueNumber\(issueNo: number, cel: string \| undefined\)[\s\S]*?const src = cel \? findPolicySrc\(cel\) : undefined;/);
+});
+
+check('KE Accept and Reject buttons dispatch distinct opaque intents', () => {
+ const marker = "fld.addEventListener('click',(e)=>{";
+ const start = SCRIPT.indexOf(marker) + marker.length;
+ const end = SCRIPT.indexOf("const ec=", start);
+ assert.ok(start >= marker.length && end > start);
+ const click = new Function('e', 'v', SCRIPT.slice(start, end));
+ for (const [attribute, type] of [['data-flag-action-accept','flagActionAccept'],['data-flag-action-reject','flagActionReject']]) {
+  const messages = [];
+  click({target:{closest:selector=>{assert.ok(selector.includes('['+attribute+']'));return {hasAttribute:value=>value===attribute};}},preventDefault(){},stopPropagation(){}},{postMessage:m=>messages.push(m)});
+  assert.deepEqual(messages,[{type}]);
+  assert.ok(COCKPIT_SRC.includes('msg.type === "'+type+'"'));
+ }
 });

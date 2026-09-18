@@ -54,10 +54,10 @@ test("renderFlagActionDrawer: empty gist → the header falls back to the Type (
   assert.match(h, /Flag — CRL vs customer intent</);
 });
 
-test("renderFlagActionDrawer: the visible body rows — Type, Origin, Status, Description, extra fields, Ref, timestamps", () => {
+test("renderFlagActionDrawer: the visible body rows — Type, Workflow, Status, Description, extra fields, Ref, timestamps", () => {
   const h = renderFlagActionDrawer(OPEN_VIEW);
   assert.match(h, />Type<\/span><span class="fa-val[^"]*">CRL vs customer intent</);
-  assert.match(h, />Origin<\/span><span class="fa-val[^"]*">validation</);
+  assert.match(h, />Workflow<\/span><span class="fa-val[^"]*">MV</);
   assert.match(h, /fa-status fa-status-open">open</);
   assert.match(h, /line one\nline two/); // multiline description preserved (fa-pre → pre-wrap)
   assert.match(h, />kind<\/span><span class="fa-val[^"]*">intent-divergence</);
@@ -143,15 +143,15 @@ test("renderFlagActionDrawer: all interpolated text is escaped (header / address
   assert.match(h, /&lt;script&gt;/);
 });
 
-// ── Todo 3.5 (operator): Edit is offered for EVERY flag — "Edit flag" (human MV Type) vs "Edit description" (AI/extraction) ──
-test("edit button: always rendered; label 'Edit flag' for a human Type, 'Edit description' for an AI/extraction flag", () => {
+// ── Todo 3.5 (operator): Edit is offered for mutable MV flags — "Edit flag" (human MV Type) vs "Edit description" (retained authoring-tag) ──
+test("edit button: always rendered; label 'Edit flag' for a human Type, 'Edit description' for an retained authoring-tag flag", () => {
   const human = renderFlagActionDrawer(OPEN_VIEW); // descriptionOnly:false
   assert.match(human, /data-flag-action-edit/);
   assert.match(human, /Edit flag/);
   const ai = renderFlagActionDrawer({ ...OPEN_VIEW, descriptionOnly: true });
   assert.match(ai, /data-flag-action-edit/); // still editable (description only)
   assert.match(ai, /Edit description/);
-  assert.ok(!/Edit flag/.test(ai), "an AI flag says 'Edit description', not 'Edit flag'");
+  assert.ok(!/Edit flag/.test(ai), "an authoring-tag MV flag says 'Edit description', not 'Edit flag'");
 });
 test("delete button (Todo 4): always rendered with data-flag-action-delete, destructive styling, for every flag", () => {
   const human = renderFlagActionDrawer(OPEN_VIEW);
@@ -159,21 +159,25 @@ test("delete button (Todo 4): always rendered with data-flag-action-delete, dest
   assert.match(human, /fa-danger/);
   assert.match(human, /Delete flag/);
   const ai = renderFlagActionDrawer({ ...OPEN_VIEW, descriptionOnly: true });
-  assert.match(ai, /data-flag-action-delete/); // offered for an AI flag too
+  assert.match(ai, /data-flag-action-delete/); // offered for an authoring-tag MV flag too
 });
-test("description row: ALWAYS shown (operator — human-editable on AI flags), em-dash when empty; Ref omitted when empty", () => {
+test("description row: ALWAYS shown (operator — human-editable on authoring-tag MV flags), em-dash when empty; Ref omitted when empty", () => {
   const noDesc = renderFlagActionDrawer({ ...OPEN_VIEW, description: undefined });
   assert.match(noDesc, />Description<\/span><span class="fa-val fa-pre"><span class="fa-em">—/); // Description row present with em-dash
   const noRef = renderFlagActionDrawer({ ...OPEN_VIEW, issueRef: undefined, issueNo: undefined });
   assert.ok(!/>Ref</.test(noRef), "no Ref row when ref absent");
 });
 
-test('Authoring-step flags allow status changes but not content edits or deletion',()=>{
+test('Open KE flags offer Accept and Reject, while closed KE flags offer Reopen',()=>{
  for(const status of ['open','resolved']){
-  const html=renderFlagActionDrawer({...OPEN_VIEW,status,readOnly:true,issueNo:42});
-  assert.match(html,/Authoring flag · Content read only/);
-  assert.doesNotMatch(html,/data-flag-action-(edit|delete)/);
-  assert.match(html,/data-flag-action-toggle/);
+  const html=renderFlagActionDrawer({...OPEN_VIEW,category:'extraction',status,readOnly:true,issueNo:42});
+  assert.match(html,/KE flag · Content read only/);assert.doesNotMatch(html,/data-flag-action-(edit|delete)/);
+  if(status==='open'){
+   assert.match(html,/data-flag-action-accept>Accept flag/);assert.match(html,/data-flag-action-reject>Reject flag/);
+   assert.doesNotMatch(html,/data-flag-action-toggle|Resolve flag/);
+  }else{
+   assert.match(html,/Reopen flag/);assert.doesNotMatch(html,/data-flag-action-(accept|reject)/);
+  }
   assert.match(html,/data-flag-action-issue/);assert.match(html,/data-flag-action-close/);
  }
 });

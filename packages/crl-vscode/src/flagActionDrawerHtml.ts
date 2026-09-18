@@ -22,7 +22,7 @@ export interface FlagActionField {
 export interface FlagActionView {
   /** the human "Type" — `displayName` when the tag has one, else the raw tag id (extraction/legacy tags have none). */
   typeLabel: string;
-  /** step-provenance (`extraction` | `validation`) — shown so a KE-origin finding reads distinctly from an MV-origin one. */
+  /** Current workflow (`extraction` | `validation`); accepted KE findings belong to MV. */
   category: string;
   status: "open" | "resolved";
   /** the target's SHORT label (the header) + its FULL self-describing label (the anchor's retained `label`). */
@@ -53,7 +53,7 @@ export interface FlagActionView {
    *  gets a DESCRIPTION-ONLY form (a human may add/fix the description; the Type/summary/fields stay the AI's, so no silent
    *  retype). `descriptionOnly` drives the button label + the edit-form mode. */
   descriptionOnly: boolean;
-  /** Content editing/deletion is restricted to the authoring workflow; MV may still resolve/reopen. */
+  /** KE content is read-only until accepted into MV; reject closes it without conversion. */
   readOnly?: boolean;
 }
 
@@ -64,8 +64,8 @@ function row(key: string, valueHtml: string, pre = false): string {
 }
 
 /** Render the read-only flag-action drawer: a header (target + ✕), the flag's full content as labelled rows, and the action
- *  buttons that exist in this todo — Resolve/Reopen (status toggle) + Open issue #N (numeric ref only). Edit/Delete arrive in
- *  later todos (deliberately absent, not disabled). Carries `data-flag-action-drawer`. */
+ *  actions: KE Accept/Reject or Reopen, MV Resolve/Reopen and edit/delete, and linked issues.
+ *  Carries `data-flag-action-drawer`. */
 export function renderFlagActionDrawer(v: FlagActionView): string {
   const em = `<span class="fa-em">—</span>`;
   // The header IS the summary now (disc 359 — the target label was too long + duplicated the Target row); an empty gist
@@ -76,7 +76,7 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   // contrast, is NOT editable, so an empty Ref row is pure noise → omitted. Type/Origin/Status/Created always have a value.
   const rows =
     row("Type", escapeHtml(v.typeLabel)) +
-    row("Origin", escapeHtml(v.category)) +
+    row("Workflow", escapeHtml(v.category === "extraction" ? "KE" : v.category === "validation" ? "MV" : v.category)) +
     row("Status", `<span class="fa-status fa-status-${v.status}">${v.status === "resolved" ? "resolved" : "open"}</span>`) +
     row("Description", v.description?.trim() ? escapeHtml(v.description) : em, true) + // .trim(): a whitespace-only value reads as empty (em-dash)
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
@@ -97,8 +97,11 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     row("Id", escapeHtml(v.id)) +
     `</details>`;
 
-  const toggle =
-    v.status === "resolved"
+  const authoring = v.category === "extraction";
+  const toggle = authoring && v.status === "open"
+    ? `<button type="button" class="fa-btn fa-primary" data-flag-action-accept>Accept flag</button>` +
+      `<button type="button" class="fa-btn" data-flag-action-reject>Reject flag</button>`
+    : v.status === "resolved"
       ? `<button type="button" class="fa-btn fa-toggle" data-flag-action-toggle>↻ Reopen flag</button>`
       : `<button type="button" class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>✓ Resolve flag</button>`;
   const issue =
@@ -116,8 +119,8 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     `<div class="flag-head"><span class="flag-title" title="${escapeHtml(headerText)}">Flag — ${escapeHtml(headerText)}</span>` +
     `<button type="button" class="flag-close" data-flag-action-close aria-label="Close">✕</button></div>` +
     `<div class="fa-body">${rows}${details}</div>` +
-    (v.readOnly ? `<div class="fa-note">Authoring flag · Content read only</div>` : "") +
-    `<div class="flag-actions">${v.readOnly ? issue+toggle : del+issue+edit+toggle}</div>` +
+    (authoring || v.readOnly ? `<div class="fa-note">KE flag · Content read only</div>` : "") +
+    `<div class="flag-actions">${authoring || v.readOnly ? issue+toggle : del+issue+edit+toggle}</div>` +
     `</div>`
   );
 }

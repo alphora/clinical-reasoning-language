@@ -1116,6 +1116,16 @@
       },
       {
         "kind": "completion",
+        "label": "text",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is text.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
         "label": "time",
         "itemKind": 24,
         "insertText": null,
@@ -1568,6 +1578,16 @@
         "insertText": null,
         "sortText": null,
         "detail": "CRL parameter type — `param type is string.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "text",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is text.`",
         "documentation": null,
         "range": null
       },
