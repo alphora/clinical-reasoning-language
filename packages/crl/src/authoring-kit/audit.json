@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "1e16e14f14aef1c95b3fb70ba62070e15b56ff61",
-  "auditedSchemaVersion": "2.10",
-  "auditedContentHash": "5fb897620d481340a5466cf182d6b7b9c6b5fa8eb1da99f784d27a49f424a940",
-  "scope": "Kit schema 2.10 local build 6.3.2 maintenance from 3bf25ef2420f7d52d39161292973333860827f26 through 1e16e14f14aef1c95b3fb70ba62070e15b56ff61. Complete changed-path inventory and dispositions in coverage.md. Preferred title and compatible gist inputs normalize to unchanged schema1 storage; matching dual aliases, malformed and missing input refusals, Description persistence/retry identity and Title/Description UI are mapped to owning assertions. Core5067 and extension1287 passed, real MCP and both typechecks/builds passed. Both review arms assessed; native final follow-up converged. This is a completed bounded source audit at an unpublished local revision. Installed artifact equality and rendering are separate delivery checks. No language/emitter/native runtime change, historical flag migration or clinical certification is asserted.",
+  "auditedRevision": "50b7965614480b18d1cccf8de00b36badde8771a",
+  "auditedSchemaVersion": "2.11",
+  "auditedContentHash": "db69bde7a50a776fa7fce6d9b2946dffea2ad0722521e5c6c8ead31fff55c657",
+  "scope": "Bounded shared question wording maintenance from 1e16e14f14aef1c95b3fb70ba62070e15b56ff61 through 50b7965614480b18d1cccf8de00b36badde8771a. Source, field ownership, exact preservation/reversal, project/MCP and editor boundaries, native group/answer identity and kit retrieval are mapped in coverage.md. Reviews798-805 native converged; external coverage unavailable. Source/native and development-host evidence do not replace packaged delivery acceptance. No clinical certification or customer migration.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
