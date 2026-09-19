@@ -1,8 +1,10 @@
 // REFACTOR:grounded: MV proposes wording; the CRL owner applies and re-emits it.
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync, renameSync, unlinkSync, readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, isAbsolute } from "node:path";
-import { buildCRL, createPresentationCatalog, type PresentationContext, resolveCelImports } from "@smile-digital-health/crl";
+import { buildCRL, type PresentationContext, resolveCelImports } from "@smile-digital-health/crl";
+
+import { resolvePresentationTarget, planPresentationEdit } from "@smile-digital-health/crl/language-services";
 
 type Ast = NonNullable<ReturnType<typeof buildCRL>["result"]>;
 type Declaration = NonNullable<Ast["presentations"]>[number];
@@ -20,34 +22,9 @@ export interface WordingTarget {
   owners: { questionText?: Declaration; questionDescription?: Declaration };
 }
 
-/** The parser currently preserves literal text; JavaScript escaping would change wording. */
-function crlString(value: string): string {
-  if (/[`\\]/.test(value)) throw new Error("Backticks and backslashes cannot be represented faithfully in presentation wording yet.");
-  return /["\r\n]/.test(value) ? "`" + value + "`" : '"' + value + '"';
-}
-function refText(ref: Declaration["target"]): string {
-  return typeof ref === "string" ? crlString(ref) : crlString(ref.libraryName) + "." + crlString(ref.name);
-}
-function declarationText(p: Declaration, eol: string) {
-  return [`presentation for ${refText(p.target)}:`, ...p.contexts.map(c => `- in ${c.kind} ${refText(c.ref)}.`),
-    `- question text is ${crlString(p.questionText!)}.`, ...(p.questionDescription ? [`- question description is ${crlString(p.questionDescription)}.`] : [])].join(eol);
-}
-
 export function resolveWordingTarget(filePath: string, source: string, concept: string, context?: PresentationContext): WordingTarget | undefined {
-  const parsed = buildCRL(source);
-  if (!parsed.success || !parsed.result) return undefined;
-  const ast = parsed.result;
-  if (!ast.statements.some(s => s.type === "Concept" && s.name === concept && s.code)) return undefined;
-  const catalog = createPresentationCatalog(ast, filePath), resolved = catalog.resolveOccurrence(concept, context);
-  const errors = [...catalog.diagnostics, ...resolved.diagnostics].filter(d => d.severity === "error");
-  const scopes = [resolved.fieldOwners.questionText, resolved.fieldOwners.questionDescription].filter((p): p is Declaration => !!p);
-  const scopeLabel = [...new Set(scopes.map(p => p.contexts.length ? p.contexts.map(c => `${c.kind} ${JSON.stringify(c.ref)}`).join(", ") : "all uses in this library"))].join("; ") || "new default for all uses in this library";
-  return { filePath, library: ast.library.name, concept, baseline: source,
-    editable: errors.length === 0,
-    readOnlyReason: errors.length ? `Question wording needs correction (${[...new Set(errors.map(d=>d.kind))].join(', ')}). Ask the CRL owner to validate it.` : !resolved.wording.questionText ? "No question wording authored." : undefined,
-    questionText: errors.length ? concept : resolved.wording.questionText ?? concept, questionDescription: errors.length ? "" : resolved.wording.questionDescription ?? "",
-    scopeLabel, owners: { ...resolved.fieldOwners, questionDescription: resolved.fieldOwners.questionDescription?.questionDescription !== undefined ? resolved.fieldOwners.questionDescription : resolved.declaration },
-    ...(context ? { context: { decision: context.decision, criteria: [...context.criteria] } } : {}) };
+  try { const target=resolvePresentationTarget(source,concept,context); return target ? {...target,filePath} : undefined; }
+  catch { return undefined; }
 }
 
 /** Resolve display owners from the same include closure used for evaluation, including packages. */
@@ -79,55 +56,12 @@ export function createPresentationProposal(target: WordingTarget, questionText: 
   if (questionText.length > 8000 || questionDescription.length > 16000) throw new Error("Presentation wording exceeds the editing limit.");
   const sourcePath = relative(dirname(policySrc), target.filePath).replace(/\\/g, "/");
   if (isAbsolute(sourcePath) || sourcePath === ".." || sourcePath.startsWith("../")) throw new Error("The owning CRL is outside this policy; propose that change in its owning workspace.");
-  const fields = (["questionText", "questionDescription"] as const).flatMap(field => {
-    const proposed = field === "questionText" ? questionText : questionDescription;
-    if (proposed === target[field]) return [];
-    const owner = target.owners[field];
-    return [{ field, before: target[field], proposed,
-      declaration: owner ? { contexts: owner.contexts, location: owner.location } : null,
-      operation: field === "questionDescription" && proposed === "" ? "remove-field-from-owner" : owner ? "replace-field" : "add-default-field" }];
-  });
-  if (!fields.length) throw new Error("There are no wording changes to propose.");
-  // Validate the proposed declarations against the complete owning library before exporting.
-  const parsed = buildCRL(target.baseline);
-  if (!parsed.success || !parsed.result) throw new Error("The baseline CRL is not parseable.");
-  const declarations = parsed.result.presentations ?? [];
-  const edits = new Map<string, Declaration>();
-  let added: Declaration | undefined;
-  for (const field of fields) {
-    const owner = target.owners[field.field];
-    const key = owner ? JSON.stringify(owner.location) : "new";
-    let next = edits.get(key);
-    if (!next) {
-      next = owner ? { ...owner } : declarations.find(p => (typeof p.target === "string" ? p.target : p.target.name) === target.concept && p.contexts.length === 0);
-      next = next ? { ...next } : { type: "Presentation", target: target.concept, contexts: [], questionText: target.questionText, location: parsed.result.location };
-      if (!owner && !declarations.some(p => p.location === next!.location)) added = next;
-      edits.set(key, next);
-    }
-    if (field.field === "questionDescription" && !field.proposed) delete next.questionDescription;
-    else next[field.field] = field.proposed;
-  }
-  const eol = target.baseline.includes("\r\n") ? "\r\n" : "\n";
-  const offset = (point: { line: number; column: number }) => {
-    const lines = target.baseline.split(/\r?\n/); let n = 0;
-    for (let i = 0; i < point.line - 1; i++) n += lines[i].length + eol.length;
-    return n + point.column;
-  };
-  let proposedSource = target.baseline;
-  const replacements = [...edits.values()].filter(p => p !== added).map(p => ({ start: offset(p.location.start), end: offset(p.location.end), text: declarationText(p, eol) }));
-  for (const edit of replacements.sort((a,b) => b.start-a.start)) proposedSource = proposedSource.slice(0, edit.start) + edit.text + proposedSource.slice(edit.end);
-  if (added) proposedSource += eol + eol + declarationText(added, eol) + eol;
-  const check = buildCRL(proposedSource);
-  if (!check.success || !check.result) throw new Error("The proposed presentation does not parse as CRL.");
-  const errors = createPresentationCatalog(check.result).diagnostics.filter(d => d.severity === "error");
-  if (errors.length) throw new Error(errors.map(d => d.message).join(" "));
-  const effective = createPresentationCatalog(check.result).resolve(target.concept, target.context ? { decision: target.context.decision, criteria: new Set(target.context.criteria) } : undefined);
-  if ((effective.questionText ?? target.concept) !== questionText || (effective.questionDescription ?? "") !== questionDescription) {
-    throw new Error("This change would expose different inherited wording. Propose the change at its owning presentation instead.");
-  }
+  const plan=planPresentationEdit(target.baseline,{library:target.library,concept:target.concept,
+    ...(target.context ? {context:target.context} : {}),questionText,questionDescription});
+  const fields=plan.fields, proposedSource=plan.candidateSource;
   return { schemaVersion: 1, kind: "crl-presentation-patch", status: "proposed", id: randomUUID(), created: new Date().toISOString(),
     ownerScope: "crl", proposalScope: "medical-validation", target: { file: sourcePath, library: target.library, concept: target.concept },
-    baseline: { sha256: createHash("sha256").update(target.baseline).digest("hex"), content: target.baseline, unsaved: evidence.unsavedBaseline },
+    baseline: { sha256: plan.beforeSha256, content: target.baseline, unsaved: evidence.unsavedBaseline },
     evidence, fields, proposedSource, validation: "CRL parse and owning-library presentation checks passed; owning KE must run full emit and results validation after application.",
     application: "Owning KE: check the baseline and competing proposals; apply the targeted presentation edits in CRL scope, then emit CRL and regenerate CQL/FHIR results. This proposal has not changed CRL or deployed resources." };
 }

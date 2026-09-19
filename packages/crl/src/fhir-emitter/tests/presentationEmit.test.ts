@@ -1,3 +1,4 @@
+import { planPresentationEdit } from "../../editing/presentationEdit";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,6 +35,21 @@ function inputs(value: any): any[] {
 }
 function inputText(input: any) { return input.extension?.find((e: any) => e.url.endsWith("cpg-input-text"))?.valueString; }
 describe("authored presentation in emitted question inputs", () => {
+  it("a source-valid wording edit still requires emission coexistence checks", () => {
+    const source = `library "P".\n${answer}${activity}
+criterion "A": - when ("Answer").
+criterion "B": - when ("Answer").
+presentation for "Answer": - in criterion "A". - question text is "Same?".
+presentation for "Answer": - in criterion "B". - question text is "Same?".
+decision "D": - when ("A" or "B") then recommend activity "Met".`;
+    expect(emit(source).success).toBe(true);
+    const plan = planPresentationEdit(source, {library:"P", concept:"Answer", context:{decision:"D",criteria:["A"]}, questionText:"Different?"});
+    expect(plan.validation.remaining).toContain("Emission presentation coexistence checks");
+    const emitted = emit(plan.candidateSource);
+    expect(emitted.success).toBe(false);
+    expect(emitted.errors.some(e => e.kind === "presentation-overlap")).toBe(true);
+  });
+
   it("still rejects conflicting same-profile wording on DNF guard arms", () => {
     const result = emit(`library "P".\n${answer}${activity}
 criterion "A": - when ("Answer").
