@@ -25,6 +25,7 @@ const ALIASES: Record<string, string[]> = {
   "library-scoping": ["import", "include library", "qualified reference"],
   "cel-cases": ["test cases", "CEL", "data", "expected activity", "multiple results", "multiple assertions", "cre-multiple-result-assertions"],
   "mv-case-authoring": ["MV CEL", "medical validation cases", "off path data", "regression suite", "Result Questionnaire", "selected route"],
+  "shared-wording-editing": ["edit source wording", "preview_presentation_edit", "apply_presentation_edit", "revert_presentation_edit", "Edit Question Wording", "shared default", "undo wording", "wording conflict"],
   "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change"],
   "produce-results": ["retryFailed", "retry failed cases", "caseTimeoutMs", "native timeout", "retry-from", "emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
   "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine"],
@@ -37,6 +38,7 @@ const ALIASES: Record<string, string[]> = {
 const RELATED: Record<string, string[]> = {
   "text-answers": ["rule:concept-form", "rule:publication-selection", "rule:concept-presentation"],
   "mv-case-authoring": ["rule:cel-cases", "rule:verify-loop", "rule:produce-results", "rule:emit-output-root"],
+  "shared-wording-editing": ["rule:concept-presentation", "rule:mv-wording-patches", "rule:verify-loop"],
   "mv-wording-patches": ["rule:concept-presentation", "rule:mv-case-authoring", "rule:produce-results", "rule:verify-loop"],
   "guards": ["rule:branch-guards", "rule:decision-composition"],
   "branch-guards": ["rule:publication-selection", "rule:cel-cases"],

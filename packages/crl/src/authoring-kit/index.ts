@@ -353,7 +353,8 @@ export type {
 // schemaVersion → "2.8": policy entry-point identity and complete generated-directory replacement.
 // schemaVersion → "2.9": flag descriptions and KE acceptance workflow.
 // "2.9" → "2.10": preferred Title/Description authoring vocabulary with legacy gist compatibility; stored records unchanged.
-const SCHEMA_VERSION = "2.10";
+// "2.10" → "2.11": shared owner wording edits and native question/answer association.
+const SCHEMA_VERSION = "2.11";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -556,6 +557,10 @@ const RULES: KitRule[] = [
       },
       {
         "text": "Presentation is optional for any concept declaring code is, across answer types; missing presentation warns even if the concept is not reached. Presentation on an uncoded concept errors. Without presentation, the emitted input has no question-text extension and the tested engine uses the concept name; description is absent, not a repeated name. Authored text maps to cpg-input-text. Authored description is preserved in cpg-input-description but the delivered CQFramework does not yet display it. Verify emitted description separately from native question text and pause/leaf behavior. Co-occurring occurrences of the same input profile must resolve compatible wording, including authored text versus concept-name fallback. A scoped presentation without a base can therefore conflict with an unpresented occurrence (presentation-overlap); identical effective text is compatible.",
+        "force": "default"
+      },
+      {
+        "text": "In the tested native Questionnaire, authored question text is on the input group, while the answer item can retain the concept name. Associate the group by its exact input profile definition and its contained answer item by that profile plus #Observation.value[x]; join the QuestionnaireResponse by linkId and definition. Do not compare wording only on answer leaves, use display text as identity, or borrow text from an unrelated ancestor/sibling. Missing or incorrectly associated group text fails the wording check. These checks cover the tested selected Observation input shape, not an arbitrary Questionnaire hierarchy. Description still requires emitted-extension verification because native description rendering is not supported.",
         "force": "default"
       },
       {
@@ -972,6 +977,18 @@ const RULES: KitRule[] = [
       { text: "Default MV examples to minimally sufficient route data, retaining necessary earlier false answers and meaningful clinical alternatives. Keep deliberate engineering controls and reuse MV cases where practical; do not invent CEL case inheritance.", force: "default" },
       { text: "Verify the actual entry point, complete case/output inventory and native outcomes. Normal commands publish the whole MV suite, while regression uses isolated output. Route-focused MV does not discharge native verification or source-fidelity obligations.", force: "invariant", test: "verifyLoop:native-outcome-verification" },
     ],
+  },
+  {
+    id: "shared-wording-editing",
+    applicability: "Editing locally owned CRL question wording",
+    category: "process",
+    rule: "Use CRL: Edit Question Wording in the owning CRL editor, or MCP preview_presentation_edit followed by apply_presentation_edit. Select by library/concept identity and an existing default or scope, supply only changed fields, and review the old/new text, per-field owner impact and source diff. Editing an inherited field edits its actual shared owner; it does not create a new per-use override. External consumers are unknown. The tools preserve ordinary CRL, comments and unrelated computation rather than inventing another authoring format.",
+    ref: "docs/shared-presentation-editing.md; concept-presentation; mv-wording-patches",
+    clauses: [
+      { text: "MCP works on saved files within the explicit owning package. It refuses packaged/generated/linked targets, unsupported intent and stale source/project snapshots; apply requires the exact preview token. Omitted fields stay unchanged. Empty description requests removal, but removal exposing unexpected inherited wording is refused. Unsupported literal text, ambiguous ownership and source validation failures are errors, not permission to overwrite the file. Re-preview current source after a conflict.", force: "default" },
+      { text: "The human editor includes participating unsaved CRL buffers, refreshes untouched fields and retains edited drafts on conflict. Apply uses one ordinary editor undo step and leaves the document unsaved. MCP cannot see other editors' unsaved buffers; save/reconcile those before using it. MCP revert_presentation_edit accepts its original receipt only against the exact resulting source, validates the reversal, and refuses intervening changes. Use Git for broader recovery; neither adapter promises a cross-process transaction.", force: "default" },
+      { text: "This is source/import/presentation validation, not full emission compatibility or native acceptance. Regenerate CRL/CQL/FHIR and native results, verify group/answer associations and behavior, then renew review. Source edits do not resolve flags, mark verdicts or apply/dispose MV proposals. MV's pencil remains a proposal-only handoff to the source owner, who explicitly reconciles and records its disposition.", force: "default" }
+    ]
   },
   {
     id: "mv-wording-patches",

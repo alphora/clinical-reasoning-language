@@ -31,12 +31,24 @@ const one = (x, type) => {
   assert.equal(found.length, 1, type);
   return found[0];
 };
+const {assertQuestionAssociation,assertOtherAnswersUnchanged}=require("./presentation-check.cjs");
+const {planPresentationEdit}=require("../../dist/editing/presentationEdit");
 const write = (p, x) => fs.writeFileSync(p, JSON.stringify(x, null, 2) + "\n");
 const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 async function main() {
   const [jarArg, outArg, mode] = process.argv.slice(2);
   const temporalOnly = mode === "--temporal-only";
-  assert(jarArg && outArg, "Usage: node intake.cjs <engine.jar> <new-scratch-directory> [--temporal-only]");
+  const presentationOnly = mode === "--presentation-only";
+  const wording = [
+    ["Primary Diagnosis", "primary-diagnosis", "Which diagnosis needs review?"],
+    ["Treatment Begun", "treatment-begun", "Has the treatment already started?"],
+    ["Additional Information", "additional-information", "What else \u2014 if anything \u2014 should we review?"],
+  ];
+  let presentationSource = INTAKE_CRL;
+  if (presentationOnly) for (const [concept,,questionText] of wording) {
+    presentationSource = planPresentationEdit(presentationSource, {library:"Intake",concept,questionText,questionDescription:"Details for " + concept + ".\nKeep the original meaning."}).candidateSource;
+  }
+  assert(jarArg && outArg, "Usage: node intake.cjs <engine.jar> <new-scratch-directory> [--temporal-only|--presentation-only]");
   const jar = path.resolve(jarArg),
     out = path.resolve(outArg),
     root = path.resolve(pkg, "../.."),
@@ -79,6 +91,11 @@ async function main() {
         cases = emitCelToFhir(resolveCelImports(cel));
       assert(cql.success, JSON.stringify(cql.errors));
       assert(fhir.success, JSON.stringify(fhir.errors));
+      if (presentationOnly) for (const [concept,,text] of wording) {
+        const inputs=objects(fhir.resources).filter(x=>x.extension?.some(e=>e.url?.endsWith("/cpg-input-text")&&e.valueString===text));
+        assert(inputs.length>0,"Emitted authored input text: "+concept);
+        for(const input of inputs) assert(input.extension.some(e=>e.url?.endsWith("/cpg-input-description")&&e.valueMarkdown==="Details for "+concept+".\nKeep the original meaning."),"Emitted description: "+concept);
+      }
       assert.deepEqual(
         cases.diagnostics.filter((d) => d.severity === "error"),
         [],
@@ -114,10 +131,10 @@ async function main() {
       };
       return { planId: plan[0].resource.id, bundle };
     };
-    const normal = prepare("normal", INTAKE_CRL);
+    const normal = prepare("normal", presentationSource);
     const control = prepare(
       "presence-control",
-      INTAKE_CRL.replace(
+      presentationSource.replace(
         'decision "Intake":',
         'activity "Missing": - request CPGCommunicationRequest. - with `MISSING`.\ndecision "Intake":',
       ).replace(
@@ -151,11 +168,7 @@ async function main() {
         else item.answer = [{ valueString: value }];
         submitted.authored = `2030-01-0${i}T12:00:00Z`;
         // Confirm no unrelated answer has been removed or modified by the test client.
-        const siblings = (x) =>
-          objects(x.item)
-            .filter((v) => v.definition?.endsWith("#Observation.value[x]") && v.text !== item.text)
-            .map((v) => [v.text, v.answer]);
-        assert.deepEqual(siblings(submitted), siblings(prior));
+        assertOtherAnswersUnchanged(prior, submitted, item);
         request.entry.push({ resource: submitted });
       }
       write(path.join(dir, "repo.json"), repo);
@@ -217,6 +230,9 @@ async function main() {
       assert.deepEqual(activities[0].payload, [{ contentString: outcome }]);
       q = one(result, "Questionnaire");
       qr = one(result, "QuestionnaireResponse");
+      if (presentationOnly) for (const [,slug,text] of wording) {
+        assertQuestionAssociation(q,qr,INTAKE_BASE+"/StructureDefinition/intake-native-"+slug,text);
+      }
       const answers = objects(qr.item).filter((x) =>
         x.definition?.endsWith("#Observation.value[x]"),
       );
@@ -264,6 +280,17 @@ async function main() {
       console.log(name + ": PASS");
     }
 
+    if (presentationOnly) {
+      // Exercise the association oracle against corrupted copies of real native output.
+      const profile=INTAKE_BASE+"/StructureDefinition/intake-native-primary-diagnosis";
+      const missing=structuredClone(q);delete assertQuestionAssociation(missing,qr,profile,wording[0][2]).group.text;
+      assert.throws(()=>assertQuestionAssociation(missing,qr,profile,wording[0][2]));
+      const swapped=structuredClone(q);const a=assertQuestionAssociation(swapped,qr,profile,wording[0][2]).group;
+      const b=assertQuestionAssociation(swapped,qr,INTAKE_BASE+"/StructureDefinition/intake-native-treatment-begun",wording[1][2]).group;
+      [a.text,b.text]=[b.text,a.text];assert.throws(()=>assertQuestionAssociation(swapped,qr,profile,wording[0][2]));
+      write(path.join(out,"verification.json"),{passed:true,engineSha256:ENGINE_JAR_SOURCE.sha256,contract:"Planner-edited CRL through native group/answer/QR association; five answer/change/clear outcomes; missing/swapped native wording copies rejected. Description emission checked separately; no native description rendering claim.",rows,negativeControls:["missing group wording","swapped group wording"]});
+      return;
+    }
     // These are synthetic source controls, not additional ADMIN policy requirements.
     const activity =
       'activity "Human Review": - request CPGCommunicationRequest. - with `HUMAN_REVIEW`.\n';

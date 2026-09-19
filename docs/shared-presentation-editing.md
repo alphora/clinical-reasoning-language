@@ -1,0 +1,15 @@
+# Edit question wording in owned CRL
+
+`CRL: Edit Question Wording` operates on the active local CRL source. Choose a coded concept by identity, then its default or existing authored scope. Edit Question and/or Description, Preview, inspect the per-field impact and Show source diff, then Apply source edit. Apply leaves the editor unsaved and creates one ordinary Undo step.
+
+A scoped question and inherited description can have different owners. Editing the inherited description updates the shared default. This command does not create a new per-use override. Untouched fields are refreshed from current source; edits to a field whose value or owner changed require explicit conflict resolution and a fresh preview. Unused criterion scopes without a matching decision context require direct source editing.
+
+MCP provides `preview_presentation_edit`, `apply_presentation_edit`, and `revert_presentation_edit`. Preview takes absolute `projectRoot`, `filePath`, and `request` with `library`, `concept`, optional `context: {decision, criteria}`, and the changed `questionText` and/or `questionDescription`. Apply repeats that target/request with the returned `previewToken`. Retain the returned receipt for exact reversal. Inspect the actual tool schema for required fields; unsupported intent such as a new single-use override is refused.
+
+MCP edits saved files. It cannot see unsaved changes in another editor. The human command includes participating local CRL buffers and refuses unsaved validation dependencies it cannot represent. Packaged, generated and linked targets are not local editing targets. Stale source, project configuration, discovery membership or dependencies require a fresh preview. Empty Description requests removal; removal that exposes unexpected inherited text is refused. Both adapters preserve unrelated source and refuse unsupported literal text.
+
+Reversal requires the exact post-edit source; it is not a merge or a replacement for Git. File replacement is optimistic single-file protection, not a transaction against independent writers. MCP does not reconcile another editor's unsaved work; save or resolve it first.
+
+Successful preview/apply establishes source/import/presentation-declaration checks only. Emission can still reject incompatible co-occurring presentations. Regenerate and verify the actual CQL/FHIR and native result before renewed MV. Source edits do not complete flags, verdicts or MV patch dispositions. MV's pencil continues to create a proposal for the source owner.
+
+For the tested native selected Observation inputs, question wording is on the group identified by the input profile. Its answer item uses that exact profile plus `#Observation.value[x]`; QR association uses `linkId` and `definition`. The answer leaf may retain the concept label. Missing/misassociated group wording is a failure; do not guess from generic ancestor text. Authored descriptions remain in emitted `cpg-input-description`, with native description rendering still unsupported.

@@ -92,6 +92,7 @@ describe("one authoring kit: discovery and complete guidance", () => {
     ["MV CEL", "rule:mv-case-authoring"],
     ["off path data", "rule:mv-case-authoring"],
     ["edit question", "rule:mv-wording-patches"],
+    ["preview_presentation_edit", "rule:shared-wording-editing"],
     ["KE handoff", "rule:mv-wording-patches"],
     ["coded answers", "rule:named-answer-options"],
     ["age today", "rule:patient-age-projection"],

@@ -22,13 +22,14 @@ describe("owned native processes",()=>{
     const code="const c=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:"+JSON.stringify(ignore?"ignore":"inherit")+"});require('node:fs').writeFileSync("+JSON.stringify(pids)+",JSON.stringify([process.pid,c.pid]));setInterval(()=>{},1000);";
     const sentinel=spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:"ignore",windowsHide:true});
     try {
-      const r=await runOwnedProcess(process.execPath,["-e",code],{timeoutMs:5000,maxBytes:65536});
+      // Allow the Windows PowerShell wrapper to compile before exercising descendant timeout cleanup.
+      const r=await runOwnedProcess(process.execPath,["-e",code],{timeoutMs:15000,maxBytes:65536});
       expect(r).toMatchObject({failure:"timeout",cleanupConfirmed:true});
       const owned=JSON.parse(readFileSync(pids,"utf8")) as number[];
       for(let i=0;i<50&&owned.some(alive);i++) await sleep(20);
       expect(owned.map(alive)).toEqual([false,false]); expect(alive(sentinel.pid!)).toBe(true);
     } finally { sentinel.kill("SIGKILL"); }
-  },25000);
+  },35000);
   it("cleans a descendant after its launcher exits normally",async()=>{
     const pids=path.join(fixture(),"pids.json");
     const code="const c=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});require('node:fs').writeFileSync("+JSON.stringify(pids)+",JSON.stringify([process.pid,c.pid]));process.exit(0);";

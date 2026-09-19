@@ -11,6 +11,7 @@ const directories: string[] = [];
 afterEach(() =>
   directories.splice(0).forEach((d) => fs.rmSync(d, { recursive: true, force: true })),
 );
+// @kit shared-wording-editing:mcp
 test("MCP JSON preview/apply/revert is discoverable and enforces stale request refusal", async () => {
   const projectRoot = fs.mkdtempSync(join(tmpdir(), "crl-wording-mcp-"));
   directories.push(projectRoot);

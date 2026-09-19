@@ -27,6 +27,7 @@ function roundTrip(source: string, change: Parameters<typeof planPresentationEdi
 }
 
 describe("shared presentation edits", () => {
+// @kit shared-wording-editing:preservation
   test("changes only literal bytes and preserves inline, trailing and declaration comments", () => {
     const source =
       base +
