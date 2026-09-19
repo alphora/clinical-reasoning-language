@@ -2,6 +2,6 @@
   "auditedRevision": "50b7965614480b18d1cccf8de00b36badde8771a",
   "auditedSchemaVersion": "2.11",
   "auditedContentHash": "db69bde7a50a776fa7fce6d9b2946dffea2ad0722521e5c6c8ead31fff55c657",
-  "scope": "Bounded shared question wording maintenance from 1e16e14f14aef1c95b3fb70ba62070e15b56ff61 through 50b7965614480b18d1cccf8de00b36badde8771a. Source, field ownership, exact preservation/reversal, project/MCP and editor boundaries, native group/answer identity and kit retrieval are mapped in coverage.md. Reviews798-805 native converged; external coverage unavailable. Source/native and development-host evidence do not replace packaged delivery acceptance. No clinical certification or customer migration.",
+  "scope": "Kit schema 2.11. Bounded shared question wording maintenance from 1e16e14f14aef1c95b3fb70ba62070e15b56ff61 through 50b7965614480b18d1cccf8de00b36badde8771a. Source, field ownership, exact preservation/reversal, project/MCP and editor boundaries, native group/answer identity and kit retrieval are mapped in coverage.md. Reviews798-805 native converged; external coverage unavailable. Source/native and development-host evidence do not replace packaged delivery acceptance. No clinical certification or customer migration.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
