@@ -1,6 +1,6 @@
-## Pending shared wording evidence
+## Shared wording evidence
 
-`shared-wording-editing:{preservation,mcp,editor}` maps to editing/presentationEdit.test.ts, mcp/presentationEditing.test.ts, and the extension presentationEditorHost.test.mjs. Companion filesystem, model and script assertions are dispositioned in coverage.md's pending maintenance section. `concept-presentation:{native-association,sibling-answer-preservation}` maps to scripts/native-acceptance/presentation-check.test.cjs; its shared helper is invoked by intake.cjs --presentation-only against actual generated native Q/QR. Node test controls alone do not establish native behavior. No installed-host qualification or completed kit audit is asserted.
+`shared-wording-editing:{preservation,mcp,editor}` maps to editing/presentationEdit.test.ts, mcp/presentationEditing.test.ts, and the extension presentationEditorHost.test.mjs. Companion filesystem, model and script assertions are dispositioned in coverage.md's shared wording maintenance section. `concept-presentation:{native-association,sibling-answer-preservation}` maps to scripts/native-acceptance/presentation-check.test.cjs; its shared helper is invoked by intake.cjs --presentation-only against actual generated native Q/QR. Node test controls alone do not establish native behavior. The completed bounded source audit is recorded in coverage.md; this mapping does not assert packaged-host qualification.
 
 # Reverse kit claim map
 
