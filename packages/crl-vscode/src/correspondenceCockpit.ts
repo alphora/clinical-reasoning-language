@@ -3975,8 +3975,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Todo 3.5: the description-only form (a mutable legacy flag) posts no tag/summary — those guards apply to the FULL edit only.
     if (!draft.descriptionOnly) {
       if (rawTag === "") return fail("a type is required");
-      if (summary === "") return fail("a summary is required");
-      if (/[\r\n]/.test(summary)) return fail("the summary must be a single line");
+      if (summary === "") return fail("a title is required");
+      if (/[\r\n]/.test(summary)) return fail("the title must be a single line");
     }
     if (currentCel !== cel || mode !== "medical-validation") return fail("policy changed — reopen the flag");
 
@@ -4374,9 +4374,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (target.key) fields.key = target.key; // GAP 3: an occurrence flag carries the node address `<nodeId>~<signature>`
     // Local summary validation (the lean gist must be ONE line — createFlag itself permits newline gists). Keep the drawer
     // OPEN on a form error so the user's text isn't lost — they fix + Insert again.
-    if (summary === "") return fail("a summary is required");
-    if (/[\r\n]/.test(summary)) return fail("the summary must be a single line");
-    if (hasForbiddenGistChars(summary)) return fail("the summary can't contain a backtick or `;`");
+    if (summary === "") return fail("a title is required");
+    if (/[\r\n]/.test(summary)) return fail("the title must be a single line");
+    if (hasForbiddenGistChars(summary)) return fail("the title can't contain a backtick or `;`");
     // Identity guard keyed on `currentCel`/`mode`, NOT `indexVersion`: a same-policy rebuild (a background save) bumps
     // indexVersion but the write re-resolves on LIVE text, so the draft must survive it (both reviewers). Only a DIFFERENT
     // policy / mode change means there's nothing to write — and that surfaces a note (never a silent drop).

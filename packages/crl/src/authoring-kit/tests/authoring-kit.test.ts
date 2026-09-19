@@ -311,7 +311,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.9");
+    expect(kit.schemaVersion).toBe("2.10");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -653,8 +653,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.9");
-    expect(kit.contentHash).toBe("46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826");
+    expect(kit.schemaVersion).toBe("2.10");
+    expect(kit.contentHash).toBe("5fb897620d481340a5466cf182d6b7b9c6b5fa8eb1da99f784d27a49f424a940");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {
@@ -925,6 +925,7 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
       "name",
       "library",
       "tag",
+      "title",
       "gist",
       "description",
       "fields",

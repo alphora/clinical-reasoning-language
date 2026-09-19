@@ -61,7 +61,10 @@ export interface CreateFlagTarget {
 /** The author-supplied flag draft (tag + gist + extra fields + status) the create seam validates. Re-homed from `createFlag`. */
 export interface CreateFlagInput {
   tag: string;
-  gist: string;
+  /** Short human-readable title. Stored as gist for record compatibility. */
+  title?: string;
+  /** Compatibility input for title; both names must agree when supplied together. */
+  gist?: string;
   /** Plain-text source detail, reasoning, consequence, and review question; separate from the short gist. */
   description?: string;
   /** extra `; key value` fields (e.g. `direction`, `ref`, `assumption`, `key`); registry-required ones are enforced. */
@@ -254,15 +257,25 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   if (!def) return { ok: false, reason: "unknown-tag", message: `"${input.tag}" is not a registered flag tag` };
   const canon = def.id;
 
-  const gist = (input.gist ?? "").trim(); // trims outer whitespace/newlines; INTERNAL newlines are kept (multi-line description)
-  if (gist === "") return { ok: false, reason: "invalid-value", message: "a gist is required" };
-  if (hasForbiddenGistChars(gist)) return { ok: false, reason: "invalid-value", message: "the gist must not contain a backtick or `;` (a `;` starts a field)" };
+  for (const key of ["title", "gist"] as const) {
+    if (input[key] !== undefined && typeof input[key] !== "string")
+      return { ok: false, reason: "invalid-value", message: `${key} must be plain text` };
+  }
+  const title = input.title?.trim();
+  const legacyTitle = input.gist?.trim();
+  if (title !== undefined && legacyTitle !== undefined && title !== legacyTitle)
+    return { ok: false, reason: "invalid-value", message: "title and legacy gist must match when both are supplied" };
+  const gist = title ?? legacyTitle ?? "";
+  if (gist === "") return { ok: false, reason: "invalid-value", message: "a title is required (legacy gist is also accepted)" };
+  if (hasForbiddenGistChars(gist)) return { ok: false, reason: "invalid-value", message: "the title must not contain a backtick or `;` (a `;` starts a field)" };
 
   if (input.description !== undefined && typeof input.description !== "string")
     return { ok: false, reason: "invalid-value", message: "description must be plain text" };
   const description = input.description?.trim();
 
   const provided = input.fields ?? {};
+  if (Object.prototype.hasOwnProperty.call(provided, "title"))
+    return { ok: false, reason: "invalid-value", message: "use top-level `title`, not `fields.title`" };
   if (Object.prototype.hasOwnProperty.call(provided, "description"))
     return { ok: false, reason: "invalid-value", message: "use top-level `description`, not `fields.description`" };
   // `status` is set from the top-level `status` param, never from `fields` — reject a `fields.status` explicitly rather than

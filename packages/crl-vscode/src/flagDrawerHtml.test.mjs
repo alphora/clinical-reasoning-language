@@ -163,4 +163,8 @@ test("renderFlagDrawer descriptionOnly: 'Edit description —' heading, NO Type/
   assert.ok(!/data-flag-insert/.test(h), "no create Insert intent");
 });
 
+
+// @kit review-flags:title-description
+test("flag form names the two inputs Title and Description", () => { const html = renderFlagDrawer({targetLabel:"C",tags:[],summary:"Short title",stub:"Full explanation"}); assert.match(html,/>Title<\/span>/); assert.match(html,/aria-label="Title"/); assert.match(html,/>Description<\/span>/); });
+
 console.log("flagDrawerHtml.test: ok");

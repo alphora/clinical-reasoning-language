@@ -120,7 +120,7 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
   const submitLabel = opts.edit ? "Save changes" : "Insert flag + create issue";
   // The create form tells the author the description becomes the issue body; on edit that framing is wrong (the body only
   // re-syncs on a Type change), so use a neutral placeholder.
-  const descPlaceholder = opts.edit ? "the concern in a couple of lines" : "the concern in a couple of lines — becomes the GitHub issue body";
+  const descPlaceholder = opts.edit ? "source context, reasoning, and the review question" : "source context, reasoning, and the review question — becomes the GitHub issue body";
 
   return (
     `<div class="flag-drawer${opts.edit ? " flag-edit-drawer" : ""}" data-flag-drawer>` +
@@ -129,8 +129,8 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
     `<label class="flag-row"><span class="flag-label">Type</span>` +
     `<select data-flag-tag aria-label="Flag type">${tagOptions}</select></label>` +
     `<div class="flag-fields">${fieldGroups}</div>` +
-    `<label class="flag-row"><span class="flag-label">Summary</span>` +
-    `<input type="text" class="flag-input${ring("summary")}" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Summary"></label>` +
+    `<label class="flag-row"><span class="flag-label">Title</span>` +
+    `<input type="text" class="flag-input${ring("summary")}" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Title"></label>` +
     `<label class="flag-col"><span class="flag-label">Description</span>` +
     `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="${escapeHtml(descPlaceholder)}" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
     `<div class="flag-actions">` +

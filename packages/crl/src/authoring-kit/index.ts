@@ -352,7 +352,8 @@ export type {
 // schemaVersion → "2.7": standard dateTime answers, presence and measured renderer boundary.
 // schemaVersion → "2.8": policy entry-point identity and complete generated-directory replacement.
 // schemaVersion → "2.9": flag descriptions and KE acceptance workflow.
-const SCHEMA_VERSION = "2.9";
+// "2.9" → "2.10": preferred Title/Description authoring vocabulary with legacy gist compatibility; stored records unchanged.
+const SCHEMA_VERSION = "2.10";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -1153,8 +1154,8 @@ const RULES: KitRule[] = [
       "contradicts itself (source-vs-source); `@open-fork` — an INTERNAL modeling fork you encoded one way but did not " +
       "settle (`chosen`/`alternatives` fields); `@fidelity-defect` — a known encoding≠source defect, with a REQUIRED " +
       "`direction` = `over-reach|criterion-drop` (over-reach = you ADDED logic the source doesn't support; criterion-drop = " +
-      "you OMITTED a source-required criterion). Use a short `gist` title and put the source detail, options, reasoning, consequences and MV question in top-level `description`. " +
-      "Description is plain text displayed in MV; `fields.description` is rejected: use the top-level parameter. Description is trimmed at the edges, omitted when blank, and permits newlines, semicolons and backticks. Description does not participate in retry identity; retrying with changed detail returns the existing record without overwriting it. There is no MCP amend operation for an existing Description; fix it through the KE-owned record workflow, not by filing a duplicate with a changed gist. An optional issue link belongs in `fields.ref` (e.g. `#207`). " +
+      "you OMITTED a source-required criterion). Use a short `title` and put the source detail, options, reasoning, consequences and MV question in top-level `description`. " +
+      "Title is the flag header; Description is the separate explanation. The API accepts `title` (preferred) or legacy `gist`; when both are supplied they must match after trimming. Records keep schema1 `gist` and `description`: no stored-record rename or migration. Verify the persisted record and rendered header/Description after authoring. Description is plain text displayed in MV; `fields.description` is rejected: use the top-level parameter. Description is trimmed at the edges, omitted when blank, and permits newlines, semicolons and backticks. Description does not participate in retry identity; retrying with changed detail returns the existing record without overwriting it. There is no MCP amend operation for an existing Description; fix it through the KE-owned record workflow, not by filing a duplicate with a changed gist. An optional issue link belongs in `fields.ref` (e.g. `#207`). " +
       "Accept flag moves an open KE flag into MV with the same ID/content/anchor; Reject flag closes it without conversion. Author flags `status open` (the default). An open flag blocks Medical Validation " +
       "completion. Separately, `@gap-filed` IS still a `.crl` meta tag (NOT a flag) — a durable `- meta is `@gap-filed: …; " +
       "ref <issue>`.` pointer to an already-filed gap, REQUIRED `; ref`; it ships fine and does not gate. The four flag " +
@@ -1205,7 +1206,7 @@ const RULES: KitRule[] = [
       {
         text:
           "How to WRITE flags — use the `crl` MCP tools; they write the store directly. `create_flag` authors a flag on a " +
-          "concept, decision, or library (pass `kind`, `name`, the `tag`, a short `gist`, optional plain-text `description`, and required extra `fields` " +
+          "concept, decision, or library (pass `kind`, `name`, the `tag`, a short `title`, optional plain-text `description`, and required extra `fields` " +
           "like `direction`, and the optional issue link as `fields.ref`); `set_flag_status` flips one flag " +
           '`open`<->`resolved` by selector. This KE automation API remains distinct from human MV Accept/Reject: resolving an extraction flag leaves it KE-owned and creates no MV flag. Pass `tag` as the BARE tag id — `"open-fork"`, `"fidelity-defect"` (the `@` ' +
           'prefix is display-only prose; `tag: "@open-fork"` is an `unknown-tag`). Both REQUIRE a `path` to a `.crl` file ' +
@@ -1337,7 +1338,7 @@ const EXAMPLES: KitExample[] = [
       "Review flag: an @open-fork on the concept it concerns (via create_flag — short title, detail in Description)",
     language: "text",
     snippet:
-      'create_flag(\n  path: "<policy>/src/crl/coverage-policy.crl",\n  kind: "concept", name: "BMI Threshold",\n  tag: "open-fork",\n  gist: "Eligibility threshold",\n  description: "Encoded BMI-40-only provisionally. The source also allows 35-plus-comorbidity. This changes who qualifies; which reading should apply?",\n  fields: { chosen: "bmi-40-only", alternatives: "bmi-35-plus-comorbidity", ref: "#207" }\n)\n→ writes <policy>/src/medical-validation/flags/<id>.json  (status defaults to open)',
+      'create_flag(\n  path: "<policy>/src/crl/coverage-policy.crl",\n  kind: "concept", name: "BMI Threshold",\n  tag: "open-fork",\n  title: "Eligibility threshold",\n  description: "Encoded BMI-40-only provisionally. The source also allows 35-plus-comorbidity. This changes who qualifies; which reading should apply?",\n  fields: { chosen: "bmi-40-only", alternatives: "bmi-35-plus-comorbidity", ref: "#207" }\n)\n→ writes <policy>/src/medical-validation/flags/<id>.json  (status defaults to open)',
     valid: true,
     note: "The flag is a STORE record, not a `.crl` line: a short gist + detailed `description` + `chosen`/`alternatives` (semantic, optional) + an optional issue `ref`. `create_flag` writes `medical-validation/flags/<id>.json`; it does NOT touch the `.crl`. An open flag blocks Medical Validation completion.",
   },
@@ -1345,7 +1346,7 @@ const EXAMPLES: KitExample[] = [
     id: "fidelity-defect-flag", title: "Review flag: an @fidelity-defect on a DECISION (required `direction` field)",
     language: "text",
     snippet:
-      'create_flag(\n  path: "<policy>/src/crl/coverage-decision.crl",\n  kind: "decision", name: "Coverage Decision",\n  tag: "fidelity-defect",\n  gist: "the encoding reads an axillary-only finding the source does not require",\n  fields: { direction: "over-reach", ref: "#207" }\n)',
+      'create_flag(\n  path: "<policy>/src/crl/coverage-decision.crl",\n  kind: "decision", name: "Coverage Decision",\n  tag: "fidelity-defect",\n  title: "the encoding reads an axillary-only finding the source does not require",\n  fields: { direction: "over-reach", ref: "#207" }\n)',
     valid: true,
     note: 'Anchor at the narrowest faithful scope — here `kind: "decision"`. `@fidelity-defect` REQUIRES a `direction` = over-reach|criterion-drop; omitting it → `create_flag` returns `reason: missing-field` and writes nothing.',
   },
@@ -1363,7 +1364,7 @@ const EXAMPLES: KitExample[] = [
       "Review flag at LIBRARY scope: an @internal-inconsistency spanning the whole policy (via create_flag)",
     language: "text",
     snippet:
-      'create_flag(\n  path: "<policy>/src/crl/policy.crl",\n  kind: "library", name: "Coverage Policy",\n  tag: "internal-inconsistency",\n  gist: "the eligibility section requires prior imaging, but the exclusions section forbids it",\n  fields: { ref: "#207" }\n)',
+      'create_flag(\n  path: "<policy>/src/crl/policy.crl",\n  kind: "library", name: "Coverage Policy",\n  tag: "internal-inconsistency",\n  title: "the eligibility section requires prior imaging, but the exclusions section forbids it",\n  fields: { ref: "#207" }\n)',
     valid: true,
     note: 'Use `kind: "library"` (name = the library name) for a contradiction that isn\'t about one concept or decision. `@internal-inconsistency` = the SOURCE contradicts itself. The flag anchors to the library; nothing is written into the `.crl`.',
   },

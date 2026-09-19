@@ -176,3 +176,25 @@ test("description rejects nontext SDK values and directs misplaced fields to the
   expect(misplaced).toMatchObject({ ok: false, reason: "invalid-value" });
   if (!misplaced.ok) expect(misplaced.message).toContain("top-level `description`");
 });
+
+const rentalTitle = "Rental documentation scope";
+const rentalDescription = "We applied the general documentation requirement to rentals because it covers all requests and gives no rental exception. Please verify this interpretation.";
+// @kit review-flags:title-description
+test("title and legacy gist produce identical persisted records and retry identities", () => {
+  const make = (input: any) => validateAndBuildMvFlagDraft(CONCEPT, { kind: "concept", name: "C" }, { tag: "open-fork", description: rentalDescription, ...input }, () => "fixed-id", () => "2026-09-18T00:00:00.000Z");
+  const preferred = make({ title: rentalTitle });
+  const legacy = make({ gist: rentalTitle });
+  const both = make({ title: " " + rentalTitle + " ", gist: rentalTitle });
+  expect(preferred.ok).toBe(true);
+  expect(preferred).toEqual(legacy);
+  expect(both).toEqual(legacy);
+  if (!preferred.ok) return;
+  expect(preferred.flag).toMatchObject({ schemaVersion: 1, gist: rentalTitle, description: rentalDescription, category: "extraction", status: "open" });
+  expect(preferred.flag).not.toHaveProperty("title");
+});
+// @kit review-flags:title-description
+test.each([{ title: 42 }, { gist: null }, { title: "X", gist: 42 }, { title: "X", gist: "Y" }, { title: " " }, {}, { title: "X", fields: { title: "nested" } }])("invalid title aliases fail without throwing: %j", input => {
+  const make = () => validateAndBuildMvFlagDraft(CONCEPT, { kind: "concept", name: "C" }, { tag: "open-fork", ...input } as any);
+  expect(make).not.toThrow();
+  expect(make()).toMatchObject({ ok: false, reason: "invalid-value" });
+});

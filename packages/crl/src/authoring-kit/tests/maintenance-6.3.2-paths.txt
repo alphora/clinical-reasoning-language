@@ -1,0 +1,25 @@
+Baseline 3bf25ef2420f7d52d39161292973333860827f26; target recorded in coverage.md.
+
+package-lock.json
+package.json
+packages/crl-vscode/package.json
+packages/crl-vscode/src/correspondenceCockpit.ts
+packages/crl-vscode/src/flagDrawerHtml.test.mjs
+packages/crl-vscode/src/flagDrawerHtml.ts
+packages/crl-vscode/src/mcp-server.test.mjs
+packages/crl/package.json
+packages/crl/src/authoring-kit/audit.json
+packages/crl/src/authoring-kit/index.ts
+packages/crl/src/authoring-kit/tests/authoring-kit.test.ts
+packages/crl/src/authoring-kit/tests/coverage.md
+packages/crl/src/cli/tests/run-mcp-server.test.mjs
+packages/crl/src/flags/flagVocab.ts
+packages/crl/src/flags/mvFlag.ts
+packages/crl/src/flags/tests/buildFlagDraft.test.ts
+packages/crl/src/mcp/server.ts
+packages/crl/src/authoring-kit/tests/maintenance-6.3.2-paths.txt
+
+Inspected, unrelated operator/workspace changes preserved outside audit content commit:
+.claude/skills/crl-release/SKILL.md
+AGENTS.md
+mail-context.md

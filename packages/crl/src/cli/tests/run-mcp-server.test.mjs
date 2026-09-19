@@ -115,6 +115,38 @@ try {
     ]);
   });
 
+
+// @kit review-flags:title-description
+  await check("title creation survives persisted reload, legacy retry, and conflict rejection", async () => {
+  const root = mkdtempSync(join(tmpdir(), "flag-title-"));
+  const src = join(root, "src"); mkdirSync(join(src, "crl"), { recursive: true }); mkdirSync(join(src, "cel"));
+  const crlPath = join(src, "crl", "policy.crl");
+  writeFileSync(crlPath, 'library "L".\nconcept "C":\n- type is Observation.\n- code is `c`.');
+  const title = "Rental documentation scope";
+  const description = "We applied the general documentation requirement to rentals because it covers all requests and gives no rental exception. Please verify this interpretation.";
+  const args = { path: crlPath, kind: "concept", name: "C", tag: "open-fork", title, description };
+  const call = async a => JSON.parse((await client.callTool({ name: "create_flag", arguments: a })).content[0].text);
+  const result = await call(args); assert.equal(result.success, true);
+  const file = join(src, "medical-validation", "flags", result.flag.id + ".json");
+  const before = readFileSync(file, "utf8"), disk = JSON.parse(before);
+  assert.equal(disk.gist, title); assert.equal(disk.description, description); assert.ok(!Object.hasOwn(disk, "title"));
+  assert.equal(disk.category, "extraction"); assert.equal(disk.anchor.name, "C");
+  const { title: ignoredTitle, ...oldArgs } = args;
+  const retry = await call({ ...oldArgs, gist: title, description: "Different detail" });
+  assert.equal(retry.deduped, true); assert.deepEqual(retry.flag, disk); assert.equal(readFileSync(file, "utf8"), before);
+  const conflict = await call({ ...args, gist: "Different title" }); assert.equal(conflict.success, false); assert.match(conflict.message, /must match/);
+  assert.equal(readFileSync(file, "utf8"), before);
+  const { title: unusedTitle, ...missingTitle } = args;
+  const missing = await client.callTool({ name: "create_flag", arguments: missingTitle });
+  assert.notEqual(missing.isError, true, "missing alias is a domain refusal, not a schema error");
+  assert.deepEqual(JSON.parse(missing.content[0].text), { success: false, reason: "invalid-value", message: "a title is required (legacy gist is also accepted)" });
+  for (const invalidArgs of [{ ...args, title: 42 }, { ...args, gist: 42 }]) {
+    const invalid = await client.callTool({ name: "create_flag", arguments: invalidArgs });
+    assert.equal(invalid.isError, true, "nonstring aliases are rejected by MCP schema");
+  }
+  assert.equal(readFileSync(file, "utf8"), before);
+});
+
   // @kit review-flags:description
   await check("create_flag persists Description separately and preserves retry identity", async () => {
     const root = mkdtempSync(join(tmpdir(), "flag-description-"));
@@ -330,8 +362,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.9");
-    assert.equal(kit.contentHash, "46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826");
+    assert.equal(kit.schemaVersion, "2.10");
+    assert.equal(kit.contentHash, "5fb897620d481340a5466cf182d6b7b9c6b5fa8eb1da99f784d27a49f424a940");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 19);
     assert.equal(kit.dispositionModel.categories.length, 3);

@@ -40,6 +40,7 @@ export interface MvFlag {
   /** the concern TYPE (the flag tag). Human MV Types (a `displayName` in flagVocab): validation-concern / narrative-defect /
    *  tooling-bug / other. AI-authoring tags: customer-confirmable / internal-inconsistency / open-fork / fidelity-defect. */
   tag: string;
+  /** Persisted short title; the authoring API accepts title and the compatibility alias gist. */
   gist: string;
   description?: string;
   status: MvFlagStatus;

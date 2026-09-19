@@ -1161,7 +1161,7 @@ export function createServer(): McpServer {
         "policy (used to VALIDATE the target exists AND to locate the store via the enclosing `src/`); inline `code` is NOT " +
         "supported (a store can't be located without a filesystem path). Plus the target + flag: `kind` is concept|decision|" +
         "library; `name` is that node's name (for library, the library name). `tag` must be a registered flag tag (aliases " +
-        "canonicalized); `gist` is a short title; `description` holds source detail, reasoning, consequences and the review question. Description is plain text: outer whitespace trimmed, blank omitted; newlines, semicolons and backticks allowed. Use top-level `description`, never `fields.description`. Optional issue links use `fields.ref`. `fields` supplies " +
+        "canonicalized); `title` is the preferred short title, with legacy `gist` accepted. If both are supplied their trimmed values must match. `description` holds source detail, reasoning, consequences and the review question. Description is plain text: outer whitespace trimmed, blank omitted; newlines, semicolons and backticks allowed. Use top-level `description`, never `fields.description`. Optional issue links use `fields.ref`. `fields` supplies " +
         "extra `; key value` fields — any registry-REQUIRED field (e.g. `@fidelity-defect` needs `direction`) is enforced and " +
         "enum fields are checked. To anchor the flag to a SPECIFIC decision node, pass its occurrence key as `fields.key` " +
         "(`<nodeId>~<signature>`) — it is NOT validated for placement, so a stale/wrong key just orphans to the policy. " +
@@ -1178,7 +1178,8 @@ export function createServer(): McpServer {
         name: z.string().min(1).describe("The concept/decision name — or, for kind=library, the library name."),
         library: z.string().optional().describe("The declaring library name (optional; a .crl declares exactly one). Ignored for kind=library."),
         tag: z.string().min(1).describe("The flag tag id (e.g. `validation-concern`, `fidelity-defect`); aliases are canonicalized."),
-        gist: z.string().min(1).describe("Short flag title. No backtick or `;`. Put detailed explanation in description."),
+        title: z.string().min(1).optional().describe("Short human-readable flag title. Supply title or legacy gist; at least one is required, and both must agree if supplied. Put the full explanation in description. Stored in the existing gist field."),
+        gist: z.string().min(1).optional().describe("Compatibility alias for title. Supply title or gist; if both are supplied their trimmed values must match."),
         description: z.string().optional().describe("Plain-text Description shown in MV; outer whitespace is trimmed, internal formatting preserved. Not fields.description."),
         fields: z.record(z.string(), z.string()).optional().describe("Extra `; key value` fields (e.g. { direction: 'over-reach', ref: '#203' }). Required fields for the tag are enforced."),
         status: z.enum(["open", "resolved"]).optional().describe("The `; status` (default `open`)."),
@@ -1220,7 +1221,7 @@ export function createServer(): McpServer {
   return server;
 }
 
-type CreateFlagArgs = ToolArgs & { kind: CreateFlagTarget["kind"]; name: string; library?: string; tag: string; gist: string; description?: string; fields?: Record<string, string>; status?: FlagStatus };
+type CreateFlagArgs = ToolArgs & { kind: CreateFlagTarget["kind"]; name: string; library?: string; tag: string; title?: string; gist?: string; description?: string; fields?: Record<string, string>; status?: FlagStatus };
 type SetFlagStatusArgs = ToolArgs & { scope: MvFlagScope; name: string; library?: string; tag: string; key?: string; id?: string; status: FlagStatus };
 
 type ToolResponse = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
@@ -1265,7 +1266,7 @@ function runCreateFlag(args: CreateFlagArgs): ToolResponse {
   const refusal = legacyStoreRefusal(src.path);
   if (refusal) return refusal; // #230: don't add to the new store while old records sit hidden at `.crl/flags/`
   try {
-    const built = validateAndBuildMvFlagDraft(src.text, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, gist: args.gist, description: args.description, fields: args.fields, status: args.status });
+    const built = validateAndBuildMvFlagDraft(src.text, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, title: args.title, gist: args.gist, description: args.description, fields: args.fields, status: args.status });
     if (!built.ok) return writeResult(built); // domain validation failure — no file written
     const loaded = loadFlags(src.storeDir);
     if (loaded.warning) return writeResult({ ok: false, reason: "store-warning", message: loaded.warning }); // don't write into a partially-unreadable store
