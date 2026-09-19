@@ -9,6 +9,7 @@ import { isAbsolute, join as pathJoin } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { registerPresentationEditing } from "./presentationEditing";
 
 // Provenance must name the version that actually ran.
 const CRL_PACKAGE_VERSION: string = (require("../../package.json") as { version: string }).version;
@@ -390,6 +391,7 @@ const inputSchema = {
 
 export function createServer(): McpServer {
   const server = new McpServer({ name: "crl", version: "0.1.0" });
+  registerPresentationEditing(server);
 
   server.registerTool(
     "tokenize_crl",

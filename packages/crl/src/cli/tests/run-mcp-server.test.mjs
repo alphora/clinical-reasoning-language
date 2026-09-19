@@ -80,7 +80,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 20 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
+  await check("MCP tools: 23 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
     const { tools } = await client.listTools();
     const native = tools.find(t => t.name === "emit_results").inputSchema.properties;
     assert.equal(native.retryFailed.type, "boolean");
@@ -92,6 +92,7 @@ try {
     assert.doesNotMatch(descriptions, /asserted-only|never evaluates `code is`|sanctioned patient-age both-rep carve-out/);
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
+      "apply_presentation_edit",
       "authoring_kit",
       "build_crl_ast",
       "canonicalize_source",
@@ -104,7 +105,9 @@ try {
       "emit_results",
       "generate_provenance",
       "normalize_provenance",
+      "preview_presentation_edit",
       "render_scenario",
+      "revert_presentation_edit",
       "run_decision",
       "set_flag_status",
       "tokenize_crl",

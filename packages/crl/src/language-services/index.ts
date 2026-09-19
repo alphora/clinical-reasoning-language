@@ -33,3 +33,4 @@ export * from "./celDiagnostics";
 // the extension's esbuild generates dist/catalog.json via this module's parseCatalog.
 export * from "./catalog";
 export * from "../editing/presentationEdit";
+export * from "../editing/presentationFile";

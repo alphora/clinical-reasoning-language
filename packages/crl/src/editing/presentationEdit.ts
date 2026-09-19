@@ -69,6 +69,11 @@ function contextOf(request: PresentationEditRequest): PresentationContext | unde
 }
 /** The parser preserves literal spelling rather than decoding JavaScript escapes. */
 function literal(value: string): string {
+  if (Buffer.from(value, "utf8").toString("utf8") !== value)
+    return fail(
+      "invalid-encoding",
+      "Question wording must be lossless UTF-8; unpaired surrogate characters are not supported.",
+    );
   if (/[`\\]/.test(value))
     return fail(
       "unsupported-literal",
@@ -201,6 +206,11 @@ export function planPresentationEdit(
   expectedSha256?: string,
 ) {
   if (typeof source !== "string") return fail("invalid-source", "CRL source must be text.");
+  if (Buffer.from(source, "utf8").toString("utf8") !== source)
+    return fail(
+      "invalid-encoding",
+      "CRL source must be lossless UTF-8; reconcile unpaired surrogate characters before editing.",
+    );
   const beforeSha256 = sourceSha256(source);
   if (expectedSha256 !== undefined && expectedSha256 !== beforeSha256)
     return fail("stale-source", "Source changed since preview. Preview the current source again.");
