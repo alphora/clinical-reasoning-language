@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "3bf25ef2420f7d52d39161292973333860827f26",
-  "auditedSchemaVersion": "2.9",
-  "auditedContentHash": "46d007bb22697b3ae67ebff58ed74157b9e48b785a95c7ab17c7151c314af826",
-  "scope": "Kit schema 2.9 release 6.3.0 maintenance from 510c931f2323c89f9822592e01668112dd6ff795 through 3bf25ef2420f7d52d39161292973333860827f26. Complete changed-path inventory and dispositions in coverage.md. Typed text/dateTime selected values, generic presence guards, exact policy entry-point identities, full generated-directory replacement, Description creation contract, MV-only launch and KE Accept/Reject are mapped to owning tests. Full core5059 and extension1285 pass, real MCP and typechecks pass. Native plan/code coverage converged; external Description plan and release code initial round completed, follow-up blocked by automatic approval review. Prior semantic sessions remain separately identified; installed delivery is still a release gate. No clinical certification or migration of existing flags is asserted.",
+  "auditedRevision": "1e16e14f14aef1c95b3fb70ba62070e15b56ff61",
+  "auditedSchemaVersion": "2.10",
+  "auditedContentHash": "5fb897620d481340a5466cf182d6b7b9c6b5fa8eb1da99f784d27a49f424a940",
+  "scope": "Kit schema 2.10 local build 6.3.2 maintenance from 3bf25ef2420f7d52d39161292973333860827f26 through 1e16e14f14aef1c95b3fb70ba62070e15b56ff61. Complete changed-path inventory and dispositions in coverage.md. Preferred title and compatible gist inputs normalize to unchanged schema1 storage; matching dual aliases, malformed and missing input refusals, Description persistence/retry identity and Title/Description UI are mapped to owning assertions. Core5067 and extension1287 passed, real MCP and both typechecks/builds passed. Both review arms assessed; native final follow-up converged. This is a completed bounded source audit at an unpublished local revision. Installed artifact equality and rendering are separate delivery checks. No language/emitter/native runtime change, historical flag migration or clinical certification is asserted.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

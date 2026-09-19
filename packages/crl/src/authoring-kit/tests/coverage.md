@@ -1,6 +1,6 @@
-## Maintenance - local build 6.3.2 (reviewed content pending commit)
+## Maintenance - local build 6.3.2
 
-Baseline audit: `3bf25ef2420f7d52d39161292973333860827f26`. Target: pending reviewed content commit; finalize literal SHA in separate metadata commit. Kit schema 2.10, content hash `5fb897620d481340a5466cf182d6b7b9c6b5fa8eb1da99f784d27a49f424a940`. Complete changed-path inventory: [maintenance-6.3.2-paths.txt](maintenance-6.3.2-paths.txt). This local delivery has a completed, bounded content audit; public publication is independent of audit consistency. No customer content or historical flag migration.
+Baseline audit: `3bf25ef2420f7d52d39161292973333860827f26`. Target: `1e16e14f14aef1c95b3fb70ba62070e15b56ff61`. Audit metadata is committed separately. Kit schema 2.10, content hash `5fb897620d481340a5466cf182d6b7b9c6b5fa8eb1da99f784d27a49f424a940`. Complete changed-path inventory: [maintenance-6.3.2-paths.txt](maintenance-6.3.2-paths.txt). This local delivery has a completed, bounded content audit; public publication is independent of audit consistency. No customer content or historical flag migration.
 
 Intent: the operator requires coherent versions/audit metadata in local builds and a new patch version for installation. The title implementation follows the accepted short Title / separate Description contract. The audit does not certify medical fidelity or new native language behavior. The intervening 6.3.0 audit/ledger finalization and package/lock version changes were read and are metadata-only; no dependencies, native engine/driver, compiler, grammar, fixtures or reference artifact source changed in this interval.
 
