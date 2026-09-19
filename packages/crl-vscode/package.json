@@ -87,6 +87,10 @@
     ],
     "commands": [
       {
+        "command": "crl.editQuestionWording",
+        "title": "CRL: Edit Question Wording"
+      },
+      {
         "command": "crl.setup",
         "title": "CRL: Set up tools (MCP, CLAUDE.md, highlighting)"
       },
