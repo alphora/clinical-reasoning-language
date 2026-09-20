@@ -1,6 +1,6 @@
 # Maintenance — local native evaluation fixes 6.4.1
 
-Baseline audit: `50b7965614480b18d1cccf8de00b36badde8771a`. Implementation base: `bc847098d58b0af1e7642718fc2e9562a353bc20`. Target: pending reviewed content commit; stamp remains unchanged until review and checks finish. Kit2.12/hash `3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597`. Complete changed-path inventory: maintenance-6.4.1-paths.txt.
+Baseline audit: `50b7965614480b18d1cccf8de00b36badde8771a`. Implementation base: `bc847098d58b0af1e7642718fc2e9562a353bc20`. Target: `5020abfe4c509c20ecf65e11dcaba401193b5d29`. Reviewed source audit completed; metadata is stamped separately. Kit2.12/hash `3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597`. Complete changed-path inventory: maintenance-6.4.1-paths.txt.
 
 The full baseline-to-base delta was inspected: package/lock versions, audit metadata, coverage finalization and reverse-map wording only. Current scope adds source binding, Condition status coding, native error classification, qualified FHIRHelpers and named PlanDefinition conditions. Session API, upstream engine adoption and Linux qualification are excluded. No authored syntax, clinical interpretation or customer content migration changes.
 

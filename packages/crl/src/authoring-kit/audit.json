@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "50b7965614480b18d1cccf8de00b36badde8771a",
-  "auditedSchemaVersion": "2.11",
-  "auditedContentHash": "db69bde7a50a776fa7fce6d9b2946dffea2ad0722521e5c6c8ead31fff55c657",
-  "scope": "Kit schema 2.11 bounded shared question wording maintenance from 1e16e14f14aef1c95b3fb70ba62070e15b56ff61 through 50b7965614480b18d1cccf8de00b36badde8771a. Source, field ownership, exact preservation/reversal, project/MCP and editor boundaries, native group/answer identity and kit retrieval are mapped in coverage.md. Reviews798-805 native converged; external coverage unavailable. Source/native and development-host evidence do not replace packaged delivery acceptance. No clinical certification or customer migration.",
+  "auditedRevision": "5020abfe4c509c20ecf65e11dcaba401193b5d29",
+  "auditedSchemaVersion": "2.12",
+  "auditedContentHash": "3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597",
+  "scope": "Kit schema 2.12 bounded native evaluation and identifier-only PlanDefinition maintenance from50b7965614480b18d1cccf8de00b36badde8771a through 5020abfe4c509c20ecf65e11dcaba401193b5d29. Source binding, Condition coding, native error classification, named CQL condition carriers and qualified helpers are mapped in coverage.md. Reviews816/817 native converged; external unavailable. Source/native checks and regenerated Bleph evidence do not replace installed delivery acceptance. Existing pinned engine retained; session API, upstream adoption and Linux qualification excluded. No customer migration or clinical certification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
