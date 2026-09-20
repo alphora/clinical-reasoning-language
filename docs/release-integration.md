@@ -2,8 +2,8 @@
 
 Audited September 20, 2026. Public baseline: `v6.3.0` at
 `46102010de434b9e89c02159c4c796c813bf80c2`.
-Qualified local candidate: **6.4.2**, commit
-`710fe11be29a4dfb09cfcb62cfd2b88dd5ff6f02`.
+Qualified local candidate: **6.4.4**, isolated branch `codex/hcsc-session-delivery`.
+Reviewed product content: `72560b0b4b88cf93b875a395af22972d55e1535e`; kit audit: `efecd1a028c40c15974cf7cbee35e22caac4f0cc`.
 This record describes local integration, not public publication.
 
 | Local build/work | Retained behavior | Integrated revision |
@@ -35,15 +35,9 @@ kit export, `SHA256SUMS`, `delivery-receipt.json`, `retention-audit.json`, and
 VSIX SHA256: `23d3fbada891254e7a8ba56881c3e31272e0447f569fb697c18a35128289e49f`.
 npm SHA256: `047d15350da4051c9b73efbdb610afc8cfb3e970003bf1ca92e4951620543cfb`.
 
-## Work preserved separately
+## Upstream engine work held separately
 
-The typed session API/CLI and adoption of the upstream apply engine are unfinished
-on `codex/apply-session-upstream` in `tmp/apply-session-upstream`. Earlier work
-remains on `codex/apply-portability-session`. These are not delivered local build
-features and are not implicitly certified by 6.4.2. Their current progress and
-remaining installed/Linux/native/kit checks are recorded in
-`tmp/REFACTORS-IN-FORCE.md`, pointing to `tmp/DESIGN-apply-portability-session.md`.
-The previously proposed pause PR is deprecated; do not automatically reapply it.
+The typed session API/CLI is included in6.4.4 with the retained qualified engine SHA2569870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e. The upstream feature-definition-based-population candidate c34dc910255a70cd503ead5283f313ae8082e1cb is not adopted: actual paused output contains an empty data-absent-reason extension. No output repair or new pause patch was added. Mixed-condition and broader upstream qualification remain separate. The previously proposed pause PR remains deprecated.
 
 The main checkout's existing project-instruction and mail-context edits remain
 separate. They were neither discarded nor folded into the product delivery.
@@ -64,3 +58,13 @@ This reconciliation itself does not require repeating the whole test suite.
 ## Local6.4.3 ? Result Questionnaire duplicate-input fix
 
 This follow-up is based on the complete6.4.2 retention checkpoint8c8897c8. It preserves every earlier local release feature, the FHIR packager, coded Observation sources, pinned engine and kit2.13. Only MV question grouping/numbering/edit-state display changes; no customer migration. Evidence is in local build tmp/local-mv-question-dedup-6.4.3. Session/upstream work remains isolated at ec226205 and is not part of this local build.
+
+## Local6.4.4 — definition Bundle and native session delivery
+
+Based on the complete6.4.3 integration7b2421c9257dde3971c3a841ba364cef388467f4. Retains all prior local features and packaging. Includes independently committed cross-library emitter correction cab9ec369eca429cb7649f75585741d87460d3d0 and reviewed session checkpoint9401f5f3 through merge8a610ad5ea078152ff8c0298484d53363407e9e8. No customer migration or new language syntax.
+
+Uncoded support libraries no longer falsely claim a coded policy's CodeSystem. Physical CQL filenames stay distinct, and PlanDefinitions bind the Library owning their named conditions. `emit_crl_bundle` and `emitCrlBundle` return a read-only definitions collection with local CQL embedded; `package_fhir` remains the separate NPM packaging operation. The stateless session API/CLI supports explicit typed edits and clears, with caller-owned retained state and documented repeating-group limitations. Kit2.14 is synchronized and audited.
+
+Delivery evidence: `tmp/local-hcsc-session-6.4.4/`, including archives, kit export, SHA256SUMS, installed MCP and native receipts, exact archive/staged-file comparisons and delivery-receipt.json. Reuse prior unaffected broad-suite evidence; affected209core/kit and41extension tests passed. Actual installed artifacts are independently qualified. This is a local build, not a public release.
+
+For the next release, include this branch's completed delivery commit rather than starting from an older release worktree or dropping the session branch. Confirm its ancestry and retain the evidence ledger. Upstream adoption is a separate task.

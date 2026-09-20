@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
-import { execFileSync } from "node:child_process";
 
 // @kit fhir-packaging:definition-bundle-mcp
 // Same protocol checks run against the actual core and extension stdio servers.
@@ -32,9 +31,9 @@ export async function checkEmitBundle(client) {
     assert.equal(readFileSync(file, "utf8"), source);
     for (const invalid of ["relative.crl", root, join(root, "missing.crl")]) assert.equal((await call(invalid)).isError, true);
     if (process.platform !== "win32") {
-      const fifo = join(root, "input.crl");
-      execFileSync("mkfifo", [fifo]);
-      const refused = await call(fifo);
+      // /dev/null is a bounded non-regular input even on WSL mounts that cannot
+      // create FIFOs. A regressed reader gets EOF, never an unbounded stream.
+      const refused = await call("/dev/null");
       assert.equal(refused.isError, true);
       assert.match(refused.content[0].text, /regular file/);
     }
