@@ -12,6 +12,7 @@ const response = (answer = '[{"valueString":"old"}]') => '{"resourceType":"Quest
 const opts = (r: string, edits: any[], mode: "full" | "edits-only" = "full") => ({ expectedResponseSha256: sha256(r), authored: "2030-01-01T12:00:00Z", mode, edits });
 const a = "/item/0/item/0";
 const build = (q: string, r: string, edits: any[], mode: "full" | "edits-only" = "full") => buildSessionResponse(q, r, opts(r, edits, mode));
+// @kit native-apply-session:typed-edits
 describe("explicit typed response editing", () => {
   it("refuses parent replacement that would discard children, but permits editing a child", () => {
     const q = JSON.stringify({ resourceType: "Questionnaire", url: canonical, item: [{ linkId: "parent", type: "boolean", item: [{ linkId: "child", type: "string" }] }] });

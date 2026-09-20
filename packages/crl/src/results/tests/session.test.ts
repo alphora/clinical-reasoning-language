@@ -33,6 +33,7 @@ beforeEach(() => {
   runWith(args => { outputs(args); return success; });
 });
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+// @kit native-apply-session:failure-boundary
 describe("applySession boundary", () => {
   it("uses the validated snapshot when caller fields change during Java discovery", async () => {
     let release!: (value: unknown) => void;

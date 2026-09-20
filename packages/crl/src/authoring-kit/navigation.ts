@@ -5,7 +5,8 @@ export type KitContent = Omit<AuthoringKit, "contentHash" | "navigation" | "audi
 
 /** Authored discovery terms, hashed with the kit. Retired spellings lead to current guidance. */
 const ALIASES: Record<string, string[]> = {
-  "fhir-packaging": ["FHIR npm package", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
+  "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API"],
+  "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
   "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start"],
   "concept-form": ["concept", "case feature", "Scalar", "remove scalar", "Observation", "code is", "absence", "completeness", "evidence completeness"],
   "value-type": ["value type is", "boolean", "Quantity", "CodeableConcept"],
@@ -37,6 +38,7 @@ const ALIASES: Record<string, string[]> = {
 // rule's contract. Artifact-to-rule prerequisites supply each example's context.
 // REFACTOR:grounded (#322): typed intake teaching is discoverable with its prerequisites.
 const RELATED: Record<string, string[]> = {
+  "native-apply-session": ["rule:produce-results", "rule:text-answers", "rule:verify-loop"],
   "fhir-packaging": ["rule:verify-loop", "rule:emitted-trees-are-ours"],
   "text-answers": ["rule:concept-form", "rule:publication-selection", "rule:concept-presentation"],
   "mv-case-authoring": ["rule:cel-cases", "rule:verify-loop", "rule:produce-results", "rule:emit-output-root"],

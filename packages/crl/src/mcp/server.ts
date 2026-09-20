@@ -24,6 +24,7 @@ import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
+import { emitCrlBundle } from "../emit-bundle";
 import { produceResults, shutdownProducer } from "../results/produce";
 import { ENGINE_JAR_SOURCE, engineJarHelp } from "../results/spawn";
 import { RESULT_USE_CASES, isResultUseCase } from "../results/useCases";
@@ -645,6 +646,30 @@ export function createServer(): McpServer {
         },
       ),
   );
+
+  server.registerTool("emit_crl_bundle", {
+    title: "Emit a FHIR definition Bundle",
+    description: "Return a definitions-only FHIR collection Bundle from one CRL file and its emitted dependency closure, with CQL embedded in Library.content.data. Uses the same two-lane emitter and native repository assembly as execution. Refuses emission errors, unresolved references, collisions, or missing CQL; failures never return a partial Bundle. Returns warnings and diagnostics. Read-only: does not write or replace project files. No patient data, static Questionnaire, or transaction conversion is added. External dependencies such as hl7.fhir.uv.cql.FHIRHelpers remain runtime dependencies. For an NPM archive of existing emitted definitions, use package_fhir.",
+    inputSchema: {
+      path: z.string().min(1).describe("Absolute path to a readable .crl file; imports resolve through its package.json."),
+      date: z.string().min(1).optional().describe("ISO publication date; otherwise use project metadata."),
+      capability: z.enum(["shareable", "computable", "publishable", "executable"]).optional()
+        .describe("CRMI capability level, default publishable. Executable is currently unsupported."),
+    },
+  }, (args) => {
+    try {
+      const problem = absolutePathProblem(args.path, "path");
+      if (problem) throw new ToolInputError(problem);
+      if (!statSync(args.path).isFile()) throw new ToolInputError("Path must be a regular file.");
+      // Reuse the MCP entry-file bound and readable-file validation without calling
+      // the write-capable emit handler. Operational errors are distinct from emit refusals.
+      resolveSource({ path: args.path });
+      const result = emitCrlBundle(args.path, { date: args.date, capability: args.capability });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (error) {
+      return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }], isError: true };
+    }
+  });
 
   server.registerTool(
     "emit_cel",

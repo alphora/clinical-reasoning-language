@@ -1,0 +1,48 @@
+M	package-lock.json
+M	packages/crl-vscode/esbuild.js
+M	packages/crl-vscode/src/mcp-server.test.mjs
+A	packages/crl-vscode/src/sessionBundle.test.mjs
+M	packages/crl-vscode/src/stableServer.ts
+A	packages/crl/docs/apply-session.md
+M	packages/crl/package.json
+M	packages/crl/scripts/copy-catalog.mjs
+M	packages/crl/scripts/native-acceptance/ApplySessionDriver.java
+M	packages/crl/scripts/native-acceptance/intake.cjs
+M	packages/crl/scripts/native-acceptance/presentation-check.cjs
+M	packages/crl/scripts/native-acceptance/presentation-check.test.cjs
+M	packages/crl/scripts/native-acceptance/session-classes/ApplySessionDriver.class
+M	packages/crl/scripts/native-acceptance/session-classes/build.json
+M	packages/crl/src/authoring-kit/audit.json
+M	packages/crl/src/authoring-kit/index.ts
+M	packages/crl/src/authoring-kit/navigation.ts
+M	packages/crl/src/authoring-kit/tests/authoring-kit.test.ts
+M	packages/crl/src/authoring-kit/tests/coverage.md
+A	packages/crl/src/cli/run-apply-session.ts
+M	packages/crl/src/cli/tests/run-mcp-server.test.mjs
+M	packages/crl/src/cql-emitter/lowerLocalCodes.ts
+M	packages/crl/src/fhir-emitter/decision.ts
+M	packages/crl/src/fhir-emitter/tests/criterionEmit.test.ts
+M	packages/crl/src/fhir-emitter/tests/membershipPublication.test.ts
+M	packages/crl/src/imports/emit.ts
+M	packages/crl/src/imports/tests/foreignPublicationInterface.test.ts
+A	packages/crl/src/imports/tests/source-publication-identity.test.ts
+M	packages/crl/src/index.ts
+M	packages/crl/src/mcp/server.ts
+M	packages/crl/src/results/driver.ts
+M	packages/crl/src/results/driver/ApplyDriver.build.json
+M	packages/crl/src/results/driver/ApplyDriver.class
+M	packages/crl/src/results/driver/ApplyDriver.java
+M	packages/crl/src/results/runtimeFingerprint.ts
+A	packages/crl/src/results/session.ts
+A	packages/crl/src/results/sessionErrors.ts
+A	packages/crl/src/results/sessionJson.ts
+A	packages/crl/src/results/sessionResponse.ts
+A	packages/crl/src/results/sessionValidation.ts
+A	packages/crl/src/results/tests/session.test.ts
+A	packages/crl/src/results/tests/sessionCli.test.ts
+A	packages/crl/src/results/tests/sessionErrors.test.ts
+A	packages/crl/src/results/tests/sessionResponse.test.ts
+packages/crl/src/authoring-kit/tests/maintenance-6.4.4-paths.txt
+packages/crl/src/cli/tests/emit-bundle-smoke.mjs
+packages/crl/src/emit-bundle.test.ts
+packages/crl/src/emit-bundle.ts

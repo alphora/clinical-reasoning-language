@@ -1,4 +1,5 @@
 import { checkFhirPackage } from "../../crl/src/cli/tests/fhir-package-smoke.mjs";
+import { checkEmitBundle } from "../../crl/src/cli/tests/emit-bundle-smoke.mjs";
 // Integration test: spawn the BUILT dist/mcp-server.js as a real MCP stdio
 // server and drive it with the SDK client. Run via `npm run test:mcp`
 // (the script compiles first). Every check shares ONE connected client
@@ -87,6 +88,7 @@ check("MCP tools: 23 registered (+ canonicalize_source; + #237/T3 check_fhir_ids
       "emit_cel",
       "emit_cql",
       "emit_crl",
+      "emit_crl_bundle",
       "emit_crl_fhir",
       "emit_results",
       "generate_provenance",
@@ -168,8 +170,8 @@ check("authoring_kit full exports all 19 artifacts and determination guidance", 
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.13");
-    assert.equal(kit.contentHash, "daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c");
+    assert.equal(kit.schemaVersion, "2.14");
+    assert.equal(kit.contentHash, "ed2f2be40009500cbc7e01a2e6c6d51926e4101c96df243b021dd20659f76eaf");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 19);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -625,3 +627,4 @@ check("title creation survives persisted reload, legacy retry, and conflict reje
 });
 
 check("FHIR package through actual extension MCP bundle", () => checkFhirPackage(client));
+check("Definition Bundle through actual extension MCP bundle", () => checkEmitBundle(client));
