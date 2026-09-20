@@ -148,8 +148,8 @@
                 {
                   "kind": "applicability",
                   "expression": {
-                    "language": "text/cql-expression",
-                    "expression": "not \"CodedQuestionInterface\".\"Qualifying Symptom Documented\""
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch Ref L44C11"
                   }
                 }
               ]
@@ -180,8 +180,8 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not \"CodedQuestionInterface\".\"Service Requested\""
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch Ref L42C7"
               }
             }
           ]

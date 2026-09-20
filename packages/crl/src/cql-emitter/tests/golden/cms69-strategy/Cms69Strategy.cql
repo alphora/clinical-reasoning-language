@@ -2,7 +2,7 @@ library Cms69Strategy
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 
 valueset "BMI Range as a Condition ValueSet": 'urn:example:placeholder'
@@ -109,3 +109,45 @@ define "Patient Has Underweight Diagnosis":
 
 define "Has Anti-Obesity Medication Contraindication":
   exists CRLCommon.Has("Anti-Obesity Medication Contraindication")
+
+define "CRL branch Ref L81C7":
+  "Patient Eligible For BMI Screening"
+
+define "Not CRL branch Ref L81C7":
+  not ("Patient Eligible For BMI Screening")
+
+define "CRL branch Ref L83C9":
+  "BMI Not Documented During Measurement Period"
+
+define "Not CRL branch Ref L83C9":
+  not ("BMI Not Documented During Measurement Period")
+
+define "CRL branch Ref L84C9":
+  "Has Documented High BMI"
+
+define "Not CRL branch Ref L84C9":
+  not ("Has Documented High BMI")
+
+define "CRL branch Ref L85C9":
+  "Has Documented Low BMI"
+
+define "Not CRL branch Ref L85C9":
+  not ("Has Documented Low BMI")
+
+define "CRL branch Ref L94C7":
+  "Patient Has Overweight or Obese Diagnosis"
+
+define "Not CRL branch Ref L94C7":
+  not ("Patient Has Overweight or Obese Diagnosis")
+
+define "CRL action Ref L97C51":
+  "Has Anti-Obesity Medication Contraindication"
+
+define "Not CRL action Ref L97C51":
+  not Coalesce(("Has Anti-Obesity Medication Contraindication"), false)
+
+define "CRL branch Ref L104C7":
+  "Patient Has Underweight Diagnosis"
+
+define "Not CRL branch Ref L104C7":
+  not ("Patient Has Underweight Diagnosis")

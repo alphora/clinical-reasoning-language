@@ -1,3 +1,4 @@
+import { planConditionBody } from "../../fhir-emitter/tests/planConditionTestHelpers";
 // REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 // #224 ii.1c — end-to-end CQL emit through the PUBLIC entry (`emitCQLImports`) over a
 // decision whose guard references a `criterion`. This exercises the emit-family seams that
@@ -155,7 +156,7 @@ ${ACTIVITIES}`;
 // A concept referenced ONLY by a SELF-QUALIFIED `unless` action guard must (a) get an
 // Interface re-export (else the negated condition dangles at $apply — the self-qualified
 // normalization fix), (b) emit a case-feature StructureDefinition + action input, and
-// (c) lower to a library-qualified, Coalesce-wrapped negated applicability condition.
+// (c) reference a CQL definition that totalizes the complete action-unless operand.
 const GUARD_POLICY = `# Policy
 library "Policy".
 concept "Gate Concept":
@@ -184,6 +185,11 @@ describe("#224 iii.1 — per-action guard emit (self-qualified, guard-only conce
       // qualified ref → no re-export → the emitted negated condition referenced a missing define.
       const iface = result.cqlByLibrary.find((e) => e.libraryName === "PolicyInterface")?.cql ?? "";
       expect(iface).toContain("Blocker");
+      const names = new Set(result.cqlByLibrary.map(e => e.libraryName));
+      for (const entry of result.cqlByLibrary) for (const match of entry.cql.matchAll(/^include ([^\s]+)(?: version [^\n]+)?$/gm)) {
+        if (match[1] !== "hl7.fhir.uv.cql.FHIRHelpers") expect(names.has(match[1]!)).toBe(true);
+      }
+      expect(iface).not.toMatch(/^include Policy$/m);
     });
   });
 
@@ -192,7 +198,7 @@ describe("#224 iii.1 — per-action guard emit (self-qualified, guard-only conce
       const result = emitFhirDefFromPath(path.join(root, "policy.crl"), { date: "2026-06-04" });
       expect(result.success).toBe(true);
       const resources = result.resources.map((r) => r.resource as Record<string, any>);
-      // (a) the negated applicability condition, library-qualified to the Interface + Coalesce.
+      // REFACTOR:grounded: the named applicability condition resolves in the bound Interface.
       const pd = resources.find((r) => r.resourceType === "PlanDefinition" && r.id === "policy");
       const conds: any[] = [];
       const stack = [...(pd!.action ?? [])];
@@ -201,8 +207,10 @@ describe("#224 iii.1 — per-action guard emit (self-qualified, guard-only conce
         if (a.condition) conds.push(...a.condition);
         if (a.action) stack.push(...a.action);
       }
-      const neg = conds.find((c) => c.expression?.language === "text/cql-expression");
-      expect(neg?.expression.expression).toBe('not Coalesce("PolicyInterface"."Blocker", false)');
+      const neg = conds.find((c) => c.expression?.expression.startsWith("Not CRL action Ref"));
+      expect(neg).toBeDefined();
+      const cql = emitCQLImports(path.join(root, "policy.crl"));
+      expect(planConditionBody(cql, pd as { library: string[] }, neg.expression)).toBe('not Coalesce(("Blocker"), false)');
       // (b) a case-feature StructureDefinition for the guard-only concept.
       const sd = resources.find(
         (r) => r.resourceType === "StructureDefinition" && String(r.id).includes("blocker"),

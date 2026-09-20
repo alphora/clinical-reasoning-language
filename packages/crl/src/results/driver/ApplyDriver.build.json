@@ -1,8 +1,8 @@
 {
   "builtFrom": "ApplyDriver.java",
-  "javaSha256": "72974caf6a4c09c427c6d7d47c5b00fd64235388c6f62a283c03776c553580b5",
-  "classSha256": "573eb0e817451a50e78a0883aa53f867bc61e44e51effeff18810b42fbdae631",
+  "javaSha256": "0815e6bfd992622387cab75329fe5751226fbd21ca17e866d91bb79739d5ffec",
+  "classSha256": "aeea824b299b711cfc5160add133e908241f3a606d5ea2a30f692a5772c6f086",
   "classFileMajor": 61,
-  "engineJar": "cqf-fhir-cr-cli-4.7-crl-4aee6041.jar",
+  "engineJar": "cqf-fhir-cr-cli-4.8.0-codex-apply-pause-on-unknown-r4-4aee604-SNAPSHOT.jar",
   "engineJarSha256": "9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e"
 }

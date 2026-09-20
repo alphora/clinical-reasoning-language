@@ -1,3 +1,4 @@
+import { planConditionBody } from "./planConditionTestHelpers";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -87,8 +88,8 @@ describe("selected membership FHIR and CEL", () => {
     if (!named) {
       const target = [...emitCQLImports(crl).publicationTargets!.values()][0]!;
       expect(plan.library).toContain(`http://example.org/publication/Library/${target.libraryName}`);
-      expect(branches[0].condition[0].expression.expression).toContain(`"${target.libraryName}"."${target.define}"`);
-      expect(branches[1].condition[0].expression.expression).toBe(`not ${branches[0].condition[0].expression.expression}`);
+      expect(planConditionBody(emitCQLImports(crl), plan, branches[0].condition[0].expression)).toContain(`${target.libraryName}."${target.define}"`);
+      expect(planConditionBody(emitCQLImports(crl), plan, branches[1].condition[0].expression)).toBe(`not (${planConditionBody(emitCQLImports(crl), plan, branches[0].condition[0].expression)})`);
     }
   });
   it.each([false, true])("retains same-named local and foreign criterion dependencies (transitive=%s)", (transitive) => {
@@ -109,7 +110,7 @@ describe("selected membership FHIR and CEL", () => {
     const sds = profiles(emitted); expect(sds).toHaveLength(3); expect(new Set(sds.map((p) => p.url)).size).toBe(3);
     const plan = emitted.resources.find((r) => r.sourceKind === "Decision")!.resource as any;
     expect(plan.action).toHaveLength(2); expect(plan.action[0].condition).toHaveLength(1);
-    expect(plan.action[0].condition[0].expression.expression).toContain(' or ');
+    expect(planConditionBody(emitCQLImports(crl), plan, plan.action[0].condition[0].expression)).toContain(' or ');
     expect(plan.action[0].input.flatMap((i: any) => i.profile).sort()).toEqual(sds.map((s) => s.url).sort());
     expect(plan.action[1].input).toHaveLength(1);
   });
@@ -134,12 +135,13 @@ describe("selected membership FHIR and CEL", () => {
       expect(branches).toHaveLength(2);
       const condition = branches[0].condition;
       expect(condition).toHaveLength(1);
-      expect(condition[0].expression.language).toBe("text/cql-expression");
-      if (!guard.includes("Ready")) expect(condition[0].expression.expression).toContain('FHIRHelpers.ToBoolean(');
-      expect(condition[0].expression.expression).not.toContain('Coalesce');
+      expect(condition[0].expression.language).toBe("text/cql-identifier");
+      const body = planConditionBody(emitCQLImports(crl), plan, condition[0].expression);
+      if (!guard.includes("Ready")) expect(body).toContain('FHIRHelpers.ToBoolean(');
+      expect(body).not.toContain('Coalesce');
       expect(branches[0].input).toHaveLength(2);
       expect(branches[1].input).toHaveLength(1);
-      if (guard.includes("Ready")) expect(condition[0].expression.expression).toContain('."Ready"');
+      if (guard.includes("Ready")) expect(body).toContain('"Ready"');
     });
   // @kit branch-guards:priority-exclusion
   it("preserves the same compound failure boundary in first priority exclusions", () => {
@@ -149,7 +151,8 @@ describe("selected membership FHIR and CEL", () => {
     const branches = actionTree(plan.action).filter((a) => a.definitionCanonical);
     expect(branches).toHaveLength(2);
     expect(branches[0].condition).toHaveLength(1); expect(branches[1].condition).toHaveLength(1);
-    expect(branches[1].condition[0].expression.expression).toBe(`not (${branches[0].condition[0].expression.expression})`);
+    const emitted = emitCQLImports(crl);
+    expect(planConditionBody(emitted, plan, branches[1].condition[0].expression)).toBe(`not (${planConditionBody(emitted, plan, branches[0].condition[0].expression)})`);
   });
   it.each([false, true])("gathers the coded operand and only an authored own answer slot (coded=%s)", (coded) => {
     const { crl } = fixture(source(coded)); const result = emitFhirDefFromPath(crl);

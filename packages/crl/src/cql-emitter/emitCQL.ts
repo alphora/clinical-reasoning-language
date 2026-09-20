@@ -137,6 +137,7 @@ import type {
 import {
   getRefName,
   getRefLibrary,
+  normalizeLocalRef,
   isQualifiedRef,
   reductionNotEmittable,
   StructuredEmitError,
@@ -164,7 +165,7 @@ import { assumedShapePreMigration } from "../grammar/conceptShapes";
 
 /**
  * #187 — the FHIRHelpers version the emitted CQL pins in
- * `include FHIRHelpers version '<v>'`. This MUST equal the engine's bundled
+ * `include hl7.fhir.uv.cql.FHIRHelpers version '<v>'`. This MUST equal the engine's bundled
  * FHIRHelpers version AND the header version of the shipped `catalog/FHIRHelpers.cql`
  * (== `loadFHIRHelpers().version`), so emitted == engine == include == catalog
  * source. A drift-guard test in imports/tests/emit.test.ts asserts all three agree.
@@ -761,7 +762,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     const neededGuards = synthesizeGuardCriteria(collisionAst);
     if (preparedGuards !== undefined) {
       const missing = neededGuards.filter((needed) => !preparedGuards.some((prepared) =>
-        prepared.name === needed.name && prepared.condition === needed.condition));
+        prepared.name === needed.name && JSON.stringify(prepared.condition) === JSON.stringify(needed.condition)));
       if (missing.length > 0) return { success: false, errors: missing.map((guard) => ({
         type: "Validation", kind: "emit-partition-criterion-dependency",
         line: guard.location.start.line, column: guard.location.start.column,
@@ -1360,18 +1361,28 @@ class Emitter {
         // REFACTOR:grounded (#320, review 563 C1): foreignCriterionScopeErrors already
         // rejected foreign criteria. Only bare and genuine raw-source self refs reach
         // this criterion branch; do not justify qualifier removal by validator assumptions.
-        const cql = emitCriterionDefine(c.name, c.condition, (ref, kind) => {
+        let cql = emitCriterionDefine(c.name, c.condition, (ref, kind) => {
           if (kind === "criterion") return cqlIdent(getRefName(ref));
-          const record = this.renderPublicationReference(ref);
-          const descriptor = this.publicationDescriptorOf(ref);
+          // REFACTOR:grounded: source self qualification remains local after physical splitting.
+          const localRef = normalizeLocalRef(ref, this.ast.library.name);
+          const record = this.renderPublicationReference(localRef);
+          const descriptor = this.publicationDescriptorOf(localRef);
           if (descriptor !== undefined && descriptor.valueType !== "boolean") {
             this.emitErrors.push({ type: "Validation", kind: "publication-unsupported-context",
               message: `Criterion "${c.name}" needs a Boolean value; publication "${getRefName(ref)}" publishes ${descriptor.valueType}.` });
             return "null /* non-Boolean publication guard; emit fails */";
           }
-          return descriptor !== undefined ? publicationBooleanRead(record) : cqlIdent(getRefName(ref));
+          return descriptor !== undefined ? publicationBooleanRead(record) : record;
         }, cqlIdent);
-        this.enrollCriterion(c.name, cql);
+        // REFACTOR:grounded: a branch NOT preserves null; legacy action-unless totalizes
+        // its complete operand first. Keep this distinction out of authored Criterion syntax.
+        if (c.__planCondition?.negated) {
+          const prefix = "define " + cqlIdent(c.name) + ":\n  ";
+          const body = cql.slice(prefix.length);
+          cql = prefix + (c.__planCondition.carrier === "action"
+            ? "not Coalesce((" + body + "), false)" : "not (" + body + ")");
+        }
+        this.enrollCriterion(c.name, cql, c.__planCondition?.carrier === "action" && c.__planCondition.negated);
         return cql;
       })
       .join("\n\n");
@@ -1561,38 +1572,27 @@ class Emitter {
     });
   }
 
-  /**
-   * ⭐ REFACTOR:grounded (#189, 2026-08-29) — a criterion define is a SANCTIONED THREE-STATE GUARD, never a
-   * total boolean axiom.
-   *
-   * `criterionDefineLeafPolicy` renders leaves BARE (`emitCriterionDefine`) precisely so an UNKNOWN leaf
-   * makes the guard UNKNOWN: a criterion is a GUARD, and a guard is where a pause has to be able to happen.
-   * The charter settles it — *"Composition is strong Kleene, and totality belongs at the arm, never per
-   * operand. A negated branch guard is null-propagating"* (§4) — and its one two-valued exception is the
-   * per-action `unless` carrier, which re-totalizes at the REFERENCE SITE, not here.
-   *
-   * ⚠ This enrolled `total`/`axiom` until 2026-08-29, which was a rule that outlived its construct: true
-   * before the Kleene flip, false after it, and the ledger went on certifying every criterion — including
-   * the synthetic guard defines whose entire mechanism is returning null (MEASURED: `$apply` logs
-   * `returned null` for one, and pauses because of it). A false `total` here is exactly the dishonest
-   * certificate the §1 proof exists to catch, so the proof was being fed the defect it screens for.
-   *
-   * The family tag is what keeps the exemption structural: `"guard"` is reachable ONLY from this site, so
-   * nothing else can claim a deliberate partial by asking for one.
-   */
-  private enrollCriterion(name: string, cql: string): void {
+  /** REFACTOR:grounded: branch/criterion definitions preserve unknown.
+   * Only the compiler-owned action-unless carrier has a Boolean boundary. */
+  private enrollCriterion(name: string, cql: string, totalizedAction = false): void {
     this.ledger.appendDefine({
       library: this.ledgerLibrary(),
       name,
       resultType: "Boolean",
-      obligation: {
+      obligation: totalizedAction ? {
+        kind: "requires-boundary",
+        form: "compiler action-unless condition",
+        cell: "action unless: not Coalesce(complete operand, false)",
+      } : {
         kind: "sanctioned-three-state",
         family: "guard",
         form: "criterion define (strong-Kleene guard body — bare leaves)",
         cell: "§4 branch guard → null-propagating; totality belongs at the reference site",
       },
-      discharge: { booleanEffect: "three-state", readBy: "strong-Kleene guard body (bare leaves)" },
-      origin: "criterion-guard",
+      discharge: totalizedAction
+        ? { booleanEffect: "total", dischargedBy: "boundary-coalesce" }
+        : { booleanEffect: "three-state", readBy: "strong-Kleene guard body (bare leaves)" },
+      origin: totalizedAction ? "plan-action-condition" : "criterion-guard",
       cql,
       obligationSource: "manufactured",
       result: { shape: "Scalar", valueType: "boolean" },
@@ -1926,7 +1926,7 @@ class Emitter {
       "",
       "using FHIR version '4.0.1'",
       "",
-      `include FHIRHelpers version '${this.options.fhirHelpersVersion}' called FHIRHelpers`,
+      `include hl7.fhir.uv.cql.FHIRHelpers version '${this.options.fhirHelpersVersion}' called FHIRHelpers`,
       "include CRLCommon called CRLCommon",
     ];
     // Case-feature truth-set lane (Inferences / Interface layers only): the

@@ -173,7 +173,8 @@ first:
   it("emits a compound guard once in its own bucket, independently of the Decision bucket", () => {
     const source = input('( "Ready" and "Leaf" )');
     const guards = synthesizeGuardCriteria(source);
-    expect(guards).toHaveLength(1);
+    expect(guards.filter((guard) => !guard.__planCondition)).toHaveLength(1);
+    expect(guards.filter((guard) => guard.__planCondition)).toHaveLength(6);
     const result = emitPartitioned(source, "Partitioned", "Policy", {
       classify: (statement) => statement.type === "Decision" ? "Root" : "Guards",
       order: ["Guards", "Root"], libraryNameFor: (_, value) => `Custom${value}`,

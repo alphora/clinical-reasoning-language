@@ -2,7 +2,7 @@ library CodeIsBasicFixtureLocalConcepts
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 
 codesystem "Code Is Basic Fixture Local Codes": 'http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-fixture-local'

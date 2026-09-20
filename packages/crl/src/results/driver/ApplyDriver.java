@@ -69,7 +69,10 @@ public class ApplyDriver {
                 new String(Files.readAllBytes(Paths.get(repoFile)), StandardCharsets.UTF_8));
 
         InMemoryFhirRepository repo = new InMemoryFhirRepository(ctx, bundle);
-        PlanDefinitionProcessor processor = new PlanDefinitionProcessor(repo);
+        // Resolve the standard external FHIRHelpers include through its registered namespace.
+        org.opencds.cqf.fhir.cr.CrSettings settings = org.opencds.cqf.fhir.cr.CrSettings.getDefault();
+        settings.getEvaluationSettings().addRegisteredNamespace("hl7.fhir.uv.cql", "http://hl7.org/fhir/uv/cql");
+        PlanDefinitionProcessor processor = new PlanDefinitionProcessor(repo, settings);
 
         IBaseParameters result = processor.applyR5(
                 Eithers.forMiddle3(new IdType("PlanDefinition", pdId)),

@@ -80,7 +80,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // are the include TARGETS, not includers, so exclude them here.)
     for (const entry of result.cqlByLibrary) {
       if (CATALOG_LIB_NAMES.has(entry.libraryName)) continue;
-      expect(entry.cql).toMatch(/include FHIRHelpers/);
+      expect(entry.cql).toMatch(/include hl7\.fhir\.uv\.cql\.FHIRHelpers/);
       expect(entry.cql).toMatch(/include CRLCommon/);
       expect(entry.cql).toMatch(/using FHIR version/);
     }
@@ -852,7 +852,7 @@ decision "Triage":
     // Single red test if ANY of the three FHIRHelpers version sources diverge:
     //   (1) the shipped catalog `FHIRHelpers.cql` header `library ... version '<v>'`,
     //   (2) the loader's declared `loadFHIRHelpers().version`,
-    //   (3) the emitter's `include FHIRHelpers version '<v>'` pin
+    //   (3) the emitter's `include hl7.fhir.uv.cql.FHIRHelpers version '<v>'` pin
     //       (DEFAULT_FHIRHELPERS_VERSION, also stamped in every emitted layer).
     // All three must equal the engine's bundled FHIRHelpers version (4.0.1) so
     // emitted == engine == include == catalog source.
@@ -869,7 +869,7 @@ decision "Triage":
     const root = path.join(FIXTURES, "cms22-split", "cms22.crl");
     const result = emitCQLImports(root);
     const policyCql = result.cqlByLibrary.find((e) => e.libraryName === "CMS22")!.cql;
-    expect(policyCql).toContain(`include FHIRHelpers version '${DEFAULT_FHIRHELPERS_VERSION}'`);
+    expect(policyCql).toContain(`include hl7.fhir.uv.cql.FHIRHelpers version '${DEFAULT_FHIRHELPERS_VERSION}'`);
   });
 });
 

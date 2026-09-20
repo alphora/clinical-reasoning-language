@@ -94,17 +94,25 @@ first:
 - otherwise then recommend activity "Deny".
 `;
 
-describe("#189 collectGuardDefines — only PRIORS, only under `first:`", () => {
+describe("PlanDefinition condition inventory", () => {
   it("names the compound prior of an ordered block", () => {
     const decisions = parse(POLICY("")).statements.filter((s): s is Decision => s.type === "Decision");
-    expect(collectGuardDefines(decisions[0]!).map((g) => g.name)).toEqual([expect.stringMatching(/^Guard L\d+C\d+$/)]);
+    const guards = collectGuardDefines(decisions[0]!);
+    expect(guards.filter(g => !g.planCondition).map(g => g.name)).toEqual([expect.stringMatching(/^Guard L\d+C\d+$/)]);
+    expect(guards.filter(g => g.planCondition).map(g => g.name)).toEqual([
+      "CRL branch And L22C9", "Not CRL branch And L22C9",
+      "CRL branch Ref L22C9", "Not CRL branch Ref L22C9",
+      "CRL branch Ref L22C17", "Not CRL branch Ref L22C17",
+    ]);
   });
 
   it("names nothing under `all:` — order carries no priority there, so there is nothing to exclude", () => {
     const src = POLICY("").replace("first:\n- when ( \"A\" and \"B\" )", "all:\n- when ( \"A\" and \"B\" )")
       .replace("- otherwise then recommend activity \"Deny\".", "- when \"A\" then recommend activity \"Deny\".");
     const decisions = parse(src).statements.filter((s): s is Decision => s.type === "Decision");
-    expect(collectGuardDefines(decisions[0]!)).toEqual([]);
+    const guards = collectGuardDefines(decisions[0]!);
+    expect(guards.filter(g => !g.planCondition)).toEqual([]);
+    expect(guards.filter(g => g.planCondition)).toHaveLength(8);
   });
 });
 
@@ -132,4 +140,17 @@ criterion "` + generated + `":
   it("is silent when nothing collides", () => {
     expect(guardDefineNameCollisions(parse(POLICY("")))).toEqual([]);
   });
+});
+
+// REFACTOR:grounded: constructed ASTs may reuse source positions; never bind B to A's define.
+it("rejects distinct conditions sharing one identity within the same decision", () => {
+  const ast = parse(POLICY(""));
+  const decision = ast.statements.find((s): s is Decision => s.type === "Decision")!;
+  const branch = decision.body.statements[0]!;
+  if (branch.type !== "WhenBlock" || branch.condition.type !== "BranchConditionAnd") throw new Error("fixture");
+  const [a, b] = branch.condition.operands;
+  b!.location = a!.location;
+  const errors = guardDefineNameCollisions(ast);
+  expect(errors).toHaveLength(2);
+  expect(errors.every(e => e.kind === "guard-define-name-collision")).toBe(true);
 });

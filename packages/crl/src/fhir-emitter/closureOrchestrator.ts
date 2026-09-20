@@ -1,3 +1,4 @@
+import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { checkPresentationReachability } from "./presentationReachability";
 import { createPresentationCatalog } from "../emit/presentation";
@@ -2259,6 +2260,7 @@ export function emitFhirDefClosure(
   // Inv 2(d) — case-feature cpg-featureExpression DEFINE integrity: the referenced define must exist in the
   // referenced library's emitted CQL (the general backstop for the #189 2d dangle class). No-op when the
   // manifest carries no CQL (`cqlByLibrary: []`, graph-only unit callers), like Inv 4.
+  errors.push(...applyPlanExpressionInvariant(inv1.surviving, cqlByLibrary));
   const inv2dErrors = applyFeatureExpressionDefineInvariant(inv1.surviving, cqlByLibrary);
   errors.push(...inv2errors, ...inv2dErrors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 

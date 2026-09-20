@@ -170,8 +170,8 @@ Syntax and rules:
 - **Branch guards preserve authored decision logic and dependency inputs.**
   A guard whose dependency closure contains any admitted selected publication
   (including through a named criterion or imported operand)
-  emits its whole Boolean expression as one `text/cql-expression` applicability
-  condition. Its Case Feature dependencies remain in `input[]`. Legacy guards
+  emits its whole Boolean expression in a named CQL definition, referenced by
+  one `text/cql-identifier` applicability condition. Its Case Feature dependencies remain in `input[]`. Legacy guards
   lower `and` to per-atom conditions and inline `or` to DNF action arms.
   Source fidelity depends on retaining distinct criteria in decision logic,
   not on the number of applicability conditions.
@@ -505,9 +505,9 @@ is required.
 Action guards **lower to FHIR** (`#224` iii.1): a guarded menu member emits its
 own `PlanDefinition.action.condition[kind="applicability"]`. `only when "C"` emits
 the same positive `text/cql-identifier` a branch atom does; `unless "C"` emits an
-inline `text/cql-expression` `not "<Library>"."C"` — a single negated atom, library-
-qualified so a downstream FHIR engine (`$apply`) resolves the concept in the plan's
-library. The guard concept is also surfaced as a case-feature `input`, exactly like a
+identifier for a generated CQL definition containing `not Coalesce(<guard>, false)`.
+This preserves the existing legacy action-unless behavior; branch negation remains
+nullable. The definition is available in the plan's bound library. The guard concept is also surfaced as a case-feature `input`, exactly like a
 branch atom, so DTR asks for it. (Action guards are legal **only** on members of a
 multi-action `any:` / `all:` block — rejected on an inline `when … then recommend …`
 action, on an `otherwise` action, and on a single menu-less action; see the don't-case.)

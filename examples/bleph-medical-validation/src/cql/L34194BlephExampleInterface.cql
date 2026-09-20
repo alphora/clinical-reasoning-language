@@ -2,7 +2,7 @@ library L34194BlephExampleInterface
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
 include L34194BlephExampleInferences
@@ -266,3 +266,33 @@ define "Upper Blepharoplasty Evidence":
 
 define "Blepharoptosis Repair Evidence":
   FHIRHelpers.ToBoolean(("Ptosis Margin Requirement Met").value as FHIR.boolean) and FHIRHelpers.ToBoolean(("Ptosis Photographs Documented").value as FHIR.boolean)
+
+define "CRL branch Ref L128C7":
+  FHIRHelpers.ToBoolean(("Cosmetic Surgical Purpose").value as FHIR.boolean)
+
+define "Not CRL branch Ref L128C7":
+  not (FHIRHelpers.ToBoolean(("Cosmetic Surgical Purpose").value as FHIR.boolean))
+
+define "CRL branch CriterionRef L129C7":
+  "Functional Necessity Documented"
+
+define "Not CRL branch CriterionRef L129C7":
+  not ("Functional Necessity Documented")
+
+define "CRL branch Ref L131C11":
+  FHIRHelpers.ToBoolean(("Upper Blepharoplasty Under Review").value as FHIR.boolean)
+
+define "Not CRL branch Ref L131C11":
+  not (FHIRHelpers.ToBoolean(("Upper Blepharoplasty Under Review").value as FHIR.boolean))
+
+define "CRL branch CriterionRef L133C15":
+  "Upper Blepharoplasty Evidence"
+
+define "Not CRL branch CriterionRef L133C15":
+  not ("Upper Blepharoplasty Evidence")
+
+define "CRL branch CriterionRef L138C15":
+  "Blepharoptosis Repair Evidence"
+
+define "Not CRL branch CriterionRef L138C15":
+  not ("Blepharoptosis Repair Evidence")

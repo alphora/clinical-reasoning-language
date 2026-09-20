@@ -101,8 +101,8 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not Coalesce(\"Cms69Strategy\".\"Has Anti-Obesity Medication Contraindication\", false)"
+                "language": "text/cql-identifier",
+                "expression": "Not CRL action Ref L97C51"
               }
             }
           ],

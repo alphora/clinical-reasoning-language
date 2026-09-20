@@ -2,7 +2,7 @@ library CodedQuestionLocalConcepts
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 
 codesystem "Coded Question Local Codes": 'http://example.org/crl/coded-question/CodeSystem/coded-question-local'

@@ -84,8 +84,8 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "FHIRHelpers.ToBoolean((\"L34194BlephExampleInterface\".\"Cosmetic Surgical Purpose\").value as FHIR.boolean)"
+                "language": "text/cql-identifier",
+                "expression": "CRL branch Ref L128C7"
               }
             }
           ],
@@ -126,15 +126,15 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not FHIRHelpers.ToBoolean((\"L34194BlephExampleInterface\".\"Cosmetic Surgical Purpose\").value as FHIR.boolean)"
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch Ref L128C7"
               }
             },
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "\"L34194BlephExampleInterface\".\"Functional Necessity Documented\""
+                "language": "text/cql-identifier",
+                "expression": "CRL branch CriterionRef L129C7"
               }
             }
           ],
@@ -190,8 +190,8 @@
                 {
                   "kind": "applicability",
                   "expression": {
-                    "language": "text/cql-expression",
-                    "expression": "FHIRHelpers.ToBoolean((\"L34194BlephExampleInterface\".\"Upper Blepharoplasty Under Review\").value as FHIR.boolean)"
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L131C11"
                   }
                 }
               ],
@@ -231,8 +231,8 @@
                     {
                       "kind": "applicability",
                       "expression": {
-                        "language": "text/cql-expression",
-                        "expression": "\"L34194BlephExampleInterface\".\"Upper Blepharoplasty Evidence\""
+                        "language": "text/cql-identifier",
+                        "expression": "CRL branch CriterionRef L133C15"
                       }
                     }
                   ],
@@ -290,8 +290,8 @@
                     {
                       "kind": "applicability",
                       "expression": {
-                        "language": "text/cql-expression",
-                        "expression": "not \"L34194BlephExampleInterface\".\"Upper Blepharoplasty Evidence\""
+                        "language": "text/cql-identifier",
+                        "expression": "Not CRL branch CriterionRef L133C15"
                       }
                     }
                   ]
@@ -335,8 +335,8 @@
                     {
                       "kind": "applicability",
                       "expression": {
-                        "language": "text/cql-expression",
-                        "expression": "\"L34194BlephExampleInterface\".\"Blepharoptosis Repair Evidence\""
+                        "language": "text/cql-identifier",
+                        "expression": "CRL branch CriterionRef L138C15"
                       }
                     }
                   ],
@@ -394,8 +394,8 @@
                     {
                       "kind": "applicability",
                       "expression": {
-                        "language": "text/cql-expression",
-                        "expression": "not \"L34194BlephExampleInterface\".\"Blepharoptosis Repair Evidence\""
+                        "language": "text/cql-identifier",
+                        "expression": "Not CRL branch CriterionRef L138C15"
                       }
                     }
                   ]
@@ -411,8 +411,8 @@
                 {
                   "kind": "applicability",
                   "expression": {
-                    "language": "text/cql-expression",
-                    "expression": "not FHIRHelpers.ToBoolean((\"L34194BlephExampleInterface\".\"Upper Blepharoplasty Under Review\").value as FHIR.boolean)"
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch Ref L131C11"
                   }
                 }
               ]
@@ -443,15 +443,15 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not FHIRHelpers.ToBoolean((\"L34194BlephExampleInterface\".\"Cosmetic Surgical Purpose\").value as FHIR.boolean)"
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch Ref L128C7"
               }
             },
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not \"L34194BlephExampleInterface\".\"Functional Necessity Documented\""
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch CriterionRef L129C7"
               }
             }
           ]

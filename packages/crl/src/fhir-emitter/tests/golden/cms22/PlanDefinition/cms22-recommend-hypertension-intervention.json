@@ -86,8 +86,8 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not Coalesce(\"Cms22Strategy\".\"Has Antihypertensive Contraindication\", false)"
+                "language": "text/cql-identifier",
+                "expression": "Not CRL action Ref L66C53"
               }
             }
           ],

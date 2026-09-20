@@ -926,14 +926,10 @@ function requalifyConcept(
   policyId: string,
   partition: Partition,
 ): Concept {
-  // A concept reaching here was layer-classified, which requires a definition;
-  // the guard keeps the now-optional `definition` field type-safe (a
-  // representation/code-only concept has none and is never requalified).
-  // (A synthesized Interface re-export carries a PRE-QUALIFIED `defined as`
-  // bare-ref; `requalifyRef` leaves its genuinely-foreign `<policyId>-<layer>`
-  // qualifier untouched, so re-qualifying it here is a safe no-op.)
-  if (!c.definition) return { ...c };
-  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib, policyId, partition),
+  // REFACTOR:grounded: source-only publications have references without a definition.
+  // Qualify each independently. Interface reexports already carry qualified definitions.
+  return { ...c,
+    ...(c.definition === undefined ? {} : { definition: requalifyDefinition(c.definition, currentLayer, maps, lib, policyId, partition) }),
     ...(c.__publication?.sourceReferences === undefined ? {} : { __publication: Object.freeze({
       ...c.__publication,
       sourceReferences: Object.freeze(c.__publication.sourceReferences.map((ref) =>
@@ -957,6 +953,7 @@ function collectLayerIncludes(
   currentLayer: Layer,
   policyId: string,
   partition: Partition,
+  sourceLibraryName: string,
 ): string[] {
   const referenced = new Set<string>();
   const addReference = (ref: ReferenceName): void => {
@@ -970,7 +967,9 @@ function collectLayerIncludes(
   // dependencies in this same bucket, so their own definitions contribute their direct
   // concept refs here without expanding the criterion DAG again.
   for (const statement of requalifiedStatements) if (statement.type === "Criterion")
-    for (const atom of branchConditionRefs(statement.condition)) addReference(atom.ref);
+    for (const atom of branchConditionRefs(statement.condition))
+      // REFACTOR:grounded: a raw source self qualifier is not an emitted sibling include.
+      addReference(normalizeLocalRef(atom.ref, sourceLibraryName));
 
   // Both-representation SELF fold-in include. An Inferences twin folds in its OWN
   // LocalElements retrieve (`LocalElements."X"…`) via the `__bothRepFoldInLocalElements`
@@ -1736,7 +1735,7 @@ export function emitPartitioned(
     if (!present.has(value)) continue;
     const libraryName = partition.libraryNameFor(policyId, value);
     const { synthetic, requalified } = buildLayerAst(workingAst, value, maps, lib, policyId, partition);
-    const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition);
+    const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition, ast.library.name);
     // REFACTOR:grounded (#320, plan589): lowering replaces producer syntax with a binding.
     // The physical layer still needs every foreign selected-envelope dependency in that binding.
     for (const statement of requalified) {

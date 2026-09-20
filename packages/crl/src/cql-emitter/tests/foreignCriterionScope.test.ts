@@ -6,7 +6,7 @@ import { emitPartitioned, FULL_PARTITION, type Partition } from "../layeredEmit"
 
 // REFACTOR:grounded (#320, review 563 C1): a foreign criterion cannot bind a local
 // namesake. Physical output naming must not make a genuine source self-ref foreign.
-function source(target: string, nested: boolean): CRL {
+function source(target: string, nested: boolean, qualifyLeaf = false): CRL {
   const result = buildCRL(`# fixture
 library "RawPolicy".
 terminology "VS":
@@ -15,7 +15,7 @@ concept "Leaf":
 - type is Observation.
 - coded from "VS".
 criterion "Ready":
-- when ( "Leaf" ).
+- when ( ${qualifyLeaf ? '"RawPolicy"."Leaf"' : '"Leaf"'} ).
 ${nested ? `criterion "Nested":\n- when ( ${target} ).` : ""}
 activity "Approve":
 - request CPGServiceRequest.
@@ -48,6 +48,14 @@ const entries = [
 ];
 
 describe.each(entries)("$name foreign criterion boundary", ({ emit }) => {
+  it("normalizes self-qualified concept leaves in branch and authored Criterion bodies", () => {
+    const result = emit(source('"RawPolicy"."Leaf"', false, true));
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    const text = "entries" in result ? result.entries.map(e => e.result.result).join("\n") : result.result!;
+    expect(text).not.toContain('RawPolicy."Leaf"');
+    expect(text).not.toMatch(/^include RawPolicy$/m);
+  });
+
   it.each([false, true])("refuses a foreign criterion with a local namesake (nested=%s)", (nested) => {
     const result = emit(source('"Foreign"."Ready"', nested));
     expect(result.success).toBe(false);

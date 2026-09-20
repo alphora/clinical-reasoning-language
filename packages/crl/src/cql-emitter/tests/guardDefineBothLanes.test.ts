@@ -5,23 +5,11 @@ import { describe, it, expect } from "vitest";
 import { emitCQLImports } from "../../imports/emit";
 import { emitFhirDefFromPath } from "../../fhir-emitter/closureOrchestrator";
 
-/**
- * #189 — the SYNTHETIC GUARD DEFINE, verified where it actually fails: ACROSS THE TWO LANES.
- *
- * Under an ordered `first:`, a later branch carries the negation of its priors' guards. `not G` lowers
- * directly for an atom, a `not <atom>`, and an `or` of atoms; every other shape is NAMED and the name
- * negated, because `$apply` ANDs an action's conditions and cannot express a disjunction.
- *
- * ⚠ The failure this file exists to catch is not a wrong condition — it is a MISSING define. The FHIR lane
- * writes `not "<Lib>"."Guard L…C…"` while the CQL lane emits no such define, and `$apply` treats a dangling
- * condition as NOT-APPLICABLE: the later arm fires unconditionally and DENIES on unknown, which is the exact
- * defect the named-define form removes. That is invisible to either lane alone, and it happened (the first
- * implementation emitted from the `Decision` statement, which classifies to NO layer). So the load-bearing
- * assertion here is the cross-lane one: every guard the PlanDefinitions reference EXISTS as a define.
- */
+/** Cross-lane contract: each PlanDefinition condition resolves in its bound
+ * CQL library. Nullable priority exclusions retain their whole expression. */
 const FIXTURE = path.resolve(__dirname, "fixtures/guard-define/guard-define.crl");
 
-const GUARD_RE = /Guard L\d+C\d+/g;
+const GUARD_RE = /(?:Not )?CRL branch \w+ L\d+C\d+/g;
 
 interface Lanes {
   readonly cql: string;
@@ -50,7 +38,7 @@ function referencedGuards(planDefinitions: Record<string, unknown>[]): Set<strin
 /** Every `Guard L…C…` name the CQL lane DEFINES. */
 function definedGuards(cql: string): Set<string> {
   const out = new Set<string>();
-  for (const m of cql.matchAll(/define "(Guard L\d+C\d+)":/g)) out.add(m[1]!);
+  for (const m of cql.matchAll(/define "((?:Not )?CRL branch \w+ L\d+C\d+)":/g)) out.add(m[1]!);
   return out;
 }
 
@@ -63,10 +51,16 @@ describe("#189 — synthetic guard defines agree across the CQL and FHIR lanes",
     expect(referenced.filter((g) => !defined.has(g))).toEqual([]);
   });
 
-  it("no define is emitted that nothing references — an orphan means the two dispatches disagree", () => {
-    const { cql, planDefinitions } = bothLanes();
-    const referenced = referencedGuards(planDefinitions);
-    expect([...definedGuards(cql)].filter((g) => !referenced.has(g))).toEqual([]);
+  it("every referenced condition is an identifier, never executable expression text", () => {
+    const { planDefinitions } = bothLanes();
+    const visit = (value: unknown): void => {
+      if (!value || typeof value !== "object") return;
+      if (Array.isArray(value)) { value.forEach(visit); return; }
+      const obj = value as Record<string, unknown>;
+      if ("language" in obj && "expression" in obj) expect(obj.language).toBe("text/cql-identifier");
+      Object.values(obj).forEach(visit);
+    };
+    planDefinitions.forEach(visit);
   });
 
   it("each shape that cannot lower directly gets EXACTLY ONE exclusion condition, never zero", () => {
@@ -77,14 +71,14 @@ describe("#189 — synthetic guard defines agree across the CQL and FHIR lanes",
     for (const decision of ["Andprior", "Notorprior", "Mixedorprior", "Nestedprior"]) {
       const pd = [...byName.entries()].find(([n]) => n.endsWith(decision))?.[1];
       expect(pd, `PlanDefinition for ${decision}`).toBeDefined();
-      const guards = [...JSON.stringify(pd).matchAll(/not \\"[^"]*\\"\.\\"(Guard L\d+C\d+)\\"/g)];
+      const guards = [...JSON.stringify(pd).matchAll(/Not CRL branch (?:And|Or|Not) L\d+C\d+/g)];
       expect(guards.length, `${decision} must carry one named exclusion`).toBe(1);
     }
   });
 
   it("the legacy define body retains bare leaves without operand Coalesce", () => {
     const { cql } = bothLanes();
-    const bodies = [...cql.matchAll(/define "Guard L\d+C\d+":\n\s*(.+)/g)].map((m) => m[1]!);
+    const bodies = [...cql.matchAll(/define "(?:Not )?CRL branch \w+ L\d+C\d+":\n\s*(.+)/g)].map((m) => m[1]!);
     expect(bodies.length).toBeGreaterThan(0);
     // A `Coalesce` here would read an unanswered question as an answered "no" — the pause-killer, one
     // layer down. Totality belongs at the arm, never per operand.

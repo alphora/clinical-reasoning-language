@@ -34,11 +34,9 @@
 //      composite's operands are themselves proven total (no vacuous cycles), and that the ledger covers
 //      every emitted boolean define header (no path emitted a define without enrolling).
 //
-// ⚠ WHAT THIS PROOF CANNOT SEE. The charter's one two-valued exception — the per-action `unless` /
-// `only when` carrier — is an INLINE `text/cql-expression` in the emitted PlanDefinition
-// (`fhir-emitter/decision.ts`), never a CQL define, so it is outside this ledger's subject set entirely. Its
-// `not Coalesce(<ref>, false)` shape is pinned by the FHIR-lane tests and by the CRE's two-valued action-guard
-// evaluation, not here. A reader looking for where the exception is enforced will not find it in this module.
+// REFACTOR:grounded: action-unless is a compiler-generated CQL define enrolled as
+// plan-action-condition with requires-boundary and boundary-coalesce. Branch and
+// criterion definitions remain three-state.
 //
 // Likewise a `sanctioned-three-state` GUARD entry carries no operand list, though the enrollment site has one
 // (the condition tree). So unlike a `composite`, the proof cannot trace guard→leaf and a guard referencing a
@@ -131,8 +129,8 @@ export type BooleanTotalityObligation =
   //   - `"guard"` — a CRITERION define, authored or synthesized (`ast/guardDefines.ts`). Its leaves render
   //     BARE (`emitCriterionDefine`, REFACTOR:grounded) precisely so an UNKNOWN leaf makes the guard
   //     UNKNOWN. A guard is where a pause has to be able to happen; Coalescing it reads an unanswered
-  //     question as "no". Totality is the REFERENCE SITE's job — the per-action `unless` carrier emits
-  //     `not Coalesce(<ref>, false)`, which is the charter's one two-valued exception.
+  //     question as "no". The compiler's per-action `unless` carrier emits
+  //     `not Coalesce(<ref>, false)`, which preserves existing legacy action-unless behavior.
   //
   // ⚠ Both families are admitted STRUCTURALLY, never by an entry asking for the exemption: a concept
   // reaches `"question"` only through `isPureQuestionConcept`, and `"guard"` only through the criterion
@@ -567,6 +565,7 @@ export function classifyBooleanTotality(
 /** The provenance of an emitted define, used by the proof's origin-matching + coverage model (§3). The enum
  *  is closed so "compare the ledger against ALL emitted define headers" has a bounded origin space. */
 export type DefineOrigin =
+  | "plan-action-condition" // Compiler-only action-unless boundary; never an authored criterion.
   | "authored" // an authored concept's define (classified by `classifyBooleanTotality`)
   | "interface-facade" // `define "X": Inferences."X"` — total iff the aliased define is total
   | "criterion-guard" // a #236 criterion define (authored or synthesized) — a STRONG-KLEENE guard, never an
@@ -870,7 +869,9 @@ function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean
     case "intrinsic-exists":
     case "null-presence":
     case "count-bare":
+      return origin === "authored";
     case "boundary-coalesce":
+      return origin === "authored" || origin === "plan-action-condition";
     case "composite-delegated":
     case "member-existence-fold":
       return origin === "authored";

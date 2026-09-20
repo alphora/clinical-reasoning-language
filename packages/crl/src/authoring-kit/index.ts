@@ -283,7 +283,7 @@ export type {
 // #236 criterion-as-reducer flip (schemaVersion 1.24→1.25): the #236 named-criterion-define lowering shipped
 //   (commit 7f9aaf1), so the kit's pre-flip "a `criterion` inline-expands byte-identical / NOT an arm reducer"
 //   framing is now false and is FLIPPED. A `criterion` lowers ONCE to a named boolean CQL define referenced BY
-//   IDENTITY (one condition per ref — positive `text/cql-identifier` or `not Coalesce("Lib"."C", false)`; body
+//   IDENTITY (one condition per ref — a `text/cql-identifier` with nullable negation in its CQL definition; body
 //   emitted once, a linear DAG); it IS an arm reducer — a ref is always ONE parent leaf, so naming reduces the
 //   arm count exactly when the inlined-then-NNF body would have >1 DNF arm (impl-panel R2/R3, disc 422: not a
 //   simple "carries an `or`" — a negated criterion ref is not inherently reducing). CRUX (both design-panel
@@ -354,7 +354,8 @@ export type {
 // schemaVersion → "2.9": flag descriptions and KE acceptance workflow.
 // "2.9" → "2.10": preferred Title/Description authoring vocabulary with legacy gist compatibility; stored records unchanged.
 // "2.10" → "2.11": shared owner wording edits and native question/answer association.
-const SCHEMA_VERSION = "2.11";
+// "2.11" → "2.12": identifier-only PlanDefinition conditions preserve their CQL guard semantics.
+const SCHEMA_VERSION = "2.12";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -674,7 +675,7 @@ const RULES: KitRule[] = [
     "force": "default"
   },
   {
-    "text": "Publication-reachable branch guards preserve the whole Boolean expression in one text/cql-expression applicability condition, including references through criteria, with dependency input[]. Naming a criterion supports reuse and readability; the number of condition entries is not a source-fidelity test.",
+    "text": "Publication-reachable branch guards preserve the whole Boolean expression in a named CQL definition referenced by one text/cql-identifier applicability condition, including references through criteria, with dependency input[]. Naming a criterion supports reuse and readability; the number of condition entries is not a source-fidelity test.",
     "force": "default"
   }
 ],
@@ -725,7 +726,7 @@ const RULES: KitRule[] = [
     id: "branch-guards",
     applicability: "All CRL authoring",
     category: "guards",
-    rule: "A when branch condition combines concept/criterion references with and, or, not and parentheses. A homogeneous chain may be bare; mixed and/or requires parentheses, as does not over a compound operand. Strong Kleene applies: not unknown is unknown. Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in one text/cql-expression applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test. Per-action only when / unless is a separate restricted menu construct (see guards). Publication-reachable means at least one operand in the guard dependency closure is an admitted selected publication: follow criterion references and imported operands too. This is an implementation choice, not a separate authored switch; migrating a dependency can change the lowering. Whole-expression evaluation prevents a true alternative from hiding an evaluated publication error (for example ambiguous selection or uninterpretable data). An evaluated error fails the case and cannot be bypassed by later first: branches; it is different from unknown and must not be treated as a pause. DNF arm-count relief is irrelevant for a guard already using whole-expression lowering. Logical grouping is not record identity: (recipient finding AND recipient assessment) OR (caregiver finding AND caregiver assessment) prevents mixing the two Boolean pairs, but each pair must already refer to the same identified person. Parentheses do not join arbitrary clinical records. The emitted dependency input[] retains the compound guard operands, including through named criteria. Do not infer native question suppression from a known truth value or from MV path display; inspect the actual native Questionnaire for the policy. CRE truth evaluation alone does not prove native question visibility.",
+    rule: "A when branch condition combines concept/criterion references with and, or, not and parentheses. A homogeneous chain may be bare; mixed and/or requires parentheses, as does not over a compound operand. Strong Kleene applies: not unknown is unknown. Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in a named CQL definition referenced by one text/cql-identifier applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test. Per-action only when / unless is a separate restricted menu construct (see guards). Publication-reachable means at least one operand in the guard dependency closure is an admitted selected publication: follow criterion references and imported operands too. This is an implementation choice, not a separate authored switch; migrating a dependency can change the lowering. Whole-expression evaluation prevents a true alternative from hiding an evaluated publication error (for example ambiguous selection or uninterpretable data). An evaluated error fails the case and cannot be bypassed by later first: branches; it is different from unknown and must not be treated as a pause. DNF arm-count relief is irrelevant for a guard already using whole-expression lowering. Logical grouping is not record identity: (recipient finding AND recipient assessment) OR (caregiver finding AND caregiver assessment) prevents mixing the two Boolean pairs, but each pair must already refer to the same identified person. Parentheses do not join arbitrary clinical records. The emitted dependency input[] retains the compound guard operands, including through named criteria. Do not infer native question suppression from a known truth value or from MV path display; inspect the actual native Questionnaire for the policy. CRE truth evaluation alone does not prove native question visibility.",
     why: "Distinct policy criteria belong in auditable decision/criterion expressions. Keep source operands and dependencies traceable while preserving unknown and authored precedence; do not assert that one applicability condition necessarily hides the decision.",
     ref: "docs/decision-shapes.md; #224",
     clauses: [
@@ -734,7 +735,7 @@ const RULES: KitRule[] = [
         force: "validator-enforced",
       },
       {
-        text: "Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in one text/cql-expression applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test. A single-determination first: exclusion uses branch not, not menu-only unless.",
+        text: "Publication-reachable branch guards, including references through a criterion, preserve the whole Boolean expression in a named CQL definition referenced by one text/cql-identifier applicability condition, with dependency input[] and null-propagating priority exclusions. Legacy guards use per-atom condition[] and DNF arms. Both retain source criteria in decision logic; the number of condition[] entries is not a source-fidelity test. A single-determination first: exclusion uses branch not, not menu-only unless.",
         force: "default",
       },
       {

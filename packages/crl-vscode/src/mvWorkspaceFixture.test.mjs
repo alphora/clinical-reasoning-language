@@ -23,7 +23,10 @@ test('the Bleph MV example is discoverable and its native forms match its MV cas
   assert.equal(names.length, 16, 'L34194 clinical route examples');
   const manifest = JSON.parse(readFileSync(join(example, 'tests/results/questionnaire-manifest-mv.json'), 'utf8'));
   assert.ok(Number.isFinite(Date.parse(manifest.generatedAt)));
-  assert.deepEqual(manifest.provenance,{"crlVersion":"5.4.2","producerJarSha256":"9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e"});
+  assert.equal(manifest.provenance.crlVersion, "6.4.1");
+  assert.equal(manifest.provenance.producerJarSha256, "9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e");
+  assert.match(manifest.provenance.runtimeSha256, /^[a-f0-9]{64}$/);
+  assert.match(manifest.provenance.definitionClosureSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(manifest.cases.map(c => c.caseName).sort(), names.sort());
   for (const c of manifest.cases) {
     assert.equal(c.state, 'generated');
@@ -69,7 +72,7 @@ test('the L34194 native delivery stays bound to its source snapshot and emitted 
  const sources=['crl','cel','cql','anchor-source','provenance','source','refined-source'].flatMap(name=>files(join(base,name))).map(p=>[relative(base,p).replaceAll('\\','/'),p.endsWith('.docx')?readFileSync(p).toString('base64'):readFileSync(p,'utf8').replaceAll('\r\n','\n')]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
  const config=JSON.parse(readFileSync(join(example,'package.json'),'utf8')).crl;
  // Update this evidence binding only after source/result regeneration and native verification.
- assert.equal(createHash('sha256').update(JSON.stringify({sources,config})).digest('hex'),'d02959fc8007a06d37f22e514e93ea462a9556a89ed2e51d237fb36fdb99ed38');
+ assert.equal(createHash('sha256').update(JSON.stringify({sources,config})).digest('hex'),'4d18c1f2d5d13b1f190a666b2330156725d847be731c93f3729be8921657d463');
  const data=JSON.parse(readFileSync(join(example,'tests/data/fhir/cel-data-manifest.json'),'utf8'));
  const results=JSON.parse(readFileSync(join(example,'tests/results/questionnaire-manifest-mv.json'),'utf8'));
  assert.deepEqual(data.cases.map(c=>c.caseId).sort(),results.cases.map(c=>c.caseId).sort());
@@ -158,10 +161,18 @@ test('the policy shares common checks before selecting procedure-specific eviden
  const descendants=flatten(common.action).map(a=>a.title);
  assert.ok(descendants.includes('Upper Blepharoplasty Evidence'));
  assert.ok(descendants.includes('Blepharoptosis Repair Evidence'));
- const expressions=a=>(a.condition??[]).map(c=>c.expression.expression);
+ const expressions=a=>(a.condition??[]).map(c=>{
+  assert.equal(c.expression.language, 'text/cql-identifier');
+  const owner=(c.expression.reference??plan.library[0]).split('|')[0].split('/').pop();
+  const library=emitted.cql.cqlByLibrary.find(l=>l.libraryName===owner);
+  assert.ok(library, 'condition must bind its actual CQL owner');
+  const definition=library.ledgerEntries.find(d=>d.name===c.expression.expression && d.visibility!=='impl');
+  assert.ok(definition, 'condition must reference a public definition');
+  return definition.cql.slice(definition.cql.indexOf(':')+1).trim();
+ });
  assert.equal(common.condition.length,2);
  assert.match(expressions(common)[0],/^not .*"Cosmetic Surgical Purpose"/);
- assert.match(expressions(common)[1],/^"[^"]+"\."Functional Necessity Documented"$/);
+ assert.equal(expressions(common)[1],'"Functional Necessity Documented"');
  const rejection=plan.action[0].action.find(a=>a.title==='otherwise');
  assert.equal(rejection.condition.length,2);
  assert.match(expressions(rejection)[0],/^not .*"Cosmetic Surgical Purpose"/);

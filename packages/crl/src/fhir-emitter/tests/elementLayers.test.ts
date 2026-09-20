@@ -45,7 +45,11 @@ describe("Elements library identity through CQL and FHIR", () => {
           const attachment = lib.content.find((a: any) => a.contentType === "text/cql");
           expect(attachment.url).toBe(`../../cql/${entry.outputFilename}`);
           if (attachment.data) expect(Buffer.from(attachment.data, "base64").toString("utf8")).toBe(entry.cql);
-          for (const match of entry.cql.matchAll(/^include (\w+)/gm)) expect(names.has(match[1])).toBe(true);
+          for (const match of entry.cql.matchAll(/^include ([\w.]+)/gm)) {
+            // REFACTOR:grounded: the qualified standard helper is external to the policy closure.
+            if (match[1] === "hl7.fhir.uv.cql.FHIRHelpers") continue;
+            expect(names.has(match[1])).toBe(true);
+          }
         }
         const walk = (value: any): void => {
           if (typeof value === "string" && value.startsWith(`${metadata.crl.canonicalBase}/Library/`)) {

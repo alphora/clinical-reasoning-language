@@ -167,6 +167,8 @@ export interface Criterion extends ASTNode {
   name: string;
   condition: BranchCondition;
   location: Location;
+  /** REFACTOR:grounded: compiler-only PlanDefinition condition carrier, never authored syntax. */
+  __planCondition?: { negated: boolean; carrier: "branch" | "action" };
 }
 
 // Block combination qualifier. Over branches: `first` = ordered first-match,

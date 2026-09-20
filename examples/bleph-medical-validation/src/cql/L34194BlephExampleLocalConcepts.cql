@@ -2,7 +2,7 @@ library L34194BlephExampleLocalConcepts
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 
 codesystem "L34194 Bleph Example Local Codes": 'http://example.org/crl/CodeSystem/l34194-bleph-example-local'

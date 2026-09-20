@@ -319,12 +319,13 @@ export const REQUIRED_STRUCTURAL_ELEMENTS: Readonly<Record<string, readonly Stru
       },
     },
     {
+      // REFACTOR:grounded: R4 Condition verification identity must match native IsVerified.
       element: "verificationStatus",
       fulfillment: {
         via: "default",
         value: {
           kind: "codeable-concept",
-          system: "http://terminology.hl7.org/CodeSystem/condition-verification",
+          system: "http://terminology.hl7.org/CodeSystem/condition-ver-status",
           code: "confirmed",
           display: "Confirmed",
         },

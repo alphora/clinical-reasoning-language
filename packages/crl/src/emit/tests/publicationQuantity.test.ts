@@ -36,6 +36,15 @@ const measurement = (value: unknown = { value: 200, unit: "cm" }) => ({
   effectiveDateTime: "2026-09-01", ...(value === null ? {} : { valueQuantity: value }),
 });
 describe("Quantity publication", () => {
+  // REFACTOR:grounded: the source binding repair applies to non-age publications too.
+  it("qualifies an uncoded Quantity source across layers", () => {
+    const { ast } = prepare(source.replace(/^- code is `height`\.\r?\n/m, ""));
+    const result = emitPartitioned(lowerLocalCodes(ast, options).ast, "Measurements", options.policyId, FULL_PARTITION, options);
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    const cql = result.entries.find(e => e.libraryName.endsWith("Inferences"))!.result.result!;
+    expect(cql).toContain('include MeasurementsExternalElements');
+    expect(cql).toContain('MeasurementsExternalElements."Height Source 1"');
+  });
   it.each([
     [{value:100,unit:"cm"},{value:1,unit:"m"},true],
     [{value:99.99999999,unit:"cm"},{value:1,unit:"m"},false],

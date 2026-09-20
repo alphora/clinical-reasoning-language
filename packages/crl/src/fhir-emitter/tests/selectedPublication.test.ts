@@ -1,3 +1,4 @@
+import { planConditionBody } from "./planConditionTestHelpers";
 import { isFhirDefError } from "../types";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildCRL } from "../../index";
 import type { BranchCondition, Concept, Decision, ReferenceName } from "../../ast/types";
-import { prepareSingleLibraryPublication, publicationBooleanRead } from "../../emit/publicationProgram";
+import { prepareSingleLibraryPublication } from "../../emit/publicationProgram";
 import { emitCQLImports } from "../../imports/emit";
 import { resolveCaseFeatureRecord } from "../caseFeatureRecord";
 import { emitFhirDefFromPath } from "../closureOrchestrator";
@@ -52,7 +53,6 @@ function fixture(source: string, name = metadata.name): string {
 }
 const ref = (name: ReferenceName = "Answer"): BranchCondition => ({ type: "BranchConditionRef", ref: name, location: LOC });
 const negate = (operand: BranchCondition): BranchCondition => ({ type: "BranchConditionNot", operand, location: LOC });
-const projection = publicationBooleanRead('"SelectedBooleanInterface"."Answer"');
 function render(conditions: BranchCondition[], actionGuard?: "unless" | "only-when") {
   const parsed = ast();
   const program = prepareSingleLibraryPublication(parsed, { canonicalBase: metadata.canonicalBase, policyId: metadata.name });
@@ -98,18 +98,21 @@ describe("selected Boolean Record FHIR publication", () => {
   });
 
   it.each([
-    ["direct", ref()],
-    ["self-qualified", ref({ type: "QualifiedReference", libraryName: "Selected Boolean", name: "Answer", location: LOC })],
-    ["negative", negate(ref())],
-    ["compound", { type: "BranchConditionAnd", operands: [ref(), negate(ref())], location: LOC } as BranchCondition],
-    ["ordered or", { type: "BranchConditionOr", operands: [ref(), ref()], location: LOC } as BranchCondition],
-  ])("projects every %s guard and its otherwise exclusion", (_name, condition) => {
-    const resource = render([condition]);
-    const rendered = expressions(resource);
-    expect(rendered.some((expression) => expression.expression.includes(projection))).toBe(true);
-    expect(rendered.every((expression) => expression.language === "text/cql-expression")).toBe(true);
-    expect(rendered.some((expression) => expression.expression.includes("Coalesce"))).toBe(false);
-    expect((resource as { library: string[] }).library).toHaveLength(1);
+    ["direct", '"Answer"'],
+    ["self-qualified", '"Selected Boolean"."Answer"'],
+    ["negative", 'not "Answer"'],
+    ["compound", '("Answer" and not "Answer")'],
+    ["ordered or", '("Answer" or "Answer")'],
+  ])("projects every %s guard and its otherwise exclusion in named CQL", (_name, guard) => {
+    const path = fixture(`${base}\ndecision "Policy": first:\n- when ${guard} then recommend activity "Approve".\n- otherwise then recommend activity "Deny".\n`);
+    const fhir = emitFhirDefFromPath(path); const cql = emitCQLImports(path);
+    expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true); expect(cql.success).toBe(true);
+    const plan = fhir.resources.find(r => r.sourceKind === "Decision")!.resource as { library: string[] };
+    const bodies = expressions(plan).map(e => planConditionBody(cql, plan, e));
+    expect(bodies).toHaveLength(2);
+    expect(bodies.every(body => body.includes('FHIRHelpers.ToBoolean(') && body.includes('"Answer"'))).toBe(true);
+    expect(bodies.some(body => body.includes("Coalesce"))).toBe(false);
+    expect(plan.library).toHaveLength(1);
   });
 
   it.each(["only-when", "unless"] as const)("rejects action %s until menu-wide pause is implemented", (guard) => {
@@ -143,8 +146,7 @@ describe("selected Boolean Record FHIR publication", () => {
     expect(elements.find((e) => e.path === "Observation.code")).toMatchObject({ min: 1, patternCodeableConcept: { coding: [{ system: `${metadata.canonicalBase}/CodeSystem/selected-publication-local`, code: "answer" }] } });
     expect(result.resources.some((r) => r.resourceType === "Library" && r.sourceName === "FHIRHelpers")).toBe(false);
     const decision = result.resources.find((r) => r.sourceKind === "Decision")!.resource as { library: string[] };
-    const interfaceName = decision.library[0]!.split("/").pop();
-    const actualProjection = publicationBooleanRead(`"${interfaceName}"."Answer"`);
-    expect(expressions(decision).every((e) => e.expression.includes(actualProjection))).toBe(true);
+    const bodies = expressions(decision).map(e => planConditionBody(cql, decision, e));
+    expect(bodies.every(body => body.includes('FHIRHelpers.ToBoolean(') && body.includes('"Answer"'))).toBe(true);
   });
 });

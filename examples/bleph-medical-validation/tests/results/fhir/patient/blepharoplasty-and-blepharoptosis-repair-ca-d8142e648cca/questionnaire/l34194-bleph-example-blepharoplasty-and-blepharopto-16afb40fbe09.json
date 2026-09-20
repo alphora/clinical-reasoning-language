@@ -1,0 +1,284 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-16afb40fbe09",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-library",
+      "valueCanonical": "http://example.org/crl/Library/L34194BlephExampleInterface"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+      "extension": [
+        {
+          "url": "name",
+          "valueCoding": {
+            "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+            "code": "patient",
+            "display": "Patient"
+          }
+        },
+        {
+          "url": "type",
+          "valueCode": "Patient"
+        }
+      ]
+    }
+  ],
+  "url": "http://example.org/crl/Questionnaire/l34194-bleph-example-blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca",
+  "version": "0.0.0-blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca",
+  "status": "active",
+  "item": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+          "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose"
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.subject"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.subject"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.effective[x]"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.authored"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+          "valueExpression": {
+            "name": "CosmeticSurgicalPurpose",
+            "language": "text/cql-identifier",
+            "expression": "Cosmetic Surgical Purpose",
+            "reference": "http://example.org/crl/Library/L34194BlephExampleInferences"
+          }
+        }
+      ],
+      "linkId": "1",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose",
+      "text": "Is this procedure solely cosmetic, with no functional benefit?",
+      "type": "group",
+      "required": false,
+      "repeats": false,
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/cql-expression",
+                "expression": "%CosmeticSurgicalPurpose.value"
+              }
+            }
+          ],
+          "linkId": "1.1",
+          "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.value[x]",
+          "text": "Cosmetic Surgical Purpose",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+          "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint"
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint#Observation.subject"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.subject"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint#Observation.effective[x]"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.authored"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+          "valueExpression": {
+            "name": "DocumentedPatientComplaint",
+            "language": "text/cql-identifier",
+            "expression": "Documented Patient Complaint",
+            "reference": "http://example.org/crl/Library/L34194BlephExampleInferences"
+          }
+        }
+      ],
+      "linkId": "2",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint",
+      "text": "Which daily activity is affected by the eyelid-related visual deficit?",
+      "type": "group",
+      "required": false,
+      "repeats": false,
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/cql-expression",
+                "expression": "%DocumentedPatientComplaint.value"
+              }
+            }
+          ],
+          "linkId": "2.1",
+          "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint#Observation.value[x]",
+          "text": "Documented Patient Complaint",
+          "type": "choice",
+          "required": false,
+          "repeats": false,
+          "answerOption": [
+            {
+              "valueCoding": {
+                "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+                "code": "reading",
+                "display": "Visual interference affecting reading"
+              }
+            },
+            {
+              "valueCoding": {
+                "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+                "code": "driving",
+                "display": "Visual interference affecting driving"
+              }
+            },
+            {
+              "valueCoding": {
+                "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+                "code": "other-daily-activity",
+                "display": "Another daily activity affected by the eyelid-related visual deficit"
+              }
+            },
+            {
+              "valueCoding": {
+                "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+                "code": "none",
+                "display": "No documented functional deficit affecting daily activities"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+          "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-individual-procedure-necessity-documented"
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-individual-procedure-necessity-documented#Observation.subject"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.subject"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-individual-procedure-necessity-documented#Observation.effective[x]"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.authored"
+              }
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
+          "valueExpression": {
+            "name": "IndividualProcedureNecessityDocumented",
+            "language": "text/cql-identifier",
+            "expression": "Individual Procedure Necessity Documented",
+            "reference": "http://example.org/crl/Library/L34194BlephExampleInferences"
+          }
+        }
+      ],
+      "linkId": "3",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-individual-procedure-necessity-documented",
+      "text": "Is this procedure independently necessary and documented?",
+      "type": "group",
+      "required": false,
+      "repeats": false,
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+              "valueExpression": {
+                "language": "text/cql-expression",
+                "expression": "%IndividualProcedureNecessityDocumented.value"
+              }
+            }
+          ],
+          "linkId": "3.1",
+          "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-individual-procedure-necessity-documented#Observation.value[x]",
+          "text": "Individual Procedure Necessity Documented",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        }
+      ]
+    }
+  ]
+}

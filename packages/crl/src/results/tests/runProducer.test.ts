@@ -55,6 +55,46 @@ describe("every case gets exactly one terminal state", () => {
   const q = { questionnaire: { resourceType: "Questionnaire", id: "q" } };
 
   // @kit produce-results:engine-errors-block-publication
+  // REFACTOR:grounded: exit zero and a returned form cannot erase a native error.
+  it.each(["error", "fatal"])("rejects embedded %s outcomes after warnings and a valid form", severity => {
+    const outcome = { resourceType: "OperationOutcome", issue: [
+      ...Array.from({ length: 100 }, () => ({ severity: "warning", diagnostics: "warning only" })),
+      { severity, code: "exception", diagnostics: 'Could not resolve identifier Age Source 1' },
+    ] };
+    for (const wrapper of [
+      outcome,
+      { resourceType: "Parameters", parameter: [{ name: "result", part: [{ name: "nested", resource: outcome }] }] },
+      { resourceType: "Bundle", entry: [{ response: { outcome } }] },
+      { resourceType: "RequestGroup", contained: [outcome] },
+    ]) {
+      const extracted = extractResults({ resourceType: "Bundle", entry: [
+        { resource: q.questionnaire }, { resource: wrapper },
+      ] });
+      expect(classify(extracted, "", false, 0)).toMatchObject({ state: "failed", reason: expect.stringContaining("Age Source 1") });
+      expect(classify(extractResults(wrapper), "", false, 0).state).toBe("failed");
+    }
+  });
+
+  it("does not fail clean no-questionnaire or generated results for informational outcomes", () => {
+    const outcome = { resourceType: "OperationOutcome", issue: [{ severity: "warning", diagnostics: "error is quoted here" }, { severity: "information" }] };
+    expect(classify(extractResults(outcome), "", false, 0).state).toBe("no-questionnaire");
+    expect(classify({ ...extractResults(outcome), ...q }, "", false, 0).state).toBe("generated");
+  });
+
+  it("retains bounded useful diagnostics even without diagnostics text", () => {
+    const results = extractResults({ resourceType: "OperationOutcome", issue: [
+      { severity: "error", details: { text: "Meaningful detail" } },
+      { severity: "fatal", code: "exception" },
+      ...Array.from({ length: 100 }, () => ({ severity: "error", diagnostics: "x".repeat(10000) })),
+    ] });
+    const result = classify(results, "", false, 0);
+    expect(result.state).toBe("failed");
+    expect(result.reason).toContain("Meaningful detail");
+    expect(result.reason).toContain("exception");
+    expect(result.reason!.length).toBeLessThanOrEqual(1200);
+  });
+
+  // @kit produce-results:engine-errors-block-publication
   it("rejects expression errors even when the engine returned a questionnaire and exited zero", () => {
     expect(classify(extractResults(PARAMS), "ERROR expression evaluation failed", false, 0).state).toBe("failed");
     expect(classify(extractResults(PARAMS), "encountered exception evaluating Library", false, 0).state).toBe("failed");

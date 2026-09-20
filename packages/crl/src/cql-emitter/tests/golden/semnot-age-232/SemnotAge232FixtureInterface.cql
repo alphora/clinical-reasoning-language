@@ -2,7 +2,7 @@ library SemnotAge232FixtureInterface
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 include CaseFeatureCommon called CFH
 include SemnotAge232FixtureInferences
@@ -218,3 +218,9 @@ define "Age 21 Or Older":
 
 define "Under Age 21":
   not FHIRHelpers.ToBoolean(("Age 21 Or Older").value as FHIR.boolean)
+
+define "CRL branch CriterionRef L20C7":
+  "Under Age 21"
+
+define "Not CRL branch CriterionRef L20C7":
+  not ("Under Age 21")

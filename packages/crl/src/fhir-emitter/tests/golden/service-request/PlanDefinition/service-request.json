@@ -117,8 +117,8 @@
             {
               "kind": "applicability",
               "expression": {
-                "language": "text/cql-expression",
-                "expression": "not \"ServiceRequestInterface\".\"Requested Service Is Covered\""
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch Ref L112C7"
               }
             }
           ]

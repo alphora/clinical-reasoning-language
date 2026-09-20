@@ -106,7 +106,10 @@ function when(condition: string, body: WhenBlockBody): WhenBlock {
 }
 // #224 compound-guard condition builders.
 function refC(ref: string): BranchCondition {
-  return { type: "BranchConditionRef", ref, location: LOC };
+  return { type: "BranchConditionRef", ref, location: {
+    start: { line: 1, column: ref.charCodeAt(0) },
+    end: { line: 1, column: ref.charCodeAt(0) + ref.length },
+  } };
 }
 function andC(...operands: BranchCondition[]): BranchCondition {
   return { type: "BranchConditionAnd", operands, location: LOC };
@@ -402,11 +405,11 @@ describe("decision — per-action guard emit (#224 iii.1)", () => {
     );
     const cond = (findAction(resource!.resource as Record<string, unknown>, "A")!.condition as Cond[])[0]!;
     expect(cond.kind).toBe("applicability");
-    expect(cond.expression.language).toBe("text/cql-expression");
+    expect(cond.expression.language).toBe("text/cql-identifier");
     // library-qualified (cqf's synthetic expression library resolves the concept there,
     // disc 310) + Coalesce (null-safe two-valued, matches CRE — disc 310 round 2).
     expect(cond.expression.expression).toBe(
-      `not Coalesce("${Q}"."Has Antihypertensive Contraindication", false)`,
+      "Not CRL action Ref L7C3",
     );
   });
 
@@ -423,7 +426,7 @@ describe("decision — per-action guard emit (#224 iii.1)", () => {
       "A",
     )!.condition as Cond[])[0]!;
     // An action guard must NEVER pause: two-valued, matching the CRE's two-valued `evalGuard`.
-    expect(actionCond.expression.expression).toBe(`not Coalesce("${Q}"."B", false)`);
+    expect(actionCond.expression.expression).toBe("Not CRL action Ref L7C3");
 
     const branch = decision(
       "Top",
@@ -433,7 +436,7 @@ describe("decision — per-action guard emit (#224 iii.1)", () => {
     const arm = acts(rootActions(emitTop(branch).resource)[0])[0]!;
     // A branch guard MUST pause: strong Kleene, `not unknown = unknown` → arm not applicable.
     expect((arm.condition as Array<{ expression: { expression: string } }>)[0]!.expression.expression).toBe(
-      `not "${Q}"."B"`,
+      "Not CRL branch Ref L1C66",
     );
   });
 
@@ -484,7 +487,7 @@ describe("decision — per-action guard emit (#224 iii.1)", () => {
     const cond = (findAction(resource!.resource as Record<string, unknown>, "A")!.condition as Cond[])[0]!;
     // normalized to bare `Contra`, then qualified with the emitting library's PD-target name.
     expect(cond.expression.expression).toBe(
-      `not Coalesce("${libraryId(METADATA, undefined)}"."Contra", false)`,
+      "Not CRL action Ref L7C3",
     );
   });
 
@@ -504,7 +507,7 @@ describe("decision — per-action guard emit (#224 iii.1)", () => {
   it("a guarded `use decision` member lowers its guard + resolves the sub-decision leaf", () => {
     const { resource } = emitGuarded(guardedMenu(guarded(useDec("Sub"), "unless", "Blocker")));
     const a = findAction(resource!.resource as Record<string, unknown>, "Sub")!;
-    expect((a.condition as Cond[])[0]!.expression.expression).toBe(`not Coalesce("${Q}"."Blocker", false)`);
+    expect((a.condition as Cond[])[0]!.expression.expression).toBe("Not CRL action Ref L7C3");
     expect(a.definitionCanonical).toBe(RESOLVE_DEC_OK("Sub"));
   });
 });
@@ -840,7 +843,7 @@ describe("decision — otherwise and first emit", () => {
     expect(actions[1]!.condition).toEqual([
       {
         kind: "applicability",
-        expression: { language: "text/cql-expression", expression: 'not "lib"."Excl"' },
+        expression: { language: "text/cql-identifier", expression: "Not CRL branch Ref L1C0" },
       },
     ]);
     expect(actions[1]!.definitionCanonical).toBeDefined();
@@ -1125,8 +1128,8 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     expect(children).toHaveLength(2);
     const arm = children[0]!;
     expect(arm.title).toBe("A and not B");
-    expect(condExprs(arm)).toEqual(["A", `not "${Q}"."B"`]);
-    expect(condLangs(arm)).toEqual(["text/cql-identifier", "text/cql-expression"]);
+    expect(condExprs(arm)).toEqual(["A", "Not CRL branch Ref L1C66"]);
+    expect(condLangs(arm)).toEqual(["text/cql-identifier", "text/cql-identifier"]);
     expect(children[1]!.title).toBe("otherwise");
   });
 
@@ -1141,8 +1144,8 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     const children = acts(rootActions(resource)[0]);
     const arm = children[0]!;
     expect(arm.title).toBe("not B");
-    expect(condExprs(arm)).toEqual([`not "${Q}"."B"`]);
-    expect(condLangs(arm)).toEqual(["text/cql-expression"]);
+    expect(condExprs(arm)).toEqual(["Not CRL branch Ref L1C66"]);
+    expect(condLangs(arm)).toEqual(["text/cql-identifier"]);
   });
 
   it("De Morgan: `not (A and B)` → TWO arms of ONE negated literal each (spliced under first:)", () => {
@@ -1157,8 +1160,8 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
 
     const children = acts(rootActions(resource)[0]); // [¬A arm, ¬B arm, otherwise]
     expect(children.map((c) => c.title)).toEqual(["not A", "not B", "otherwise"]);
-    expect(condExprs(children[0]!)).toEqual([`not "${Q}"."A"`]);
-    expect(condExprs(children[1]!)).toEqual([`not "${Q}"."B"`]);
+    expect(condExprs(children[0]!)).toEqual(["Not CRL branch Ref L1C65"]);
+    expect(condExprs(children[1]!)).toEqual(["Not CRL branch Ref L1C66"]);
   });
 
   it("De Morgan: `not (A or B)` → ONE arm of TWO negated literals (¬A ∧ ¬B)", () => {
@@ -1174,8 +1177,8 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     const children = acts(rootActions(resource)[0]); // [¬A∧¬B arm, otherwise]
     expect(children[0]!.title).toBe("not A and not B");
     expect(condExprs(children[0]!)).toEqual([
-      `not "${Q}"."A"`,
-      `not "${Q}"."B"`,
+      "Not CRL branch Ref L1C65",
+      "Not CRL branch Ref L1C66",
     ]);
     expect(children[1]!.title).toBe("otherwise");
   });
@@ -1187,7 +1190,7 @@ describe("decision — #224 iii.3 negated guard → per-literal FHIR emit", () =
     expect(hasAnyBehavior(top[0]!)).toBe(true);
     const arms = acts(top[0]);
     expect(arms.map((a) => a.title)).toEqual(["not A", "not B"]);
-    expect(condExprs(arms[0]!)).toEqual([`not "${Q}"."A"`]);
+    expect(condExprs(arms[0]!)).toEqual(["Not CRL branch Ref L1C65"]);
   });
 
   it("a negated atom's concept STILL contributes action.input[] (parity with iii.1 `unless`)", () => {
@@ -1238,7 +1241,7 @@ describe("decision — #224 i.3 compound-guard structural emit", () => {
     // ⭐ And `otherwise` now carries ONE exclusion naming the prior conjunction — not zero conditions.
     const otherwiseConds = condExprs(children[1]!);
     expect(otherwiseConds).toHaveLength(1);
-    expect(otherwiseConds[0]).toMatch(/^not .*Guard L\d+C\d+/);
+    expect(otherwiseConds[0]).toMatch(/^Not CRL branch And L\d+C\d+/);
   });
 
   it("`or` guard under `first:` → arms SPLICED as ordered siblings (no wrapper, otherwise not starved)", () => {

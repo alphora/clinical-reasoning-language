@@ -185,7 +185,8 @@ describe("#236 — criterion emit: named define reference (not expansion)", () =
       (ref) => ref === "Missing" ? null : RESOLVE_ACT_OK(ref));
     expect(result.resource).not.toBeNull();
     expect(result.resource!.library!.includes(canonical)).toBe(qualifier === "first");
-    expect(conditionExprs(result.resource).some((item) => item.expression.includes("ForeignInferences"))).toBe(qualifier === "first");
+    expect(conditionExprs(result.resource).every((item) => item.language === "text/cql-identifier")).toBe(true);
+    expect(conditionExprs(result.resource).some((item) => item.expression.startsWith("Not CRL branch Ref"))).toBe(qualifier === "first");
   });
 
   it("keeps the existing unresolved diagnostic for a missing criterion index entry", () => {
@@ -312,8 +313,8 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
   });
 
   it("`not Elig` → a negated, library-qualified, NULL-PROPAGATING condition", () => {
-    // A negated criterion literal in a BRANCH guard lowers to `not "<lib>"."<crit>"` as a
-    // text/cql-expression — the same null-propagating shape a negated concept uses there.
+    // REFACTOR:grounded: a negated criterion names a nullable CQL definition;
+    // PlanDefinition carries only the identifier, with no inline expression.
     // #189: NOT `Coalesce`d. A criterion over unanswered questions is unknown, and an unknown
     // branch guard must make its arm not-applicable so traversal halts; coalescing would read
     // the unanswered case as "no" and fire the arm. (The per-action `unless` carrier still
@@ -323,7 +324,7 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     const { resource, errors } = emit(via, [elig]);
     expect(errors).toEqual([]);
     expect(conditionExprs(resource)).toEqual([
-      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+      { language: "text/cql-identifier", expression: "Not CRL branch CriterionRef L1C0" },
     ]);
     expect(resource!.action![0]!.title).toBe("not Elig");
   });
@@ -338,7 +339,7 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     expect(resource!.action).toHaveLength(1); // one arm — the criterion negation did not multiply arms
     expect(conditionExprs(resource)).toEqual([
       { language: "text/cql-identifier", expression: "A" },
-      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+      { language: "text/cql-identifier", expression: "Not CRL branch CriterionRef L1C0" },
     ]);
   });
 
@@ -358,7 +359,7 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     expect(conditionExprs(resource)).toEqual([
       { language: "text/cql-identifier", expression: "Elig" },
       // branch 2's priority exclusion of the criterion prior — null-propagating, no Coalesce.
-      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+      { language: "text/cql-identifier", expression: "Not CRL branch CriterionRef L1C0" },
       { language: "text/cql-identifier", expression: "A" },
     ]);
   });
@@ -373,7 +374,7 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     const { resource, errors } = emit(via, [elig]);
     expect(errors).toEqual([]);
     expect(conditionExprs(resource)).toEqual([
-      { language: "text/cql-expression", expression: 'not "lib"."Elig"' },
+      { language: "text/cql-identifier", expression: "Not CRL branch CriterionRef L1C0" },
       { language: "text/cql-identifier", expression: "Elig" },
       { language: "text/cql-identifier", expression: "A" },
     ]);
@@ -399,7 +400,7 @@ describe("#236 — criterion in compound guards (one signed literal, no DNF blow
     // The criterion reference itself is untouched: it stays ONE positive `text/cql-identifier` literal.
     expect(conditionExprs(resource)).toEqual([
       { language: "text/cql-identifier", expression: "A" },
-      { language: "text/cql-expression", expression: 'not "lib"."A"' },
+      { language: "text/cql-identifier", expression: "Not CRL branch Ref L1C0" },
       { language: "text/cql-identifier", expression: "Elig" },
     ]);
   });

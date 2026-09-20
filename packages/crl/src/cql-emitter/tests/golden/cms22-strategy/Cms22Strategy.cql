@@ -2,7 +2,7 @@ library Cms22Strategy
 
 using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.0.1' called FHIRHelpers
+include hl7.fhir.uv.cql.FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
 
 valueset "Blood Pressure Panels VS": 'http://loinc.org/vs/85354-9'
@@ -91,3 +91,45 @@ define "Has Confirmed Hypertension Diagnosis":
 
 define "Has Antihypertensive Contraindication":
   exists CRLCommon.Has("Antihypertensive Contraindication")
+
+define "CRL branch Ref L48C7":
+  "Patient Eligible For BP Cognitive Support"
+
+define "Not CRL branch Ref L48C7":
+  not ("Patient Eligible For BP Cognitive Support")
+
+define "CRL branch Ref L50C9":
+  "No BP Reading At This Encounter"
+
+define "Not CRL branch Ref L50C9":
+  not ("No BP Reading At This Encounter")
+
+define "CRL branch Ref L51C9":
+  "Has Hypertensive Reading"
+
+define "Not CRL branch Ref L51C9":
+  not ("Has Hypertensive Reading")
+
+define "CRL branch Ref L52C9":
+  "Has Normal Reading With Hypertension On File"
+
+define "Not CRL branch Ref L52C9":
+  not ("Has Normal Reading With Hypertension On File")
+
+define "CRL branch Ref L64C7":
+  "Has Confirmed Hypertension Diagnosis"
+
+define "Not CRL branch Ref L64C7":
+  not ("Has Confirmed Hypertension Diagnosis")
+
+define "CRL action Ref L66C53":
+  "Has Antihypertensive Contraindication"
+
+define "Not CRL action Ref L66C53":
+  not Coalesce(("Has Antihypertensive Contraindication"), false)
+
+define "CRL branch Ref L70C7":
+  "Hypertensive Reading Without Diagnosis"
+
+define "Not CRL branch Ref L70C7":
+  not ("Hypertensive Reading Without Diagnosis")

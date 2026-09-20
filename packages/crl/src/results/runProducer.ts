@@ -51,6 +51,8 @@ export interface RunContext {
 interface ExtractedResults {
   questionnaire?: Record<string, unknown>;
   questionnaireResponse?: Record<string, unknown>;
+  /** Bounded diagnostic text; every returned outcome is still inspected. */
+  errors?: string[];
 }
 
 /**
@@ -62,20 +64,36 @@ interface ExtractedResults {
  */
 export function extractResults(params: Record<string, unknown>): ExtractedResults {
   const out: ExtractedResults = {};
-  const visit = (r: unknown): void => {
-    if (!r || typeof r !== "object") return;
-    const res = r as Record<string, unknown>;
+  // REFACTOR:grounded: inspect all embedded outcomes, even after finding the Q/QR.
+  // The process capture bounds total input. Bound displayed text, never error detection.
+  const pending: unknown[] = [params];
+  const seen = new Set<object>();
+  while (pending.length > 0) {
+    const item = pending.pop();
+    if (!item || typeof item !== "object" || seen.has(item)) continue;
+    seen.add(item);
+    const res = item as Record<string, unknown>;
     if (res.resourceType === "Questionnaire" && !out.questionnaire) out.questionnaire = res;
-    if (res.resourceType === "QuestionnaireResponse" && !out.questionnaireResponse) {
-      out.questionnaireResponse = res;
+    if (res.resourceType === "QuestionnaireResponse" && !out.questionnaireResponse) out.questionnaireResponse = res;
+    if (res.resourceType === "OperationOutcome" && Array.isArray(res.issue)) {
+      for (const raw of res.issue) {
+        if (!raw || typeof raw !== "object") continue;
+        const issue = raw as Record<string, unknown>;
+        if (issue.severity !== "error" && issue.severity !== "fatal") continue;
+        const errors = out.errors ??= [];
+        if (errors.length >= 5) continue;
+        const details = issue.details as { text?: unknown } | undefined;
+        const detail = [issue.diagnostics, details?.text, issue.code]
+          .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+        errors.push((issue.severity + ": " + (detail ?? "OperationOutcome reported an error")).replace(/\s+/g, " ").slice(0, 300));
+      }
     }
-    for (const k of ["parameter", "entry", "contained"]) {
-      const v = res[k];
-      if (Array.isArray(v)) for (const child of v) visit(child);
+    // Reverse for stable document-order traversal, including Parameters.part and Bundle.response.outcome.
+    const children = Object.values(res);
+    for (let i = children.length - 1; i >= 0; i--) {
+      if (children[i] && typeof children[i] === "object") pending.push(children[i]);
     }
-    if (res.resource) visit(res.resource);
-  };
-  visit(params);
+  }
   return out;
 }
 
@@ -122,6 +140,10 @@ export function classify(
   }
   // ⚠ An engine can exit 0 having reported errors in its OperationOutcome. Treating a clean exit as
   // proof of a clean run is what made the very first apply against our layout look successful.
+  // REFACTOR:grounded: FHIR error/fatal outcomes take precedence over successful-looking forms.
+  if (results.errors?.length) {
+    return { state: "failed", reason: ("engine OperationOutcome — " + results.errors.join("; ")).slice(0, 1100) };
+  }
   const otherErrors = stderr.split(/\r?\n/).filter(line => !/multiple values for a non repeating group/i.test(line)).join("\n");
   if (/\bERROR\b|encountered exception/i.test(otherErrors)) {
     return { state: "failed", reason: `engine reported an error${describeStderr(stderr)}` };

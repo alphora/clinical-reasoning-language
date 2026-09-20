@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildCRL } from "../../index";
 import { prepareSingleLibraryPublication, adaptPublicationCandidate } from "../publicationProgram";
@@ -8,6 +8,8 @@ import { emitCQLFromAST } from "../../cql-emitter/emitCQL";
 import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
 import { emitPartitioned, FULL_PARTITION } from "../../cql-emitter/layeredEmit";
 import * as path from "node:path";
+import { tmpdir } from "node:os";
+import { emitCrlTwoLane } from "../../emit-two-lane";
 
 // REFACTOR:grounded (#320, plan583): independently specified birthday, repair and override outcomes.
 const text = readFileSync(path.join(__dirname, "fixtures/publication-age.crl"), "utf8");
@@ -35,6 +37,38 @@ function resolve(birth: string | undefined, inputs: Candidate[]) {
   return eligible.kind === "error" ? eligible : selectPublicationCandidate(eligible.candidates, { conceptId: d.conceptId, equalTime: "error" });
 }
 describe("pattern-owned age publication", () => {
+  // @kit patient-age-projection:source-only-layer-binding
+  it("keeps source-only age bound through a criterion and shared decision in both lanes", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-age-nested-"));
+    try {
+      writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "age-nested", version: "1.0.0", crl: { canonicalBase: "https://example.org/age", date: "2026-09-20" } }));
+      const source = text.replace(/^- code is .*\r?\n/m, "")
+        .replace('decision "D":', 'concept "Answer":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `answer`.\n- shape reduction is most recent.\ncriterion "Adult Criterion":\n- when ("Adult" and "Answer").\ndecision "D":')
+        .replace('- when "Adult" then', '- when "Adult Criterion" then') +
+        '\ndecision "Parent":\nfirst:\n- when "Adult Criterion" then use decision "D".\n- otherwise then recommend activity "Deny".\n';
+      const file = path.join(dir, "policy.crl"); writeFileSync(file, source);
+      const result = emitCrlTwoLane(file);
+      expect(result.success, JSON.stringify(result.hardErrors)).toBe(true);
+      expect(result.cqlLibraries.find(l => l.outputFilename.toLowerCase().includes("inferences"))!.cql)
+        .toMatch(/ExternalElements\."Adult Source 1"/);
+      expect(result.fhir.resources.filter(r => r.resourceType === "StructureDefinition").map(r => r.sourceName)).toEqual(["Answer"]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  // @kit patient-age-projection:source-only-layer-binding
+  // REFACTOR:grounded: answerability must not determine whether a source reference resolves.
+  it.each([false, true])("qualifies age sources with a local answer representation = %s", coded => {
+    const { ast } = prepared(coded ? text : text.replace(/^- code is .*\r?\n/m, ""));
+    for (const prefix of ["AgePublication", "Custom"]) {
+      const partition = { ...FULL_PARTITION, libraryNameFor: (_p: string, view: string) => `${prefix}${view}` };
+      const result = emitPartitioned(lowerLocalCodes(ast, options).ast, "Age Publication", options.policyId, partition, options);
+      expect(result.success, JSON.stringify(result.errors)).toBe(true);
+      const cql = result.entries.find(e => e.libraryName.endsWith("Inferences"))!.result.result!;
+      expect(cql).toContain(`include ${prefix}ExternalElements`);
+      expect(cql).toContain(`${prefix}ExternalElements."Adult Source 1"`);
+      expect(cql).not.toContain('("Adult Source 1") S');
+    }
+  });
   it("publishes uncoded age without inventing an answer representation", () => {
     const source = text.replace(/^- code is .*\r?\n/m, "");
     const { ast, program, d } = prepared(source);

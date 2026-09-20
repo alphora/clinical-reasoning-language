@@ -1,0 +1,36 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-2b3616a37f2a",
+  "questionnaire": "http://example.org/crl/Questionnaire/l34194-bleph-example-blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585",
+  "status": "in-progress",
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585"
+  },
+  "item": [
+    {
+      "linkId": "1",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose",
+      "text": "Is this procedure solely cosmetic, with no functional benefit?",
+      "item": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "1.1",
+          "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.value[x]",
+          "text": "Cosmetic Surgical Purpose",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

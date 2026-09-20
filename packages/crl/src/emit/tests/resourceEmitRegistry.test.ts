@@ -431,6 +431,8 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
     ).toEqual([{ coding: [{ system: "http://x", code: "survey" }] }]);
   });
 
+  // @kit produce-results:condition-verification-identity
+  // REFACTOR:grounded: emitted defaults use the R4 coding identity consumed by IsVerified.
   it("Condition: subject wired + clinicalStatus=active + verificationStatus=confirmed (CodeableConcepts)", () => {
     const req = requiredStructuralElements("Condition");
     expect(req?.map((e) => e.element)).toEqual([
@@ -439,6 +441,10 @@ describe("required structural-element schema (Patient + ServiceRequest)", () => 
       "clinicalStatus",
       "verificationStatus",
     ]);
+    const verification = req?.find((e) => e.element === "verificationStatus");
+    expect(verification?.fulfillment.via === "default" && defaultValueJson(verification.fulfillment.value)).toEqual({
+      coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-ver-status", code: "confirmed", display: "Confirmed" }],
+    });
     const cs = req?.find((e) => e.element === "clinicalStatus");
     expect(cs?.fulfillment.via === "default" && cs.fulfillment.value).toEqual({
       kind: "codeable-concept",
