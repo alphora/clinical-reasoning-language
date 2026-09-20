@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "5020abfe4c509c20ecf65e11dcaba401193b5d29",
-  "auditedSchemaVersion": "2.12",
-  "auditedContentHash": "3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597",
-  "scope": "Kit schema 2.12 bounded native evaluation and identifier-only PlanDefinition maintenance from50b7965614480b18d1cccf8de00b36badde8771a through 5020abfe4c509c20ecf65e11dcaba401193b5d29. Source binding, Condition coding, native error classification, named CQL condition carriers and qualified helpers are mapped in coverage.md. Reviews816/817 native converged; external unavailable. Source/native checks and regenerated Bleph evidence do not replace installed delivery acceptance. Existing pinned engine retained; session API, upstream adoption and Linux qualification excluded. No customer migration or clinical certification.",
+  "auditedRevision": "a9c841c416078343b369752cc99ca66e53292e44",
+  "auditedSchemaVersion": "2.13",
+  "auditedContentHash": "daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c",
+  "scope": "Kit schema 2.13 coded Observation sourcing and FHIR NPM packaging maintenance from5020abfe4c509c20ecf65e11dcaba401193b5d29 through a9c841c416078343b369752cc99ca66e53292e44. Coverage ledger maps source, selection, local answer and archive behavior. Native reviews815/821/822 converged; external review timed out without findings. Full source suites, native13 controls, packaging32, kit82 and both actual MCP integration checks passed. Installed delivery qualification is separate. Existing pinned engine retained; session API and upstream adoption remain separate. No customer migration or clinical certification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
