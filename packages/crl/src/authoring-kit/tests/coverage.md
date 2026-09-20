@@ -1,6 +1,6 @@
 ## Local6.4.3 MV question identity maintenance
 
-Baseline a9c841c416078343b369752cc99ca66e53292e44 (kit2.13); reviewed target stamped after content commit. Kit content/schema remain2.13 with hash daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c.
+Baseline a9c841c416078343b369752cc99ca66e53292e44 (kit2.13); reviewed target 13a190955dddd169c84a9a768bd46a61f00592f4. Kit content/schema remain2.13 with hash daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c.
 
 Delta inventory: prior audit stamp, synchronized6.4.2 versions and release-retention ledger are metadata-only. Current routeCards.ts/Webview.ts changes and docs/mv-component-view.md change MV presentation only: one semantic input per Result Questionnaire card; every tree owner/path retained; equivalent wording targets share drafts; scoped variants and mixed determinations remain accessible. Existing mv-wording-patches guidance remains sufficient: proposals still target original authored field owners, never mutate CRL automatically. No language/emitter/driver/FHIR packaging change, no changed kit payload or tags removed.
 

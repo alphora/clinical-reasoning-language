@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "a9c841c416078343b369752cc99ca66e53292e44",
+  "auditedRevision": "13a190955dddd169c84a9a768bd46a61f00592f4",
   "auditedSchemaVersion": "2.13",
   "auditedContentHash": "daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c",
-  "scope": "Kit schema 2.13 coded Observation sourcing and FHIR NPM packaging maintenance from5020abfe4c509c20ecf65e11dcaba401193b5d29 through a9c841c416078343b369752cc99ca66e53292e44. Coverage ledger maps source, selection, local answer and archive behavior. Native reviews815/821/822 converged; external review timed out without findings. Full source suites, native13 controls, packaging32, kit82 and both actual MCP integration checks passed. Installed delivery qualification is separate. Existing pinned engine retained; session API and upstream adoption remain separate. No customer migration or clinical certification.",
+  "scope": "Kit schema 2.13 maintenance from a9c841c416078343b369752cc99ca66e53292e44 through 13a190955dddd169c84a9a768bd46a61f00592f4. MV Result Questionnaire grouping only; authoring content/hash unchanged. Existing wording proposal guidance remains sufficient. Coverage ledger maps all changed paths and new UI tests. Native reviews823/824 converged; external unavailable. Focused model/panel, browser and installed extension checks passed; both installed MCPs match content. Existing pinned engine and prior6.4.2 source/native/packaging qualification retained; session/upstream work excluded.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
