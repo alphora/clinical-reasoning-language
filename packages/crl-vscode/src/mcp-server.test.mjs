@@ -1,3 +1,4 @@
+import { checkFhirPackage } from "../../crl/src/cli/tests/fhir-package-smoke.mjs";
 // Integration test: spawn the BUILT dist/mcp-server.js as a real MCP stdio
 // server and drive it with the SDK client. Run via `npm run test:mcp`
 // (the script compiles first). Every check shares ONE connected client
@@ -90,6 +91,7 @@ check("MCP tools: 23 registered (+ canonicalize_source; + #237/T3 check_fhir_ids
       "emit_results",
       "generate_provenance",
       "normalize_provenance",
+      "package_fhir",
       "preview_presentation_edit",
       "render_scenario",
       "revert_presentation_edit",
@@ -166,8 +168,8 @@ check("authoring_kit full exports all 19 artifacts and determination guidance", 
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.12");
-    assert.equal(kit.contentHash, "3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597");
+    assert.equal(kit.schemaVersion, "2.13");
+    assert.equal(kit.contentHash, "daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 19);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -621,3 +623,5 @@ check("title creation survives persisted reload, legacy retry, and conflict reje
   const html = renderFlagActionDrawer(model);
   assert.ok(html.includes("Flag — " + title)); assert.ok(html.includes(description)); assert.match(html, />Description<\/span>/);
 });
+
+check("FHIR package through actual extension MCP bundle", () => checkFhirPackage(client));

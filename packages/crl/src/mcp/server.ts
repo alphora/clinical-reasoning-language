@@ -9,6 +9,7 @@ import { isAbsolute, join as pathJoin } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { packageFhir } from "../fhir-package";
 import { registerPresentationEditing } from "./presentationEditing";
 
 // Provenance must name the version that actually ran.
@@ -392,6 +393,18 @@ const inputSchema = {
 export function createServer(): McpServer {
   const server = new McpServer({ name: "crl", version: "0.1.0" });
   registerPresentationEditing(server);
+  server.registerTool("package_fhir", {
+    title: "Package FHIR definitions",
+    description: "Build a CRMI FHIR NPM .tgz from existing project src/fhir definitions. Includes package.json, ImplementationGuide, resource index and embedded local Library attachments. Requires author, description, SemVer version and crl.packageId (or packageId override); preserves canonical identities and source files. Replaces only the requested archive. Does not emit, publish, resolve remote dependencies or validate executable conformance.",
+    inputSchema: {
+      projectRoot: z.string().describe("Absolute project directory containing package.json and src/fhir"),
+      outputFile: z.string().optional().describe("Absolute .tgz destination; default output/package.tgz"),
+      packageId: z.string().optional().describe("Dotted FHIR NPM package ID; defaults to crl.packageId"),
+    },
+  }, async args => {
+    const result = await packageFhir(args);
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }], isError: !result.success };
+  });
 
   server.registerTool(
     "tokenize_crl",

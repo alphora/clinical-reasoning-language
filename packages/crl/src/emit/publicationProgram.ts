@@ -298,8 +298,12 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
       const sources = concept.representations.map((rep, index): PublicationSource => {
         const contributorId = `crl:source:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["source", index]]))}`;
         const age = readAgeProjection(rep);
-        return age ? Object.freeze({ ...age, contributorId }) : Object.freeze({ kind: rep.conceptType === "Observation" ? "observationQuantity" : "serviceRequestWitness", contributorId,
-          terminology: rep.terminologyName!, codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes });
+        if (age) return Object.freeze({ ...age, contributorId });
+        const common = { contributorId, terminology: rep.terminologyName!,
+          codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes };
+        return rep.conceptType === "Observation"
+          ? Object.freeze({ kind: "observationValue", valueType: concept.valueTypes[0] as "Quantity" | "CodeableConcept", ...common })
+          : Object.freeze({ kind: "serviceRequestWitness", ...common });
       });
       let answerOptions: PublicationDescriptor["answerOptions"];
       // REFACTOR:grounded (#320, 615): only named answer ValueSets are supported.

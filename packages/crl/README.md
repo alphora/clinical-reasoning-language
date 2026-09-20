@@ -617,3 +617,7 @@ compiled-CQL caching.
 CLI SIGINT/SIGTERM and MCP shutdown await owned-process cleanup. On POSIX,
 forcibly killing the Node owner (for example SIGKILL) cannot run that cleanup;
 Windows additionally detects owner loss through the Job Object supervisor.
+
+### FHIR NPM packaging
+
+After emitting definitions, run `crl-package-fhir --project <directory>` or the `package_fhir` MCP tool. See [package metadata, contents and validation boundaries](../../docs/fhir-npm-packaging.md).

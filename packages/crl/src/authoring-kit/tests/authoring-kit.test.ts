@@ -311,7 +311,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.12");
+    expect(kit.schemaVersion).toBe("2.13");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -653,8 +653,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.12");
-    expect(kit.contentHash).toBe("3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597");
+    expect(kit.schemaVersion).toBe("2.13");
+    expect(kit.contentHash).toBe("daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {
@@ -847,7 +847,7 @@ describe("authoring-kit — getAuthoringKit", () => {
 });
 
 describe("authoring-kit — examples are validated (no unverified CRL ships)", () => {
-  const wrap = (snippet: string) => `# T\nlibrary "T".\n${snippet}`;
+  const wrap = (snippet: string) => /^\s*library\s/.test(snippet) ? snippet : `# T\nlibrary "T".\n${snippet}`;
 
   it("do-cases are shape-clean; a mechanical don't-case raises its rule; a judge-lens don't-case is validator-clean", () => {
     const kit = getAuthoringKit();

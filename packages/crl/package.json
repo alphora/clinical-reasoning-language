@@ -18,7 +18,8 @@
     "crl-check-fhir-ids": "dist/cli/run-check-fhir-ids.js",
     "crl-emit-results": "dist/cli/run-emit-results.js",
     "crl-run-regression": "dist/cli/run-regression.js",
-    "crl-mcp": "dist/cli/run-mcp-server.js"
+    "crl-mcp": "dist/cli/run-mcp-server.js",
+    "crl-package-fhir": "dist/cli/run-package-fhir.js"
   },
   "sideEffects": false,
   "exports": {
@@ -109,6 +110,7 @@
     "cpx": "^1.2.1",
     "fsh-sushi": "^3.15.0",
     "prompts": "^2.4.2",
+    "tar": "7.5.22",
     "zod": "^4.4.3"
   },
   "devDependencies": {
