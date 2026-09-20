@@ -662,3 +662,5 @@ export { produceRegressionResults } from "./results/produce";
 export { readSuiteResult } from "./results/readSuiteResult";
 export { publishMvCel } from "./cel/publishSuite";
 export { runRegression } from "./cel/regression";
+
+export { packageFhir, type PackageFhirOptions, type PackageFhirResult } from "./fhir-package";

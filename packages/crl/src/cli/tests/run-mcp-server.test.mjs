@@ -1,3 +1,4 @@
+import { checkFhirPackage } from "./fhir-package-smoke.mjs";
 // REFACTOR:grounded (#320, plan595): both BMI kit payloads are versioned and verified through MCP.
 // REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // Integration test: spawn dist/cli/run-mcp-server.js as a real MCP stdio
@@ -80,6 +81,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
+  await check("FHIR package MCP + CLI archive roundtrip", () => checkFhirPackage(client, true));
   await check("MCP tools: 23 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
     const { tools } = await client.listTools();
     const native = tools.find(t => t.name === "emit_results").inputSchema.properties;
@@ -105,6 +107,7 @@ try {
       "emit_results",
       "generate_provenance",
       "normalize_provenance",
+      "package_fhir",
       "preview_presentation_edit",
       "render_scenario",
       "revert_presentation_edit",
@@ -365,8 +368,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.12");
-    assert.equal(kit.contentHash, "3a42be05e23f55976acefbaca4e08d5bd70a9f6e9f40ec418795ff4b4d41b597");
+    assert.equal(kit.schemaVersion, "2.13");
+    assert.equal(kit.contentHash, "daf1df90d2aa8796f3cbc1de923e1c8e0f4f3d257c3dcd5c492a6ee2ba9caa4c");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 19);
     assert.equal(kit.dispositionModel.categories.length, 3);

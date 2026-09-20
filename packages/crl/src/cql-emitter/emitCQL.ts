@@ -33,7 +33,8 @@ import { buildCRL } from "../index";
 import { publicationHasValueFormError, readPublicationHasValue, publicationProducerOperands, prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
 import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
 import { renderPublicationBMIHelpers, BMI_CQL } from "./renderPublicationBMI";
-import { renderPublicationQuantityHelpers, renderPublicationThresholdHelpers, QUANTITY_CQL, PUBLICATION_OBSERVATION_QUANTITY_CANDIDATE } from "./renderPublicationQuantity";
+import { renderPublicationThresholdHelpers, QUANTITY_CQL } from "./renderPublicationQuantity";
+import { renderPublicationObservationHelpers, PUBLICATION_OBSERVATION_CANDIDATE } from "./renderPublicationObservation";
 import { PUBLICATION_LOCAL_QUANTITY_CANDIDATE, PUBLICATION_LOCAL_STRING_CANDIDATE, PUBLICATION_LOCAL_DATETIME_CANDIDATE } from "./renderPublicationSelection";
 import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
 import { AGE_CQL, AGE_CQL_PREFIX, renderPublicationAgeHelpers } from "./renderPublicationAge";
@@ -1249,7 +1250,9 @@ class Emitter {
       }
       const quantities = this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "Quantity");
       sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers(quantities, this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "string"), this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "dateTime")));
-      if (quantities) sections.push(renderPublicationQuantityHelpers());
+      if (quantities) sections.push(renderPublicationObservationHelpers("Quantity"));
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.sources?.some(source => source.kind === "observationValue" && source.valueType === "CodeableConcept")))
+        sections.push(renderPublicationObservationHelpers("CodeableConcept"));
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && ["quantityThreshold", "bodyMassIndex"].includes(s.__publication.descriptor.producer?.kind ?? "")))
         sections.push(renderPublicationThresholdHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && s.__publication.descriptor.producer?.kind === "bodyMassIndex"))
@@ -2453,7 +2456,7 @@ class Emitter {
       const source = descriptor.sources![index];
       const target = this.renderPublicationReference(binding.sourceReferences![index]);
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} } }` : `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
-      const helper = source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationQuantity" ? PUBLICATION_OBSERVATION_QUANTITY_CANDIDATE : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
+      const helper = source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationValue" ? PUBLICATION_OBSERVATION_CANDIDATE[source.valueType] : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
       const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : "";
       const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl)}, 'Patient/' + Patient.id.value${args}))`;
       const projected = source.kind === "ageToday" ? `(${projection} C where C is not null)` : projection;
@@ -3349,7 +3352,7 @@ class Emitter {
       }
       const codes = c.__publication.source.codes.map((code) =>
         `System.Code { system: ${cqlStringLiteral(code.system)}, code: ${cqlStringLiteral(code.code)} }`).join(", ");
-      return `[${c.__publication.source.kind === "observationQuantity" ? "Observation" : "ServiceRequest"}: { ${codes} }]`;
+      return `[${c.__publication.source.kind === "observationValue" ? "Observation" : "ServiceRequest"}: { ${codes} }]`;
     }
     // A synthetic local-source CodedFromDefinition (from `lowerLocalCodes`)
     // supplies `retrieveResourceType: "Observation"` to force the local-source

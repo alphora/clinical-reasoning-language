@@ -1,6 +1,6 @@
 {
   "name": "@smile-digital-health/crl",
-  "version": "6.4.1",
+  "version": "6.4.2",
   "description": "Clinical Reasoning Language (CRL) parser and validator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +19,8 @@
     "crl-emit-results": "dist/cli/run-emit-results.js",
     "crl-run-regression": "dist/cli/run-regression.js",
     "crl-mcp": "dist/cli/run-mcp-server.js",
-    "crl-apply-session": "dist/cli/run-apply-session.js"
+    "crl-apply-session": "dist/cli/run-apply-session.js",
+    "crl-package-fhir": "dist/cli/run-package-fhir.js"
   },
   "sideEffects": false,
   "exports": {
@@ -117,6 +118,7 @@
     "fsh-sushi": "^3.15.0",
     "jsonc-parser": "3.3.1",
     "prompts": "^2.4.2",
+    "tar": "7.5.22",
     "zod": "^4.4.3"
   },
   "devDependencies": {
