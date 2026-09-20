@@ -60,3 +60,7 @@ work explicit instead of treating every branch as either shipped or disposable.
 Follow the release protocol for final artifacts and installed verification. Reuse
 valid completed evidence; rerun affected checks when a later change invalidates it.
 This reconciliation itself does not require repeating the whole test suite.
+
+## Local6.4.3 ? Result Questionnaire duplicate-input fix
+
+This follow-up is based on the complete6.4.2 retention checkpoint8c8897c8. It preserves every earlier local release feature, the FHIR packager, coded Observation sources, pinned engine and kit2.13. Only MV question grouping/numbering/edit-state display changes; no customer migration. Evidence is in local build tmp/local-mv-question-dedup-6.4.3. Session/upstream work remains isolated at ec226205 and is not part of this local build.

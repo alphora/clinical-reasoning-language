@@ -5,6 +5,8 @@ import type { WordingTarget } from "./presentationProposal";
 
 export interface RouteCard {
   id: string; ownerKey: string; concept: string; library: string;
+  questionNumber: number;
+  occurrences: { ownerKey: string; criterionPaths: { lib: string; name: string }[][] }[];
   text: string; description: string; value: string; determination: string;
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
   criteria: { lib: string; name: string }[];
@@ -52,6 +54,7 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
   questionEnabled?: (lib: string, name: string) => boolean,
   choicesFromFor: (lib: string, name: string) => string | undefined = () => undefined) {
   const cards: RouteCard[] = [], targets = new Map<string, WordingTarget>(), emitted = new Map<string, RouteCard>();
+  const questionNumbers = new Map<string, number>();
   const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: {lib: string; name: string}[], explanation: boolean, valueOnly = false, seen = new Set<string>()) => {
     const identity = JSON.stringify([lib,name]);
     if (seen.has(identity)) return;
@@ -73,10 +76,16 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     else if (inferred || !target) value = `Determination: ${determination}`;
     else value = raw ?? (answer === "yes" ? "Yes" : "No");
     // REFACTOR:grounded: conditions are tree nodes; only answer-enabled Case Features get cards.
-    const occurrence = JSON.stringify([ownerKey,lib,name,target?.context,target?.questionText,target?.questionDescription]);
+    // A question belongs to its input, not to each condition that reads it.
+    // Resolve edit ownership before merging: identical inherited wording may have
+    // different traversal contexts, while scoped declarations remain distinct.
+    const occurrence = JSON.stringify([lib,name,target?.filePath,target?.owners ?? target?.context,
+      target?.questionText,target?.questionDescription,target?.editable,target?.readOnlyReason,value,determination]);
     if (answerable && !emitted.has(occurrence)) {
+    if (!questionNumbers.has(identity)) questionNumbers.set(identity, questionNumbers.size + 1);
     const id = `card-${cards.length}`;
     cards.push({ id, ownerKey, concept: name, library: lib, text: target?.questionText ?? name,
+      questionNumber: questionNumbers.get(identity)!, occurrences: [{ownerKey, criterionPaths:[criteria]}],
       description: target?.questionDescription ?? "", value,
       answerChoices: options.map(o=>({...o, selected: selectedChoices.has(o)})),
       choicesFrom: choicesFromFor(lib,name),
@@ -85,7 +94,12 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     if (target && target.editable !== false) targets.set(id, target);
     } else if (answerable) {
       const prior = emitted.get(occurrence)!;
-      if (!prior.criterionPaths.some(p=>JSON.stringify(p)===JSON.stringify(criteria))) prior.criterionPaths.push(criteria);
+      let owner = prior.occurrences.find(o=>o.ownerKey===ownerKey);
+      if (!owner) { owner={ownerKey,criterionPaths:[]};prior.occurrences.push(owner); }
+      if (!owner.criterionPaths.some(p=>JSON.stringify(p)===JSON.stringify(criteria))) owner.criterionPaths.push(criteria);
+      // Compatibility fields describe the primary owner only; never cross-pair
+      // another condition's criterion path with that owner.
+      if (ownerKey===prior.ownerKey) prior.criterionPaths=owner.criterionPaths;
     }
     for (const dependency of valueInputs(lib,name)) {
       const truth = sv.conceptTruth?.find(r => r.libraryName === dependency.lib && r.name === dependency.name)?.satisfied;

@@ -185,6 +185,37 @@ test('distinct criterion presentations remain separate even for the same input q
  const built=buildRouteCards(q,{},()=> 'when-key',(lib,name,id,criteria)=>name==='Q'?{questionText:criteria[0]+' question?',questionDescription:'',context:{decision:'D',criteria}}:undefined,()=>[],()=>[],(lib,name)=>name==='Q');
  assert.equal(built.cards.length,2);assert.deepEqual(built.cards.map(c=>c.text),['C1 question?','C2 question?']);
  assert.equal(built.targets.size,2);
+ assert.deepEqual(built.cards.map(c=>c.questionNumber),[1,1]);
+});
+
+test('three shared inputs have three question identities across all route owners and criterion paths',()=>{
+ const names=['A','B','C'];
+ const source='library "L".\n'+names.map(name=>base.slice(base.indexOf('concept')).replaceAll('Complaint',name).replace('`complaint`','`'+name.toLowerCase()+'`')+presentation.replaceAll('Complaint',name)).join('\n');
+ const q={questions:['completion','evidence','risk'].map(nodeId=>({nodeId,conceptName:'Guard',libraryName:'L',answer:'yes',isInferred:true,expansion:{kind:'criterion',lib:'L',name:nodeId,body:{kind:'and',operands:names.map(name=>({kind:'leaf',lib:'L',name,answer:'yes'}))}}}))};
+ const built=buildRouteCards(q,{},id=>id,(lib,name,id,criteria)=>names.includes(name)?resolveWordingTarget('policy.crl',source,name,{decision:'D',criteria:new Set(criteria)}):undefined,()=>[],()=>[],(_,name)=>names.includes(name));
+ assert.equal(built.cards.length,3);assert.equal(built.targets.size,3);
+ assert.deepEqual(built.cards.map(c=>c.questionNumber),[1,2,3]);
+ for(const card of built.cards){
+   assert.deepEqual(card.occurrences.map(o=>o.ownerKey),['completion','evidence','risk']);
+   for(const occurrence of card.occurrences)assert.deepEqual(occurrence.criterionPaths,[[{lib:'L',name:occurrence.ownerKey}]]);
+   assert.deepEqual(card.criterionPaths,[[{lib:'L',name:'completion'}]]);
+   assert.equal(built.targets.get(card.id).concept,card.concept);
+ }
+});
+
+test('same named questions from different libraries retain separate numbers',()=>{
+ const q={questions:['A','B'].map(libraryName=>({nodeId:libraryName,libraryName,conceptName:'Q',answer:'yes'}))};
+ const cards=buildRouteCards(q,{},id=>id,()=>undefined,()=>[],()=>[],()=>true).cards;
+ assert.equal(cards.length,2);assert.deepEqual(cards.map(c=>c.questionNumber),[1,2]);
+});
+
+test('a shared question retains differing occurrence determinations without inventing separate question numbers',()=>{
+ const q={questions:['yes','unknown'].map((answer,i)=>({nodeId:'w'+i,libraryName:'L',conceptName:'Complaint',answer,isInferred:false}))};
+ const target=resolveWordingTarget('policy.crl',base+presentation,'Complaint');
+ const cards=buildRouteCards(q,{conceptValues:[{libraryName:'L',name:'Complaint',answerValue:{type:'boolean',value:true}}]},id=>id,()=>target).cards;
+ assert.equal(cards.length,2);assert.deepEqual(cards.map(c=>c.questionNumber),[1,1]);
+ assert.equal(cards[0].value,'Yes');assert.match(cards[1].value,/Determination: Unknown/);
+ assert.deepEqual(cards.map(c=>c.occurrences.map(o=>o.ownerKey)),[['w0'],['w1']]);
 });
 
 test('answer wording and selected choices share unambiguous coding identity',()=>{

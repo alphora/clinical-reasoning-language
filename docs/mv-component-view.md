@@ -19,6 +19,16 @@ Pinned containers enclose only visible component contents. The separate Result Q
 and boundaries, including single-child components. Disclosure actions preserve
 the clicked control and viewport position.
 
+The Result Questionnaire shows each input once, even when several conditions
+refer to it. Question identity is the library and concept, not its wording or
+position in the route. Every tree occurrence retains its condition and criterion
+path, and uses the same question number. Equivalent wording targets share their
+draft. Distinct scoped wording remains available through a selector within the
+one question card; editing still targets the selected wording's original owner.
+Differing determinations across uses remain visible, including Unknown. This is
+MV presentation behavior; it does not alter the generated FHIR Questionnaire or
+clinical evaluation.
+
 Operator-approved interactions (September 12, 2026): opening a tree disclosure
 opens its available nested disclosures; closing it preserves descendant state.
 Unknown or elided bodies remain bounded. Questions use Q numbers on the tree and
