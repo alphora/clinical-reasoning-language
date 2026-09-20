@@ -2,9 +2,14 @@ const assert=require('node:assert/strict');
 const items=xs=>(xs||[]).flatMap(x=>[x,...items(x.item),...(x.answer||[]).flatMap(a=>items(a.item))]);
 function assertQuestionAssociation(q,qr,profile,text){
  const groups=items(q.item).filter(x=>x.type==='group'&&x.definition===profile);
- assert.equal(groups.length,1,'Exactly one owning input group');const group=groups[0];assert.equal(group.text,text,'Authored wording on owning group');
  const definition=profile+'#Observation.value[x]';
- const answers=items(group.item).filter(x=>x.definition===definition&&x.type!=='group');
+ const direct=items(q.item).filter(x=>x.definition===definition&&x.type!=='group');
+ assert.ok(groups.length===1||groups.length===0,'At most one owning input group');
+ assert.equal(direct.length,1,'Exactly one answer for the input profile');
+ // Definition-based generation can put wording directly on the answer instead
+ // of wrapping it in a group; identity remains profile + value path + linkId.
+ const group=groups[0]||direct[0];assert.equal(group.text,text,'Authored wording on the owning question');
+ const answers=groups.length?items(group.item).filter(x=>x.definition===definition&&x.type!=='group'):direct;
  assert.equal(answers.length,1,'Exactly one answer inside its owning group');
  assert.equal(items(q.item).filter(x=>x.definition===definition).length,1,'Unique answer association');
  const responses=items(qr.item).filter(x=>x.linkId===answers[0].linkId&&x.definition===definition);

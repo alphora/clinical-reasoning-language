@@ -156,6 +156,8 @@ async function main() {
       const { repo, subject } = model.bundle(caseName);
       const request = { resourceType: "Bundle", type: "collection", entry: [] };
       if (i >= 3) {
+        // Definition-based extraction resolves the returned Questionnaire by canonical.
+        repo.entry.push({ resource: structuredClone(q) });
         const submitted = carryExtractionBindings(q, qr),
           item = objects(submitted.item).find(
             (x) =>
@@ -258,6 +260,8 @@ async function main() {
         i === 0 ? undefined : { valueString: "Please review the attached information." },
       );
       if (i >= 3) {
+        // Definition-based extraction resolves the returned Questionnaire by canonical.
+        repo.entry.push({ resource: structuredClone(q) });
         assert(
           objects(repo).some(
             (x) =>
@@ -343,7 +347,7 @@ async function main() {
       const { repo, subject } = model.bundle(caseName);
       const request = { resourceType: "Bundle", type: "collection", entry: [] };
       if (repoEdit) repoEdit(repo);
-      if (requestEdit) requestEdit(request);
+      if (requestEdit) requestEdit(request, repo);
       write(path.join(dir, "repo.json"), repo);
       write(path.join(dir, "request.json"), request);
       const prefix = path.join(dir, "native");
@@ -440,7 +444,8 @@ async function main() {
         branched,
         "Answered",
         change
-          ? (request) => {
+          ? (request, repo) => {
+              repo.entry.push({ resource: structuredClone(one(previous, "Questionnaire")) });
               const submitted = carryExtractionBindings(
                 one(previous, "Questionnaire"),
                 one(previous, "QuestionnaireResponse"),
@@ -521,7 +526,8 @@ async function main() {
     assert.deepEqual(answerItems(one(temporalResult, "QuestionnaireResponse"))[0].answer, [{valueDateTime:"2026-09-17"}]);
     rows.push({name:"datetime-populated",type:"dateTime",value:"2026-09-17",passed:true});
     for (const [i, value] of ["2024", "2024-02", "2024-02-29", "1980-01-01T10:15:30Z", undefined].entries()) {
-      temporalResult = await probe("datetime-edit-" + i, temporal, "Answered", request => {
+      temporalResult = await probe("datetime-edit-" + i, temporal, "Answered", (request, repo) => {
+        repo.entry.push({ resource: structuredClone(one(temporalResult, "Questionnaire")) });
         const submitted = carryExtractionBindings(tq, structuredClone(one(temporalResult, "QuestionnaireResponse")));
         const item = answerItems(submitted)[0];
         if (value === undefined) delete item.answer;
@@ -590,7 +596,8 @@ async function main() {
       "boundary-qr-empty",
       control,
       "Answered",
-      (request) => {
+      (request, repo) => {
+        repo.entry.push({ resource: structuredClone(one(original, "Questionnaire")) });
         const submitted = carryExtractionBindings(
           one(original, "Questionnaire"),
           one(original, "QuestionnaireResponse"),

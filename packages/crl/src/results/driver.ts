@@ -97,6 +97,7 @@ export function driverArgs(args: {
   repoPath: string;
   planDefinitionId: string;
   subjectReference: string;
+  session?: { dataPath: string; outputPrefix: string; fileByteLimit: number; totalByteLimit: number };
 }): string[] {
   return [
     ...args.jvmFlags,
@@ -108,5 +109,6 @@ export function driverArgs(args: {
     args.repoPath,
     args.planDefinitionId,
     args.subjectReference,
+    ...(args.session ? ["--session", args.session.dataPath, args.session.outputPrefix, String(args.session.fileByteLimit), String(args.session.totalByteLimit)] : []),
   ];
 }

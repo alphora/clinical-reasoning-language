@@ -18,7 +18,8 @@
     "crl-check-fhir-ids": "dist/cli/run-check-fhir-ids.js",
     "crl-emit-results": "dist/cli/run-emit-results.js",
     "crl-run-regression": "dist/cli/run-regression.js",
-    "crl-mcp": "dist/cli/run-mcp-server.js"
+    "crl-mcp": "dist/cli/run-mcp-server.js",
+    "crl-apply-session": "dist/cli/run-apply-session.js"
   },
   "sideEffects": false,
   "exports": {
@@ -41,6 +42,11 @@
       "types": "./dist/provenance/index.d.ts",
       "import": "./dist/provenance/index.js",
       "require": "./dist/provenance/index.js"
+    },
+    "./session": {
+      "types": "./dist/results/session.d.ts",
+      "import": "./dist/results/session.js",
+      "require": "./dist/results/session.js"
     }
   },
   "files": [
@@ -52,7 +58,8 @@
     "dist/**/*.java",
     "dist/**/*.class",
     "dist/**/*.ps1",
-    "README.md"
+    "README.md",
+    "docs/apply-session.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -108,6 +115,7 @@
     "antlr4ts": "^0.5.0-alpha.4",
     "cpx": "^1.2.1",
     "fsh-sushi": "^3.15.0",
+    "jsonc-parser": "3.3.1",
     "prompts": "^2.4.2",
     "zod": "^4.4.3"
   },

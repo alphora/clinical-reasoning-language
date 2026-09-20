@@ -70,3 +70,7 @@ for (const f of EXPECTED) {
   const dst = join(here, "..", "dist", "results", "driver", "windows-owned-process.ps1");
   mkdirSync(dirname(dst), { recursive: true }); copyFileSync(src, dst);
 }
+
+// REFACTOR:grounded: runtime identity and installed verification retain the driver build provenance.
+copyFileSync(join(here, "..", "src", "results", "driver", "ApplyDriver.build.json"),
+  join(here, "..", "dist", "results", "driver", "ApplyDriver.build.json"));

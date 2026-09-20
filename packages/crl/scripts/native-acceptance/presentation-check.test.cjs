@@ -11,3 +11,10 @@ function fixture(){const a={linkId:'1.1',definition:profile+'#Observation.value[
  });
 // @kit concept-presentation:sibling-answer-preservation
  test('equal leaf labels cannot conceal a modified sibling answer',()=>{const {qr}=fixture();const changed=structuredClone(qr);changed.item[0].answer=[{valueString:'New'}];assertOtherAnswersUnchanged(qr,changed,qr.item[0]);changed.item[1].answer=[{valueString:'Wrong'}];assert.throws(()=>assertOtherAnswersUnchanged(qr,changed,qr.item[0]));});
+
+test('direct definition-based answer retains wording and exact QR association',()=>{
+ const {q,qr}=fixture();const answer=q.item[0].item[0];answer.text='Edited question?';q.item[0]=answer;
+ assertQuestionAssociation(q,qr,profile,'Edited question?');
+ const wrong=structuredClone(qr);wrong.item[0].linkId='unrelated';assert.throws(()=>assertQuestionAssociation(q,wrong,profile,'Edited question?'));
+ const duplicate=structuredClone(q);duplicate.item.push(structuredClone(answer));assert.throws(()=>assertQuestionAssociation(duplicate,qr,profile,'Edited question?'));
+});

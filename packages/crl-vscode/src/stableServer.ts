@@ -22,10 +22,16 @@ import { dirname, join } from "node:path";
 // looking in a `driver/` subdir that does not exist. Same failure as the `.cql` above, one level down.
 export const STABLE_SERVER_ASSETS = [
   "mcp-server.js",
+  // REFACTOR:grounded: keep standalone session tools with their shared runtime assets.
+  "apply-session.js",
+  "crl-apply-session.js",
+  "apply-session.md",
   "CRLCommon.cql",
   "CaseFeatureCommon.cql",
   "FHIRHelpers.cql",
   join("driver", "ApplyDriver.class"),
+  join("driver", "ApplyDriver.java"),
+  join("driver", "ApplyDriver.build.json"),
   join("driver", "windows-owned-process.ps1"),
 ] as const;
 

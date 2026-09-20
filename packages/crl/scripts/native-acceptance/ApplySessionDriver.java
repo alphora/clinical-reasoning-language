@@ -44,7 +44,10 @@ public class ApplySessionDriver {
     Files.writeString(Path.of(args[4] + "-origins.txt"), origins, StandardCharsets.UTF_8);
     Bundle base = read(args[0]), data = read(args[1]);
     InMemoryFhirRepository repo = new InMemoryFhirRepository(ctx, base);
-    PlanDefinitionProcessor processor = new PlanDefinitionProcessor(repo);
+    // Resolve the standard qualified helper include without a FHIR Library resource.
+        org.opencds.cqf.fhir.cr.CrSettings settings = org.opencds.cqf.fhir.cr.CrSettings.getDefault();
+        settings.getEvaluationSettings().addRegisteredNamespace("hl7.fhir.uv.cql", "http://hl7.org/fhir/uv/cql");
+        PlanDefinitionProcessor processor = new PlanDefinitionProcessor(repo, settings);
     write(args[4] + "-request-before.json", data);
     write(args[4] + "-repository-bundle-before.json", base);
     write(args[4] + "-stored-observations-before.json", repo.search(Bundle.class, Observation.class, com.google.common.collect.ImmutableMultimap.of(), Map.of()));
