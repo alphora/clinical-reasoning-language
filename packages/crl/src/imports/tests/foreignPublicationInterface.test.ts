@@ -86,7 +86,9 @@ describe("foreign publication decision namespace", () => {
     const fhir = emitFhirDefFromPath(file);
     expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
     const plan = fhir.resources.find((e) => e.sourceKind === "Decision")!.resource as { library: string[] };
-    expect(plan.library).toContain(`https://example.org/foreign-anchor/Library/${target.libraryName}`);
+    // REFACTOR:grounded (#320, review 825): the unsplit owner contains the named
+    // condition and includes the foreign dependency; only that owner is bound here.
+    expect(plan.library).toEqual([`https://example.org/foreign-anchor/Library/${root.libraryName}`]);
   });
 
   it("reserves the new Interface identity during collision preflight", () => {

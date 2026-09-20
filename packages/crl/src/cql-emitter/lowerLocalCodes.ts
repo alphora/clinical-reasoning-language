@@ -318,9 +318,8 @@ export function lowerLocalCodes(
   // false-positive ever bites a real CQL-only, sourced-only library, narrow by raising the
   // error lazily at first actual synthesis — compute `urn` inside the loop.)
   //
-  // ⚠ The early return hands back the INPUT `ast` BY IDENTITY. `imports/emit.ts` relies on
-  // that (its `didLower` check keeps the guarded `localCodeSystemUrl` at :481 unreached).
-  // A future "clone the ast on this error path" edit would arm that throw — keep identity.
+  // Return the input unchanged on this error path. CodeSystem consumers must check
+  // localCodes, not AST identity: uncoded publication lowering can also rewrite an AST.
   const canonicalBase = opts.canonicalBase?.trim().replace(/\/+$/, "") ?? "";
   if (!canonicalBase) {
     errors.push({
@@ -2049,11 +2048,9 @@ export function lowerLocalCodes(
   const loweredByName = new Map<string, Concept>();
   for (const c of loweredConcepts) loweredByName.set(c.name, c);
 
-  // Nothing actually lowered — every `code`-bearing concept was either skipped
-  // (representation lane) or errored. Return the input AST UNTOUCHED (===) so
-  // callers that key off identity to detect "did this library synthesize a
-  // local codesystem?" (e.g. `imports/emit.ts`'s `didLower = lowered.ast !==
-  // entry.ast`) don't get a false positive from a same-content clone. A records
+  // Nothing actually lowered: preserve the input AST without a needless clone.
+  // REFACTOR:grounded (#320, review 825) — AST identity indicates rewriting only;
+  // localCodes is the evidence that a local CodeSystem was synthesized. A records
   // twin is always paired with a retargeted concept in `loweredConcepts`, so
   // `loweredConcepts.length === 0` ⟹ `recordsTwins.length === 0`; the second
   // clause documents that invariant so a future edit can't add twins without a

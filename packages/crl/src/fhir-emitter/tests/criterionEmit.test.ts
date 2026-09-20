@@ -177,14 +177,17 @@ describe("#236 — criterion emit: named define reference (not expansion)", () =
     expect(result.unmatched).toEqual([]);
   });
 
-  it.each(["all", "first"] as const)("retains a suppressed branch's foreign dependency only if a surviving %s action needs it", (qualifier) => {
+  // REFACTOR:grounded (#320, review 825) — named conditions evaluate in their owner;
+  // foreign dependencies belong to CQL even when priority complements require them.
+  it.each(["all", "first"] as const)("keeps the owner as the only evaluation library for %s actions", (qualifier) => {
     const foreign: BranchCondition = { type: "BranchConditionRef", ref: { type: "QualifiedReference", libraryName: "Foreign", name: "Answer", location: LOC }, location: LOC };
     const canonical = "http://example.org/Library/ForeignInferences";
     const d = decision("Top", [whenC(foreign, leaf(recommend("Missing"))), whenC(refC("Photo"), leaf(recommend("Act")))], qualifier);
     const result = emit(d, [], RESOLVE_ALL, (ref) => typeof ref !== "string", () => ({ libraryName: "ForeignInferences", define: "Answer", canonical }),
       (ref) => ref === "Missing" ? null : RESOLVE_ACT_OK(ref));
     expect(result.resource).not.toBeNull();
-    expect(result.resource!.library!.includes(canonical)).toBe(qualifier === "first");
+    expect(result.resource!.library).toHaveLength(1);
+    expect(result.resource!.library).not.toContain(canonical);
     expect(conditionExprs(result.resource).every((item) => item.language === "text/cql-identifier")).toBe(true);
     expect(conditionExprs(result.resource).some((item) => item.expression.startsWith("Not CRL branch Ref"))).toBe(qualifier === "first");
   });
