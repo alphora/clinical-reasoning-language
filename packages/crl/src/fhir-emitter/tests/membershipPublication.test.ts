@@ -87,7 +87,10 @@ describe("selected membership FHIR and CEL", () => {
     expect(branches).toHaveLength(2); expect(branches[0].input).toHaveLength(1);
     if (!named) {
       const target = [...emitCQLImports(crl).publicationTargets!.values()][0]!;
-      expect(plan.library).toContain(`http://example.org/publication/Library/${target.libraryName}`);
+      // REFACTOR:grounded (#320, review 825): dependency is in the owner's CQL;
+      // identifier-only PD conditions must evaluate in that owner, not the dependency.
+      const owner = emitCQLImports(crl).cqlByLibrary.find(e => e.sourceLibraryName === "Policy" && (e.role === "interface" || e.role === "root"))!;
+      expect(plan.library).toEqual([`http://example.org/publication/Library/${owner.libraryName}`]);
       expect(planConditionBody(emitCQLImports(crl), plan, branches[0].condition[0].expression)).toContain(`${target.libraryName}."${target.define}"`);
       expect(planConditionBody(emitCQLImports(crl), plan, branches[1].condition[0].expression)).toBe(`not (${planConditionBody(emitCQLImports(crl), plan, branches[0].condition[0].expression)})`);
     }

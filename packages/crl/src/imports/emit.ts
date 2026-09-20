@@ -34,7 +34,7 @@ import {
   preLowerAge,
 } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
-import { pascalCaseNameForId, localCodeSystemUrl } from "../fhir-emitter/slug";
+import { pascalCaseNameForId, localCodeSystemUrl, localDomainIdFor } from "../fhir-emitter/slug";
 import type { PublicationEmitScope } from "../emit/publicationProgram";
 import type { CRLError } from "../types/errors";
 
@@ -480,6 +480,18 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
   const domainIdFor = (entry: RegistryEntry): string | undefined => localDomainResolver.domainIdFor(entry);
   const disambiguatedBaseFor = (entry: RegistryEntry): string | undefined =>
     localDomainResolver.disambiguatedBaseFor(entry);
+  // REFACTOR:grounded (#320, review 825) — physical CQL layers belong to a source library,
+  // independently of its local coding domain. Uncoded helpers publish layers too and must
+  // not reuse the policy's layer names, whether reached by an include or a qualified ref.
+  // Preserve the entry point and existing coded-library identities. The FHIR lane consumes
+  // these physical names from the manifest; local retrieval/profile identities stay unchanged.
+  const localCodePaths = new Set(prepared.localCodePaths);
+  const splitBaseFor = (entry: RegistryEntry): string => {
+    const domain = domainIdFor(entry);
+    if (entry.filePath === graph.rootPath || localCodePaths.has(entry.filePath) || domain === undefined)
+      return domain ?? entry.ast.library.name;
+    return localDomainIdFor(domain, entry.ast.library.name, false);
+  };
   // Filled from actual split/rename plans before consumers emit. Lowering needs only raw admission.
   const renderedSourceByLibrary = new Map<string, string>();
   const publicationTargets = new Map<string, { readonly libraryName: string; readonly define: string }>();
@@ -543,9 +555,7 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
     const entryLocalDomainId = domainIdFor(entry);
     // #257 (age slice) T1 — run the shared AGE pre-pipeline (retirement scan + standalone posrep
     // synthesis) BEFORE `lowerLocalCodes`, so a standalone Patient age posrep is classifiable in this
-    // lane (rather than dropping to a null layer) and the retirement fires here too. `didLower` is
-    // computed against the pre-transformed ast, so a standalone-only library (no `code is`) does not
-    // spuriously register a local-domain for collision tracking.
+    // lane (rather than dropping to a null layer) and the retirement fires here too.
     // #189 Slice C 2a — classify authored obligations from the RAW `entry.ast` (still un-lowered here).
     authoredObligationsByPath.set(entry.filePath, buildAuthoredObligations(entry.ast));
     namedAnswerSetsByPath.set(
@@ -566,14 +576,11 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
       publication: publicationScopeFor(entry),
     });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
-    // `didLower` = did `lowerLocalCodes` synthesize a local codesystem (the `code is` lowering) —
-    // computed against the pre-transformed ast, so a standalone-only library (no `code is`) does not
-    // spuriously register a local-domain for collision tracking. `astChanged` = did EITHER pass
-    // transform the ast (so the entry must carry the transformed ast — the standalone synthesis is
-    // lost otherwise, since `lowerLocalCodes` fast-paths a no-`code is` library to `=== preAge.ast`).
-    const didLower = lowered.ast !== preAge.ast;
+    // REFACTOR:grounded (#320, review 825) — publication lowering also rewrites uncoded
+    // sources. Only actual local codes establish a CodeSystem collision participant;
+    // AST identity tells us solely whether to retain the transformed tree.
     const astChanged = lowered.ast !== entry.ast;
-    if (didLower && entry.name) {
+    if (lowered.localCodes.length > 0 && entry.name) {
       // #198 — the collision key is the PER-ENTRY policy-id-slugged local-domain url
       // (the same disambiguated slug source the lowering uses), so the cross-library
       // collision preflight stays consistent with the emitted url. Under Option B a
@@ -729,7 +736,7 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
       // #198 — per-entry disambiguated policy-id base (primary unchanged; sibling
       // suffixed). `plan.kind` is policy-id-independent, but pass the per-entry base
       // so this preflight decides from the SAME identity the emit loop uses.
-      domainIdFor(entry) ?? entry.name,
+      splitBaseFor(entry),
       localCodesCountFor(entry.name),
     );
     if (plan.kind === "full" || plan.kind === "interface") splitLibraryNames.add(entry.name);
@@ -790,7 +797,7 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
       const plan = computeSplitPlan(
         entry.ast,
         entry.name,
-        domainIdFor(entry) ?? entry.name,
+        splitBaseFor(entry),
         localCodesCountFor(entry.name),
       );
       const source =
@@ -836,7 +843,7 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
   // split/rename collision preflight. Targets are actual public declarations, never helper lists.
   for (const entry of emitClosure) {
     if (!entry.name || willSuppress(entry)) continue;
-    const plan = computeSplitPlan(entry.ast, entry.name, domainIdFor(entry) ?? entry.name, localCodesCountFor(entry.name));
+    const plan = computeSplitPlan(entry.ast, entry.name, splitBaseFor(entry), localCodesCountFor(entry.name));
     const names = plan.emittedLibraryNames.map((name) => plan.kind === "none" ? libraryRenames.get(name)! : name);
     for (const name of names) renderedSourceByLibrary.set(name, entry.filePath);
     for (const statement of entry.ast.statements) {
@@ -976,7 +983,7 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
     // entry this source produces, so the FHIR lane can identify a `none` sibling's
     // base Library explicitly.
     const entryDisambiguatedBase = disambiguatedBaseFor(entry);
-    const entryPolicyId = entryLocalDomainId ?? entry.name;
+    const entryPolicyId = splitBaseFor(entry);
     const plan = computeSplitPlan(entry.ast, entry.name, entryPolicyId, localCodesCountFor(entry.name));
     if (plan.kind !== "none") {
       const partitioned = emitPartitioned(entry.ast, entry.name, plan.policyId!, plan.partition!, {

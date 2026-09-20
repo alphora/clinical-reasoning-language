@@ -425,7 +425,6 @@ export function emitDecisionPlanDefinition(
       guardQualifierLibraryName ?? libraryId(metadata, libraryReferenceSuffix),
     isPublication,
     publicationGuardTarget,
-    publicationLibraries: new Set(),
   };
   // REFACTOR:grounded (#320, review 563): diagnose every invalid criterion site before
   // branch/priority emission can introduce unrelated resolution failures or dependencies.
@@ -434,12 +433,12 @@ export function emitDecisionPlanDefinition(
   // #189 null/pause — under an ordered `first:`, each branch also carries the NEGATION of its prior
   // siblings' guards, so an unknown earlier guard poisons every later arm and traversal HALTS (V4).
   const topLevelResults = decision.body.statements.map((branch, i) =>
-    withPublicationDependencies(ctx, () => withPriorityExclusions(
+    withPriorityExclusions(
       emitBranch(branch, ctx, decision.body.qualifier),
       decision.body.qualifier === "first"
         ? priorityExclusions(decision.body.statements.slice(0, i), ctx)
         : [],
-    )),
+    ),
   );
   // An incomplete criterion graph cannot establish publication reachability or a safe priority
   // complement. Refuse the resource even if independent branches otherwise survived emission.
@@ -536,7 +535,10 @@ export function emitDecisionPlanDefinition(
     type: {
       coding: [{ system: PLAN_DEFINITION_TYPE_CS, code: planTypeCode }],
     },
-    library: [...new Set([libraryUrl, ...ctx.publicationLibraries])],
+    // REFACTOR:grounded (#320, review 825) — every emitted condition is an identifier
+    // in this owner library (Interface when split, root otherwise). Foreign publications
+    // are CQL includes of the owner, not additional PlanDefinition evaluation contexts.
+    library: [libraryUrl],
     action: rootActions,
   };
 
@@ -587,7 +589,6 @@ interface EmitCtx {
   guardQualifierLibraryName: string;
   isPublication: (ref: ReferenceName) => boolean;
   publicationGuardTarget: PublicationGuardTargetResolver;
-  publicationLibraries: Set<string>;
 }
 
 // REFACTOR:grounded: publication guards read the selected Boolean Record through generated CQL definitions.
@@ -602,7 +603,6 @@ function conceptGuardTarget(ref: ReferenceName, ctx: EmitCtx): { libraryName: st
   if (isQualifiedRef(normalized) && publicationGuard(normalized, ctx)) {
     const target = ctx.publicationGuardTarget(normalized);
     if (!target) return null;
-    ctx.publicationLibraries.add(target.canonical);
     return target;
   }
   const define = ctx.conceptResolver(normalized);
@@ -985,19 +985,6 @@ function checkDecisionCriteria(decision: Decision, ctx: EmitCtx): void {
   walk(decision.body.statements);
 }
 
-// REFACTOR:grounded (#320, review 563): dependencies follow surviving actions,
-// including their priority complements. Nested suppressed branches contribute none.
-function withPublicationDependencies(ctx: EmitCtx, emit: () => EmitActionResult): EmitActionResult {
-  const parent = ctx.publicationLibraries;
-  const dependencies = new Set<string>();
-  ctx.publicationLibraries = dependencies;
-  try {
-    const result = emit();
-    if (result.kind === "emitted") for (const canonical of dependencies) parent.add(canonical);
-    return result;
-  } finally { ctx.publicationLibraries = parent; }
-}
-
 function emitWhenBlock(
   wb: WhenBlock, ctx: EmitCtx, qualifier: BlockQualifier | undefined,
 ): EmitActionResult {
@@ -1328,10 +1315,10 @@ function fillBranchBody(
   // actions (a compound `or` child spliced under this block's `first:`), so flat-map;
   // the childResults stay 1:1 with statements for the cascade-diagnostic index loop.
   const childResults = body.statements.map((stmt, i) =>
-    withPublicationDependencies(ctx, () => withPriorityExclusions(
+    withPriorityExclusions(
       emitBlockStatement(stmt, ctx, body.qualifier),
       body.qualifier === "first" ? priorityExclusions(body.statements.slice(0, i), ctx) : [],
-    )),
+    ),
   );
   const survivingChildren = childResults
     .filter((r): r is { kind: "emitted"; actions: Record<string, unknown>[] } => r.kind === "emitted")

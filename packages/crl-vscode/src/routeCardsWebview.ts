@@ -4,6 +4,8 @@ import { VERDICT_ICON_STYLE } from './branchVerdict';
 // Kept self-contained so the exact browser controller can be exercised in DOM tests.
 export function installRouteCards(root: HTMLElement, api: { postMessage(m: unknown): void }, generation: () => number, onLayout: () => void = () => {}, standalone = false) {
   let snapshot: any, external = false, layer: SVGGElement | undefined, originalBox: string | null = null;
+  const selectedWording = new Map<string, string>();
+  const occurrences = (card: any): {ownerKey:string;criterionPaths:any[][]}[] => card.occurrences ?? [{ownerKey:card.ownerKey,criterionPaths:card.criterionPaths ?? [card.criteria ?? []]}];
   let questionsVisible = true;
   let verdictFocusToken: string | undefined;
   let nextQuestionnaireFocus = 0;
@@ -111,7 +113,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
   }
   function cardForm(card: any, index: number, ownerKey: string, cardWidth: number): HTMLDivElement {
       const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id; form.dataset.ownerKey = ownerKey; form.style.width = standalone ? "100%" : cardWidth + "px";
-      const caption = document.createElement("div"); caption.className = "route-card-caption"; caption.textContent = (!standalone ? "Q" : "") + String(index + 1); form.append(caption);
+      const caption = document.createElement("div"); caption.className = "route-card-caption"; caption.textContent = (!standalone ? "Q" : "") + String(card.questionNumber ?? index + 1); form.append(caption);
       const text = document.createElement("div"); text.className = "route-card-question"; text.textContent = card.text; form.append(text);
       if (card.description) {
         const toggle=document.createElement("button"); toggle.className="route-description-toggle"; toggle.textContent="Description"; toggle.setAttribute("aria-expanded", String(!!card.descriptionOpen));
@@ -129,7 +131,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
           form.append(list);
         }
       }
-      const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.proposal ? "Saved for KE review" : ""; form.append(status);
+      const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.statusMessage ?? (card.proposal ? "Saved for KE review" : ""); form.append(status);
       if (card.readOnlyReason) { const reason = document.createElement("p"); reason.textContent = card.readOnlyReason; form.append(reason); }
       if (card.editable) {
         const edit = document.createElement("button"); edit.className="route-card-edit"; edit.title="Edit question"; edit.setAttribute("aria-label","Edit question");
@@ -144,7 +146,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         const questionLabel=document.createElement("label"); questionLabel.textContent="Question"; questionLabel.append(input);
         const descriptionLabel=document.createElement("label"); descriptionLabel.textContent="Description"; descriptionLabel.append(desc); editor.append(questionLabel,descriptionLabel);
         const save = document.createElement("button"); save.textContent = "Save change";
-        save.onclick = () => { save.disabled = true; status.textContent = "Saving…"; api.postMessage({ type: "routeCardProposal", gen: generation(), token: snapshot.token, key: card.id, fields: { questionText: card.draftText ?? card.text, questionDescription: card.draftDescription ?? card.description } }); };
+        save.disabled = !!card.saving;
+        save.onclick = () => { card.saving = true; card.statusMessage = "Saving…"; save.disabled = true; status.textContent = card.statusMessage; api.postMessage({ type: "routeCardProposal", gen: generation(), token: snapshot.token, key: card.id, fields: { questionText: card.draftText ?? card.text, questionDescription: card.draftDescription ?? card.description } }); };
         const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.onclick = () => { card.editing = false; delete card.draftText; delete card.draftDescription; sendDraft(card); render(); };
         editor.append(save, cancel); form.append(editor);
         edit.onclick = () => { card.editing = true; card.editingOwner=standalone?undefined:ownerKey; sendDraft(card); render(); root.querySelector<HTMLTextAreaElement>('[data-card-id="'+card.id+'"] .route-card-editor:not([hidden]) textarea')?.focus(); };
@@ -160,7 +163,27 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const heading=document.createElement('p');heading.className='route-branch-label';heading.textContent=snapshot.label;root.append(heading);
       if(snapshot.note){const note=document.createElement('p');note.className='route-card-note';note.setAttribute('role','status');note.textContent=snapshot.note;root.append(note);}
       const panel=document.createElement('div');panel.className='route-questionnaire';root.append(panel);
-      for(const [index,card] of snapshot.cards.entries())panel.append(cardForm(card,index,card.ownerKey,480));
+      const questions = new Map<string, any[]>();
+      for (const card of snapshot.cards) {
+        const identity=JSON.stringify([card.library,card.concept]);
+        questions.set(identity,[...(questions.get(identity) ?? []),card]);
+      }
+      for (const [index,[identity,variants]] of [...questions].entries()) {
+        const card=variants.find(c=>c.id===selectedWording.get(identity)) ?? variants.find(c=>c.editing) ?? variants[0];
+        const form=cardForm(card,index,card.ownerKey,480);
+        if (variants.length>1) {
+          const label=document.createElement('label');label.className='route-wording-label';label.textContent='Question wording ';
+          const select=document.createElement('select');select.className='route-wording-select';select.setAttribute('aria-label','Question wording');
+          const differingValues=new Set(variants.map(v=>v.value)).size>1;
+          variants.forEach((v,i)=>{const option=document.createElement('option');option.value=v.id;option.textContent=`${i+1}: ${v.scopeLabel ?? 'Use in this route'} — ${v.text}${differingValues ? ' — '+v.value : ''}`;select.append(option);});
+          select.value=card.id;
+          select.onchange=()=>{selectedWording.set(identity,select.value);render();const next=Array.from(root.querySelectorAll<HTMLElement>('.route-card')).find(n=>n.dataset.cardId===select.value);next?.querySelector<HTMLSelectElement>('.route-wording-select')?.focus({preventScroll:true});};
+          label.append(select);form.append(label);
+          const determinations=[...new Set(variants.map(c=>c.determination || 'Input value only'))];
+          if(determinations.length>1){const note=document.createElement('p');note.className='route-determination-note';note.textContent='Determination differs across uses: '+determinations.join(', ')+'.';form.append(note);}
+        }
+        panel.append(form);
+      }
       return;
     }
     const svg = root.querySelector<SVGSVGElement>(".flow-svg");
@@ -182,7 +205,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     if(questionsVisible)for(const toggle of Array.from(root.querySelectorAll('[data-flow-choices-toggle]')))hide(toggle);
     for(const option of nodes.filter(n=>n.dataset.flowChoice)) {
       const choice=JSON.parse(option.dataset.flowChoice!);
-      const card=snapshot.cards.find((c:any)=>JSON.stringify([c.library,c.concept])===option.dataset.flowChoiceFor && c.ownerKey===option.dataset.flowWhen);
+      const card=snapshot.cards.find((c:any)=>JSON.stringify([c.library,c.concept])===option.dataset.flowChoiceFor && occurrences(c).some(o=>o.ownerKey===option.dataset.flowWhen));
       if(card?.answerChoices?.some((c:any)=>c.selected && c.code===choice.code && c.system===choice.system)) {
         const hadSelected=option.classList.contains('flow-choice-selected');option.classList.add('flow-choice-selected');restore.push(()=>{if(!hadSelected)option.classList.remove('flow-choice-selected');});set(option,'aria-label',(option.querySelector('title')?.textContent??'')+' — Selected answer');
       }
@@ -214,23 +237,24 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     // DOM textContent for every authored string; no authored HTML enters the canvas.
     for (const [index, card] of (questionsVisible || external ? snapshot.cards : []).entries()) {
       const identity = JSON.stringify([card.library,card.concept]);
-      const paths=(card.criterionPaths ?? [card.criteria ?? []]).map((p:any[])=>p.map(c=>JSON.stringify([c.lib,c.name])));
-      const owners = visible.filter(n => n.dataset.flowWhen === card.ownerKey && n.dataset.flowQuestion === identity && paths.some((p:string[])=>JSON.stringify(p)===JSON.stringify(criterionPath(n))));
-        for (const collapse of visible.filter(n => n.dataset.flowWhen === card.ownerKey && n.dataset.flowHiddenCriterion && paths.some((path:string[])=>{
+      const number=card.questionNumber ?? index+1;
+      const associations=occurrences(card).map(o=>({ownerKey:o.ownerKey,paths:o.criterionPaths.map((p:any[])=>p.map(c=>JSON.stringify([c.lib,c.name])))}));
+      const owners = visible.filter(n => n.dataset.flowQuestion === identity && associations.some(o=>n.dataset.flowWhen===o.ownerKey && o.paths.some((p:string[])=>JSON.stringify(p)===JSON.stringify(criterionPath(n)))));
+        for (const collapse of visible.filter(n => n.dataset.flowHiddenCriterion && associations.some(o=>n.dataset.flowWhen===o.ownerKey && o.paths.some((path:string[])=>{
           const prefix=criterionPath(n);return prefix.length>0 && prefix.length<=path.length && prefix.every((c,i)=>c===path[i]);
-        }))) {
-          hidden.set(collapse,[...(hidden.get(collapse) ?? []),index+1]);
+        })))) {
+          hidden.set(collapse,[...new Set([...(hidden.get(collapse) ?? []),number])]);
         }
       // A repeated concept can have several actual occurrences within one condition.
       // Each gets the same question number, rather than choosing an arbitrary parent.
       for (const owner of owners) {
-      if (external) { placements.push({card:{...card,number:index+1},owner,height:0}); continue; }
+      if (external) { placements.push({card:{...card,number},owner,height:0}); continue; }
       if(card.editing && !card.editingOwner)card.editingOwner=owner.dataset.flowKey;
       const form = cardForm(card,index,owner.dataset.flowKey!,cardWidth);
       const fo = svgEl("foreignObject", { width:cardWidth, height:20000 });
       fo.append(form); layer.append(fo);
       const height = Math.ceil(form.offsetHeight);
-      placements.push({card: {...card, number:index+1}, owner, height, form, fo});
+      placements.push({card: {...card, number}, owner, height, form, fo});
       }
     }
     // Align primary rows across columns; reserve each question below its own
@@ -348,14 +372,14 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     onLayout();
   }
   return {
-    show(value: any) { if(value.showQuestions && snapshot?.token !== value.token) questionsVisible = true; if (snapshot?.token === value.token) for (const card of value.cards) {
+    show(value: any) { if(snapshot?.token !== value.token)selectedWording.clear(); if(value.showQuestions && snapshot?.token !== value.token) questionsVisible = true; if (snapshot?.token === value.token) for (const card of value.cards) {
       const previous = snapshot.cards.find((c: any) => c.id === card.id);
-      if(previous)Object.assign(card,{descriptionOpen:previous.descriptionOpen,choicesOpen:previous.choicesOpen});
+      if(previous)Object.assign(card,{descriptionOpen:previous.descriptionOpen,choicesOpen:previous.choicesOpen,saving:previous.saving,statusMessage:previous.statusMessage});
       if (previous && !value.authoritativeDrafts) Object.assign(card, { editing: previous.editing, editingOwner: previous.editingOwner, draftText: previous.draftText, draftDescription: previous.draftDescription, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen, choicesOpen: previous.choicesOpen });
     } snapshot = value; render(); },
     token() { return snapshot?.token; },
     isExternal() { return external; },
-    reset() { cancelQuestionnaireFocus();snapshot = undefined; external = false; clear(); },
+    reset() { cancelQuestionnaireFocus();selectedWording.clear();snapshot = undefined; external = false; clear(); },
     questionnaireState(open: boolean, focusToken?: string, requestId?: string) {
       if(external!==open){external=open;render();}
       // State synchronization alone never takes focus. A particular click owns
@@ -379,14 +403,14 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     draft(message: any) { if (!snapshot || snapshot.token!==message.token) return; const card=snapshot.cards.find((c:any)=>c.id===message.key);if(!card)return;for(const key of ['editing','editingOwner','draftText','draftDescription']){const value=message.fields[key];if(value===null)delete card[key];else card[key]=value;} },
     rebind() { restore = []; originalBox = null; layer = undefined; toolbar?.remove(); render(); },
     result(message: any) { if (!snapshot || message.token !== snapshot.token) return; const card = snapshot.cards.find((c: any) => c.id === message.key); if (!card) return;
-      card.proposal = message.ok; if (message.ok) card.editing = false; render();
-      const status = root.querySelector<HTMLElement>('[data-card-id="'+card.id+'"] .route-card-status'); if (status) status.textContent = message.message; },
+      card.proposal = message.ok; card.saving=false;card.statusMessage=message.message; if (message.ok) card.editing = false; render(); },
   };
 }
 
 export const ROUTE_CARD_STYLE = `
 ${VERDICT_ICON_STYLE}
 .route-card{user-select:text}
+.route-wording-label{display:block;margin-top:8px}.route-wording-select{max-width:100%;color:inherit;background:var(--vscode-dropdown-background,#333)}
 .flow-row.flow-pinned.leaf-allpass>.flow-allpass-badge{display:none}
 .route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; border-radius:3px; background:rgba(180,180,180,.15); color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
 .route-card-caption { display:inline-block; vertical-align:baseline; margin:0 6px 0 0; padding:0 4px; font-size:10px; line-height:1.1; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-descriptionForeground,#aaa); }
