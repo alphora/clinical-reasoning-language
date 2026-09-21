@@ -1,3 +1,9 @@
+## Local 6.4.6 engine-identity content correction
+
+Baseline: ef474dc6885c11f04e1054e4cda31d2107ae4a64; target: pending content checkpoint. The export gate correctly rejected the earlier unchanged-content assumption below: the native-results rule interpolates ENGINE_JAR_SOURCE, so the engine build ID and cache path change the canonical kit payload. The inspected full diff from installed 6.4.5 contains only that rule's two engine identifiers plus version/hash/audit metadata. No semantic clauses or examples change. Kit schema advances to 2.16; content hash is d5099f1b7a0b82af0b23b2ec2706afec50dd23799da6ad43b12426a92598fbd4.
+
+Disposition: kit updated for native-results engine identity/cache instructions; existing native-results acquisition and independent-native-proof assertions still own the behavior. Index version comment and three unit/MCP schema/hash pins are mechanical metadata changes. No tags are added or removed. Complete changed paths: authoring-kit/index.ts, authoring-kit/tests/authoring-kit.test.ts, cli/tests/run-mcp-server.test.mjs, crl-vscode/src/mcp-server.test.mjs, audit.json and this ledger. The earlier audit stamp is superseded by this correction; it did not pass the delivery gate. Reviewed engine/runtime behavior and bounded native evidence from 837/838 remain applicable.
+
 ## Local 6.4.6 upstream runtime adoption
 
 Baseline: 9adb36a190620817afb2241f409fac569733cf95; target: ef474dc6885c11f04e1054e4cda31d2107ae4a64. Kit2.15 content hash remains 4be4afc2a6f18625eee21d08397a87330daf89d95c2d50df9faae09ec2a60278. No kit claims or tags added/removed. The complete delta includes the 6.4.5 final audit/test pins/docs plus the runtime files listed below. Mechanical 6.4.6 version metadata remains pending packaging qualification.

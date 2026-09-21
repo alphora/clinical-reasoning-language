@@ -359,7 +359,8 @@ export type {
 // "2.12" → "2.13": coded Observation sourcing and FHIR NPM packaging guidance.
 // → "2.14": definitions-only Bundle composition and explicit native session API.
 // → "2.15": bounded CRE record-status preview and explicit existence verification.
-const SCHEMA_VERSION = "2.15";
+// → "2.16": upstream definition-based engine identity and cache instructions.
+const SCHEMA_VERSION = "2.16";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
