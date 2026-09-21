@@ -1,0 +1,30 @@
+library "Condition Status".
+terminology "Finding Codes":
+- system is `http://example.org/findings`.
+- code is `finding`.
+concept "Findings":
+- shape is RecordSet.
+- type is Condition.
+- coded from "Finding Codes".
+concept "Active Findings":
+- shape is RecordSet.
+- type is Condition.
+- definition is "Findings" active.
+concept "Verified Findings":
+- shape is RecordSet.
+- type is Condition.
+- definition is "Active Findings" verified.
+concept "Finding Exists":
+- type is Observation.
+- value type is boolean.
+- defined as exists ( "Verified Findings" ).
+activity "Eligible":
+- request CPGCommunicationRequest.
+- with `ELIGIBLE`.
+activity "Not Eligible":
+- request CPGCommunicationRequest.
+- with `NOT_ELIGIBLE`.
+decision "D":
+first:
+- when "Finding Exists" then recommend activity "Eligible".
+- otherwise then recommend activity "Not Eligible".

@@ -13,6 +13,9 @@ import { publicationHasValueFormError, publicationProducerOperands } from "../em
  * nullable values; missing answerable evidence pauses before a leaf. Their CRE
  * capability boundary is checked in runCel. The older presence/composition path
  * described below is legacy implementation, not the target publication semantics.
+ * Explicit Condition/Observation RecordSets now evaluate coded retrieves and the
+ * one-operand Active/IsVerified filters over emitted CEL resources. Unsupported
+ * RecordSet operations fail on consumption instead of fabricating presence truth.
  *
  * LEGACY SCOPE (unmarked implementation remains presumed-wrong under #320):
  *  - Concept satisfaction is ASSERTED + COMPOSED (REFACTOR:grounded — #189 Piece 2 + (a), disc 508/510/511):
@@ -127,7 +130,8 @@ import { readPolicyId } from "../fhir-emitter/metadata";
 import { resolveCaseFactDates } from "../cel/factDate";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
 import type { ResolvedCelGraph } from "../cel/imports/types";
-import { createPublicationContext } from "../emit/publicationContext";
+import { createPublicationContext, type PublicationContext } from "../emit/publicationContext";
+import { createRecordCollectionEvaluator } from "./recordCollections";
 import { buildLibraryScopes, lookupKnownLibrary } from "../imports/scopes";
 import type { RegistryEntry } from "../imports/types";
 import { walkIncludes } from "../imports/resolver";
@@ -403,6 +407,8 @@ export interface OwnCandidate {
 }
 
 interface Ctx {
+  recordCollection?: ReturnType<typeof createRecordCollectionEvaluator>;
+  recordScopeErrors?: ReadonlyMap<Id, string>;
   publicationNow: Date;
   publicationProgram?: PublicationProgram;
   publicationResources: readonly EmittedResource[];
@@ -1034,6 +1040,12 @@ function definitionUsesPublication(node: unknown, lib: string, ctx: Ctx): boolea
 }
 
 function evalConcept(id: Id, ctx: Ctx): ConceptEval {
+  const recordScopeError = ctx.recordScopeErrors?.get(id);
+  if (recordScopeError) {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(`record-collection-unsupported: ${recordScopeError}`);
+    return { sat: null };
+  }
   const cached = ctx.cache.get(id);
   if (cached) {
     if (cached.publicationResult?.state === "failed") {
@@ -1062,6 +1074,17 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
     ctx.stack.delete(id);
     ctx.cache.set(id, result);
     return result;
+  }
+  if (entry?.node.shape === "RecordSet" && ctx.recordCollection) {
+    ctx.stack.delete(id);
+    // A collection is not a selected Boolean answer. Explicit exists consumes its
+    // records below; a Boolean-value read must never turn a recorded false into true.
+    if (entry.node.valueTypes.includes("boolean")) {
+      ctx.runtimeError = true;
+      ctx.diagnostics.push(`record-collection-unsupported: "${entry.node.name}" is a collection, not a selected Boolean answer.`);
+      return { sat: null };
+    }
+    return recordCollectionPresence(entry, ctx);
   }
   if (entry && definitionUsesPublication(entry.node.definition, entry.lib, ctx)) {
     ctx.stack.delete(id);
@@ -1112,7 +1135,7 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
       // derived concept, so a presence answer here is always-false: a silent Deny of every eligible case, the
       // exact fabrication the count/most-recent arm below refuses. (`exists this` — a `ThisRecords` target — is
       // the concept's OWN records, sound as `directFacts` presence, so it needs no arm and falls through.)
-      composition = refTrace(red.target.ref, entry!.lib, ctx);
+      composition = existsTrace(red.target.ref, entry!.lib, ctx);
       composition = { ...composition, satisfied: composition.satisfied === true };
       composed = composition.satisfied ?? false;
     } else if (red.kind === "count" || red.kind === "mostRecent") {
@@ -1370,12 +1393,27 @@ function existsTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrac
   const refLib = getRefLibrary(ref) ?? lib;
   const name = getRefName(ref);
   const id = idOf(refLib, name);
+  if (ctx.recordScopeErrors?.has(id)) return { op: "ref", concept: name, ...traceTruth(evalConcept(id, ctx).sat) };
+  const entry = ctx.concepts.get(id);
+  if (entry?.node.shape === "RecordSet" && ctx.recordCollection) {
+    return { op: "ref", concept: name, ...traceTruth(recordCollectionPresence(entry, ctx).sat) };
+  }
   const def = ctx.concepts.get(id)?.node.definition;
   if (def?.type === "ReductionDefinition" && (def.reduction.kind === "count" || def.reduction.kind === "mostRecent")) {
     return { op: "ref", concept: name, satisfied: ctx.directFacts.has(id) };
   }
   const trace = refTrace(ref, lib, ctx);
   return { ...trace, satisfied: trace.satisfied === true }; // explicit existence remains total
+}
+
+function recordCollectionPresence(entry: ConceptEntry, ctx: Ctx): ConceptEval {
+  try {
+    return { sat: ctx.recordCollection!(entry.filePath, entry.node).length > 0 };
+  } catch (error) {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(error instanceof Error ? error.message : String(error));
+    return { sat: null };
+  }
 }
 
 function walkExpr(expr: CompositionExpression, lib: string, ctx: Ctx): CompositionTrace {
@@ -2067,7 +2105,7 @@ function runCase(
   now: Date,
   collisionDiagnostic?: string,
   pauseValidationErrors: readonly string[] = [],
-  publication?: { program?: PublicationProgram; resources?: readonly EmittedResource[]; error?: string; celLibrary: string },
+  publication?: { program?: PublicationProgram; resources?: readonly EmittedResource[]; error?: string; celLibrary: string; recordDeclarations?: PublicationContext; recordError?: string; recordScopeErrors?: ReadonlyMap<Id, string> },
   authoringErrors: readonly string[] = [],
 ): CaseRun {
   const diagnostics: string[] = [];
@@ -2431,6 +2469,17 @@ function runCase(
   }
 
   const ctx: Ctx = {
+    recordScopeErrors: publication?.recordScopeErrors,
+    recordCollection: publication?.recordError ? () => { throw new Error(publication.recordError); }
+      : publication?.recordDeclarations ? createRecordCollectionEvaluator(
+      publication.recordDeclarations, publication.resources ?? [],
+      subjectFact === undefined ? "" : `Patient/${celResourceId(publication.celLibrary, c.name, subjectFact)}`,
+      (library, name) => localIndex.forward.get(idOf(library, name)),
+      (source, node) => {
+        const library = publication.recordDeclarations!.getLibrary(source)?.libraryName;
+        return library === undefined ? "Cannot resolve collection owner." : publication.recordScopeErrors?.get(idOf(library, node.name));
+      },
+    ) : undefined,
     discardedUnknown: false,
     publicationProgram: publication?.program,
     publicationResources: publication?.resources ?? [],
@@ -2748,8 +2797,9 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
     }
     return names;
   };
+  const recordDomain = makeLocalDomainContext(graph);
   const declarations = createPublicationContext({
-    libraries: [...entriesByPath.values()].map((entry) => ({ sourceIdentity: entry.filePath, ast: entry.ast, artifact: {} })),
+    libraries: [...entriesByPath.values()].map((entry) => ({ sourceIdentity: entry.filePath, ast: entry.ast, artifact: { canonicalBase: recordDomain.base } })),
     resolveLibrary(from, qualifier) {
       const scope = scopes.get(from);
       const target = scope === undefined ? undefined : lookupKnownLibrary(scope, qualifier);
@@ -2798,6 +2848,8 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
     }
   }
   const visitedConcepts = new Set<string>();
+  let hasRecordCollections = false;
+  const recordScopeErrors = new Map<Id, string>();
   const publicationPaths = new Set<string>();
   // REFACTOR:grounded (#320, plan595): check emitted/consumed sources, not unrelated registry siblings.
   const bmiAuthoringErrors = new Set<string>();
@@ -2818,6 +2870,15 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
     const hit = declarations.lookupConcept(pending.from, pending.ref);
     if (hit.kind !== "hit" || visitedConcepts.has(hit.identity.key)) continue;
     visitedConcepts.add(hit.identity.key);
+    if (hit.node.shape === "RecordSet") {
+      hasRecordCollections = true;
+      const id = idOf(hit.identity.libraryName, hit.node.name);
+      if (concepts.get(id)?.filePath !== hit.identity.sourceIdentity) {
+        // Legacy trace/local-membership keys are library+name. Refuse a competing
+        // owner rather than retrieving its records under an explicitly included owner.
+        recordScopeErrors.set(id, `Ambiguous collection owner for ${labelOf(hit.identity.libraryName, hit.node.name)}; preview cannot represent both source identities.`);
+      }
+    }
     const bmiOwner = entriesByPath.get(hit.identity.sourceIdentity);
     if (bmiOwner !== undefined) checkBmiSource(bmiOwner);
     if (hit.node.shapeReduction !== undefined) publicationPaths.add(hit.identity.sourceIdentity);
@@ -2897,6 +2958,11 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   }
   // REFACTOR:grounded (#320, plan593): build indexes after prepared publication owners
   // have replaced any registry-default shadow, so resource membership shares that identity.
+  // Record filters consume emitted patient data even when no selected publication
+  // exists. Keep emission diagnostics localized to the individual case below.
+  if (hasRecordCollections && publicationEmission === undefined && publicationError === undefined) {
+    publicationEmission = emitCelToFhir(graph, { now });
+  }
   const localIndex = buildLocalMembershipIndex(concepts, graph);
   if (localIndex.answerErrors.length) return { success: false, runs: [], errors: localIndex.answerErrors };
   const sourceIndex = buildSourceMembershipIndex(concepts, graph);
@@ -2920,7 +2986,7 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
     const omittedInputs = scopedEmission?.diagnostics.filter((d) => d.severity === "error" || d.kind === "unsupported-yet") ?? [];
     const casePublicationError = publicationError ?? (omittedInputs.length > 0
       ? "publication-input-emission-failed: " + omittedInputs.map((d) => `${d.kind}: ${d.message}`).join("; ")
-      : hasPublication && !emittedPublicationCase
+      : (hasPublication || hasRecordCollections) && !emittedPublicationCase
       ? "publication-input-emission-failed: " + (publicationEmission?.diagnostics.map((d) => `${d.kind}: ${d.message}`).join("; ") ?? "No case resources were emitted.")
       : undefined);
     runs.push(
@@ -2940,7 +3006,9 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
         now,
         collisionDiagnostic,
         pauseValidationErrors,
-        hasPublication ? { program: publicationProgram, resources: emittedPublicationCase?.resources, error: casePublicationError, celLibrary: graph.cel.library.name } : undefined,
+        hasPublication || hasRecordCollections ? { program: publicationProgram, resources: emittedPublicationCase?.resources,
+          error: hasPublication ? casePublicationError : undefined, celLibrary: graph.cel.library.name,
+          recordDeclarations: hasRecordCollections ? declarations : undefined, recordError: casePublicationError, recordScopeErrors } : undefined,
         [...bmiAuthoringErrors],
       ),
     );

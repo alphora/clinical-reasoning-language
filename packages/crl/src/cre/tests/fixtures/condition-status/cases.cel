@@ -1,0 +1,23 @@
+library "Condition Status Cases".
+covers "Condition Status".
+fact "Subject":
+- name is "Synthetic subject".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "Finding":
+- code is "http://example.org/findings|finding".
+- defined by "Condition".
+fact "Other":
+- code is "http://example.org/findings|other".
+- defined by "Condition".
+case "Matching":
+- subject is "Subject".
+- fact is "Finding".
+- result is "D" is "Eligible".
+case "Nonmatching":
+- subject is "Subject".
+- fact is "Other".
+- result is "D" is "Not Eligible".
+case "Empty":
+- subject is "Subject".
+- result is "D" is "Not Eligible".

@@ -50,7 +50,7 @@ function resolveTerminology(name: string, registry: Registry): Terminology | und
 /** The MECHANICAL emitted `{system, code}` set of a terminology: a PURE reference VS (`valueset is <url>`, no other
  *  lines) → the single stub coding (or `[]` when it has no FHIR-id-legal tail — a URN can't be stubbed); otherwise
  *  the inline `system is`/`code is` pairs (mirrors `valueSet.ts` `buildCompose`). No runtime resolution. */
-function terminologyMembers(term: Terminology, base: string): { system: string; code: string }[] {
+export function terminologyMembers(term: Readonly<Terminology>, base: string): { system: string; code: string }[] {
   const refLines = term.body.filter((l): l is TerminologyValueset => l.type === "TerminologyValueset");
   const isPureReference = refLines.length === 1 && term.body.every((l) => l.type === "TerminologyValueset");
   if (isPureReference) {
