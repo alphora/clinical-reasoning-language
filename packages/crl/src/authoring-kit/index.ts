@@ -360,7 +360,8 @@ export type {
 // → "2.14": definitions-only Bundle composition and explicit native session API.
 // → "2.15": bounded CRE record-status preview and explicit existence verification.
 // → "2.16": upstream definition-based engine identity and cache instructions.
-const SCHEMA_VERSION = "2.16";
+// → "2.17": exact question association for flat and grouped native inputs.
+const SCHEMA_VERSION = "2.17";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -566,7 +567,7 @@ const RULES: KitRule[] = [
         "force": "default"
       },
       {
-        "text": "In the tested native Questionnaire, authored question text is on the input group, while the answer item can retain the concept name. Associate the group by its exact input profile definition and its contained answer item by that profile plus #Observation.value[x]; join the QuestionnaireResponse by linkId and definition. Do not compare wording only on answer leaves, use display text as identity, or borrow text from an unrelated ancestor/sibling. Missing or incorrectly associated group text fails the wording check. These checks cover the tested selected Observation input shape, not an arbitrary Questionnaire hierarchy. Description still requires emitted-extension verification because native description rendering is not supported.",
+        "text": "For the tested selected Observation inputs, identify exactly one non-group answer item whose definition is the exact input profile plus #Observation.value[x]. When there is no owning input group, verify authored question text on that answer item. If a group with definition equal to the exact input profile is present, require exactly one such group, verify its question text, and require it to contain the identified answer. Match the QuestionnaireResponse item by both linkId and definition. Reject missing or misassociated wording, duplicate associations, and wording borrowed from unrelated ancestors or siblings. These checks cover the tested selected Observation shape, not arbitrary Questionnaire hierarchies. Continue verifying authored descriptions in emitted extensions; native description rendering remains unqualified.",
         "force": "default"
       },
       {

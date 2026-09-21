@@ -292,7 +292,7 @@ async function main() {
       const swapped=structuredClone(q);const a=assertQuestionAssociation(swapped,qr,profile,wording[0][2]).group;
       const b=assertQuestionAssociation(swapped,qr,INTAKE_BASE+"/StructureDefinition/intake-native-treatment-begun",wording[1][2]).group;
       [a.text,b.text]=[b.text,a.text];assert.throws(()=>assertQuestionAssociation(swapped,qr,profile,wording[0][2]));
-      write(path.join(out,"verification.json"),{passed:true,engineSha256:ENGINE_JAR_SOURCE.sha256,contract:"Planner-edited CRL through native group/answer/QR association; five answer/change/clear outcomes; missing/swapped native wording copies rejected. Description emission checked separately; no native description rendering claim.",rows,negativeControls:["missing group wording","swapped group wording"]});
+      write(path.join(out,"verification.json"),{passed:true,engineSha256:ENGINE_JAR_SOURCE.sha256,contract:"Planner-edited CRL through native group/answer/QR association; five answer/change/clear outcomes; missing/swapped native wording copies rejected. Description emission checked separately; no native description rendering claim.",rows,negativeControls:["missing owning question wording","swapped owning question wording"]});
       return;
     }
     // These are synthetic source controls, not additional ADMIN policy requirements.
