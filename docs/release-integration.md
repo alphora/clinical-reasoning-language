@@ -1,9 +1,9 @@
 # Local build integration
 
-Audited September 20, 2026. Public baseline: `v6.3.0` at
+Audited September 21, 2026. Public baseline: `v6.3.0` at
 `46102010de434b9e89c02159c4c796c813bf80c2`.
-Qualified local candidate: **6.4.4**, isolated branch `codex/hcsc-session-delivery`.
-Reviewed product content: `72560b0b4b88cf93b875a395af22972d55e1535e`; kit audit: `efecd1a028c40c15974cf7cbee35e22caac4f0cc`.
+Qualified local candidate: **6.4.5**, isolated branch `codex/recovery-cre-preview-20260921`.
+Reviewed product content: `9adb36a190620817afb2241f409fac569733cf95`; kit audit: `47fb1ea833c00936a60069b5788e8eea8ee93a6e`.
 This record describes local integration, not public publication.
 
 | Local build/work | Retained behavior | Integrated revision |
@@ -81,8 +81,10 @@ separate. They were neither discarded nor folded into the product delivery.
 
 ## Preparing the next public release
 
-Start from the integrated `develop` lineage containing `710fe11b`, not a prior
-release worktree. Resolve this full candidate SHA with `git merge-base --is-ancestor`
+Retain the complete local candidate lineage through
+`47fb1ea833c00936a60069b5788e8eea8ee93a6e`, including the 6.4.4 delivery
+`db02b9cbe4d40afa047c372ab1452299d6d6902c`, not merely the older `develop`
+checkpoint `710fe11b`. Verify these full candidate SHAs with `git merge-base --is-ancestor`
 against the next candidate, and inspect any later removals or feature changes.
 When later work supersedes a retained feature, record its replacement and owning
 validation here. Add newly delivered local builds to this table. Keep unfinished
@@ -91,6 +93,35 @@ work explicit instead of treating every branch as either shipped or disposable.
 Follow the release protocol for final artifacts and installed verification. Reuse
 valid completed evidence; rerun affected checks when a later change invalidates it.
 This reconciliation itself does not require repeating the whole test suite.
+
+## Local 6.4.5 — record-status preview
+
+CRE now evaluates the supported explicit Condition/Observation RecordSet status
+filters against the actual CEL-emitted resources, including same-record Condition
+active/verified checks and explicit existence. Unsupported reached collection forms
+remain errors; off-path probes do not contaminate reached supported results. Kit 2.15
+documents that bounded support without claiming universal native parity.
+
+Qualification: 713 focused kit/CRE/AST tests, the core MCP suite and 36 extension
+MCP checks passed. Fresh installed npm and VSIX MCPs retain all 25 tools and return
+the same audited kit. The actual npm package also passed the three generic cases
+on Linux through the shared WSL coordinator. Visible installed MV checks show
+true → Eligible and false → Not Eligible with result navigation. The UI fixture
+uses stable case IDs; it has no source correspondence or generated FHIR form.
+
+The three previously completed native controls agree with the preview. All 66
+packaged native-runtime files, dependencies, CLI bins and exports match 6.4.4;
+its broader native/session evidence is retained. The full regression and long
+native suite were not rerun. Installed files match both archives (VS Code's
+installation metadata in package.json is compared separately).
+
+Artifacts and receipt: `tmp/local-cre-preview-6.4.5/`.
+VSIX SHA256: `3e6f61cac888d53426a6743a2287afe22ac642fba593904232889c2d24e5079b`.
+npm SHA256: `ecbbdf855b0af4d3588b799927594a0c4b611c23e2ce95fbb921efba547ad94c`.
+Native reviews converged; the external reviewer was unavailable. Source and audit
+are backed up on the recovery branch. No public release, customer migration or
+upstream engine adoption occurred. Upstream duplication issue1122 remains the next
+engine-adoption dependency; this local preview fix does not resolve it.
 
 ## Local6.4.3 ? Result Questionnaire duplicate-input fix
 
