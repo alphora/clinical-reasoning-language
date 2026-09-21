@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "ef474dc6885c11f04e1054e4cda31d2107ae4a64",
-  "auditedSchemaVersion": "2.15",
-  "auditedContentHash": "4be4afc2a6f18625eee21d08397a87330daf89d95c2d50df9faae09ec2a60278",
-  "scope": "Kit 2.15 delta audit from 9adb36a190620817afb2241f409fac569733cf95 through ef474dc6885c11f04e1054e4cda31d2107ae4a64. Unmodified upstream dcac972 engine adoption; existing independent native verification and explicit Questionnaire/session guidance remains sufficient. Generic shared-input deduplication, asked-unknown/compound/error controls, six-step session and four-step typed-answer controls passed on Windows with the unchanged installed driver. Complete path dispositions in coverage ledger; native plan/code review converged, external unavailable. Kit content unchanged. Installed 6.4.6 delivery qualification is separate; no public release.",
-  "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
+    "auditedRevision":  "0a164fdc83b49d9ba9a9a9cb9261fb83f4399169",
+    "auditedSchemaVersion":  "2.16",
+    "auditedContentHash":  "d5099f1b7a0b82af0b23b2ec2706afec50dd23799da6ad43b12426a92598fbd4",
+    "scope":  "Kit schema 2.16 delta audit through 0a164fdc83b49d9ba9a9a9cb9261fb83f4399169. Engine build ID and cache path in native-results guidance updated for unmodified upstream dcac972; no semantic clauses changed. Full payload diff inspected; 211 focused kit and engine acquisition tests passed. Prior reviewed native duplication, asked-unknown, error, six-step session and four typed-answer controls remain applicable. Complete delta dispositions in coverage ledger. Installed delivery qualification is separate; no public release.",
+    "evidence":  "packages/crl/src/authoring-kit/tests/coverage.md"
 }
