@@ -2,6 +2,6 @@
   "auditedRevision": "bc05b043dc660b422e9e03b450b70506e8ad540c",
   "auditedSchemaVersion": "2.17",
   "auditedContentHash": "b94d87cf2fd940d71c56017b8e172e8d877f7fef80982808bdea84f64a7d9813",
-  "scope": "Bounded flat/grouped native selected Observation question-association correction. Full baseline delta and canonical payload reviewed; 83 kit tests, 3 owning association tests and both retained native Boolean Q/QR pairs passed. No runtime changes. Grouped/flat identity, wording ownership and QR association are covered; arbitrary hierarchies and native description rendering remain unqualified. Installed delivery qualification is recorded separately.",
+  "scope": "Kit schema 2.17. Bounded flat/grouped native selected Observation question-association correction. Full baseline delta and canonical payload reviewed; 83 kit tests, 3 owning association tests and both retained native Boolean Q/QR pairs passed. No runtime changes. Grouped/flat identity, wording ownership and QR association are covered; arbitrary hierarchies and native description rendering remain unqualified. Installed delivery qualification is recorded separately.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
