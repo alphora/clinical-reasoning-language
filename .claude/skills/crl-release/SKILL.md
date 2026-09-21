@@ -143,13 +143,10 @@ Not the working tree. The thing a user installs.
       its old bundle, activation copies the old bundle, and globalStorage stays stale. You then
       conclude "the build is broken". (#224 hit exactly this at 4.92.2 → fixed by bumping to 4.92.3.)
       A patch bump is enough; `check-core.cjs` does not enforce crl-vscode↔core parity.
-- [ ] Use a dedicated verification profile and extensions directory for maintainer test hosts.
-      On Windows, a copied VS Code build also needs a distinct `win32AppUserModelId` in its own
-      `product.json`. A separate `--user-data-dir` alone
-      does not isolate Windows recent-project launch entries: a test copy with the normal app ID
-      can rewrite them to launch its executable against the user's normal profile. Verify those
-      entries still target the normal installation after launching the test host. This is maintainer
-      setup, not a KE installation step.
+- [ ] Use the existing normal VS Code executable with a dedicated verification profile and
+      extensions directory. Do not download, copy or maintain another VS Code installation.
+      Keep generated Windows test profiles, temporary output and caches on the operator's
+      designated storage drive. Record the executable and isolated profile actually used.
 - [ ] Install the VSIX into the dedicated verification extensions directory:
       `code --user-data-dir <profile> --extensions-dir <extensions> --install-extension <vsix> --force`.
       Activate those installed bytes in the verification window/profile and confirm its extension
@@ -170,6 +167,14 @@ Not the working tree. The thing a user installs.
       empty is indistinguishable from a pane with nothing to show. That shipped for months.
 
 ### `emit_results`: verify the engine and the results
+
+Linux installed-artifact qualification runs on a remote runner with its own checkout
+and storage. Use the workflow and evidence requirements in
+`docs/linux-qualification.md`. Do not run local WSL, local Linux, Docker or WSL
+status probes, and do not restore the retired coordinator. Windows VSIX activation,
+staged MCP and Windows-specific process checks remain local. Existing qualified
+native/Linux evidence may be retained for an unchanged runtime only after an
+explicit package/engine/driver comparison; label that evidence as retained.
 
 The compiled ApplyDriver ships with CRL; the CQFramework CLI engine JAR is a separate
 runtime dependency. Rebuilding CRL does not update that JAR. For an `emit_results` release:

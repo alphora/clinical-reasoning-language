@@ -1,0 +1,91 @@
+name: Installed Linux qualification
+on:
+  push:
+    paths:
+      - .github/workflows/linux-qualification.yml
+      - packages/crl/scripts/qualification/**
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag containing the exact npm asset; blank builds this checkout
+        type: string
+      artifact_sha256:
+        description: Required SHA256 when release_tag is provided
+        type: string
+      timeout_probe:
+        description: Deliberately fail a bounded step to verify diagnostic artifact delivery
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      QUALIFY: ${{ runner.temp }}/crl-qualification
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare source and actual npm artifact
+        timeout-minutes: 7
+        env:
+          EXPECTED_SHA: ${{ inputs.artifact_sha256 }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$QUALIFY/artifacts" "$QUALIFY/install" "$QUALIFY/results"
+          exec > >(tee "$QUALIFY/results/prepare.log") 2>&1
+          node -e 'require("fs").writeFileSync(process.env.QUALIFY+"/results/preparation.json",JSON.stringify({passed:false,sourceCommit:process.env.GITHUB_SHA,releaseTag:process.env.RELEASE_TAG||null,expectedSha256:process.env.EXPECTED_SHA||null},null,2))'
+          record_preparation_exit() {
+            local code=$?
+            QUALIFICATION_PREP_EXIT="$code" node -e 'const fs=require("fs"),p=process.env.QUALIFY+"/results/preparation.json",r=JSON.parse(fs.readFileSync(p));r.exitCode=Number(process.env.QUALIFICATION_PREP_EXIT);r.passed=r.exitCode===0;fs.writeFileSync(p,JSON.stringify(r,null,2))'
+            exit "$code"
+          }
+          trap record_preparation_exit EXIT
+          npm install --no-audit --no-fund
+          npm run build -w @smile-digital-health/crl
+          version=$(node -p 'require("./packages/crl/package.json").version')
+          archive="$QUALIFY/artifacts/smile-digital-health-crl-$version.tgz"
+          if [ -n "$RELEASE_TAG" ]; then
+            [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{64}$ ]] || { echo 'Release artifact requires SHA256'; exit 1; }
+            gh release download "$RELEASE_TAG" --pattern "smile-digital-health-crl-$version.tgz" --dir "$QUALIFY/artifacts"
+            echo "$EXPECTED_SHA  $archive" | sha256sum --check --strict
+          else
+            [ -z "$EXPECTED_SHA" ] || { echo 'Hash without release tag is invalid'; exit 1; }
+            npm pack -w @smile-digital-health/crl --ignore-scripts --pack-destination "$QUALIFY/artifacts"
+          fi
+          sha256sum "$archive" > "$QUALIFY/artifacts/SHA256SUMS"
+          npm install --prefix "$QUALIFY/install" --no-audit --no-fund "$archive"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+          echo "PACKAGE=$QUALIFY/install/node_modules/@smile-digital-health/crl" >> "$GITHUB_ENV"
+      - name: Exercise installed package
+        timeout-minutes: 25
+        env:
+          TIMEOUT_PROBE: ${{ inputs.timeout_probe }}
+        run: |
+          set -euo pipefail
+          if [ "$TIMEOUT_PROBE" = true ]; then
+            echo '{"passed":false,"deliberateTimeoutProbe":true}' > "$QUALIFY/results/verification.json"
+            timeout --kill-after=5s 5s node -e 'setInterval(()=>{},1000)'
+            exit 1
+          fi
+          node packages/crl/scripts/qualification/installed.cjs "$PACKAGE" "$QUALIFY/results" "$ARCHIVE" 2>&1 | tee "$QUALIFY/results/run.log"
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/crl-qualification/artifacts
+            ${{ runner.temp }}/crl-qualification/results
+            !${{ runner.temp }}/crl-qualification/results/home
+          retention-days: 14
+          if-no-files-found: error

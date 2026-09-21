@@ -1,0 +1,19 @@
+library "Native Qualification Cases".
+covers "Age Policy".
+fact "Subject":
+- name is "Synthetic subject".
+- birth date is "1980-01-01".
+- defined by "Patient".
+fact "Evidence":
+- value is true.
+- date is "2026-09-21".
+- defined by "Age Policy"."Evidence".
+case "Unanswered":
+- id is "unanswered".
+- subject is "Subject".
+- result is "Determination" is pause.
+case "Answered":
+- id is "answered".
+- subject is "Subject".
+- fact is "Evidence".
+- result is "Determination" is "Met".

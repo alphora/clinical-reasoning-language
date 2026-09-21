@@ -1,0 +1,9 @@
+library "Age Source".
+concept "Adult":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- shape reduction is most recent.
+- source representation:
+  - type is Patient.
+  - value projection is age today at least 18 years.

@@ -1,0 +1,8 @@
+{
+  "name": "qualification-age",
+  "version": "1.0.0",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/qualification-641",
+    "date": "2026-09-20"
+  }
+}

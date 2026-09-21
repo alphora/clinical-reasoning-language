@@ -1,0 +1,23 @@
+library "Age Policy".
+concept "Evidence":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `evidence`.
+- shape reduction is most recent.
+presentation for "Evidence":
+- question text is `Is the synthetic evidence confirmed?`.
+activity "Met":
+- request CPGCommunicationRequest.
+- with `Synthetic met`.
+activity "Unmet":
+- request CPGCommunicationRequest.
+- with `Synthetic unmet`.
+decision "Determination":
+first:
+- when "Age Source"."Adult" then:
+  first:
+  - when "Evidence" then recommend activity "Met".
+  - otherwise then recommend activity "Unmet".
+  end.
+- otherwise then recommend activity "Unmet".
