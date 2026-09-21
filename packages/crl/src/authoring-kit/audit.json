@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "9adb36a190620817afb2241f409fac569733cf95",
+  "auditedRevision": "ef474dc6885c11f04e1054e4cda31d2107ae4a64",
   "auditedSchemaVersion": "2.15",
   "auditedContentHash": "4be4afc2a6f18625eee21d08397a87330daf89d95c2d50df9faae09ec2a60278",
-  "scope": "Kit schema 2.15 source audit from 72560b0b4b88cf93b875a395af22972d55e1535e through 9adb36a190620817afb2241f409fac569733cf95. Explicit Condition/Observation record-status preview and bounded refusal guidance; complete delta dispositions in coverage ledger. 713 focused kit, CRE and affected AST tests pass. Three independent retained-engine native controls agree. Native source, build-plan and kit reviews converged; external unavailable. Installed artifact qualification remains separate; no upstream engine adoption or public release.",
+  "scope": "Kit 2.15 delta audit from 9adb36a190620817afb2241f409fac569733cf95 through ef474dc6885c11f04e1054e4cda31d2107ae4a64. Unmodified upstream dcac972 engine adoption; existing independent native verification and explicit Questionnaire/session guidance remains sufficient. Generic shared-input deduplication, asked-unknown/compound/error controls, six-step session and four-step typed-answer controls passed on Windows with the unchanged installed driver. Complete path dispositions in coverage ledger; native plan/code review converged, external unavailable. Kit content unchanged. Installed 6.4.6 delivery qualification is separate; no public release.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
