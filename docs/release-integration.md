@@ -2,9 +2,11 @@
 
 Audited September 21, 2026. Public baseline: `v6.3.0` at
 `46102010de434b9e89c02159c4c796c813bf80c2`.
-Qualified local candidate: **6.4.5**, isolated branch `codex/recovery-cre-preview-20260921`.
-Reviewed product content: `9adb36a190620817afb2241f409fac569733cf95`; kit audit: `47fb1ea833c00936a60069b5788e8eea8ee93a6e`.
-This record describes local integration, not public publication.
+Release candidate: **6.4.6**, isolated branch `codex/upstream-engine-6.4.6`.
+Reviewed product and audit checkpoint: `d48fc5c009d18321e7e9b6d5fdfd81e032f4444d`;
+tested version checkpoint: `9b36ece7b6b31b511e7600d0373bcd595bec5228`.
+Public release is authorized. Publication and registry verification are recorded
+separately from candidate qualification.
 
 | Local build/work | Retained behavior | Integrated revision |
 |---|---|---|
@@ -14,6 +16,10 @@ This record describes local integration, not public publication.
 | 6.4.1 | Source-only age binding; Condition coding URI; embedded native error classification; qualified FHIRHelpers with automatic adapter registration; identifier-only PlanDefinition expressions; kit 2.12 | `5574fc1d349e06f52b593ddb14e2cbc4e36878f3` |
 | FHIR packaging | Existing definitions packaged into FHIR NPM manifest, ImplementationGuide, index and portable archive; API, CLI and MCP | Original `1fefb03f2ee418edb4021aec5ff2fa2beac95875`, integrated in `a9c841c416078343b369752cc99ca66e53292e44` |
 | 6.4.2 | Selected coded Observation sources, local/source arbitration using existing semantics; packaging guidance; audited kit 2.13 | Content `a9c841c416078343b369752cc99ca66e53292e44`, audit `08dacb0f`, delivery `710fe11b` |
+| 6.4.3 | Shared-input Result Questionnaire deduplication with retained owners; kit 2.13 | `13a19095`, audit `7b2421c9` |
+| 6.4.4 | Library ownership corrections, definitions Bundle and typed native sessions; kit 2.14 | `db02b9cbe4d40afa047c372ab1452299d6d6902c` |
+| 6.4.5 | Supported record-status filtering in CRE/MV preview; kit 2.15 | `03da1eb1356a726271c24465c33fb598ba7c34dc` |
+| 6.4.6 | Unmodified upstream asked-unknown and shared-input fixes; kit 2.16 | Content/audit `d48fc5c0`, tested build `9b36ece7` |
 
 The 6.3.2, 6.4.0 and 6.4.1 heads are ancestors of the candidate. No paths
 were deleted between any of those heads and the candidate. All previous kit rule
@@ -35,7 +41,7 @@ kit export, `SHA256SUMS`, `delivery-receipt.json`, `retention-audit.json`, and
 VSIX SHA256: `23d3fbada891254e7a8ba56881c3e31272e0447f569fb697c18a35128289e49f`.
 npm SHA256: `047d15350da4051c9b73efbdb610afc8cfb3e970003bf1ca92e4951620543cfb`.
 
-## Upstream engine qualification
+## Historical upstream qualification before the shared-input fix
 
 The typed session API/CLI in 6.4.4 uses the retained qualified engine SHA256
 `9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e`.
@@ -69,20 +75,17 @@ supports the observed duplicate; it does not claim a new statement of upstream
 maintainer intent. The separate CRL MV deduplication fix does not repair native
 Questionnaire generation.
 
-Default adoption is not qualified while those duplicate controls fail. Keep the
-existing downloadable engine pin and all 6.4.4 artifacts intact. A subsequent
-release must retain PR1121's correction (or its upstream replacement), resolve
-and retest the duplicate controls, and publish/hash-verify the replacement engine
-asset before changing default acquisition guidance. No additional engine fix or
-public release is included in this qualification.
+At that checkpoint, duplicate controls prevented adoption. The later 6.4.6
+qualification below covers their upstream correction and the replacement engine.
+The 6.4.4 artifacts remain intact as evidence of their own tested runtime.
 
 The main checkout's existing project-instruction and mail-context edits remain
 separate. They were neither discarded nor folded into the product delivery.
 
 ## Preparing the next public release
 
-Retain the complete local candidate lineage through
-`47fb1ea833c00936a60069b5788e8eea8ee93a6e`, including the 6.4.4 delivery
+Retain the complete candidate lineage through
+`9b36ece7b6b31b511e7600d0373bcd595bec5228`, including the 6.4.4 delivery
 `db02b9cbe4d40afa047c372ab1452299d6d6902c`, not merely the older `develop`
 checkpoint `710fe11b`. Verify these full candidate SHAs with `git merge-base --is-ancestor`
 against the next candidate, and inspect any later removals or feature changes.
@@ -100,8 +103,8 @@ This local build retains the complete 6.4.5 delivery at
 `03da1eb1356a726271c24465c33fb598ba7c34dc` and its earlier local features.
 Reviewed source and audited kit are saved through
 `d48fc5c009d18321e7e9b6d5fdfd81e032f4444d` on
-`codex/upstream-engine-6.4.6`. This checkpoint saves the tested version metadata;
-it is not a release tag or approval for KE adoption.
+`codex/upstream-engine-6.4.6`. These checkpoints bind the tested runtime and
+version metadata; later release-record updates do not change those artifact bytes.
 
 The new engine is unmodified upstream `feature-definition-based-population`
 commit `dcac972fc38bc9a29aae2c662dfb5c4917d27234`, including merged PR1121's
@@ -132,13 +135,20 @@ engine JAR/provenance. Earlier new-engine controls are in `tmp/upstream-dcac972/
 | `smile-digital-health-crl-6.4.6.tgz` | `46eeafddb550703e33afdb28427f10733d469614b948eb51849a0f82e7cd6957` |
 | `cqf-fhir-cr-cli-definition-dcac972f.jar` | `fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f` |
 
-Delivery remains pending two gates: Linux qualification of this engine/build,
-and publication plus fresh-download verification of the pinned engine asset.
-Automatic approval review rejected the Linux command under a retired coordinator
-instruction (reported as OpenAI Codex issue47060), and separately rejected the
-public engine upload under the local-build-only scope. Neither action ran.
-The prepared engine URL is not available yet; a seeded-cache test does not prove
-network acquisition. No public VSIX/npm release or customer migration occurred.
+The remaining candidate gates passed on September 21: the exact pinned engine,
+checksum and provenance were published under `v4.122.0`; a fresh download matched
+the tested bytes and passed installed Windows native MCP execution without an
+engine override. Fresh installed Linux npm MCP passed kit, inventory, definitions
+Bundle and preview checks. Six answer/change/clear steps and four dateTime/Coding
+steps passed using this installed 6.4.6 package and Java 17. The initial Linux MCP
+cold-start request timed out; its bounded retry passed without a product change.
+
+Release assets and candidate evidence are staged in `tmp/release-6.4.6/`.
+Native readiness review839 found 0 critical, 0 important and 0 nit issues; external
+review remained unavailable. Publication CI gates npm delivery. Fresh registry
+contents must match the candidate, because CI rebuilds npm from source. The
+post-publication receipt records that separate verification. No customer migration
+is part of this release.
 
 ## Local 6.4.5 — record-status preview
 
@@ -166,8 +176,8 @@ VSIX SHA256: `3e6f61cac888d53426a6743a2287afe22ac642fba593904232889c2d24e5079b`.
 npm SHA256: `ecbbdf855b0af4d3588b799927594a0c4b611c23e2ce95fbb921efba547ad94c`.
 Native reviews converged; the external reviewer was unavailable. Source and audit
 are backed up on the recovery branch. No public release, customer migration or
-upstream engine adoption occurred. Upstream duplication issue1122 remains the next
-engine-adoption dependency; this local preview fix does not resolve it.
+upstream engine adoption occurred in 6.4.5. The subsequent 6.4.6 engine qualification
+above covers the upstream correction for duplication issue1122.
 
 ## Local6.4.3 ? Result Questionnaire duplicate-input fix
 
@@ -181,4 +191,5 @@ Uncoded support libraries no longer falsely claim a coded policy's CodeSystem. P
 
 Delivery evidence: `tmp/local-hcsc-session-6.4.4/`, including archives, kit export, SHA256SUMS, installed MCP and native receipts, exact archive/staged-file comparisons and delivery-receipt.json. Reuse prior unaffected broad-suite evidence; affected209core/kit and41extension tests passed. Actual installed artifacts are independently qualified. This is a local build, not a public release.
 
-For the next release, include this branch's completed delivery commit rather than starting from an older release worktree or dropping the session branch. Confirm its ancestry and retain the evidence ledger. Upstream adoption is a separate task.
+The 6.4.6 candidate includes this completed delivery commit and the session branch;
+their ancestry is verified. Its subsequent upstream adoption is recorded above.
