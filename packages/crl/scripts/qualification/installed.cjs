@@ -32,7 +32,7 @@ async function main(){
  const call=async(name,args,timeout=120000)=>{const r=await client.callTool({name,arguments:args},undefined,{timeout});assert(!r.isError,JSON.stringify(r));return JSON.parse(r.content.find(x=>x.type==='text').text);};
  try{
   await client.connect(transport,{timeout:120000});
-  const k=await call('authoring_kit',{view:'full'});const {view,complete,fullContentHash,...canonical}=k;assert.equal(complete,true);assert.equal(fullContentHash,installed.contentHash);assert.deepEqual(canonical,installed);
+  const k=await call('authoring_kit',{view:'full'});const {view,complete,fullContentHash,...canonical}=k;assert.equal(complete,true);assert.equal(fullContentHash,installed.contentHash);assert.deepEqual(canonical,JSON.parse(JSON.stringify(installed))); // Compare the JSON wire shape; undefined properties are omitted.
   const names=(await client.listTools()).tools.map(x=>x.name).sort();assert.deepEqual(names,read(path.join(__dirname,'expected-tools.json')).sort());receipt.tools=names;stage('installed MCP kit and inventory');
   const fixture=path.join(out,'preview');fs.cpSync(path.join(repo,'packages/crl/src/cre/tests/fixtures/condition-status'),fixture,{recursive:true});
   for(const tool of ['run_decision','render_scenario']){const r=await call(tool,{path:path.join(fixture,'cases.cel')});fs.writeFileSync(path.join(out,tool+'.json'),JSON.stringify(r,null,2));assert.equal(r.caseCount,3);assert.equal(r.passCount,3);assert.equal(r.failCount,0);assert.equal(r.errorCount,0);}stage('three generic preview cases');
