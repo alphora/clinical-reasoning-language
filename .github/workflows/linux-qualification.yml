@@ -23,10 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      QUALIFY: ${{ runner.temp }}/crl-qualification
       RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set runner-local qualification directory
+        run: echo "QUALIFY=$RUNNER_TEMP/crl-qualification" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
