@@ -3,13 +3,9 @@ import * as path from "path";
 
 import { describe, it, expect } from "vitest";
 
-import { buildCEL } from "../../cel";
-import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { emitCQLFromAST } from "../../cql-emitter/emitCQL";
 import { librariesReferencedBy } from "../../cql-emitter/layeredEmit";
-import { runCel } from "../../cre/run";
 import { buildEdgeIndex, declKey } from "../../migration/migrationInventory";
-import type { RegistryEntry } from "../../imports/types";
 import { buildCRL } from "../../index";
 import { definitionConceptRefs } from "../../provenance/indexer";
 import { Validator } from "../../validator/validator";
@@ -27,6 +23,7 @@ import {
 } from "../types";
 
 import { parseInput } from "./parseInput";
+import { runInlineCel } from "./runInlineCel";
 
 // Concept boolean composition, Todo 1 (design of record `tmp/_old/DESIGN-concept-boolean-composition.md`).
 // The NEW `defined as ( <boolean> )` family — plain `and`/`or`/`not` over SEPARATE boolean facts
@@ -369,25 +366,7 @@ fact "A Present Record":
 fact "An Also Record":
 - defined by "Also Records".
 ${celCase}`;
-    const crl = parseInput(decisionLib);
-    const built = buildCEL(cel);
-    if (!built.success || !built.result)
-      throw new Error("CEL build failed: " + JSON.stringify(built.errors));
-    const coversTarget: RegistryEntry = {
-      name: crl.library.name,
-      filePath: "inline.crl",
-      ast: crl,
-      isRoot: true,
-      origin: "root",
-    };
-    const graph: ResolvedCelGraph = {
-      filePath: "inline.cel",
-      cel: built.result,
-      coversTarget,
-      celParseErrors: [],
-      diagnostics: [],
-    };
-    const [run] = runCel(graph).runs;
+    const [run] = runInlineCel(decisionLib, cel).runs;
     expect(run).toBeDefined();
     return run;
   };
@@ -496,25 +475,7 @@ fact "A Present Record":
 fact "An Also Record":
 - defined by "Also Records".
 ${celCase}`;
-    const crl = parseInput(M);
-    const built = buildCEL(cel);
-    if (!built.success || !built.result)
-      throw new Error("CEL build failed: " + JSON.stringify(built.errors));
-    const coversTarget: RegistryEntry = {
-      name: crl.library.name,
-      filePath: "inline.crl",
-      ast: crl,
-      isRoot: true,
-      origin: "root",
-    };
-    const graph: ResolvedCelGraph = {
-      filePath: "inline.cel",
-      cel: built.result,
-      coversTarget,
-      celParseErrors: [],
-      diagnostics: [],
-    };
-    const [run] = runCel(graph).runs;
+    const [run] = runInlineCel(M, cel).runs;
     expect(run).toBeDefined();
     return run;
   };

@@ -1,0 +1,23 @@
+Baseline 72560b0b4b88cf93b875a395af22972d55e1535e through reviewed local6.4.5 content
+docs/release-integration.md
+package-lock.json
+package.json
+packages/crl-vscode/package.json
+packages/crl/package.json
+packages/crl/src/authoring-kit/audit.json
+packages/crl/src/authoring-kit/index.ts
+packages/crl/src/authoring-kit/navigation.ts
+packages/crl/src/authoring-kit/tests/authoring-kit.test.ts
+packages/crl/src/authoring-kit/tests/coverage.md
+packages/crl/src/authoring-kit/tests/maintenance-6.4.5-paths.txt
+packages/crl/src/cel/sourceMembership.ts
+packages/crl/src/cli/tests/emit-bundle-smoke.mjs
+packages/crl/src/cre/recordCollections.ts
+packages/crl/src/cre/run.ts
+packages/crl/src/cre/tests/conditionStatus.test.ts
+packages/crl/src/cre/tests/fixtures/condition-status/cases.cel
+packages/crl/src/cre/tests/fixtures/condition-status/package.json
+packages/crl/src/cre/tests/fixtures/condition-status/policy.crl
+packages/crl/src/ast/tests/concept-model-t1.test.ts
+packages/crl/src/ast/tests/definedAsBooleanComposition-t1.test.ts
+packages/crl/src/ast/tests/runInlineCel.ts

@@ -30,7 +30,7 @@ const ALIASES: Record<string, string[]> = {
   "shared-wording-editing": ["edit source wording", "preview_presentation_edit", "apply_presentation_edit", "revert_presentation_edit", "Edit Question Wording", "shared default", "undo wording", "wording conflict"],
   "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change"],
   "produce-results": ["retryFailed", "retry failed cases", "caseTimeoutMs", "native timeout", "retry-from", "emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
-  "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine"],
+  "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine", "active Condition", "verified Condition", "record filters", "preview discrepancy", "RecordSet existence"],
 };
 
 // These are learning prerequisites, not see-also links. Optional worked examples

@@ -358,7 +358,8 @@ export type {
 // "2.11" → "2.12": identifier-only PlanDefinition conditions preserve their CQL guard semantics.
 // "2.12" → "2.13": coded Observation sourcing and FHIR NPM packaging guidance.
 // → "2.14": definitions-only Bundle composition and explicit native session API.
-const SCHEMA_VERSION = "2.14";
+// → "2.15": bounded CRE record-status preview and explicit existence verification.
+const SCHEMA_VERSION = "2.15";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -1107,6 +1108,16 @@ const RULES: KitRule[] = [
     rule: "Verify with the MCP tools in order: validate_crl(path) clean → validate_cel(path) clean → run_decision(path) with every case's `result is` passing. MV file validation checks the MV set; regression file validation checks both sets. For the complete engineering check, use crl-run-regression to run MV plus regression once each. validate_cel and run_decision need FILES under a project root (a package.json) — they do not accept inline code. For a COMPOUND-GUARD branch, cite the run_decision `conditionTrace` (the per-operand truth-table) as the audit surface, and demonstrate that each conjunct is load-bearing; the DROP-ONE battery (see cel-cases) is recommended, and equivalent proof is acceptable. A satisfying case alone is insufficient.",
     ref: "verifyLoop",
     clauses: [
+      {
+        "text": "CRE/MV preview evaluates explicit Condition and Observation RecordSet retrieves against the emitted CEL patient resources, matching resource type and exact system/code. Unary Condition active and verified filters compose on the same records; Observation verified accepts final, amended and corrected. An explicit existence test returns false for an empty resulting set and true for a matching record even when its Boolean value is false. This answers existence within the authored set, not a selected answer value or a broader clinical negative; preserve the required scope/completeness assumption. These preview checks do not replace independent native execution.",
+        "force": "default",
+        "test": "verify-loop:record-status-preview"
+      },
+      {
+        "text": "This RecordSet preview supports unprojected coded retrieves and a local collection with one unprojected source representation of the same declared type. Reached unsupported operations, temporal/multi-operand status filters, selections/projections, ambiguous owners, cycles, multiple source representations, and locally coded or Boolean-annotated narrative RecordSet filters produce an evaluation error, not false. Unused unsupported collections do not fail an otherwise supported path. Treat these as bounded runtime limitations; retain the faithful authored criteria and record any unverified cases rather than weakening the model to make preview pass.",
+        "force": "default",
+        "test": "verify-loop:record-status-boundaries"
+      },
       {
         "text": "Validate CRL and CEL, compare supported CRE predictions with independent native activity/pause expectations, and record unsupported or unexecuted cases as unverified. Establish that each distinct criterion is consequential and relevant unknown behavior is correct; equivalent proof methods are acceptable.",
         "force": "invariant",

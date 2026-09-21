@@ -47,6 +47,8 @@ function setup() {
 }
 
 describe("CRE Condition status chains", () => {
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("evaluates active and verified over the same CEL Condition that native execution receives", () => {
     const graph = resolveCelImports(fixture);
     const emitted = emitCelToFhir(graph);
@@ -70,6 +72,8 @@ describe("CRE Condition status chains", () => {
     ]);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it.each([
     ["clinicalStatus", undefined],
     ["clinicalStatus", { coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: "inactive" }] }],
@@ -82,6 +86,8 @@ describe("CRE Condition status chains", () => {
     expect(evaluate()).toEqual([]);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("requires both statuses on the same record", () => {
     const { condition, emitted, evaluate } = setup();
     const other = structuredClone(condition);
@@ -91,6 +97,8 @@ describe("CRE Condition status chains", () => {
     expect(evaluate([...emitted, other])).toEqual([]);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("matches exact system/code among multiple codings and excludes other patients", () => {
     const { condition, evaluate } = setup();
     condition.body.code = { coding: [{ system: "wrong", code: "finding" }, { system: "http://example.org/findings", code: "finding" }] };
@@ -102,6 +110,8 @@ describe("CRE Condition status chains", () => {
     expect(evaluate()).toEqual([]);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("refuses cycles and unresolved operands instead of publishing false", () => {
     const { node, evaluate } = setup();
     node("Active Findings").definition = structuredClone(node("Verified Findings").definition);
@@ -110,12 +120,16 @@ describe("CRE Condition status chains", () => {
     expect(() => evaluate()).toThrow(/Cannot resolve/);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("refuses locally coded narrative filters that the emitter cannot lower", () => {
     const { node, evaluate } = setup();
     node("Active Findings").code = "active";
     expect(() => evaluate()).toThrow(/local code and a definition/);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("retains local and unprojected source records in one collection", () => {
     const { node, condition, emitted, evaluate } = setup();
     const donor = parseInput(`library "Sources". concept "Sources":
@@ -136,6 +150,8 @@ describe("CRE Condition status chains", () => {
     expect(() => evaluate(emitted, { fhirType: "Condition", system: "http://example.org/local", code: "local" })).toThrow(/unprojected source records/);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("resolves imported operands and their terminology in the declaring scope", () => {
     const { condition, emitted } = setup();
     const source = parseInput(`library "Source".
@@ -150,6 +166,8 @@ concept "Records": - shape is RecordSet. - type is Condition. - definition is "S
     expect(evaluate("Owner", owner.statements.find(s => s.type === "Concept") as Concept)).toEqual([condition]);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it.each(["source", "local", "scalar shadow"])("refuses ambiguous package/local collection owners (%s membership)", membership => project(dir => {
     const policyPath = path.join(dir, "policy.crl");
     fs.writeFileSync(policyPath, fs.readFileSync(policyPath, "utf8")
@@ -170,6 +188,8 @@ concept "Records": - shape is RecordSet. - type is Condition.
     expect(runs[0].diagnostics.join(" ")).toContain("Ambiguous collection owner");
   }));
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it.each([1, 2])("aligns %s-source union admission with FHIR/CQL emission", count => project(dir => {
     const policyPath = path.join(dir, "policy.crl");
     const representation = `- source representation:\n  - type is Observation.\n  - value type is boolean.\n  - coded from "Finding Codes".`;
@@ -191,6 +211,8 @@ concept "Records": - shape is RecordSet. - type is Condition.
     if (count === 2) expect(runs[0].diagnostics.join(" ")).toContain("multiple source representations");
   }));
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it.each([
     'definition is "Findings" active during "Encounter"',
     'definition is most recent "Findings" active',
@@ -203,6 +225,8 @@ concept "Records": - shape is RecordSet. - type is Condition.
     expect(result.runs[0].diagnostics.join(" ")).toContain("unsupported record operation");
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("does not turn an off-path unsupported collection into a case error", () => {
     const { node, graph } = setup();
     node("Active Findings").definition = definition('definition is "Findings" active during "Encounter"');
@@ -211,6 +235,8 @@ concept "Records": - shape is RecordSet. - type is Condition.
     expect(result.runs.map(r => r.status)).toEqual(["pass", "pass", "pass"]);
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it("keeps false-valued Observation existence distinct from Boolean answer consumption", () => {
     const { graph, node, nodes } = setup();
     nodes.filter(n => n.shape === "RecordSet").forEach(n => { n.conceptType = "Observation"; n.valueTypes = []; });
@@ -228,6 +254,8 @@ concept "Records": - shape is RecordSet. - type is Condition.
     expect(values.runs[0].diagnostics.join(" ")).toContain("not a selected Boolean answer");
   });
 
+  // @kit verify-loop:record-status-preview
+  // @kit verify-loop:record-status-boundaries
   it.each(["final", "amended", "corrected", "preliminary", undefined])("applies Observation verification to %s without reading its false value", status => {
     const { node, nodes, condition, evaluate } = setup();
     nodes.filter(n => n.shape === "RecordSet").forEach(n => { n.conceptType = "Observation"; n.valueTypes = []; });

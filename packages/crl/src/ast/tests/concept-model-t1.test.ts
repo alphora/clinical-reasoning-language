@@ -20,6 +20,7 @@ import {
 } from "../types";
 
 import { parseInput } from "./parseInput";
+import { runInlineCel } from "./runInlineCel";
 
 // Concept-model redesign Todo 1 (disc 394): the grammar/AST additions — `value element is`
 // on the local rep and on posreps, the rep-level `value projection is` projector, `defined as
@@ -468,14 +469,7 @@ case "has present":
 - subject is "Pat".
 - fact is "A Present Record".
 - result is "D" is "Approve".`;
-    const graph: ResolvedCelGraph = (() => {
-      const crl = parseInput(M);
-      const built = buildCEL(cel);
-      if (!built.success || !built.result) throw new Error("CEL build failed: " + JSON.stringify(built.errors));
-      const coversTarget: RegistryEntry = { name: crl.library.name, filePath: "inline.crl", ast: crl, isRoot: true, origin: "root" };
-      return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
-    })();
-    const [run] = runCel(graph).runs;
+    const [run] = runInlineCel(M, cel).runs;
     expect(run).toBeDefined();
     expect(run.status).toBe("pass");
     expect(run.conceptTruth.find((r) => r.name === "Has Present")?.satisfied).toBe(true);
@@ -516,14 +510,7 @@ case "has trials":
 - subject is "Pat".
 - fact is "A Trial Record".
 - result is "D" is "Approve".`;
-    const graph: ResolvedCelGraph = (() => {
-      const crl = parseInput(M);
-      const built = buildCEL(cel);
-      if (!built.success || !built.result) throw new Error("CEL build failed: " + JSON.stringify(built.errors));
-      const coversTarget: RegistryEntry = { name: crl.library.name, filePath: "inline.crl", ast: crl, isRoot: true, origin: "root" };
-      return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
-    })();
-    const [run] = runCel(graph).runs;
+    const [run] = runInlineCel(M, cel).runs;
     expect(run).toBeDefined();
     expect(run.status, JSON.stringify(run.diagnostics)).toBe("pass");
     expect(run.conceptTruth.find((r) => r.name === "Has Trials")?.satisfied).toBe(true);
