@@ -1,7 +1,7 @@
 {
-    "auditedRevision":  "0a164fdc83b49d9ba9a9a9cb9261fb83f4399169",
-    "auditedSchemaVersion":  "2.16",
-    "auditedContentHash":  "d5099f1b7a0b82af0b23b2ec2706afec50dd23799da6ad43b12426a92598fbd4",
-    "scope":  "Kit schema 2.16 delta audit through 0a164fdc83b49d9ba9a9a9cb9261fb83f4399169. Engine build ID and cache path in native-results guidance updated for unmodified upstream dcac972; no semantic clauses changed. Full payload diff inspected; 211 focused kit and engine acquisition tests passed. Prior reviewed native duplication, asked-unknown, error, six-step session and four typed-answer controls remain applicable. Complete delta dispositions in coverage ledger. Installed delivery qualification is separate; no public release.",
-    "evidence":  "packages/crl/src/authoring-kit/tests/coverage.md"
+  "auditedRevision": "bc05b043dc660b422e9e03b450b70506e8ad540c",
+  "auditedSchemaVersion": "2.17",
+  "auditedContentHash": "b94d87cf2fd940d71c56017b8e172e8d877f7fef80982808bdea84f64a7d9813",
+  "scope": "Bounded flat/grouped native selected Observation question-association correction. Full baseline delta and canonical payload reviewed; 83 kit tests, 3 owning association tests and both retained native Boolean Q/QR pairs passed. No runtime changes. Grouped/flat identity, wording ownership and QR association are covered; arbitrary hierarchies and native description rendering remain unqualified. Installed delivery qualification is recorded separately.",
+  "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
