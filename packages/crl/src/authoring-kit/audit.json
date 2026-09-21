@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "72560b0b4b88cf93b875a395af22972d55e1535e",
-  "auditedSchemaVersion": "2.14",
-  "auditedContentHash": "ed2f2be40009500cbc7e01a2e6c6d51926e4101c96df243b021dd20659f76eaf",
-  "scope": "Kit schema 2.14 source audit from13a190955dddd169c84a9a768bd46a61f00592f4 through72560b0b4b88cf93b875a395af22972d55e1535e. Definitions-only Bundle MCP, explicit native session API and cross-library emitter correction. Complete delta dispositions and bounded claims in coverage ledger.209focused core/kit and41extension tests pass; retained-engine six-step cumulative answer/change/clear and five cross-library native controls pass. Upstream c34 adoption held; installed artifact qualification remains separate. Native reviews converged; external unavailable.",
+  "auditedRevision": "9adb36a190620817afb2241f409fac569733cf95",
+  "auditedSchemaVersion": "2.15",
+  "auditedContentHash": "4be4afc2a6f18625eee21d08397a87330daf89d95c2d50df9faae09ec2a60278",
+  "scope": "Kit schema 2.15 source audit from 72560b0b4b88cf93b875a395af22972d55e1535e through 9adb36a190620817afb2241f409fac569733cf95. Explicit Condition/Observation record-status preview and bounded refusal guidance; complete delta dispositions in coverage ledger. 713 focused kit, CRE and affected AST tests pass. Three independent retained-engine native controls agree. Native source, build-plan and kit reviews converged; external unavailable. Installed artifact qualification remains separate; no upstream engine adoption or public release.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
