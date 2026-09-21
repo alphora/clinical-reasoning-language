@@ -2,9 +2,9 @@
 
 Audited September 21, 2026. Public baseline: `v6.3.0` at
 `46102010de434b9e89c02159c4c796c813bf80c2`.
-Release candidate: **6.4.6**, isolated branch `codex/upstream-engine-6.4.6`.
-Reviewed product and audit checkpoint: `d48fc5c009d18321e7e9b6d5fdfd81e032f4444d`;
-tested version checkpoint: `9b36ece7b6b31b511e7600d0373bcd595bec5228`.
+Release candidate: **6.4.7**, recovered from `codex/kit-question-association-6.4.7`.
+Reviewed content checkpoint: `bc05b043dc660b422e9e03b450b70506e8ad540c`;
+tested product and audit checkpoint: `6d01d3fd56e0f73546e3bc3b5e52b8a1920449a0`.
 Public release is authorized. Publication and registry verification are recorded
 separately from candidate qualification.
 
@@ -20,6 +20,28 @@ separately from candidate qualification.
 | 6.4.4 | Library ownership corrections, definitions Bundle and typed native sessions; kit 2.14 | `db02b9cbe4d40afa047c372ab1452299d6d6902c` |
 | 6.4.5 | Supported record-status filtering in CRE/MV preview; kit 2.15 | `03da1eb1356a726271c24465c33fb598ba7c34dc` |
 | 6.4.6 | Unmodified upstream asked-unknown and shared-input fixes; kit 2.16 | Content/audit `d48fc5c0`, tested build `9b36ece7` |
+| 6.4.7 | Corrected flat/grouped native question association guidance; kit 2.17 | Reviewed content `bc05b043`, audited build `6d01d3fd` |
+
+## 6.4.7 installed qualification
+
+Kit 2.17 identifies selected Observation answers by the exact profile definition
+plus `#Observation.value[x]`. Flat forms carry question wording on that answer;
+grouped forms use its exact owning group. QuestionnaireResponse association uses
+both definition and linkId. Duplicate or misassociated wording remains an error.
+Native description rendering is still unqualified; inspect emitted extensions.
+
+Fresh Windows npm and installed VSIX activation/staged MCP checks passed after
+recovery. Both expose the complete audited kit and all 25 tools; definitions Bundle
+and three generic preview cases pass. All 969 npm files and 34 VSIX files match
+their archives, allowing only VS Code's installation metadata. Runtime comparison
+against published 6.4.6 finds only reviewed kit/audit content and version metadata
+changes. The pinned engine, driver and execution assets are unchanged. Completed
+6.4.6 native/Linux evidence is retained through that comparison; it was not rerun.
+
+Candidate receipts are in `tmp/local-kit-6.4.7/`. The release verification asset
+records archive identities, fresh installed checks and retained evidence. Release
+CI and fresh registry verification remain separate publication checks. Remote Linux
+qualification infrastructure is separate follow-up work, outside this release.
 
 The 6.3.2, 6.4.0 and 6.4.1 heads are ancestors of the candidate. No paths
 were deleted between any of those heads and the candidate. All previous kit rule
