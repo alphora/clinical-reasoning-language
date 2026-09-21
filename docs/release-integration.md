@@ -35,9 +35,46 @@ kit export, `SHA256SUMS`, `delivery-receipt.json`, `retention-audit.json`, and
 VSIX SHA256: `23d3fbada891254e7a8ba56881c3e31272e0447f569fb697c18a35128289e49f`.
 npm SHA256: `047d15350da4051c9b73efbdb610afc8cfb3e970003bf1ca92e4951620543cfb`.
 
-## Upstream engine work held separately
+## Upstream engine qualification
 
-The typed session API/CLI is included in6.4.4 with the retained qualified engine SHA2569870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e. The upstream feature-definition-based-population candidate c34dc910255a70cd503ead5283f313ae8082e1cb is not adopted: actual paused output contains an empty data-absent-reason extension. No output repair or new pause patch was added. Mixed-condition and broader upstream qualification remain separate. The previously proposed pause PR remains deprecated.
+The typed session API/CLI in 6.4.4 uses the retained qualified engine SHA256
+`9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e`.
+The next engine candidate is [cqframework PR1121](https://github.com/cqframework/clinical-reasoning/pull/1121),
+commit `ac74433ea0b7d426bf44f042aa30826b449c38e6`, based on
+`feature-definition-based-population` at `c34dc910255a70cd503ead5283f313ae8082e1cb`.
+Its only production change supplies `valueCode: asked-unknown` to the absent
+condition-result extension in DSTU3, R4 and R5. Three scoped regression tests
+accompany that change. The 45 adapter tests, Checkstyle and scoped formatting pass.
+
+The locally built PR jar has SHA256
+`f04bab8f0167c35cfb96614b8337d0819bc748ab0fe87a70d0fd9d695831bbc5`.
+Qualification uses the exact installed 6.4.4 SDK and unchanged driver through
+explicit engine path/hash selection. No retired pause patch or output repair
+is applied. Evidence and executable probes are under `tmp/upstream-pr1121/`.
+
+Windows six-step answer/edit/clear and four-step typed sessions pass. Five HCSC
+controls and all sixteen Bleph examples pass. Of eleven additional source-data
+controls, eight pass and three return duplicate questions: STEADI all-no,
+prior-fall-yes and unsteady-yes each return six questions for three definitions.
+Their terminal outcomes still match. Condition controls verify false/unknown
+in both orders, exclusive first-route outcomes, nested unknown pauses, and
+reported evaluation errors. The standard non-session driver invocation passes.
+Linux six-step sessions and all four typed steps pass using JRE 17.
+
+A generic two-action/single-input reproduction returns two questions on both
+unpatched c34dc91 and PR1121, versus one on the retained engine. The candidate's
+`ApplyRequest` records item definitions containing an element fragment, then
+checks them against the input profile canonical without that fragment. This
+supports the observed duplicate; it does not claim a new statement of upstream
+maintainer intent. The separate CRL MV deduplication fix does not repair native
+Questionnaire generation.
+
+Default adoption is not qualified while those duplicate controls fail. Keep the
+existing downloadable engine pin and all 6.4.4 artifacts intact. A subsequent
+release must retain PR1121's correction (or its upstream replacement), resolve
+and retest the duplicate controls, and publish/hash-verify the replacement engine
+asset before changing default acquisition guidance. No additional engine fix or
+public release is included in this qualification.
 
 The main checkout's existing project-instruction and mail-context edits remain
 separate. They were neither discarded nor folded into the product delivery.
