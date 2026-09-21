@@ -1,42 +1,22 @@
 {
-  "buildId": "cqf-4.7-crl-4aee6041",
-  "upstreamBase": "4.7.0",
-  "upstreamBaseCommit": "1335b9443777725220c3520342e1664dda409584",
-  "sourceCommit": "4aee604184e3b8ea01d1778d116baf072bd73f79",
-  "sourceTree": "4dee56c68e5c96240464df880106bce73cdf9368",
-  "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/4aee604184e3b8ea01d1778d116baf072bd73f79",
+  "bytes": 218350816,
+  "upstreamFixes": {
+    "askedUnknown": "0ade9a9de6621eabb5adb6ff99cbf01ab67d725d",
+    "sharedInputDeduplication": "dcac972fc38bc9a29aae2c662dfb5c4917d27234"
+  },
+  "embeddedVersionExplanation": "Gradle checkout-derived snapshot identity; exact upstream source commit is authoritative, not an upstream version 0.1.0 release.",
+  "patchManifests": [],
+  "buildLauncherJdkMajor": 23,
   "upstreamRelease": false,
-  "embeddedBuildVersion": "4.8.0-codex-apply-pause-on-unknown-r4-4aee604-SNAPSHOT",
-  "embeddedVersionExplanation": "Gradle derives the next-version branch snapshot; source is pinned4.7 plus reviewed extraction/ID and applicability-pause patches, not an upstream4.8 release.",
-  "asset": "cqf-fhir-cr-cli-4.7-crl-4aee6041.jar",
-  "sha256": "9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e",
-  "bytes": 215815439,
-  "unchangedThirdPartyJars": 126,
-  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=2",
-  "jdkMajor": 17,
+  "targetJavaMajor": 17,
+  "sha256": "fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f",
+  "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f.jar",
+  "buildId": "cqf-definition-dcac972f",
+  "upstreamBase": "feature-definition-based-population",
+  "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/dcac972fc38bc9a29aae2c662dfb5c4917d27234",
+  "embeddedBuildVersion": "0.1.0-detached-dcac972-SNAPSHOT",
   "license": "Apache-2.0",
-  "scope": "Complete maintainer-built CLI jar; no runtime overlay or upstream publication claim.",
-  "patchManifests": [
-    "patches/cqframework/manifest.json",
-    "patches/cqframework/applicability-pause/manifest.json"
-  ],
-  "verifiedPauseClasses": [
-    {
-      "path": "org/opencds/cqf/fhir/cr/CrSettings.class",
-      "sha256": "3202c4001611877cd02723ada708e074d341de8fbd98d852b215e77affb2b85c"
-    },
-    {
-      "path": "org/opencds/cqf/fhir/cr/plandefinition/PlanDefinitionProcessor.class",
-      "sha256": "6e53029092ed5cb23461f2752229af98ea7aad705546c6468bbebea1ddfef22e"
-    },
-    {
-      "path": "org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.class",
-      "sha256": "fb4846f1d1a73cc4a0e9ea6c6032b595e416d6e4620e5b34a5500fc5e64dae94"
-    },
-    {
-      "path": "org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.class",
-      "sha256": "130151bf9724dff9d783cb78bd6fcd4f051ae87c4729ee9496830ad08efe3bcb"
-    }
-  ],
-  "nestedEngineJar": "BOOT-INF/lib/cqf-fhir-cr-4.8.0-codex-apply-pause-on-unknown-r4-4aee604-SNAPSHOT.jar"
+  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=2",
+  "scope": "Complete maintainer-built CLI jar from unmodified upstream; no runtime overlay or local patch."
 }

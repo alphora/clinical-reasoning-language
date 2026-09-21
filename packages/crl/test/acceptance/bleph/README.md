@@ -10,10 +10,10 @@ From the repository root, with dependencies installed and Java 17 or newer:
 
 ```sh
 npm run test:native:checks
-npm run test:native:bleph -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-4aee6041.jar --out /existing/parent/new-run
+npm run test:native:bleph -- --engine-jar /path/to/cqf-fhir-cr-cli-definition-dcac972f.jar --out /existing/parent/new-run
 ```
 
-In PowerShell use `npm.cmd` for argument forwarding. The acceptance command's `pretest:native:bleph` hook builds the core before execution; do not invoke `run.cjs` directly as a source acceptance gate. Checker tests require built core driver helpers. Java or jar absence is an error, never a skipped pass. No download or installation occurs. The jar must match `ENGINE_JAR_SOURCE` in `src/results/spawn.ts`: CRL-maintained build `cqf-4.7-crl-4aee6041`, SHA256 `9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e`. Source/build provenance is in [cli-build.json](../../../../../patches/cqframework/cli-build.json). Historical original-engine measurements below identify what ran at that time, not the current engine selection.
+In PowerShell use `npm.cmd` for argument forwarding. The acceptance command's `pretest:native:bleph` hook builds the core before execution; do not invoke `run.cjs` directly as a source acceptance gate. Checker tests require built core driver helpers. Java or jar absence is an error, never a skipped pass. No download or installation occurs. The jar must match `ENGINE_JAR_SOURCE` in `src/results/spawn.ts`: CRL-maintained build `cqf-definition-dcac972f`, SHA256 `fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f`. Source/build provenance is in [cli-build.json](../../../../../patches/cqframework/cli-build.json). Historical original-engine measurements below identify what ran at that time, not the current engine selection.
 
 The output parent must exist and the final directory must be new and outside source/fixture directories. Outputs include exact inputs, emitted definitions/CQL, process logs, Parameters, per-case checks, toolchain/fixture/dist/harness hashes, and a completeness summary. Choose a drive with adequate space. `--java PATH` selects a runtime; `--workers 1..4` defaults to2. `--batch-size 1..32` defaults to8 cases per JVM; `--batch-size 1` starts a separate JVM for each case. `--order reverse` reverses the full case order for isolation checks; default is `forward`. Every mode runs all116 cases.
 
@@ -71,69 +71,32 @@ Run outputs inside the workspace are admitted only under `tmp/`; outputs outside
 
 The final summary separately reports `nativeAccepted`, `creAccepted`, their pass counts, infrastructure failures and native acceptance mismatches. `accepted` is the paired verdict and requires both plus complete coverage. CRE exceptions, malformed results and missing predictions remain failures in their own column and do not prevent valid emitted inputs from reaching native execution. `sourceDirty` is surfaced in the summary: working-tree development runs are supported because code must be tested before commit. A green development run is not evidence of review, release or installation.
 
-## QR-only session acceptance
+## Session verification
 
-Run the separate four-step native operation gate with:
+The current supported session adapter is documented in
+[apply-session.md](../../../docs/apply-session.md). Supply the matching returned
+Questionnaire by canonical along with the QuestionnaireResponse. The caller owns
+explicit session data and answer/change/clear state; do not suppress native errors
+or rely on QR-only extraction instructions from an older engine.
 
-```sh
-npm run test:native:bleph-session -- --engine-jar /path/to/cqf-fhir-cr-cli-4.7-crl-4aee6041.jar --out /existing/parent/new-session
-```
-
-This command builds the core and uses the pinned complete engine jar. It starts with `missing-cosmetic`,
-constructs the next QR from the preceding returned Q/QR, answers cosmetic=false, changes the complaint
-to `none-of-the-listed-complaints`, and clears cosmetic.answer. `session.json` pins pause → Met → Unmet →
-pause and the exact question sets: 3 → 11 → 11 → 3 groups. A pause is before any leaf activity.
-
-The client copies `sdc-questionnaire-definitionExtract` and `sdc-questionnaire-definitionExtractValue`
-from each matching Q item to its QR item. Current Q bindings replace stale QR bindings, including an
-empty binding set; unrelated extensions and all other answers remain intact. Match both linkId and
-definition. Nested answer items are handled. Only the QR is submitted; the Q is neither contained nor
-preloaded in the repository. No client trimming or injected answer Observations is used.
-
-CQFramework explicitly reads these bindings on QR items. The published extension contexts do not list
-QR.item, so this is a documented engine-specific client convention. CQFramework also logs an unsuccessful
-lookup of the ephemeral Q canonical before successfully extracting from the QR instructions. The gate
-retains raw logs and reports that exact diagnostic separately; all other engine errors and every
-OperationOutcome remain failures. The exception is matched to the submitted canonical and admitted once.
-It cannot substitute for successful extraction checks.
-
-Native extraction must preserve explicit false, complete Coding values, local codes, subject and authored
-time. Clinical data remains fixed; stored Observations and repository input must remain unchanged.
-Responses must remain intact. Activities, routes, structured pause evidence, exact questions and typed answers all
-receive independent checks. The complete engine needs no overlay. The original4.7 engine remains an
-explicit failure control, never a second passing contract. Runtime class-origin checks cover both the
-extraction classes and the applicability-pause classes. See [engine provenance](../../../../../patches/cqframework/cli-build.json).
-
-The session helper is test-only; the production ApplyDriver remains unchanged. Its committed Java17
-class and source hashes are checked at runtime. Maintainers rebuild with
-`node packages/crl/scripts/native-acceptance/build-session.cjs ENGINE_JAR EXISTING_SCRATCH_PARENT JDK_BIN`.
-That build extracts only into a fresh child of the specified scratch directory and cleans its own files.
-Running the test requires no compiler or extraction. Four dependent calls run sequentially with fresh
-repositories, each bounded to120 seconds,768MiB heap and32MiB per process output stream. The output
-directory must be new. Inputs, engine mutations, full results, logs, hashes and individual verdicts
-are retained. Target mismatches remain failures while later stages continue where a unique Q/QR exists.
-
-This measures the native operation API with a request dataBundle. It does not certify HTTP wiring,
-visible client rendering, deletion of previously persisted answers, Patient age, requested-code value
-overrides, packaged customer installation or all of #320. The clear step starts with cosmetic absent
-from the original repository; it does not remove a persisted prior answer. The116-case gate remains
-separate and does not include this currently failing original-engine path.
+The `test:native:bleph-session` QR-only helper is historical qualification for the
+4.7-derived engine shipped in earlier builds. It is not qualified for the current
+upstream definition-based population engine. Its exact 3 → 11 → 11 → 3 group counts,
+QR.item extraction bindings and missing-Questionnaire diagnostic exception must not
+be carried into the current acceptance contract. Use the packaged adapter's native
+session checks for current-engine qualification; see the release integration record.
 
 ## Direct-data suite limits
 
 This suite is direct-data acceptance. It does not certify QuestionnaireResponse edit/resubmit, `$extract`, persisted/session merging, repository side effects, client rendering, Patient age projection, requested-code value override, arbitrary action guards, installed VSIX/npm artifacts, or all of #320. Patient is the subject here. Request concepts are Boolean determinations, not editable requested-code values. No fixture run alone establishes release readiness or full narrative coverage. Those remaining integration and packaged-artifact gates are separate.
 
-## Current release verification and shared helper
+## Historical release verification and shared helper
 
-Release4.122.0 verification uses the complete engine identified in `cli-build.json`:
-116 native/116 CRE cases and four QR-only session stages pass. Earlier dated counts
-above are historical runs, not the current checklist. The original engine fails all
-four current stages on behavior; its JVM and class-origin checks succeed.
+Release 4.122.0 recorded 116 native/116 CRE cases and four QR-only session stages
+against its own 4.7-derived runtime. That evidence belongs to that engine; it does
+not qualify a later engine selected by the current `cli-build.json`.
 
-`session.cjs` and `bmi-session.cjs` are the shared helper's production callers within
-the test harness. BMI retains its separate Q+QR request model and does not invoke
-Bleph's QR-only extraction checker. The original-engine Bleph control exercises the
-same helper/class-origin admission used by BMI. Unit checks cover both callers.
-The optional development overlay is built from the recorded extraction/ID patch
-source; it must satisfy the runner's exact supported base/hash pair. It is not a
-release artifact or a second accepted engine contract. Use the complete release jar.
+The `session.cjs` and `bmi-session.cjs` test helpers preserve their historical
+request contracts. The old development overlays and their manifests are retained
+as source evidence, not as current engine installation instructions. Current
+runtime adoption uses the unmodified upstream engine with no overlay.
