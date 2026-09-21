@@ -94,6 +94,52 @@ Follow the release protocol for final artifacts and installed verification. Reus
 valid completed evidence; rerun affected checks when a later change invalidates it.
 This reconciliation itself does not require repeating the whole test suite.
 
+## Local 6.4.6 — upstream engine adoption checkpoint
+
+This local build retains the complete 6.4.5 delivery at
+`03da1eb1356a726271c24465c33fb598ba7c34dc` and its earlier local features.
+Reviewed source and audited kit are saved through
+`d48fc5c009d18321e7e9b6d5fdfd81e032f4444d` on
+`codex/upstream-engine-6.4.6`. This checkpoint saves the tested version metadata;
+it is not a release tag or approval for KE adoption.
+
+The new engine is unmodified upstream `feature-definition-based-population`
+commit `dcac972fc38bc9a29aae2c662dfb5c4917d27234`, including merged PR1121's
+asked-unknown correction and the shared-input duplicate-question fix. The generic
+shared-input reproduction and three previously failing controls now pass;
+upstream issue1122 is closed. There are no local engine patches. Kit 2.16 updates
+the engine identity and cache instructions; it adds no language syntax.
+
+Qualification completed on Windows: 211 focused tests, the core MCP suite and
+36 extension MCP checks; fresh installed npm and actual VSIX MCPs retain all
+25 tools and return the audited kit. Each installed transport generates the two
+generic native cases using the new default engine from an isolated seeded cache.
+The visible installed MV FHIR pane shows one Boolean question and the saved Yes
+answer. Archive comparisons cover 969 npm files and 34 VSIX files. The 63 native
+runtime/catalog files outside the engine-acquisition module are unchanged from
+6.4.5, including the driver and session implementation. Previously completed
+new-engine condition/error, six-step session and four-step typed-answer checks
+are retained evidence, not described as new installed-6.4.6 runs. No full-suite
+rerun or customer clinical acceptance is claimed.
+
+Artifacts and evidence: `tmp/local-upstream-6.4.6/`, including
+`delivery-receipt.json`, `SHA256SUMS`, installed MCP/native/UI receipts and the
+engine JAR/provenance. Earlier new-engine controls are in `tmp/upstream-dcac972/`.
+
+| Artifact | SHA256 |
+| --- | --- |
+| `crl-language-support-6.4.6-local.vsix` | `368aa13bd924c3a836949a5c16d2a5a20d428be23a0b070e76b183ab548691fd` |
+| `smile-digital-health-crl-6.4.6.tgz` | `46eeafddb550703e33afdb28427f10733d469614b948eb51849a0f82e7cd6957` |
+| `cqf-fhir-cr-cli-definition-dcac972f.jar` | `fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f` |
+
+Delivery remains pending two gates: Linux qualification of this engine/build,
+and publication plus fresh-download verification of the pinned engine asset.
+Automatic approval review rejected the Linux command under a retired coordinator
+instruction (reported as OpenAI Codex issue47060), and separately rejected the
+public engine upload under the local-build-only scope. Neither action ran.
+The prepared engine URL is not available yet; a seeded-cache test does not prove
+network acquisition. No public VSIX/npm release or customer migration occurred.
+
 ## Local 6.4.5 — record-status preview
 
 CRE now evaluates the supported explicit Condition/Observation RecordSet status
