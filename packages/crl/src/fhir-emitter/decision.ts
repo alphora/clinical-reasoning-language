@@ -520,7 +520,15 @@ export function emitDecisionPlanDefinition(
     resourceType: "PlanDefinition",
     id,
     meta: { profile: planDefProfiles(isRoot, level) },
-    extension: knowledgeExtensions(level, "structured"),
+    extension: [
+      ...knowledgeExtensions(level, "structured"),
+      // DTR $questionnaire-package copies this root extension after $apply.
+      // The configured canonical base also supplies the next-question server base.
+      ...(isRoot ? [{
+        url: "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
+        valueUrl: metadata.canonicalBase,
+      }] : []),
+    ],
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; from the
     // npm package (authoritative).

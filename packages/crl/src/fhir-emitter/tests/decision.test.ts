@@ -184,6 +184,12 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
+    expect((r.extension as Array<{ url: string }>).filter(e =>
+      e.url === "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive"
+    )).toEqual([{
+      url: "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
+      valueUrl: METADATA.canonicalBase,
+    }]);
   });
 
 
@@ -259,6 +265,9 @@ describe("decision — emitDecisionPlanDefinition Sub-decision (isRoot=false)", 
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("eca-rule");
+    expect((r.extension as Array<{ url: string }>).some(e =>
+      e.url === "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive"
+    )).toBe(false);
   });
 });
 
