@@ -24,6 +24,10 @@
     {
       "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
       "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
+      "valueUrl": "http://example.org/crl"
     }
   ],
   "url": "http://example.org/crl/PlanDefinition/l34194-bleph-example",
