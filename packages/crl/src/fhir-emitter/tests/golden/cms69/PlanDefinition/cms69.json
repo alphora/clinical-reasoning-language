@@ -24,6 +24,10 @@
     {
       "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
       "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
+      "valueUrl": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69"
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69",
