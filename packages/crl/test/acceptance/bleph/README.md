@@ -54,16 +54,18 @@ sets exclude later qualification inputs. All six activity routes, both dispositi
 frontiers and per-suite counts are checked at fixture load.
 
 A pause requires the independently expected frontier, its named unanswered inputs, the exact returned
-question set, no activity/recommendation route, and no engine/OperationOutcome errors. The corrected
-engine's nullable path does not emit the old null-warning strings. Those logs are not required positive
-evidence; any observed legacy warnings are retained and checked against declared guard expressions.
+question set, no activity/recommendation route, and no engine/OperationOutcome errors. The pinned `dcac972f`
+engine DOES emit null-warning strings, but logs the expression OBJECT, so they cannot be matched against
+`pauseNullExpressions` (see the known-red note below). Those logs are not required positive evidence; the
+check that compares them is currently unsatisfiable rather than informative.
 These checks establish observable behavior, not an internal engine execution trace.
 
 ## What a pass requires
 
 All116 inputs must be present exactly once, and every fixture file except the documented non-inputs must be hash-listed. Every case uses a fresh repository and processor with its exact emitted resources loaded once. Source validation and emission must succeed. Native process success, parseable complete Parameters, no OperationOutcome or logged engine error, exact activity route → recommendation wrapper → activity linkage and content, subject and Q/QR-version association, question status/required/options, and typed answers are checked independently of CRE. Activity notes are checked against their literal authored text, including Unicode.
 
-Pause requires the independently authored frontier, named unanswered inputs, the exact question set and no activity/resource-bearing route. Fixture loading additionally checks the frontier against authored request/cosmetic/both-requested/qualification order, so relabeling a frontier fails independently of runtime logs. Legacy null warnings, if emitted, must match the declared expressions; the current engine does not emit them. This reviewed change uses structured output and subsequent repair transitions as positive evidence, not an engine trace of its internal program counter.
+Pause requires the independently authored frontier, named unanswered inputs, the exact question set and no activity/resource-bearing route. Fixture loading additionally checks the frontier against authored request/cosmetic/both-requested/qualification order, so relabeling a frontier fails independently of runtime logs. Legacy null warnings, if emitted, must match the declared expressions; against the pinned engine this
+comparison cannot pass (see the known-red note below). This reviewed change uses structured output and subsequent repair transitions as positive evidence, not an engine trace of its internal program counter.
 
 Activity assertions cover identity, subject, status, prohibition, payload, reason code and profile, rather than every possible FHIR element. They do not seal unlisted extensions or fields. Object property order is irrelevant. Emitted data bytes are pinned; emitted definitions and CQL are preserved with executable hashes and tested behavior, not compared to a frozen whole-bundle hash. The manifest's invocation text describes the inspected shipped driver; its recorded class hash and actual per-case arguments identify what ran.
 
@@ -100,3 +102,38 @@ The `session.cjs` and `bmi-session.cjs` test helpers preserve their historical
 request contracts. The old development overlays and their manifests are retained
 as source evidence, not as current engine installation instructions. Current
 runtime adoption uses the unmodified upstream engine with no overlay.
+
+## KNOWN RED — `pauseNullExpressions` vs the pinned engine (measured 2026-09-24, CRL 6.4.9)
+
+Measured, twice, 116 cases each: `{"cases":116,"nativePassed":67,"crePassed":116,"nativeAcceptanceFailures":49,"infrastructureFailures":0}`.
+All 49 failures are the single error `Unexpected legacy null-condition warnings`, in preserved(38) / unknowns(10) /
+supplemental(1); `completed` passes 47/47.
+
+Cause. `check.cjs` scrapes `/Condition expression (.+) returned null/` from engine stderr and compares the captures to
+`contract.pauseNullExpressions`, which holds CQL expression TEXT pinned on 2026-09-08 (`9100b742`). The engine adopted on
+2026-09-21 (`ef474dc6`, build `dcac972f`) logs the CqfExpression OBJECT instead:
+
+    Condition expression 'org.opencds.cqf.fhir.utility.CqfExpression@14db6db6' returned null
+
+That is Java's default `Object.toString()`. Distinct captures in one run included `@14db6db6`, `@18970f8a`, `@19f89ead`,
+`@21c565af`, `@266ff25d`, `@2d627573` — identity hashes, different every run. So the comparison can never match, and
+repinning would produce a fixture that passes once and never again.
+
+Not caused by 6.4.9. Establishing that, the same 116 cases were run against the released 6.4.8 emitter with this same
+corrected contract: byte-identical counts, 67 passed / 49 failed.
+
+Why this was invisible until now: `contract.json` also pinned a stale `planId`, so the harness aborted at fixture load
+long before reaching these cases. Fixing that pin (6.4.9) is what exposed this one.
+
+That planId staleness has the same shape and is worth stating, because it is the reason this file needs a note at all.
+This suite was CORRECT when added on 2026-09-07 (`6805ff44`) and passed 116/116 that day: `decisionId` then had no root
+branch, so every decision got `<pkg>-<slug>-<hash>` and `mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e`
+was the genuine emitted id. `2f42c13d` (2026-09-18, "canonical policy entry points") added `isRoot ? policyIdBase(metadata)`
+so a policy's entry point carries the exact package identity. It swept the eleven golden PlanDefinitions that `npm test`
+reads and did not touch this fixture — because nothing automated reads this fixture. `npm test` does not run it, no CI
+workflow references it, and it needs a 218 MB engine jar and minutes of JVM time, so it is pinned like a golden but swept
+like documentation. Both breaks reached a release for that one reason.
+
+The real fix is upstream — render the expression at the log site, or give `CqfExpression` a meaningful `toString()`. Until
+then this check is unsatisfiable. Do NOT repin it to observed hashes. Deferred deliberately by the operator rather than
+weakening a pause-verification assertion inside a release.

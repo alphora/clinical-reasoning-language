@@ -6,8 +6,8 @@
     "completed": 47,
     "supplemental": 3
   },
-  "planId": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e",
-  "questionnaireUrl": "http://iehp.org/crl/Questionnaire/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-67a3764d4a7e",
+  "planId": "mcpm-bleph",
+  "questionnaireUrl": "http://iehp.org/crl/Questionnaire/mcpm-bleph",
   "bindings": {
     "B": {
       "definition": "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested#Observation.value[x]",

@@ -113,9 +113,12 @@ function checkNative(result, entry, contract, subject, stderr = '') {
   check(result?.resourceType === 'Parameters' && Array.isArray(result.parameter), 'Expected Parameters result');
   check(!hasEngineError(stderr), 'Engine logged an error');
   const nullExpressions = [...new Set([...stderr.matchAll(/Condition expression (.+) returned null/g)].map(m => m[1]))].sort();
-  // Nullable evaluation no longer emits legacy warning strings. A pause is checked
-  // below by the independently authored frontier, exact questions/answers and absent
-  // activity/route, never inferred from missing log messages alone.
+  // KNOWN RED on the pinned dcac972f engine: it DOES emit these warnings, but logs the
+  // CqfExpression object rather than its text, so the capture is `…CqfExpression@<identityHash>`
+  // — a different value every run, which `pauseNullExpressions` (CQL text, pinned 2026-09-08)
+  // can never match and cannot be repinned against. See test/acceptance/bleph/README.md.
+  // A pause is still checked below by the independently authored frontier, exact
+  // questions/answers and absent activity/route, never inferred from missing log messages.
   if (entry.expected.kind === 'pause') check(Array.isArray(contract.pauseNullExpressions?.[entry.expected.nodeId]), 'Unknown expected pause frontier');
   if (nullExpressions.length) check(same(nullExpressions, [...(entry.expected.kind === 'pause' ? contract.pauseNullExpressions?.[entry.expected.nodeId] || [] : [])].sort()), 'Unexpected legacy null-condition warnings');
   const resources = objects(result, r => typeof r.resourceType === 'string');
