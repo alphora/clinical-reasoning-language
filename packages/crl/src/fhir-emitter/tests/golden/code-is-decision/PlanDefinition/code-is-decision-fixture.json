@@ -27,7 +27,7 @@
     },
     {
       "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
-      "valueUrl": "http://example.org/crl/code-is-decision"
+      "valueBoolean": true
     }
   ],
   "url": "http://example.org/crl/code-is-decision/PlanDefinition/code-is-decision-fixture",

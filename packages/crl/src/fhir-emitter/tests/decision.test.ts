@@ -188,7 +188,7 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
       e.url === "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive"
     )).toEqual([{
       url: "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
-      valueUrl: METADATA.canonicalBase,
+      valueBoolean: true,
     }]);
   });
 

@@ -27,7 +27,7 @@
     },
     {
       "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
-      "valueUrl": "http://example.org/endoluminal-ablation"
+      "valueBoolean": true
     }
   ],
   "url": "http://example.org/endoluminal-ablation/PlanDefinition/service-request",

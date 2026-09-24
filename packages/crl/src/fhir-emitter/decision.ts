@@ -522,11 +522,16 @@ export function emitDecisionPlanDefinition(
     meta: { profile: planDefProfiles(isRoot, level) },
     extension: [
       ...knowledgeExtensions(level, "structured"),
-      // DTR $questionnaire-package copies this root extension after $apply.
-      // The configured canonical base also supplies the next-question server base.
+      // Root-only adaptive marker. Per the operator (2026-09-24): the URL value is
+      // "true for the resulting Questionnaire, but it needs to be boolean true on the
+      // PD (spec needs to be updated but we can't wait)". Both halves of that are the
+      // operator's; nothing here asserts how, or whether, a server carries this marker
+      // from the PlanDefinition to the Questionnaire. The canonical base is no longer
+      // on the PlanDefinition at all — a consumer that needs it reads the package's
+      // `ImplementationGuide.url` / manifest `canonical` (see fhir-package/index.ts).
       ...(isRoot ? [{
         url: "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
-        valueUrl: metadata.canonicalBase,
+        valueBoolean: true,
       }] : []),
     ],
     url,
