@@ -361,7 +361,17 @@ export type {
 // → "2.15": bounded CRE record-status preview and explicit existence verification.
 // → "2.16": upstream definition-based engine identity and cache instructions.
 // → "2.17": exact question association for flat and grouped native inputs.
-const SCHEMA_VERSION = "2.17";
+// → "2.18": CONTENT change — removes two invalid clause anchors. The `verify-loop` RecordSet-preview
+//   clauses are `force: "default"`, but each carried a `test`, which by contract (types.ts) is the
+//   anchor an INVARIANT clause names. Their values named `verify-loop:…` — the RULE id, not the
+//   `verifyLoop:` methodology namespace — so both resolved to nothing, and the force-coverage gate
+//   missed it by only checking invariants. The `test` fields are DELETED rather than given
+//   requirements to point at: inventing a methodology requirement so the anchor resolves would turn
+//   optional guidance into a per-policy obligation nobody reviewed. The clauses keep their evidence
+//   through the `@kit verify-loop:record-status-…` tags on conditionStatus.test.ts, which are a
+//   separate `<ruleId>:<claim>` namespace. The gate is now bidirectional: an invariant clause must
+//   carry a resolving anchor, and a non-invariant clause must carry none.
+const SCHEMA_VERSION = "2.18";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -1112,13 +1122,11 @@ const RULES: KitRule[] = [
     clauses: [
       {
         "text": "CRE/MV preview evaluates explicit Condition and Observation RecordSet retrieves against the emitted CEL patient resources, matching resource type and exact system/code. Unary Condition active and verified filters compose on the same records; Observation verified accepts final, amended and corrected. An explicit existence test returns false for an empty resulting set and true for a matching record even when its Boolean value is false. This answers existence within the authored set, not a selected answer value or a broader clinical negative; preserve the required scope/completeness assumption. These preview checks do not replace independent native execution.",
-        "force": "default",
-        "test": "verify-loop:record-status-preview"
+        "force": "default"
       },
       {
         "text": "This RecordSet preview supports unprojected coded retrieves and a local collection with one unprojected source representation of the same declared type. Reached unsupported operations, temporal/multi-operand status filters, selections/projections, ambiguous owners, cycles, multiple source representations, and locally coded or Boolean-annotated narrative RecordSet filters produce an evaluation error, not false. Unused unsupported collections do not fail an otherwise supported path. Treat these as bounded runtime limitations; retain the faithful authored criteria and record any unverified cases rather than weakening the model to make preview pass.",
-        "force": "default",
-        "test": "verify-loop:record-status-boundaries"
+        "force": "default"
       },
       {
         "text": "Validate CRL and CEL, compare supported CRE predictions with independent native activity/pause expectations, and record unsupported or unexecuted cases as unverified. Establish that each distinct criterion is consequential and relevant unknown behavior is correct; equivalent proof methods are acceptable.",

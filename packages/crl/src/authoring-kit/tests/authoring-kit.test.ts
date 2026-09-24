@@ -43,8 +43,18 @@ function assertForceCoverage(kit: ReturnType<typeof getAuthoringKit>): void {
     for (const clause of rule.clauses) {
       if (!clause.text.trim() || !['validator-enforced', 'invariant', 'default'].includes(clause.force))
         throw new Error(rule.id + ': invalid force clause');
-      if (clause.force === 'invariant' && !anchors.has(clause.test ?? ''))
-        throw new Error(rule.id + ': unresolved invariant anchor');
+      // Bidirectional, because `test` is by contract an INVARIANT clause's field (types.ts). The
+      // old check only asked whether an invariant's anchor resolved, so two `default` clauses on
+      // `verify-loop` carrying `verify-loop:…` — the rule id, not the `verifyLoop:` methodology
+      // namespace — anchored to nothing and stayed green. Checking resolution alone would still
+      // have let a default clause carry a RESOLVING anchor, which is the same category error
+      // wearing a valid name.
+      if (clause.force === 'invariant') {
+        if (!clause.test) throw new Error(rule.id + ': invariant clause has no anchor');
+        if (!anchors.has(clause.test)) throw new Error(rule.id + ': unresolved anchor ' + clause.test);
+      } else if (clause.test) {
+        throw new Error(rule.id + ': non-invariant clause carries an anchor ' + clause.test);
+      }
     }
   }
 }
@@ -311,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.17");
+    expect(kit.schemaVersion).toBe("2.18");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -544,6 +554,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     { text: "Claim", force: "invariant", test: "verifyLoop:missing" },
     { text: "Claim", force: "invariant", test: "judgeLens.composition:missing" },
     { text: "", force: "default" },
+    // A RESOLVING anchor on a non-invariant clause. Deliberately a real id: an unresolvable one
+    // would only re-prove the dangling-name check, not that the force/anchor pairing is rejected.
+    { text: "Claim", force: "default", test: "verifyLoop:native-outcome-verification" },
+    { text: "Claim", force: "validator-enforced", test: "verifyLoop:native-outcome-verification" },
   ])("rejects malformed force metadata %j", clause => {
     const kit = getAuthoringKit();
     const rules = kit.rules.map((rule, index) => index === 0 ? { ...rule, clauses: [clause] } : rule);
@@ -653,8 +667,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.17");
-    expect(kit.contentHash).toBe("b94d87cf2fd940d71c56017b8e172e8d877f7fef80982808bdea84f64a7d9813");
+    expect(kit.schemaVersion).toBe("2.18");
+    expect(kit.contentHash).toBe("30e932e249f5c8f7b1d4f8d7b780b67fe21898339e1163c57e794553842f25a3");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {
