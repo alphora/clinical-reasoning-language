@@ -13,8 +13,8 @@ cleanup already requested. Retain ambiguous material and explain why.
 ## Identify what can go
 
 Measure free space and the largest relevant directories before choosing targets.
-Include the effective TEMP/TMP directories on D as well as leftovers at their old
-C locations. Relocation is not retention: D temp files need the same purge checks.
+Include the effective TEMP/TMP directories on E as well as leftovers in prior
+locations. Relocation is not retention: temporary files need the same purge checks.
 Include generated files at the checkout root and tool cache locations, not only
 `tmp/`. Count physical storage without following junctions or double-counting
 linked trees; file sizes may include shared hardlinked storage.
@@ -72,17 +72,17 @@ history pruning are outside ordinary scratch cleanup; preserve cited revisions.
 Removal can succeed with ignored files present: the ignored-content inspection,
 not absence of a refusal, protects those files.
 
-## Stop new writes filling C
+## Keep generated temporary files and caches on E
 
 Honor the operator's destination. For this workspace, generated temporary files
-and caches belong on D; do not move source checkouts already on E. Derive the
-current user paths and mirror each selected C path on D. Keep resolved machine
+and caches belong on E. Use an explicit E destination for TEMP/TMP and each tool
+cache; do not inherit a C or D scratch default. Keep resolved machine
 paths in local operation records, not committed skill text.
 
 Pay particular attention to agent-created files anywhere below the C user profile:
 one-off scripts, downloaded tools, probes, logs, screenshots, build staging and test
 outputs. Set an explicit working directory for commands and use a named task
-directory under the chosen D scratch root. Do not fall back to the profile root,
+directory under the chosen E scratch root. Do not fall back to the profile root,
 Downloads, or a tool's C temp default for convenience. Preserve requested final
 artifacts outside scratch. Do not redefine USERPROFILE/HOME or junction the entire
 profile to redirect a few generators.

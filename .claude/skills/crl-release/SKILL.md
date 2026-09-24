@@ -144,9 +144,16 @@ Not the working tree. The thing a user installs.
       conclude "the build is broken". (#224 hit exactly this at 4.92.2 → fixed by bumping to 4.92.3.)
       A patch bump is enough; `check-core.cjs` does not enforce crl-vscode↔core parity.
 - [ ] Use the existing normal VS Code executable with a dedicated verification profile and
-      extensions directory. Do not download, copy or maintain another VS Code installation.
+      extensions directory, passing `--user-data-dir` and `--extensions-dir` explicitly. Do not
+      download, copy or maintain another VS Code installation: the operator requires ONE installed
+      `Code.exe` for every launch. A distinct `win32AppUserModelId` does not isolate the default
+      profile when the profile arguments are absent, so a copied executable can be launched against
+      the operator's normal profile through a stale shortcut or recent-project entry. If a test needs
+      a different VS Code version, REPORT that requirement rather than making another copy.
       Keep generated Windows test profiles, temporary output and caches on the operator's
-      designated storage drive. Record the executable and isolated profile actually used.
+      designated storage drive. Record the executable's actual version and the isolated profile used.
+      Test-workspace entries may still appear in Windows recents: verify launch targets after testing,
+      and clean only the entries the test created, preserving pre-existing pins, order and recents.
 - [ ] Install the VSIX into the dedicated verification extensions directory:
       `code --user-data-dir <profile> --extensions-dir <extensions> --install-extension <vsix> --force`.
       Activate those installed bytes in the verification window/profile and confirm its extension

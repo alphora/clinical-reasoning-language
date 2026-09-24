@@ -325,6 +325,14 @@ prints the command. Ask the operator in chat — **do not run the grant yourself
 
 # Project rules (CRL) — outside the provisioned blocks above
 
+## Local build and test storage
+
+Operator instruction: generated scratch, temporary files, build/test outputs and
+tool caches belong on E:. Set TEMP/TMP and applicable cache variables explicitly
+before running commands, and verify the effective path. Existing processes may
+retain C: or D: defaults after settings change; those defaults are not permission
+to use them. Keep machine-specific paths in local configuration.
+
 ## Rules are also the patient — invoke `stale-requirements`
 
 A charter clause, a memory, a doctrine comment, a kit rule, or an operator escalation can be **stale,
