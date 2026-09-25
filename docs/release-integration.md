@@ -43,6 +43,26 @@ records archive identities, fresh installed checks and retained evidence. Releas
 CI and fresh registry verification remain separate publication checks. Remote Linux
 qualification infrastructure is separate follow-up work, outside this release.
 
+## 6.4.9 — retained native/Linux evidence
+
+Published September 24, 2026 at `4c445d26d9e491aa820d586c31d359f82b278510`. Scope: the root
+PlanDefinition adaptive marker becomes `valueBoolean: true`; authoring kit 2.18 removes two invalid
+clause anchors; the bleph acceptance `planId` is repinned.
+
+Runtime comparison against 6.4.8 finds the execution assets **unchanged**: `git diff v6.4.8 v6.4.9`
+reports zero changed files under `packages/crl/src/results` (including the `ApplyDriver.class` bytes
+and `ENGINE_JAR_SOURCE`), `packages/crl-vscode/src/stableServer.ts`, `packages/crl/scripts/build-driver.mjs`
+and `patches/cqframework`. The pinned engine (`cqf-fhir-cr-cli-definition-dcac972f.jar`,
+`fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f`) and the compiled driver are the
+same artifacts qualified previously. Completed native/Linux evidence is therefore **retained** through
+that comparison; the remote workflow was not rerun for 6.4.9. Windows installed-artifact checks WERE
+performed for this release: VS Code 1.138.0 isolated profile, both installed MCP entry points at the
+25-tool inventory, canonical kit equality with the published export, and `emit_crl_fhir` through the
+installed server emitting the Boolean marker.
+
+⚠ The bleph native acceptance suite is a recorded known red at 67/116, unrelated to this release and
+unchanged by it; cause and evidence are in `packages/crl/test/acceptance/bleph/README.md`.
+
 The 6.3.2, 6.4.0 and 6.4.1 heads are ancestors of the candidate. No paths
 were deleted between any of those heads and the candidate. All previous kit rule
 IDs remain. Flag implementation and drawer files are unchanged from 6.3.2;
