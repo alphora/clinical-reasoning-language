@@ -1,0 +1,78 @@
+{
+  "resourceType": "Library",
+  "id": "McpmBlephExternalConcepts",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://iehp.org/crl/Library/McpmBlephExternalConcepts",
+  "version": "0.0.0",
+  "name": "McpmBlephExternalConcepts",
+  "title": "McpmBlephExternalConcepts",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "McpmBlephExternalConcepts",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+        "code": "logic-library"
+      }
+    ]
+  },
+  "relatedArtifact": [
+    {
+      "type": "depends-on",
+      "resource": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-service-codes"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoptosis-repair-service-codes"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-2aa31e7fdaeb"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-a0ebda795232"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0c544edc395d"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-13387ec190e0"
+    }
+  ],
+  "content": [
+    {
+      "contentType": "text/cql",
+      "url": "../../cql/McpmBlephExternalConcepts.cql"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepaA54eec6c1900AnswerCodes",
+  "title": "blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+  "description": "blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+  "status": "draft",
+  "experimental": true,
+  "publisher": "unknown",
+  "date": "2020-01-01T00:00:00.000Z",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin",
+      "display": "Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin"
+    },
+    {
+      "code": "near-or-far-vision-impairment-due-to-blepharochalasis",
+      "display": "Impairment of near or far vision due to blepharochalasis"
+    },
+    {
+      "code": "near-or-far-vision-impairment-due-to-blepharoptosis",
+      "display": "Impairment of near or far vision due to blepharoptosis"
+    },
+    {
+      "code": "near-or-far-vision-impairment-due-to-dermatochalasis",
+      "display": "Impairment of near or far vision due to dermatochalasis"
+    },
+    {
+      "code": "none-of-the-listed-indications",
+      "display": "None of the listed indications"
+    },
+    {
+      "code": "prosthesis-difficulties-in-an-anophthalmic-socket",
+      "display": "Prosthesis difficulties in an anophthalmic socket"
+    },
+    {
+      "code": "symptomatic-redundant-skin-weighing-down-upper-lashes",
+      "display": "Symptomatic redundant skin weighing down upper lashes"
+    },
+    {
+      "code": "visual-field-defect-due-to-blepharochalasis",
+      "display": "Visual field defect due to blepharochalasis"
+    },
+    {
+      "code": "visual-field-defect-due-to-blepharoptosis",
+      "display": "Visual field defect due to blepharoptosis"
+    },
+    {
+      "code": "visual-field-defect-due-to-dermatochalasis",
+      "display": "Visual field defect due to dermatochalasis"
+    }
+  ]
+}

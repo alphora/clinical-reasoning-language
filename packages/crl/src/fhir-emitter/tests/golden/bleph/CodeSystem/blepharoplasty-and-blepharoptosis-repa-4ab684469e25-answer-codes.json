@@ -1,0 +1,69 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepa4ab684469e25AnswerCodes",
+  "title": "blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+  "description": "blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+  "status": "draft",
+  "experimental": true,
+  "publisher": "unknown",
+  "date": "2020-01-01T00:00:00.000Z",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "complaint-of-chronic-blepharitis",
+      "display": "Patient Reports Chronic Blepharitis"
+    },
+    {
+      "code": "complaint-of-chronic-dermatitis",
+      "display": "Patient Reports Chronic Dermatitis"
+    },
+    {
+      "code": "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes",
+      "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Looking Through The Eyelashes"
+    },
+    {
+      "code": "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin",
+      "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Seeing The Upper Eyelid Skin"
+    },
+    {
+      "code": "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping",
+      "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Upper Eyelid Drooping"
+    },
+    {
+      "code": "complaint-of-interference-with-near-or-distance-vision",
+      "display": "Patient Reports Interference With Near Or Distance Vision"
+    },
+    {
+      "code": "complaint-of-interference-with-visual-field",
+      "display": "Patient Reports Interference With Visual Field"
+    },
+    {
+      "code": "none-of-the-listed-complaints",
+      "display": "None of the listed complaints"
+    }
+  ]
+}

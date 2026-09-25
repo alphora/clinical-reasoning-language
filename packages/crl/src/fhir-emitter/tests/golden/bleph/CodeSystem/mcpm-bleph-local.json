@@ -1,0 +1,81 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "mcpm-bleph-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/CodeSystem/mcpm-bleph-local",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairLocal",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "blepharoplasty-requested",
+      "display": "Blepharoplasty Requested"
+    },
+    {
+      "code": "blepharoptosis-repair-requested",
+      "display": "Blepharoptosis Repair Requested"
+    },
+    {
+      "code": "performed-for-cosmetic-purposes",
+      "display": "Cosmetic Surgical Purpose"
+    },
+    {
+      "code": "functional-or-reconstructive-surgery-performed-to-correct-indication",
+      "display": "Functional Or Reconstructive Surgical Indication"
+    },
+    {
+      "code": "documented-patient-complaint",
+      "display": "Documented Patient Complaint"
+    },
+    {
+      "code": "photographic-demonstration-submitted",
+      "display": "Photographic Demonstration Submitted"
+    },
+    {
+      "code": "visual-field-demonstration-submitted",
+      "display": "Visual Field Demonstration Submitted"
+    },
+    {
+      "code": "submitted-photographs-conform-to-the-photograph-submission-standards",
+      "display": "Photograph Submission Standards Met"
+    },
+    {
+      "code": "submitted-visual-field-examination-conforms-to-the-examination-standards",
+      "display": "Visual Field Examination Standards Met"
+    },
+    {
+      "code": "blepharoplasty-individually-documented",
+      "display": "Individual Blepharoplasty Documentation"
+    },
+    {
+      "code": "blepharoptosis-repair-individually-documented",
+      "display": "Individual Blepharoptosis Repair Documentation"
+    }
+  ]
+}

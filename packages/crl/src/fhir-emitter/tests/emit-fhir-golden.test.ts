@@ -46,6 +46,13 @@ const CORPORA: Record<string, string> = {
   // customer content), so the new construct has a durable emit oracle in BOTH lanes rather than living only
   // in a gitignored artifact.
   "coded-question": "coded-question/coded-question.crl",
+  // ⭐ The bleph acceptance policy's EMITTED artifacts, pinned here so emit drift is caught by
+  // `npm test` like every other corpus. It was not pinned before, and that gap is exactly how
+  // `2f42c13d` ("canonical policy entry points") moved root PlanDefinition ids, swept the eleven
+  // goldens below, and left `test/acceptance/bleph/contract.json` pinning an id the emitter no
+  // longer produced — silently, because the only thing reading that contract is a manual,
+  // jar-gated harness that no CI workflow runs. Same relative escape as `service-request`.
+  bleph: "../../../../test/acceptance/bleph/src/crl/blepharoplasty-blepharoptosis-repair.crl",
 };
 
 // Hermetic, reproducible emit: pass an explicit `date` override (highest

@@ -1,0 +1,632 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "mcpm-bleph",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
+      "valueBoolean": true
+    }
+  ],
+  "url": "http://iehp.org/crl/PlanDefinition/mcpm-bleph",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairBlepharoplastyAndBlepharoptosisRepairCoverageDetermination",
+  "title": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://iehp.org/crl/Library/McpmBlephInterface"
+  ],
+  "action": [
+    {
+      "title": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "description": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+          "description": "Blepharoplasty Requested or Blepharoptosis Repair Requested",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "CRL branch Or L412C9"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Is blepharoplasty requested?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Confirm whether this request includes blepharoplasty."
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Is blepharoptosis repair requested?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Confirm whether this request includes blepharoptosis repair."
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested"
+              ]
+            }
+          ],
+          "action": [
+            {
+              "title": "Cosmetic Surgical Purpose",
+              "description": "Cosmetic Surgical Purpose",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L414C11"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Is the requested surgery being performed for cosmetic purposes?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Answer for the purpose of the surgery under review."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-cosmetic-surgical-purpose"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://iehp.org/crl/PlanDefinition/mcpm-bleph-not-certify-unmet-recommendation"
+            },
+            {
+              "title": "Blepharoplasty Requested and Blepharoptosis Repair Requested",
+              "description": "Blepharoplasty Requested and Blepharoptosis Repair Requested",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch Ref L414C11"
+                  }
+                },
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch And L415C13"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Is blepharoplasty requested?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Confirm whether this request includes blepharoplasty."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoplasty-requested"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Is blepharoptosis repair requested?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Confirm whether this request includes blepharoptosis repair."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-blepharoptosis-repair-requested"
+                  ]
+                }
+              ],
+              "action": [
+                {
+                  "title": "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted and Individual Blepharoplasty Documentation and Individual Blepharoptosis Repair Documentation",
+                  "description": "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted and Individual Blepharoplasty Documentation and Individual Blepharoptosis Repair Documentation",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "condition": [
+                    {
+                      "kind": "applicability",
+                      "expression": {
+                        "language": "text/cql-identifier",
+                        "expression": "CRL branch And L417C17"
+                      }
+                    }
+                  ],
+                  "input": [
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Which listed indication is this functional or reconstructive surgery performed to correct?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Select the indication the requested surgery is intended to correct, including the stated causal relationship. Select none of the listed indications when none applies."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-functional-or-reconstructive-surgical-indication"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Which complaint has the patient reported?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Select the documented complaint supporting this request, or none of the listed complaints."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Do the submitted photographs conform to the photograph submission standards?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Assess the submitted photographs against the policy's photograph submission standards."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photograph-submission-standards-met"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "What does the submitted photograph demonstrate?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Select the finding demonstrated by the photograph, or none of the listed photographic demonstrations. An attachment alone does not establish a finding."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Does the submitted visual field examination conform to the visual field examination standards?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Assess the submitted examination against the policy's visual field examination standards."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-examination-standards-met"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "What does the submitted visual field examination demonstrate?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Select the finding demonstrated by the visual field printout, or none of the listed visual field demonstrations."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-demonstration-submitted"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Is the requested blepharoplasty individually documented?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Assess the documentation supporting the blepharoplasty request independently of any concurrent blepharoptosis repair."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-individual-blepharoplasty-documentation"
+                      ]
+                    },
+                    {
+                      "extension": [
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                          "valueString": "Is the requested blepharoptosis repair individually documented?"
+                        },
+                        {
+                          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                          "valueMarkdown": "Assess the documentation supporting the blepharoptosis repair request independently of any concurrent blepharoplasty."
+                        }
+                      ],
+                      "type": "Observation",
+                      "profile": [
+                        "http://iehp.org/crl/StructureDefinition/mcpm-bleph-individual-blepharoptosis-repair-documentation"
+                      ]
+                    }
+                  ],
+                  "definitionCanonical": "http://iehp.org/crl/PlanDefinition/mcpm-bleph-certify-met-recommendation"
+                },
+                {
+                  "title": "otherwise",
+                  "description": "otherwise",
+                  "code": [
+                    {
+                      "coding": [
+                        {
+                          "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                          "code": "guideline-based-care"
+                        }
+                      ]
+                    }
+                  ],
+                  "definitionCanonical": "http://iehp.org/crl/PlanDefinition/mcpm-bleph-not-certify-unmet-recommendation",
+                  "condition": [
+                    {
+                      "kind": "applicability",
+                      "expression": {
+                        "language": "text/cql-identifier",
+                        "expression": "Not CRL branch And L417C17"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                  "valueString": "any"
+                }
+              ]
+            },
+            {
+              "title": "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted",
+              "description": "Qualifying Functional Indication and Qualifying Patient Complaint Documented and Qualifying Objective Demonstration Submitted",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch Ref L414C11"
+                  }
+                },
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch And L415C13"
+                  }
+                },
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch And L420C13"
+                  }
+                }
+              ],
+              "input": [
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Which listed indication is this functional or reconstructive surgery performed to correct?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Select the indication the requested surgery is intended to correct, including the stated causal relationship. Select none of the listed indications when none applies."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-functional-or-reconstructive-surgical-indication"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Which complaint has the patient reported?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Select the documented complaint supporting this request, or none of the listed complaints."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-documented-patient-complaint"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Do the submitted photographs conform to the photograph submission standards?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Assess the submitted photographs against the policy's photograph submission standards."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photograph-submission-standards-met"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "What does the submitted photograph demonstrate?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Select the finding demonstrated by the photograph, or none of the listed photographic demonstrations. An attachment alone does not establish a finding."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-photographic-demonstration-submitted"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "Does the submitted visual field examination conform to the visual field examination standards?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Assess the submitted examination against the policy's visual field examination standards."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-examination-standards-met"
+                  ]
+                },
+                {
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                      "valueString": "What does the submitted visual field examination demonstrate?"
+                    },
+                    {
+                      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                      "valueMarkdown": "Select the finding demonstrated by the visual field printout, or none of the listed visual field demonstrations."
+                    }
+                  ],
+                  "type": "Observation",
+                  "profile": [
+                    "http://iehp.org/crl/StructureDefinition/mcpm-bleph-visual-field-demonstration-submitted"
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://iehp.org/crl/PlanDefinition/mcpm-bleph-certify-met-recommendation"
+            },
+            {
+              "title": "otherwise",
+              "description": "otherwise",
+              "code": [
+                {
+                  "coding": [
+                    {
+                      "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                      "code": "guideline-based-care"
+                    }
+                  ]
+                }
+              ],
+              "definitionCanonical": "http://iehp.org/crl/PlanDefinition/mcpm-bleph-not-certify-unmet-recommendation",
+              "condition": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch Ref L414C11"
+                  }
+                },
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch And L415C13"
+                  }
+                },
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "Not CRL branch And L420C13"
+                  }
+                }
+              ]
+            }
+          ],
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+              "valueString": "any"
+            }
+          ]
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://iehp.org/crl/PlanDefinition/mcpm-bleph-not-certify-unmet-recommendation",
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch Or L412C9"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepaC19d8d02609dAnswerCodes",
+  "title": "blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes",
+  "description": "blepharoplasty-and-blepharoptosis-repa-c19d8d02609d-answer-codes",
+  "status": "draft",
+  "experimental": true,
+  "publisher": "unknown",
+  "date": "2020-01-01T00:00:00.000Z",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "none-of-the-listed-visual-field-demonstrations",
+      "display": "None of the listed visual field demonstrations"
+    },
+    {
+      "code": "visual-field-at-least-12-degree-upper-field-loss-repose-and-elevated-demonstrating-potential-correction",
+      "display": "Visual Field Printout Shows At Least 12 Degree Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction"
+    },
+    {
+      "code": "visual-field-at-least-30-percent-upper-field-loss-repose-and-elevated-demonstrating-potential-correction",
+      "display": "Visual Field Printout Shows At Least 30 Percent Upper Field Loss With Upper Lid Skin Or Lid Margin In Repose And Elevated Demonstrating Potential Correction"
+    }
+  ]
+}

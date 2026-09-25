@@ -1,0 +1,120 @@
+{
+  "resourceType": "ValueSet",
+  "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0c544edc395d",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-0c544edc395d",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairBlepharoplastyAndBlepharoptosisRepairDocumentedPatientComp",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "compose": {
+    "include": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "concept": [
+          {
+            "code": "complaint-of-interference-with-near-or-distance-vision",
+            "display": "Patient Reports Interference With Near Or Distance Vision"
+          },
+          {
+            "code": "complaint-of-interference-with-visual-field",
+            "display": "Patient Reports Interference With Visual Field"
+          },
+          {
+            "code": "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping",
+            "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Upper Eyelid Drooping"
+          },
+          {
+            "code": "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes",
+            "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Looking Through The Eyelashes"
+          },
+          {
+            "code": "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin",
+            "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Seeing The Upper Eyelid Skin"
+          },
+          {
+            "code": "complaint-of-chronic-blepharitis",
+            "display": "Patient Reports Chronic Blepharitis"
+          },
+          {
+            "code": "complaint-of-chronic-dermatitis",
+            "display": "Patient Reports Chronic Dermatitis"
+          },
+          {
+            "code": "none-of-the-listed-complaints",
+            "display": "None of the listed complaints"
+          }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-interference-with-near-or-distance-vision",
+        "display": "Patient Reports Interference With Near Or Distance Vision"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-interference-with-visual-field",
+        "display": "Patient Reports Interference With Visual Field"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-difficulty-seeing-due-to-upper-eyelid-drooping",
+        "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Upper Eyelid Drooping"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-difficulty-seeing-due-to-looking-through-the-eyelashes",
+        "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Looking Through The Eyelashes"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-difficulty-seeing-due-to-seeing-the-upper-eyelid-skin",
+        "display": "Patient Reports Difficulty Seeing At Distance Or Near Due To Seeing The Upper Eyelid Skin"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-chronic-blepharitis",
+        "display": "Patient Reports Chronic Blepharitis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "complaint-of-chronic-dermatitis",
+        "display": "Patient Reports Chronic Dermatitis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-4ab684469e25-answer-codes",
+        "code": "none-of-the-listed-complaints",
+        "display": "None of the listed complaints"
+      }
+    ]
+  }
+}

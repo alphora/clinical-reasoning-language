@@ -1,0 +1,138 @@
+{
+  "resourceType": "ValueSet",
+  "id": "mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-13387ec190e0",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoplasty-and-blepharoptosis-repair-13387ec190e0",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairBlepharoplastyAndBlepharoptosisRepairFunctionalOrReconstru",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "compose": {
+    "include": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "concept": [
+          {
+            "code": "near-or-far-vision-impairment-due-to-dermatochalasis",
+            "display": "Impairment of near or far vision due to dermatochalasis"
+          },
+          {
+            "code": "near-or-far-vision-impairment-due-to-blepharochalasis",
+            "display": "Impairment of near or far vision due to blepharochalasis"
+          },
+          {
+            "code": "near-or-far-vision-impairment-due-to-blepharoptosis",
+            "display": "Impairment of near or far vision due to blepharoptosis"
+          },
+          {
+            "code": "visual-field-defect-due-to-dermatochalasis",
+            "display": "Visual field defect due to dermatochalasis"
+          },
+          {
+            "code": "visual-field-defect-due-to-blepharochalasis",
+            "display": "Visual field defect due to blepharochalasis"
+          },
+          {
+            "code": "visual-field-defect-due-to-blepharoptosis",
+            "display": "Visual field defect due to blepharoptosis"
+          },
+          {
+            "code": "symptomatic-redundant-skin-weighing-down-upper-lashes",
+            "display": "Symptomatic redundant skin weighing down upper lashes"
+          },
+          {
+            "code": "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin",
+            "display": "Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin"
+          },
+          {
+            "code": "prosthesis-difficulties-in-an-anophthalmic-socket",
+            "display": "Prosthesis difficulties in an anophthalmic socket"
+          },
+          {
+            "code": "none-of-the-listed-indications",
+            "display": "None of the listed indications"
+          }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "near-or-far-vision-impairment-due-to-dermatochalasis",
+        "display": "Impairment of near or far vision due to dermatochalasis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "near-or-far-vision-impairment-due-to-blepharochalasis",
+        "display": "Impairment of near or far vision due to blepharochalasis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "near-or-far-vision-impairment-due-to-blepharoptosis",
+        "display": "Impairment of near or far vision due to blepharoptosis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "visual-field-defect-due-to-dermatochalasis",
+        "display": "Visual field defect due to dermatochalasis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "visual-field-defect-due-to-blepharochalasis",
+        "display": "Visual field defect due to blepharochalasis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "visual-field-defect-due-to-blepharoptosis",
+        "display": "Visual field defect due to blepharoptosis"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "symptomatic-redundant-skin-weighing-down-upper-lashes",
+        "display": "Symptomatic redundant skin weighing down upper lashes"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "chronic-symptomatic-dermatitis-of-pretarsal-skin-caused-by-redundant-upper-lid-skin",
+        "display": "Chronic, symptomatic dermatitis of pretarsal skin caused by redundant upper lid skin"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "prosthesis-difficulties-in-an-anophthalmic-socket",
+        "display": "Prosthesis difficulties in an anophthalmic socket"
+      },
+      {
+        "system": "http://iehp.org/crl/CodeSystem/blepharoplasty-and-blepharoptosis-repa-a54eec6c1900-answer-codes",
+        "code": "none-of-the-listed-indications",
+        "display": "None of the listed indications"
+      }
+    ]
+  }
+}

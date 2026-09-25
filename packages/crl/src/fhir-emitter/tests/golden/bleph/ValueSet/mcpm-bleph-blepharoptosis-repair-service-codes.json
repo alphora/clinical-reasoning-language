@@ -1,0 +1,104 @@
+{
+  "resourceType": "ValueSet",
+  "id": "mcpm-bleph-blepharoptosis-repair-service-codes",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://iehp.org/crl/ValueSet/mcpm-bleph-blepharoptosis-repair-service-codes",
+  "version": "0.0.0",
+  "name": "BlepharoplastyAndBlepharoptosisRepairBlepharoptosisRepairServiceCodes",
+  "title": "Blepharoplasty And Blepharoptosis Repair",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Blepharoplasty And Blepharoptosis Repair",
+  "compose": {
+    "include": [
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "concept": [
+          {
+            "code": "67901"
+          },
+          {
+            "code": "67902"
+          },
+          {
+            "code": "67903"
+          },
+          {
+            "code": "67904"
+          },
+          {
+            "code": "67905"
+          },
+          {
+            "code": "67906"
+          },
+          {
+            "code": "67907"
+          },
+          {
+            "code": "67908"
+          }
+        ]
+      }
+    ]
+  },
+  "expansion": {
+    "timestamp": "2020-01-01T00:00:00.000Z",
+    "contains": [
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67901"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67902"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67903"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67904"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67905"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67906"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67907"
+      },
+      {
+        "system": "http://www.ama-assn.org/go/cpt",
+        "code": "67908"
+      }
+    ]
+  }
+}
