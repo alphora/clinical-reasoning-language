@@ -37,6 +37,7 @@ import {
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { publicationAdmissionReason, readPublicationHasValue, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
 import { readPublicationBMI } from "../emit/publicationBMI";
+import { readPublicationAnyMembership } from "../template-match/anyMembership";
 import type {
   UseSiteOperandUntypedWarning,
   UseSiteTypeMismatchError,
@@ -203,6 +204,23 @@ export class UseSiteTypeValidator {
     errors: ValidationError[],
   ): void {
     const def = concept.definition;
+    const aggregate = readPublicationAnyMembership(concept);
+    if (aggregate && concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined) {
+      const resolve = (ref: ReferenceName) => resolveLib(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx)?.types.concepts.get(getRefName(ref));
+      const seen = new Set<ReturnType<typeof resolve>>();
+      for (const ref of aggregate.operands) {
+        const target = resolve(ref.value);
+        if (target && seen.has(target))
+          errors.push(publicationContextMismatch(concept.name, getRefName(ref.value), "aggregate membership operands must be distinct resolved concepts", ref.location, attribution));
+        if (target) seen.add(target);
+        if (target && (!target.publication || publicationAdmissionReason(target.publication) !== undefined || target.publication.valueTypes[0] !== "CodeableConcept"))
+          errors.push(publicationContextMismatch(concept.name, getRefName(ref.value), "aggregate membership requires a selected CodeableConcept publication", ref.location, attribution));
+      }
+      const anchor = resolve(aggregate.validity.value);
+      if (anchor && !aggregate.operands.some(ref => resolve(ref.value) === anchor))
+        errors.push(publicationContextMismatch(concept.name, getRefName(aggregate.validity.value), "aggregate validity must name an operand", aggregate.validity.location, attribution));
+      return;
+    }
     // REFACTOR:grounded (#320, plan595): explicit numeric producers consume selected Quantity publications.
     // Their dependencies and validity are checked by preparation, not legacy narrative matching.
     if (concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined) {

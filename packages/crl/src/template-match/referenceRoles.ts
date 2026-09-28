@@ -1,6 +1,7 @@
 import type { CanonicalArg, CanonicalPatternCall } from "./canonicalTypes";
 import type { Location, NarrativeClause } from "../ast/types";
 import { matchNarrative } from "./matcher";
+import { readAnyMembership } from "./anyMembership";
 
 /**
  * ⭐⭐ WHICH NAMESPACE EACH QUOTED NAME IN A NARRATIVE BELONGS TO.
@@ -73,6 +74,12 @@ function walkCall(call: CanonicalPatternCall, out: Map<string, RefRole>): void {
  */
 export function narrativeReferenceRoles(body: NarrativeClause): ReadonlyMap<string, RefRole> {
   const out = new Map<string, RefRole>();
+  const aggregate = readAnyMembership(body);
+  if (aggregate) {
+    for (const ref of [...aggregate.operands, aggregate.validity]) out.set(spanKey(ref.location), "concept");
+    out.set(spanKey(aggregate.terminology.location), "terminology");
+    return out;
+  }
   const matched = matchNarrative(body);
   if (matched?.known !== true) return out;
   walkCall(matched, out);

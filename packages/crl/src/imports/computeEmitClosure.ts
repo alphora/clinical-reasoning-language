@@ -160,6 +160,9 @@ export function collectCqlIncludeRefs(entry: RegistryEntry, _scope: LibraryScope
   };
   for (const stmt of entry.ast.statements) {
     if (stmt.type === "Concept") {
+      // Prepared producer envelopes carry physical dependencies separately. A finite
+      // predicate's source library is not an executable CQL include.
+      if (stmt.__publication?.role === "public" && stmt.__publication.descriptor.producer !== undefined) continue;
       visitConceptDefinitionRefs(stmt as Concept, visit);
     }
   }

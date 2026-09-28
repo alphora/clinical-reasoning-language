@@ -11,6 +11,7 @@ import type { PublicationCandidate } from "./publicationSelection";
 import { publicationSourceAdmissionReason, type PublicationSource } from "./publicationSource";
 import { readAgeProjection } from "./publicationAge";
 import { readPublicationBMI } from "./publicationBMI";
+import { readPublicationAnyMembership } from "../template-match/anyMembership";
 import { readPublicationQuantity, isPublicationComparisonDecimal } from "./publicationQuantity";
 import {
   createPublicationContext,
@@ -70,9 +71,17 @@ export interface PublicationBMIProducer {
   readonly operands: readonly [QualifiedConceptIdentity, QualifiedConceptIdentity];
   readonly validityOperand: 0 | 1;
 }
-export type PublicationProducer = PublicationMembershipProducer | PublicationThresholdProducer | PublicationBMIProducer | PublicationHasValueProducer;
+export interface PublicationAnyMembershipProducer {
+  readonly kind: "anyMembership";
+  readonly producerId: string;
+  readonly operands: readonly QualifiedConceptIdentity[];
+  readonly domains: readonly (readonly PublicationCode[])[];
+  readonly qualifying: readonly PublicationCode[];
+  readonly validityOperand: number;
+}
+export type PublicationProducer = PublicationMembershipProducer | PublicationThresholdProducer | PublicationBMIProducer | PublicationHasValueProducer | PublicationAnyMembershipProducer;
 export function publicationProducerOperands(p: PublicationProducer | undefined): readonly QualifiedConceptIdentity[] {
-  return p === undefined ? [] : p.kind === "bodyMassIndex" ? p.operands : [p.operand];
+  return p === undefined ? [] : p.kind === "bodyMassIndex" || p.kind === "anyMembership" ? p.operands : [p.operand];
 }
 
 // REFACTOR:grounded (#320, plan587): unary comparison contributes its own Boolean record.
@@ -182,15 +191,17 @@ export function publicationAdmissionReason(concept: Readonly<Concept>): string |
   const membership = readPublicationMembership(concept);
   const threshold = readPublicationThreshold(concept);
   const bmi = readPublicationBMI(concept);
+  const anyMembership = readPublicationAnyMembership(concept);
   if (concept.code !== undefined && concept.code.trim().length === 0) return "A local `code is` must be nonempty.";
   // REFACTOR:grounded (#320, plan585): an age calculation needs no invented answer identity.
-  if (concept.code === undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
-  if (concept.definition !== undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined)
+  if (concept.code === undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && anyMembership === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
+  if (concept.definition !== undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && anyMembership === undefined)
     return "Supported production is selected-value presence, selected-value membership, quantity threshold, or body mass index with an explicit validity operand; other definitions cannot be ignored.";
   const sourceReason = publicationSourceAdmissionReason(concept);
   if (sourceReason !== undefined) return sourceReason;
   if (hasValue !== undefined && concept.valueTypes[0] !== "boolean") return "Has-value produces an Observation with a boolean value.";
   if (membership !== undefined && concept.valueTypes[0] !== "boolean") return "Membership produces an Observation with a boolean value.";
+  if (anyMembership !== undefined && concept.valueTypes[0] !== "boolean") return "Aggregate membership produces an Observation with a boolean value.";
   if (threshold !== undefined && concept.valueTypes[0] !== "boolean") return "A quantity comparison produces an Observation with a boolean value.";
   if (bmi !== undefined && concept.valueTypes[0] !== "Quantity") return "Body mass index produces an Observation with a Quantity value.";
   if (concept.valueElement !== undefined && concept.valueElement.path !== "value")
@@ -366,6 +377,30 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
           operand: prepared.identity, domain, qualifying: normalized(qualifying) });
       }
       // REFACTOR:grounded (#322): resolve the selected operand in its owning scope, never raw retrieval.
+      const aggregate = readPublicationAnyMembership(concept);
+      if (aggregate !== undefined) {
+        if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");
+        const inputs: PublicationDescriptor[] = [];
+        for (const ref of aggregate.operands) {
+          const hit = declarations.lookupConcept(library.sourceIdentity, ref.value, ref.location);
+          if (hit.kind !== "hit") return fail("Aggregate membership operand cannot resolve.", ref.location, "publication-reference-resolution");
+          if (hit.node.shapeReduction === undefined) return fail("Aggregate membership requires explicitly selected operands.", ref.location, "publication-membership-operand-unsupported");
+          const prepared = prepare(hit.library, hit.node);
+          if (!prepared) return fail("Aggregate membership operand preparation failed.", ref.location, "publication-dependency-failed");
+          if (prepared.valueType !== "CodeableConcept" || !prepared.valueDomain) return fail("Aggregate membership requires CodeableConcept operands with finite domains.", ref.location, "publication-membership-operand-unsupported");
+          if (inputs.some(p => p.identity.key === prepared.identity.key)) return fail("Aggregate membership operands must be distinct.", ref.location, "publication-duplicate-operand");
+          inputs.push(prepared);
+        }
+        const anchor = declarations.lookupConcept(library.sourceIdentity, aggregate.validity.value, aggregate.validity.location);
+        const validityOperand = anchor.kind === "hit" ? inputs.findIndex(p => p.identity.key === anchor.identity.key) : -1;
+        if (validityOperand < 0) return fail("Aggregate validity must name one of its resolved operands.", aggregate.validity.location, "publication-validity-operand-unsupported");
+        const qualifying = finiteTerminology(library.sourceIdentity, aggregate.terminology.value, aggregate.terminology.location).codes;
+        const domains = inputs.map(p => p.valueDomain!);
+        if (domains.some(domain => qualifying.some(code => !domain.some(d => publicationCodeKey(d) === publicationCodeKey(code)))))
+          return fail("Every qualifying code must belong to every operand domain.", aggregate.terminology.location, "publication-membership-domain-coverage");
+        producer = Object.freeze({ kind: "anyMembership", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["anyMembership", 0]]))}`,
+          operands: Object.freeze(inputs.map(p => p.identity)), domains: Object.freeze(domains), qualifying: normalized(qualifying), validityOperand });
+      }
       const presence = readPublicationHasValue(concept);
       if (presence !== undefined) {
         if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");

@@ -399,6 +399,11 @@ function routePublicationReferences(entry: RegistryEntry, scope: PublicationEmit
     return Object.fromEntries(Object.entries(node).map(([key, child]) => {
       // Bindings are shared immutable semantic facts, not AST syntax to rewrite.
       if (key.startsWith("__")) return [key, child];
+      // A prepared producer executes its descriptor, not the retained narrative. Its
+      // selected dependencies are routed below; finite terminology is already embedded.
+      if (key === "definition" && node.type === "Concept" &&
+          (node.__publication as Concept["__publication"])?.role === "public" &&
+          (node.__publication as Concept["__publication"])?.descriptor.producer !== undefined) return [key, child];
       const isConceptSlot = (key === "ref" && conceptRefParents.has(String(node.type))) ||
         (node.type === "NConceptRef" && key === "value") ||
         (node.type === "ActionGuard" && key === "conceptName");

@@ -124,6 +124,7 @@ import {
 import { selectPublicationCandidate, type PublicationCandidate } from "../emit/publicationSelection";
 import { interpretPublicationCodeableValue } from "../emit/publicationDomain";
 import { produceHasValueCandidate } from "../emit/publicationHasValue";
+import { produceAnyMembershipCandidate } from "../emit/publicationAnyMembership";
 import { produceMembershipCandidate } from "../emit/publicationProducer";
 import { adaptObservationPublicationCandidate, adaptServiceRequestPublicationCandidate, adaptRequestCodePublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
 import { readPolicyId } from "../fhir-emitter/metadata";
@@ -991,7 +992,9 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     const failed = operands.find(p => p?.state === "failed");
     if (failed?.state === "failed") return { sat: null, publicationResult: failed };
     const selectedOperands = operands.map(p => p?.state === "selected" ? p.candidate : undefined);
-    const produced = descriptor.producer.kind === "bodyMassIndex"
+    const produced = descriptor.producer.kind === "anyMembership"
+      ? produceAnyMembershipCandidate(descriptor, selectedOperands, ctx.publicationSubjectReference)
+      : descriptor.producer.kind === "bodyMassIndex"
       ? produceBMICandidate(descriptor, selectedOperands[0], selectedOperands[1], ctx.publicationSubjectReference)
       : descriptor.producer.kind === "hasValue" ? produceHasValueCandidate(descriptor, selectedOperands[0], ctx.publicationSubjectReference)
       : produceMembershipCandidate(descriptor, selectedOperands[0], ctx.publicationSubjectReference);

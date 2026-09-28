@@ -45,6 +45,7 @@ import { branchConditionRefs } from "../ast/branchCondition";
 import { foreignCriterionScopeErrors } from "./criterionScope";
 import { renderPublicationSelectionHelpers, renderPublicationCandidateHelpers, PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_SELECTION_CQL_FUNCTIONS, PUBLICATION_LOCAL_BOOLEAN_CANDIDATE, PUBLICATION_LOCAL_CODEABLE_CANDIDATE, PUBLICATION_CANDIDATE_CQL_TYPE } from "./renderPublicationSelection";
 import { publicationEnvelopeName, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, PUBLICATION_PRODUCER_FUNCTIONS, renderPublicationProducerHelpers, renderPublicationCodeTable, renderAnswerClassification } from "./renderPublicationProducer";
+import { ANY_MEMBERSHIP_CQL, renderPublicationAnyMembershipHelpers } from "./renderPublicationAnyMembership";
 // #203 Todo 5 — status-aware meta emit. Direct `../meta` imports (NOT via `../index`) to avoid a barrel cycle:
 // emitCQL already pulls buildCRL from ../index, and meta/* does not import cql-emitter, so the edge is one-directional.
 import { parseMetaTag } from "../meta/parseMetaTag";
@@ -1268,6 +1269,8 @@ class Emitter {
       if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
         (s.__publication.descriptor.producer !== undefined || s.__publication.descriptor.valueDomain !== undefined)))
         sections.push(renderPublicationProducerHelpers(this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.producer?.kind === "hasValue")));
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && s.__publication.descriptor.producer?.kind === "anyMembership"))
+        sections.push(renderPublicationAnyMembershipHelpers());
     }
 
     const concepts = this.ast.statements
@@ -2494,7 +2497,9 @@ class Emitter {
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: ${title} }`
         : `FHIR.CodeableConcept { text: ${title}, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode.code)} } } } }`;
       const profile = descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl);
-      const produced = producer.kind === "bodyMassIndex"
+      const produced = producer.kind === "anyMembership"
+        ? `${cqlIdent(ANY_MEMBERSHIP_CQL)}({ ${operands.map((op, i) => `Tuple { publication: ${op}, domain: ${renderPublicationCodeTable(producer.domains[i])} }`).join(", ")} }, ${renderPublicationCodeTable(producer.qualifying)}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
+        : producer.kind === "bodyMassIndex"
         ? `${cqlIdent(BMI_CQL.candidate)}(${operands[0]}, ${operands[1]}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
         : producer.kind === "hasValue"
         ? `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.hasValue)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${cqlStringLiteral(producer.operandValueType)}, 'Patient/' + Patient.id.value)`

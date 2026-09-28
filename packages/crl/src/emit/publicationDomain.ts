@@ -118,7 +118,7 @@ export function interpretPublicationCodeableValue(
 }
 
 export function classifyPublicationMembership(
-  producer: PublicationMembershipProducer,
+  producer: Pick<PublicationMembershipProducer, "domain" | "qualifying">,
   resource: Readonly<Record<string, unknown>>,
 ):
   | { readonly kind: "unknown" }
