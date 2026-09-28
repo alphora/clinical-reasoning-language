@@ -100,6 +100,33 @@ describe("interactive response pruning", () => {
     expect(result.pruned).toBe(true);
     expect(result.response.item).toEqual([{ linkId: "g", item: [{ linkId: "a", answer: [{ valueBoolean: false }] }] }]);
     expect(qr().item).toHaveLength(2);
+    expect(result.questionnaire.item).toEqual([{ ...q.item[0], item: [q.item[0].item[0]] }]);
+    expect(q.item).toHaveLength(2);
+  });
+  it("trims later empty questions while preserving preceding unanswered and display items", () => {
+    const form = { ...q, item: [
+      { linkId: "empty", type: "string" }, { linkId: "note", type: "display", text: "Instructions" },
+      { linkId: "second", type: "boolean", definition: "urn:def" }, { linkId: "later", type: "string" },
+    ] };
+    const before = { item: [{ linkId: "second", answer: [{ valueBoolean: false }] }] };
+    const after = { item: [{ linkId: "second", answer: [{ valueBoolean: true }] }] };
+    const result = pruneInteractiveResponse(form, before, after);
+    expect(result.pruned).toBe(true);
+    expect(result.questionnaire).toEqual({ ...form, item: form.item.slice(0, 3) });
+    expect(result.response.item.map(i => i.linkId)).toEqual(["empty", "note", "second"]);
+    expect(pruneInteractiveResponse(form, before, before).questionnaire).toEqual(form);
+  });
+  it("retains the shared repeated template needed by earlier occurrences", () => {
+    const form = { item: [{ linkId: "g", type: "group", repeats: true, item: [
+      { linkId: "a", type: "string" }, { linkId: "b", type: "string" },
+    ] }, { linkId: "tail", type: "string" }] };
+    const occurrence = value => ({ linkId: "g", item: [{ linkId: "a", answer: [{ valueString: value }] }, { linkId: "b", answer: [{ valueString: "kept" }] }] });
+    const before = { item: [occurrence("first"), occurrence("second")] }, after = structuredClone(before);
+    after.item[1].item[0].answer[0].valueString = "edit";
+    const result = pruneInteractiveResponse(form, before, after);
+    expect(result.response.item[0]).toEqual(before.item[0]);
+    expect(result.response.item[1].item.map(i => i.linkId)).toEqual(["a"]);
+    expect(result.questionnaire.item).toEqual([form.item[0]]);
   });
   it("change-back does not restore discarded answers", () => {
     const first = pruneInteractiveResponse(q, qr(), qr(false)).response;
@@ -132,6 +159,7 @@ describe("interactive response pruning", () => {
     const old = { item: [{ linkId: "parent", answer: [{ valueBoolean: true, item: [{ linkId: "child", answer: [{ valueString: "old" }] }] }] }] };
     const fresh = structuredClone(old); fresh.item[0].answer[0].valueBoolean = false;
     expect(pruneInteractiveResponse(nested, old, fresh).response.item[0].answer).toEqual([{ valueBoolean: false }]);
+    expect(pruneInteractiveResponse(nested, old, fresh).questionnaire.item).toEqual([{ linkId: "parent", type: "boolean" }]);
   });
   it("removes renderer defaults without mutating the authoritative Questionnaire", () => {
     expect(questionnaireWithoutDefaults(q).item[0].item[0].initial).toBeUndefined();
@@ -140,6 +168,50 @@ describe("interactive response pruning", () => {
 });
 describe("interactive native request lifecycle", () => {
   const defs = { resourceType: "Bundle", type: "collection", entry: [{ resource: { resourceType: "PlanDefinition", id: "plan" } }] };
+  it("submits the explicit retained Q with QR, preserving canonical metadata and retrying the same pair", async () => {
+    const requests = []; let fail = false;
+    const session = new InteractiveSession(defs, "plan", async request => {
+      requests.push(request); if (fail) throw Error("evaluation failed");
+      return { questionnaire: q, response: qr(), activities: [] };
+    });
+    session.reset(state); await session.evaluate();
+    const retained = pruneInteractiveResponse(q, qr(), qr(false));
+    retained.questionnaire.title = "untrusted metadata";
+    fail = true;
+    await expect(session.evaluate(retained.response, retained.questionnaire)).rejects.toThrow("evaluation failed");
+    await expect(session.evaluate(retained.response, retained.questionnaire)).rejects.toThrow("evaluation failed");
+    const submitted = requests.slice(1).map(r => JSON.parse(r.repositoryJson).entry.at(-1).resource);
+    expect(submitted[0]).toEqual({ ...q, item: [{ ...q.item[0], item: [q.item[0].item[0]] }] });
+    expect(submitted[1]).toEqual(submitted[0]);
+    expect(session.result.questionnaire).toEqual(q);
+    fail = false;
+    await session.evaluate({ resourceType: "QuestionnaireResponse", item: [] }, q);
+    expect(JSON.parse(requests.at(-1).repositoryJson).entry.at(-1).resource).toEqual(q);
+    const count = requests.length;
+    for (const [bad, message] of [
+      [{ ...q, url: "urn:other" }, "does not match the current form"],
+      [{ ...q, version: "other" }, "does not match the current form"],
+      [{ ...q, resourceType: "QuestionnaireResponse" }, "does not match the current form"],
+      [{ ...q, item: [q.item[0], q.item[0]] }, "Duplicate retained Questionnaire item"],
+      [{ ...q, item: [{ linkId: "unknown" }] }, "contains an unknown item"],
+      [{ ...q, item: [{ ...q.item[0], item: [q.item[1]] }] }, "contains an unknown item"],
+      [{ ...q, item: [{ ...q.item[0], answer: [], item: null }] }, "cannot contain response answers"],
+      [{ ...q, item: {} }, "Expected retained Questionnaire items"],
+      [{ ...q, item: [null] }, "with a nonempty linkId"],
+      [{ ...q, item: [{ linkId: 2 }] }, "with a nonempty linkId"],
+    ]) await expect(session.evaluate(qr(), bad)).rejects.toThrow(message);
+    expect(requests).toHaveLength(count);
+
+  });
+  it("refuses a trim that removes a retained enableWhen dependency, without changing either input", () => {
+    const forward = structuredClone(q);
+    forward.item[0].item[0].enableWhen = [{ question: "c", operator: "exists", answerBoolean: true }];
+    const before = JSON.stringify(forward), previous = qr(), incoming = qr(false);
+    expect(() => pruneInteractiveResponse(forward, previous, incoming)).toThrow("depends on a removed question through enableWhen");
+    expect(JSON.stringify(forward)).toBe(before);
+    expect(incoming).toEqual(qr(false));
+    expect(pruneInteractiveResponse(forward, previous, previous).questionnaire).toEqual(forward);
+  });
   it("each request contains only definitions + current Q, initial data + current QR", () => {
     const before = JSON.stringify(state.bundle), request = interactiveRequest(defs, "plan", state, q, qr());
     expect(JSON.parse(request.repositoryJson).entry.map(e => e.resource.resourceType)).toEqual(["PlanDefinition", "Questionnaire"]);

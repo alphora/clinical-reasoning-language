@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, mkdtemp
 import { join, relative, isAbsolute, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
 import { emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
 import type { ApplySessionRequestV1, ApplySessionResult, ApplySessionOptions } from "@smile-digital-health/crl/session";
 
@@ -101,10 +102,13 @@ export function prepareInteractivePolicy(celPath: string) {
     r.type?.coding?.some((c: any) => c.code === "workflow-definition"));
   if (roots.length !== 1 || !roots[0].id) throw new Error("The policy must emit exactly one workflow-definition PlanDefinition.");
   return { initialStates, definitions: emitted.bundle, planId: roots[0].id,
-    warnings: emitted.diagnostics.filter(d => d.severity === "warning").map(d => JSON.stringify(d.detail)) };
+    warnings: emitted.diagnostics.filter(d => d.severity === "warning").map(d => {
+      const detail = d.detail as { message?: unknown; line?: unknown };
+      return typeof detail?.message === "string" ? detail.message + (typeof detail.line === "number" ? ` (line ${detail.line})` : "") : JSON.stringify(d.detail);
+    }) };
 }
 
-export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; diagnostics?: string[] }
+export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; warnings?: string[] }
 export function readInteractiveResult(native: Fhir): InteractiveResult {
   const resources: Fhir[] = [];
   const visit = (v: any) => {
@@ -159,7 +163,7 @@ export function nativeInteractiveRunner(apply: NativeApply, scratchRoot = tmpdir
       if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}${cleanup ? "" : ` (native files retained at ${dir})`}`);
       const artifact = result.artifacts["native-result.json"];
       if (!artifact || artifact.bytes > 32 * 1024 * 1024) throw new Error("Native result is missing or too large.");
-      return { ...readInteractiveResult(JSON.parse(readFileSync(artifact.path, "utf8"))), diagnostics: result.diagnostics.map(d => d.message) };
+      return { ...readInteractiveResult(JSON.parse(readFileSync(artifact.path, "utf8"))), warnings: result.diagnostics.filter(d => d.severity === "warning").map(d => d.message) };
     } finally {
       // dir is our absolute mkdtemp child of the chosen scratch root, never a supplied project path.
       if (cleanup) rmSync(dir, { recursive: true, force: true });
@@ -178,11 +182,31 @@ export class InteractiveSession {
     private run: (r: ApplySessionRequestV1, signal: AbortSignal) => Promise<InteractiveResult>) {}
   cancel() { ++this.epoch; this.abort?.abort(); }
   reset(initial: InitialState) { this.cancel(); this.initial = initial; this.result = undefined; }
-  async evaluate(response?: Fhir): Promise<InteractiveResult | undefined> {
+  async evaluate(response?: Fhir, retainedQuestionnaire?: Fhir): Promise<InteractiveResult | undefined> {
     if (!this.initial) throw new Error("Select an initial state.");
+    let questionnaire = this.result?.questionnaire;
+    if (retainedQuestionnaire) {
+      if (!response || !questionnaire || retainedQuestionnaire.resourceType !== "Questionnaire" ||
+        retainedQuestionnaire.url !== questionnaire.url || retainedQuestionnaire.version !== questionnaire.version)
+        throw new Error("The retained Questionnaire does not match the current form.");
+      const validate = (items: any[]) => {
+        if (!Array.isArray(items)) throw new Error("Expected retained Questionnaire items.");
+        const ids = new Set();
+        for (const item of items) {
+          if (!item || typeof item !== "object" || typeof item.linkId !== "string" || !item.linkId)
+            throw new Error("Expected a retained Questionnaire item with a nonempty linkId.");
+          if (item.answer !== undefined) throw new Error("Questionnaire items cannot contain response answers.");
+          if (ids.has(item.linkId)) throw new Error("Duplicate retained Questionnaire item.");
+          ids.add(item.linkId);
+          if (item.item !== undefined) validate(item.item);
+        }
+      };
+      validate(retainedQuestionnaire.item);
+      questionnaire = retainInteractiveQuestionnaire(questionnaire, retainedQuestionnaire);
+    }
     this.cancel();
     const epoch = this.epoch, abort = this.abort = new AbortController();
-    const request = interactiveRequest(this.definitions, this.planId, this.initial, this.result?.questionnaire, response);
+    const request = interactiveRequest(this.definitions, this.planId, this.initial, questionnaire, response);
     const previous = this.work;
     const work = (async () => {
       await previous.catch(() => {});

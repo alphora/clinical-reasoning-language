@@ -13,7 +13,7 @@ vi.mock("vscode", () => ({
   } },
 }));
 vi.mock("./interactiveQuestionnaire", () => ({
-  prepareInteractivePolicy: () => ({ planId: "p", definitions: {}, warnings: [], initialStates: [1, 2].map(n => ({ id: String(n), label: `Codeset ${n}`, subject: `Patient/p${n}`, bundle: {} })) }),
+  prepareInteractivePolicy: () => ({ planId: "p", definitions: {}, warnings: ["Definition warning"], initialStates: [1, 2].map(n => ({ id: String(n), label: `Codeset ${n}`, subject: `Patient/p${n}`, bundle: {} })) }),
   nativeInteractiveRunner: () => {},
   InteractiveSession: class {
     result; cancel = vi.fn(); reset = vi.fn();
@@ -35,6 +35,8 @@ describe("interactive panel ownership", () => {
   it("selects one state, guards duplicate Continue, and ignores stale results after switching", async () => {
     const { panel, session, token } = await init();
     expect(panel.messages.at(-1).states).toHaveLength(2);
+    expect(panel.messages.at(-1).warnings).toEqual(["Definition warning"]);
+    expect(panel.messages.at(-1).error).toBeUndefined();
     const work = panel.receive({ type: "start", token });
     await panel.receive({ type: "start", token }); expect(session.evaluate).toHaveBeenCalledTimes(1);
     await panel.receive({ type: "select", token, id: "2" });
@@ -64,7 +66,12 @@ describe("interactive panel ownership", () => {
     const first = panel.receive({ type: "start", token });
     session.resolve({ questionnaire: { url: "q" }, response: {}, activities: [] }); await first;
     await panel.receive({ type: "start", token }); expect(session.evaluate).toHaveBeenCalledTimes(1);
-    const next = panel.receive({ type: "continue", token, response: { resourceType: "QuestionnaireResponse" } });
+    const response = { resourceType: "QuestionnaireResponse" }, questionnaire = { resourceType: "Questionnaire", url: "q", item: [] };
+    await panel.receive({ type: "continue", token, response });
+    expect(session.evaluate).toHaveBeenCalledTimes(1);
+    expect(panel.messages.at(-1)).toMatchObject({ type: "error", message: "A current Questionnaire and QuestionnaireResponse are required to continue." });
+    const next = panel.receive({ type: "continue", token, response, questionnaire });
+    expect(session.evaluate).toHaveBeenLastCalledWith(response, questionnaire);
     expect(session.evaluate).toHaveBeenCalledTimes(2); session.reject(Error("failure")); await next;
     expect(panel.messages.at(-1).type).toBe("error");
   });

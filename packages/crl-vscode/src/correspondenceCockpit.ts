@@ -5485,6 +5485,7 @@ export const artifactSlug = (s: string): string =>
  *
  * Pure + exported so the list is unit-testable without a webview.
  */
+// Serialized into the interactive webview: keep this function self-contained (no module-level dependencies).
 export function unrenderableQuestionnaireFeatures(q: unknown): string[] {
   const found = new Set<string>();
   const at = (o: Record<string, unknown>): string =>
