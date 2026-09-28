@@ -532,8 +532,8 @@ export function resolveBoundaryTransform(inputs: {
  * ⭐ Render "is this record already our case feature?" for a resolved boundary spec.
  *
  * ⚠⚠ THIS THIN WRAPPER EXISTS TO RESPECT AN IMPORT BOUNDARY, and the boundary is right. A test pins that
- * `resourceEmitRegistry` is imported ONLY by its own home plus `fhir-emitter/structureDefinition` and
- * `cel/emitter/emitFhir` — every other production importer is the premature-wiring hazard it guards. Wiring
+ * `resourceEmitRegistry` is imported ONLY by its own home and the explicitly reviewed consumers listed in
+ * `effectiveRepresentation.test.ts`. Wiring
  * `emitCQL` straight into the registry to reach `renderCodingIdentityCheck` would have widened that
  * allowlist for a convenience.
  *

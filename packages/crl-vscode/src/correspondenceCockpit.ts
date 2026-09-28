@@ -2,6 +2,7 @@ import {isAuthoringFlag} from './flagWorkflow';
 import { paintFlagBadges } from './flagBadgesWebview';
 import { summarizeFlagBadges } from './flagPlacement';
 import { createBranchQuestionnairePanel, nextQuestionnaireColumn } from "./branchQuestionnairePanel";
+import { createInteractiveQuestionnairePanel } from "./interactiveQuestionnairePanel";
 import { leafRouteNeighbors, type BranchIdentity } from "./branchNavigation";
 import { summarizeBranchVerdict } from "./branchVerdict";
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
@@ -420,6 +421,7 @@ export function shouldWidenFilterForSelection(
 }
 
 export function registerCorrespondenceCockpit(context: vscode.ExtensionContext): void {
+  const interactiveQuestionnaire = createInteractiveQuestionnairePanel(context, unrenderableQuestionnaireFeatures);
   // NOTE: crl.active is owned + gated (on workspace .crl/.cel content) by registerProvenancePanel — do NOT set it here.
   // An unconditional setContext at activation would surface both the provenance view and this navigator in EVERY window.
 
@@ -1047,7 +1049,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         : "";
     // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
     // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
-    const questionnaires=mode==='medical-validation'?`<div class="fc-toggle">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')}</div>`:'';
+    const questionnaires=mode==='medical-validation'?`<div class="fc-toggle">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn" data-interactive-questionnaire>Interactive FHIR Questionnaire</button></div>`:'';
     return progress + toggle + diverterToggle + exportBtn + reviewVerdictsBtn + questionnaires + banner + flowLegendChrome(mode);
   }
 
@@ -2538,6 +2540,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         void v.panel.webview.postMessage({type:'branchQuestionnaireState',gen:v.gen,open:branchQuestionnaire.isOpen,focusToken:msg.token,requestId:typeof msg.requestId==='string'?msg.requestId:undefined});return;
       }
       if(msg.type==='toggleQuestionnairePane' && (msg.value==='questionnaire'||msg.value==='fhirQuestionnaire')){toggleQuestionnairePane(msg.value);return;}
+      if(msg.type==='openInteractiveQuestionnaire' && mode==='medical-validation' && currentCel){interactiveQuestionnaire.open(currentCel);return;}
       if (msg.type === "routeCardProposal") { proposeCard(msg); return; }
       if (msg.type === "routeCardSource" && pinnedCards && pinnedCards.token === msg.token && pinnedCards.epoch === indexVersion) {
         const card = pinnedCards.payload.cards.find((c: any) => c.id === msg.key);
@@ -3236,6 +3239,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     pinnedCards=undefined;
     mode = targetMode;
     currentCel = celPath;
+    interactiveQuestionnaire.policyChanged(currentCel);
     flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
     expandedGuardWhens = new Set(); // #224 ii.3 Slice 2: a retarget starts the new policy's criteria all-collapsed (nodeKeys aren't policy-qualified beyond lib/decision, so carry-over could pre-expand a same-named branch)
     cockpitAgentBridge.notifyChanged(); // refresh the agent chip for the new mode/policy (getAppState reads live state)
@@ -6109,7 +6113,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `window.addEventListener('pointerup',()=>{if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
   `root.addEventListener('click',(e)=>{if(fpMoved){fpMoved=false;e.stopPropagation();e.preventDefault();}},true);` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
-  `fcc.addEventListener('click',(e)=>{const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
+  `fcc.addEventListener('click',(e)=>{const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
   // disc 164: the produced-path diverter overlay on/off toggle (MV chrome).
   `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +

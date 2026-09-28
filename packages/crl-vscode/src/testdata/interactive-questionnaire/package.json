@@ -1,0 +1,6 @@
+{
+  "name": "interactive-questionnaire-test",
+  "version": "1.0.0",
+  "private": true,
+  "crl": { "canonicalBase": "https://example.org/interactive-questionnaire", "date": "2026-09-27" }
+}

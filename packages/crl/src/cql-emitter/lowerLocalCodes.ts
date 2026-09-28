@@ -114,6 +114,7 @@ import type { ReferenceName } from "../ast/types";
 import { conceptRefsOfDefinition } from "../ast/conceptDependencies";
 import { matchNarrative } from "../template-match/matcher";
 import { patternReturnShape } from "../template-match/patternCatalog";
+import { publicationSourceResourceType } from "../emit/publicationSource";
 import {
   deriveEffectiveRepresentations,
   type EffectiveRepresentationDescriptor,
@@ -506,7 +507,8 @@ export function lowerLocalCodes(
         const source = descriptor.sources![index];
         topLevelIdentifierNames.add(sourceName);
         const sourceTwin: Concept = {
-          ...stmt, name: sourceName, shape: "RecordSet", conceptType: source.kind === "ageToday" ? "Patient" : source.kind === "observationValue" ? "Observation" : "ServiceRequest", valueTypes: [], representations: [],
+          // REFACTOR:grounded (859): retrieve the descriptor's actual source resource kind.
+          ...stmt, name: sourceName, shape: "RecordSet", conceptType: publicationSourceResourceType(source), valueTypes: [], representations: [],
           definition: source.kind === "ageToday" ? undefined : { type: "CodedFromDefinition", terminologyName: source.terminology, location: stmt.location },
           __loweringRole: "source-impl", __publication: Object.freeze({ descriptor, role: "retrieve", source: descriptor.sources![index] }),
         };

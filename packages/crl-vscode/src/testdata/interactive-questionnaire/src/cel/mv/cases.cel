@@ -1,0 +1,8 @@
+library "Interactive Test Cases".
+covers "Interactive Test".
+fact "Patient":
+- name is "Synthetic interactive test".
+- birth date is "1980-01-01".
+- defined by "Patient".
+case "Initial":
+- subject is "Patient".

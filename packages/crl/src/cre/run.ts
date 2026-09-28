@@ -125,7 +125,7 @@ import { selectPublicationCandidate, type PublicationCandidate } from "../emit/p
 import { interpretPublicationCodeableValue } from "../emit/publicationDomain";
 import { produceHasValueCandidate } from "../emit/publicationHasValue";
 import { produceMembershipCandidate } from "../emit/publicationProducer";
-import { adaptObservationPublicationCandidate, adaptServiceRequestPublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
+import { adaptObservationPublicationCandidate, adaptServiceRequestPublicationCandidate, adaptRequestCodePublicationCandidate, matchesPublicationSource, matchesCelPublicationPatient } from "../emit/publicationSource";
 import { readPolicyId } from "../fhir-emitter/metadata";
 import { resolveCaseFactDates } from "../cel/factDate";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
@@ -969,6 +969,8 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     const adapted = source.kind === "ageToday"
       ? produceAgeCandidate(descriptor, source, resource, ctx.publicationSubjectReference, ageClock(ctx.publicationNow))
       : source.kind === "observationValue" ? adaptObservationPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference)
+      // REFACTOR:grounded (859): validate/project request data before finite-code membership.
+      : source.kind === "requestCode" ? adaptRequestCodePublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference)
       : adaptServiceRequestPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference);
     if (adapted.kind === "error") return fail(adapted.code, adapted.message);
     if (adapted.kind === "missing") continue;

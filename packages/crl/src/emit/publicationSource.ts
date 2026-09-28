@@ -4,7 +4,28 @@ import type { PublicationCandidate } from "./publicationSelection";
 import { publicationDerivedCandidateKey } from "./publicationProducer";
 import type { PublicationValueError } from "./publicationDomain";
 import { readAgeProjection, type PublicationAgeSource } from "./publicationAge";
-export type PublicationSource = PublicationServiceRequestSource | PublicationAgeSource | PublicationObservationSource;
+import { isValidFhirTemporal, compareFhirTemporal } from "../cel/temporal";
+import { resourceCodingPlacement } from "./resourceEmitRegistry";
+export type PublicationSource = PublicationServiceRequestSource | PublicationAgeSource | PublicationObservationSource | PublicationRequestCodeSource;
+
+// REFACTOR:grounded (859): request code projection is independent of a local answer slot.
+export interface PublicationRequestCodeSource {
+  readonly kind: "requestCode";
+  readonly resourceType: "ServiceRequest" | "MedicationRequest";
+  readonly contributorId: string;
+  readonly terminology: ReferenceName;
+  readonly codes: readonly PublicationCode[];
+}
+
+export function publicationSourceResourceType(source: PublicationSource) {
+  switch (source.kind) {
+    case "ageToday": return "Patient" as const;
+    case "requestCode": return source.resourceType;
+    case "observationValue": return "Observation" as const;
+    case "serviceRequestWitness": return "ServiceRequest" as const;
+    default: { const unexpected: never = source; throw new Error(`Unexpected publication source ${unexpected}`); }
+  }
+}
 
 // REFACTOR:grounded (#320, plan587): measurement projection preserves value and measurement time.
 export interface PublicationObservationSource {
@@ -27,9 +48,10 @@ export interface PublicationServiceRequestSource {
 export function publicationSourceAdmissionReason(concept: Readonly<Concept>): string | undefined {
   if (concept.representations.length === 0) return undefined;
   if (concept.valueTypes[0] === "Quantity" || concept.valueTypes[0] === "CodeableConcept") {
-    return concept.representations.every(rep => rep.conceptType === "Observation" && rep.terminologyName !== undefined &&
+    return concept.representations.every(rep => (rep.conceptType === "Observation" ||
+      (concept.valueTypes[0] === "CodeableConcept" && (rep.conceptType === "ServiceRequest" || rep.conceptType === "MedicationRequest"))) && rep.terminologyName !== undefined &&
       rep.valueProjection === undefined && rep.valueElement === undefined && rep.valueTypes.length === 0)
-      ? undefined : `${concept.valueTypes[0]} sources require Observation coded-from with its native value; other projections are not implemented.`;
+      ? undefined : `${concept.valueTypes[0]} sources require Observation native values, or CodeableConcept request codes from ServiceRequest/MedicationRequest; other projections are not implemented.`;
   }
   if (concept.valueTypes[0] !== "boolean") return "Source publication requires an Observation<boolean> result.";
   if (concept.representations.some(rep => readAgeProjection(rep) !== undefined))
@@ -64,10 +86,60 @@ export function matchesCelPublicationPatient(resource: Record<string, unknown>, 
 
 export function matchesPublicationSource(source: PublicationSource, resource: Record<string, unknown>): boolean {
   if (source.kind === "ageToday") return resource.resourceType === "Patient";
+  // Validate the request before membership filtering: a Reference or malformed code is not a negative.
+  if (source.kind === "requestCode") return resource.resourceType === source.resourceType;
   if (resource.resourceType !== (source.kind === "observationValue" ? "Observation" : "ServiceRequest")) return false;
   const coding = (resource.code as { coding?: unknown } | undefined)?.coding;
   return Array.isArray(coding) && coding.some((item) => item !== null && typeof item === "object" &&
     source.codes.some((code) => code.system === item.system && code.code === item.code));
+}
+
+// REFACTOR:grounded (859): finite inline request codes; errors survive nonmembership.
+export function adaptRequestCodePublicationCandidate(
+  descriptor: PublicationDescriptor, source: PublicationRequestCodeSource,
+  resource: Record<string, unknown>, subjectReference: string,
+): { kind: "candidate"; candidate: PublicationCandidate<Record<string, unknown>> } | { kind: "missing" } | PublicationValueError {
+  const fail = (code: string, message: string): PublicationValueError => ({ kind: "error", code, message });
+  if (resource.resourceType !== source.resourceType) return fail("publication-source-mismatch", "Unexpected request resource type.");
+  if (resource.status !== "active" || resource.intent !== "order" ||
+      (resource.doNotPerform !== undefined && resource.doNotPerform !== false) ||
+      (resource._doNotPerform !== undefined && resource.doNotPerform === undefined) ||
+      (resource.modifierExtension !== undefined && (!Array.isArray(resource.modifierExtension) || resource.modifierExtension.length > 0)))
+    return fail("publication-source-state-unsupported", "Request code projection supports active orders without prohibition or modifier extensions.");
+  const patient = publicationPatientId(subjectReference);
+  if (patient === undefined || patient !== publicationPatientId((resource.subject as { reference?: unknown })?.reference))
+    return fail("publication-source-subject-unsupported", "The source must resolve to the current evaluation Patient.");
+  if (typeof resource.id !== "string" || !/^[A-Za-z0-9.-]{1,64}$/.test(resource.id))
+    return fail("publication-missing-input-identity", "A retrieved request requires a valid FHIR id.");
+  if ((resource._authoredOn !== undefined && resource.authoredOn === undefined) ||
+      (resource.authoredOn !== undefined && (typeof resource.authoredOn !== "string" || !isValidFhirTemporal(resource.authoredOn))))
+    return fail("publication-invalid-validity", "Request authoredOn must be a supported FHIR dateTime or absent.");
+  if (typeof resource.authoredOn === "string" && compareFhirTemporal(resource.authoredOn, resource.authoredOn) === "unsupported")
+    return fail("publication-incomparable-validity", "Request authoredOn precision is unsupported.");
+  const value = resource[resourceCodingPlacement(source.resourceType)!.jsonName];
+  if (source.resourceType === "MedicationRequest" && resource.medicationReference !== undefined)
+    return fail("publication-source-code-unsupported", "MedicationReference resolution is not implemented for request code projection.");
+  const coding = value !== null && typeof value === "object" ? (value as { coding?: unknown }).coding : undefined;
+  if (!Array.isArray(coding) || coding.length === 0 || coding.some(c => c === null || typeof c !== "object" ||
+      typeof c.system !== "string" || !c.system.trim() || typeof c.code !== "string" || !c.code.trim()))
+    return fail("publication-source-code-unsupported", "Request code projection requires nonempty system/code codings.");
+  const projected: Record<string, unknown> = {
+    resourceType: "Observation", status: "final", subject: { reference: subjectReference },
+    code: descriptor.localCode === undefined ? { text: descriptor.title } : { coding: [descriptor.localCode], text: descriptor.title },
+    ...(descriptor.profileUrl === undefined ? {} : { meta: { profile: [descriptor.profileUrl] } }),
+    valueCodeableConcept: value,
+    ...(resource.authoredOn === undefined ? {} : { effectiveDateTime: resource.authoredOn }),
+    ...(resource._authoredOn === undefined ? {} : { _effectiveDateTime: resource._authoredOn }),
+  };
+  const violation = publicationResourceError(descriptor, projected);
+  if (violation !== undefined) return violation;
+  if (!coding.some(c => source.codes.some(k => k.system === c.system && k.code === c.code))) return { kind: "missing" };
+  const input = `${source.resourceType}/${resource.id}`;
+  return { kind: "candidate", candidate: {
+    key: publicationDerivedCandidateKey(source.contributorId, input), contributorId: source.contributorId,
+    arm: "source", retrievedInputIdentity: input, resource: projected,
+    ...(typeof resource.authoredOn === "string" ? { validity: resource.authoredOn } : {}),
+  } };
 }
 
 export function adaptObservationPublicationCandidate(

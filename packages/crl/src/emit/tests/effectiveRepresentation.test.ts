@@ -492,8 +492,9 @@ describe("#189-flip import boundary — effectiveRepresentation / resourceEmitRe
     //     resource record via the deriver).
     // `resourceEmitRegistry` (the per-resource emit table) is consumed via `effectiveRepresentation` PLUS, at
     // the 2d flip, directly by `fhir-emitter/structureDefinition` (the case-feature SD profile shape —
-    // `caseFeatureProfileShape`). Any OTHER production importer of either module is still the premature-wiring
-    // hazard this boundary guards. Match an actual IMPORT, NOT a comment mention (the substring scan
+    // `caseFeatureProfileShape`), the CEL instance writer, and the request-source CQL renderer below.
+    // Other production importers require explicit review and registration in this boundary.
+    // Match an actual IMPORT, NOT a comment mention (the substring scan
     // false-positived on migration/*.ts docstrings citing line numbers).
     // `cel/emitter/emitFhir.ts` joins at #189 B4 (disc 501): the CEL instance lane is the FIRST production
     // consumer of `deriveEffectiveRepresentations` — it resolves a local fact's CodeableConcept DATUM shape from
@@ -511,6 +512,8 @@ describe("#189-flip import boundary — effectiveRepresentation / resourceEmitRe
     const REGISTRY_ALLOW = new Set([
       "fhir-emitter/structureDefinition.ts",
       "cel/emitter/emitFhir.ts",
+      // Read the canonical request coding placement instead of duplicating resource field names.
+      "cql-emitter/renderPublicationRequest.ts",
     ]);
     const erOffenders: string[] = [];
     const registryOffenders: string[] = [];
@@ -541,7 +544,7 @@ describe("#189-flip import boundary — effectiveRepresentation / resourceEmitRe
     ).toEqual([]);
     expect(
       registryOffenders,
-      `resourceEmitRegistry may be imported ONLY via effectiveRepresentation or the sanctioned 2d site (${[...REGISTRY_ALLOW].join(", ")}); found: ${registryOffenders.join(", ")}`,
+      `resourceEmitRegistry may be imported ONLY within emit or by the sanctioned consumers (${[...REGISTRY_ALLOW].join(", ")}); found: ${registryOffenders.join(", ")}`,
     ).toEqual([]);
   });
 });

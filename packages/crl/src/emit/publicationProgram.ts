@@ -303,6 +303,9 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
           codes: finiteTerminology(library.sourceIdentity, rep.terminologyName!, rep.location).codes };
         return rep.conceptType === "Observation"
           ? Object.freeze({ kind: "observationValue", valueType: concept.valueTypes[0] as "Quantity" | "CodeableConcept", ...common })
+          : concept.valueTypes[0] === "CodeableConcept" && (rep.conceptType === "ServiceRequest" || rep.conceptType === "MedicationRequest")
+          // REFACTOR:grounded (859): typed request datum projection, independent of answerability.
+          ? Object.freeze({ kind: "requestCode", resourceType: rep.conceptType, ...common })
           : Object.freeze({ kind: "serviceRequestWitness", ...common });
       });
       let answerOptions: PublicationDescriptor["answerOptions"];

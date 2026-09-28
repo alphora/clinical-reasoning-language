@@ -1,0 +1,9 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    { "resource": { "resourceType": "Patient", "id": "interactive-patient", "name": [{ "text": "Synthetic interactive test" }], "gender": "unknown", "birthDate": "1980-01-01" } },
+    { "resource": { "resourceType": "ServiceRequest", "id": "interactive-request", "meta": { "profile": ["http://hl7.org/fhir/us/davinci-crd/StructureDefinition/profile-servicerequest"] }, "status": "draft", "intent": "order", "code": { "coding": [{ "system": "http://snomed.info/sct", "code": "185349003", "display": "Encounter for check up" }] }, "subject": { "reference": "Patient/interactive-patient" }, "authoredOn": "2026-09-27", "requester": { "reference": "Practitioner/interactive-requester" } } },
+    { "resource": { "resourceType": "Practitioner", "id": "interactive-requester", "name": [{ "text": "Synthetic requester" }] } }
+  ]
+}

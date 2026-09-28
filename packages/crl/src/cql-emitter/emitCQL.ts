@@ -35,6 +35,8 @@ import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
 import { renderPublicationBMIHelpers, BMI_CQL } from "./renderPublicationBMI";
 import { renderPublicationThresholdHelpers, QUANTITY_CQL } from "./renderPublicationQuantity";
 import { renderPublicationObservationHelpers, PUBLICATION_OBSERVATION_CANDIDATE } from "./renderPublicationObservation";
+import { renderPublicationRequestHelpers, requestCodeHelper } from "./renderPublicationRequest";
+import { publicationSourceResourceType } from "../emit/publicationSource";
 import { PUBLICATION_LOCAL_QUANTITY_CANDIDATE, PUBLICATION_LOCAL_STRING_CANDIDATE, PUBLICATION_LOCAL_DATETIME_CANDIDATE } from "./renderPublicationSelection";
 import { PUBLICATION_SERVICE_REQUEST_CANDIDATE } from "./renderPublicationSelection";
 import { AGE_CQL, AGE_CQL_PREFIX, renderPublicationAgeHelpers } from "./renderPublicationAge";
@@ -1253,6 +1255,10 @@ class Emitter {
       if (quantities) sections.push(renderPublicationObservationHelpers("Quantity"));
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.sources?.some(source => source.kind === "observationValue" && source.valueType === "CodeableConcept")))
         sections.push(renderPublicationObservationHelpers("CodeableConcept"));
+      // REFACTOR:grounded (859): emit only the declared typed request projection helpers.
+      for (const type of ["ServiceRequest", "MedicationRequest"] as const)
+        if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.sources?.some(source => source.kind === "requestCode" && source.resourceType === type)))
+          sections.push(renderPublicationRequestHelpers(type));
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && ["quantityThreshold", "bodyMassIndex"].includes(s.__publication.descriptor.producer?.kind ?? "")))
         sections.push(renderPublicationThresholdHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && s.__publication.descriptor.producer?.kind === "bodyMassIndex"))
@@ -1680,7 +1686,7 @@ class Emitter {
     });
     if (c.__publication !== undefined) return notBoolean("publication", {
       shape: c.__publication.role === "retrieve" ? "RecordSet" : "Record",
-      resourceType: c.__publication.source?.kind === "ageToday" ? "Patient" : c.__publication.source?.kind === "serviceRequestWitness" ? "ServiceRequest" : "Observation",
+      resourceType: c.__publication.source === undefined ? "Observation" : publicationSourceResourceType(c.__publication.source),
     });
     // ⭐ #189 null/pause — a sanctioned THREE-STATE read. It IS a Boolean-typed define and it IS null when
     // nothing establishes it; enrolling it as `not-boolean` ("representations-only stub") described the pause
@@ -2456,10 +2462,10 @@ class Emitter {
       const source = descriptor.sources![index];
       const target = this.renderPublicationReference(binding.sourceReferences![index]);
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} } }` : `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
-      const helper = source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationValue" ? PUBLICATION_OBSERVATION_CANDIDATE[source.valueType] : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
-      const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : "";
+      const helper = source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationValue" ? PUBLICATION_OBSERVATION_CANDIDATE[source.valueType] : source.kind === "requestCode" ? requestCodeHelper(source.resourceType) : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
+      const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : source.kind === "requestCode" ? `, ${renderPublicationCodeTable(source.codes)}` : "";
       const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl)}, 'Patient/' + Patient.id.value${args}))`;
-      const projected = source.kind === "ageToday" ? `(${projection} C where C is not null)` : projection;
+      const projected = source.kind === "ageToday" || source.kind === "requestCode" ? `(${projection} C where C is not null)` : projection;
       candidates = `Flatten({ ${candidates}, ${projected} })`;
     }
     const producer = descriptor.producer;
@@ -3344,6 +3350,8 @@ class Emitter {
     // REFACTOR:grounded (#320, review 564 C4): the prepared finite code set is the same
     // matching authority used by CRE. Do not replace it with a server ValueSet expansion.
     if (c.__publication?.source !== undefined) {
+      // REFACTOR:grounded (859): code/state validation precedes membership filtering.
+      if (c.__publication.source.kind === "requestCode") return `[${c.__publication.source.resourceType}]`;
       if (c.__publication.source.kind === "ageToday") {
         this.emitErrors.push({ type: "Validation", kind: "publication-source-unsupported",
           message: `Unsupported publication source kind for "${c.name}".`,

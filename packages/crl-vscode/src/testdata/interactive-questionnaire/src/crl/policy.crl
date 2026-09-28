@@ -1,0 +1,43 @@
+// Synthetic UI/runtime fixture, not a medical policy.
+library "Interactive Test".
+
+concept "First Answer":
+- shape is Record.
+- type is Observation.
+- value type is text.
+- code is `first-answer`.
+- shape reduction is most recent.
+
+concept "Second Answer":
+- shape is Record.
+- type is Observation.
+- value type is text.
+- code is `second-answer`.
+- shape reduction is most recent.
+
+concept "Has First":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "First Answer" has a value.
+- shape reduction is most recent.
+
+concept "Has Second":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Second Answer" has a value.
+- shape reduction is most recent.
+
+presentation for "First Answer":
+- question text is "First answer".
+presentation for "Second Answer":
+- question text is "Second answer".
+
+activity "Complete":
+- request CPGCommunicationRequest.
+- with `COMPLETE`.
+
+decision "Interactive Test":
+first:
+- when ("Has First" and "Has Second") then recommend activity "Complete".
