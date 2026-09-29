@@ -2,15 +2,32 @@
 // BROWSER_EXE=<Chromium executable> node packages/crl-vscode/test/interactiveQuestionnaire.browser.cjs
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const {spawn} = require('node:child_process'), assert = require('node:assert/strict'), esbuild = require('esbuild');
-const root = path.resolve('tmp/interactive-questionnaire'); fs.mkdirSync(root,{recursive:true});
+const root = path.resolve(process.env.CRL_IQ_OUTPUT || 'tmp/interactive-questionnaire'); fs.mkdirSync(root,{recursive:true});
 const profile = fs.mkdtempSync(path.join(root,'browser-'));
 const browser = process.env.BROWSER_EXE || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
+const installed = process.env.CRL_IQ_EXTENSION_ROOT && path.resolve(process.env.CRL_IQ_EXTENSION_ROOT);
+let installedRuntime;
 const load = (entry) => {
-  const js = esbuild.buildSync({entryPoints:[entry],bundle:true,platform:'node',format:'cjs',write:false}).outputFiles[0].text;
+  if(installed){
+    if(!installedRuntime){
+      // Expose unchanged installed functions for headless execution; only VS Code UI APIs are stubbed.
+      const Module=require('node:module'),file=path.join(installed,'dist/extension.js'),source=fs.readFileSync(file,'utf8');
+      const m=new Module(file,module);m.filename=file;m.paths=Module._nodeModulePaths(path.dirname(file));
+      const stub=new Proxy(function(){},{get:()=>stub,apply:()=>stub,construct:()=>stub}),req=m.require.bind(m);
+      m.require=id=>id==='vscode'?Object.fromEntries([...source.matchAll(/vscode[0-9]*\.([A-Za-z0-9_]+)/g)].map(match=>[match[1],stub])):req(id);
+      m._compile(source+'\nmodule.exports.__iq={interactiveQuestionnaireHtml,InteractiveSession,nativeInteractiveRunner,prepareInteractivePolicy,unrenderableQuestionnaireFeatures};',file);
+      installedRuntime=m.exports.__iq;
+      for(const [name,value] of Object.entries(installedRuntime)) assert.equal(typeof value,"function",`Installed binding ${name} must be callable`);
+    }
+    return installedRuntime;
+  }
+  const js = esbuild.buildSync({entryPoints:[entry],bundle:true,alias:{vscode:path.resolve('packages/crl-vscode/test/oracle/vscode-stub.ts')},platform:'node',format:'cjs',write:false}).outputFiles[0].text;
   const m={exports:{}};new Function('require','module','exports','__dirname',js)(require,m,m.exports,path.resolve('packages/crl-vscode/dist'));return m.exports;
 };
 const {interactiveQuestionnaireHtml}=load('packages/crl-vscode/src/interactiveQuestionnaireHtml.ts');
-const assets=path.resolve('packages/crl-vscode/media/lforms');
+const {unrenderableQuestionnaireFeatures:inspect}=load('packages/crl-vscode/src/correspondenceCockpit.ts');
+assert.equal(typeof inspect,'function','Use the production feature inspector in both source and installed tests');
+const assets=installed?path.join(installed,'media/lforms'):path.resolve('packages/crl-vscode/media/lforms');
 let child, ws, server, seq=0; const pending=new Map();
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(test,detail){for(let i=0;i<160;i++){const v=await test();if(v)return v;await delay(50);}throw Error('Timeout: '+detail);}
@@ -24,7 +41,7 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
 (async()=>{
   server=http.createServer((req,res)=>{
     if(req.url==='/'){
-      let html=interactiveQuestionnaireHtml('test','http://127.0.0.1:*',name=>'/'+name);
+      let html=interactiveQuestionnaireHtml('test','http://127.0.0.1:*',name=>'/'+name,inspect);
       html=html.replace('<script nonce="test" src=',`<script nonce="test">window.sent=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.sent.push(m)});</script><script nonce="test" src=`);
       res.setHeader('Content-Type','text/html');res.end(html);
     }else{const name=path.basename(req.url);const file=path.join(assets,name);if(!fs.existsSync(file)){res.statusCode=404;res.end();return;}res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'image/png');res.end(fs.readFileSync(file));}
@@ -39,19 +56,34 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
   await until(()=>evaluate('window.sent?.some(m=>m.type==="ready")'),'panel ready');
   const questionnaire={resourceType:'Questionnaire',id:'q',url:'urn:test:interactive',version:'1',status:'active',item:['a','b','c'].map((id,i)=>({linkId:id,type:'string',text:'Question '+id,initial:[{valueString:['A','B','C'][i]}]}))};
   const response={resourceType:'QuestionnaireResponse',questionnaire:'urn:test:interactive|1',status:'in-progress',subject:{reference:'Patient/p'},item:['a','b','c'].map((id,i)=>({linkId:id,answer:[{valueString:['A','B','C'][i]}]}))};
-  await post({type:'initial',token:1,states:[{id:'1',label:'Codeset 1'},{id:'2',label:'Codeset 2'}],subject:'Patient/p'});
+  await post({type:'initial',token:1,states:[{id:'1',label:'Codeset 1'},{id:'2',label:'Codeset 2'}],subject:'Patient/p',warnings:['Definition warning']});
   await post({type:'result',token:1,questionnaire,response,activities:[],subject:'Patient/p'});await mounted();
   assert.equal(await evaluate(`document.getElementById('start').disabled`),true);
   assert.deepEqual(await values(),['A','B','C']);
+  assert.equal(await evaluate(`document.getElementById('warnings').hidden`),false);
+  assert.equal(await evaluate(`document.getElementById('warnings').open`),false);
+  assert.equal(await evaluate(`document.getElementById('status').textContent.includes('Definition warning')`),false);
+  await post({type:'result',token:1,questionnaire,response,activities:['Complete'],warnings:['Evaluation warning'],subject:'Patient/p'});await mounted();
+  assert.equal(await evaluate(`document.getElementById('warning-list').children.length`),2);
+  assert.equal(await evaluate(`document.getElementById('results').hidden`),false);
+  assert.equal(await evaluate(`document.getElementById('results').getBoundingClientRect().top>=document.getElementById('form').getBoundingClientRect().bottom`),true);
+  assert.equal(await evaluate(`document.querySelectorAll('#outcomes li').length`),0);
+  assert.equal(await evaluate(`document.getElementById('outcomes').textContent`),'Complete');
+  fs.writeFileSync(path.join(root,'layout.png'),Buffer.from((await rpc('Page.captureScreenshot',{format:'png'})).data,'base64'));
+  await evaluate(`document.getElementById('warning-summary').click()`);
+  assert.equal(await evaluate(`document.getElementById('warnings').open`),true);
+  fs.writeFileSync(path.join(root,'warnings.png'),Buffer.from((await rpc('Page.captureScreenshot',{format:'png'})).data,'base64'));
+  await evaluate(`document.getElementById('warning-summary').click()`);
   const started=Date.now();await input(0,'changed');await mounted();await input(0,'A');
-  assert.deepEqual(await values(),['A','','']);
+  assert.deepEqual(await values(),['A']);
   await evaluate(`document.getElementById('continue').click()`);
   let submission=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
   assert.deepEqual(submission.response.item.map(i=>i.linkId),['a']);
+  assert.deepEqual(submission.questionnaire.item.map(i=>i.linkId),['a']);
   assert.equal(submission.response.item[0].answer[0].valueString,'A');
   assert.equal(submission.response.subject.reference,'Patient/p');assert.equal(submission.response.questionnaire,'urn:test:interactive|1');
   const fastChangeMs=Date.now()-started;assert.ok(fastChangeMs<360,'change-back must exercise the vendor debounce window: '+fastChangeMs);
-  await post({type:'error',token:1,message:'Synthetic evaluation failure'});assert.deepEqual(await values(),['A','','']);
+  await post({type:'error',token:1,message:'Synthetic evaluation failure'});assert.equal(await evaluate(`document.getElementById('status').textContent`),'Synthetic evaluation failure');assert.deepEqual(await values(),['A']);
   await input(0,'');await evaluate(`document.getElementById('continue').click()`);
   submission=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
   assert.equal(submission.response.item[0].linkId,'a');assert.ok(!submission.response.item[0].answer?.length, JSON.stringify(submission.response));
@@ -70,7 +102,7 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
   assert.equal(await evaluate(`document.activeElement.id`),focusedId);
   assert.equal(await evaluate(`document.activeElement.selectionStart`),2);
   await rpc('Input.dispatchKeyEvent',{type:'keyDown',key:'y',text:'y'});await rpc('Input.dispatchKeyEvent',{type:'keyUp',key:'y'});
-  assert.deepEqual(await values(),['Axy','','']);
+  assert.deepEqual(await values(),['Axy']);
   assert.equal(await evaluate(`document.getElementById('outcomes').childElementCount`),0,'prior activity must not look current after editing');
   await evaluate(`document.getElementById('continue').click(); document.getElementById('cancel').click();`);
   assert.equal(await evaluate(`document.getElementById('codeset').disabled && document.getElementById('reset').disabled`),true);
@@ -80,12 +112,60 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
   await post({type:'cancelled',token:4,id:'2',message:'Cancelled'});
   assert.equal(await evaluate(`document.getElementById('codeset').value`),'2');
   assert.equal(await evaluate(`document.getElementById('codeset').disabled`),false);
-  assert.deepEqual(await values(),['Axy','','']);
+  assert.deepEqual(await values(),['Axy']);
+  // Export failures must block stale submission and recover after a successful edit.
+  await post({type:'result',token:4,questionnaire,response,activities:[],subject:'Patient/p'});await mounted();
+  const countBeforeFailure=await evaluate(`window.sent.filter(m=>m.type==='continue').length`);
+  await evaluate(`window.savedExport=LForms.Util.getFormFHIRData;LForms.Util.getFormFHIRData=()=>{throw Error('forced export failure')}`);
+  await input(0,'failed');
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),true);
+  await evaluate(`document.getElementById('continue').click()`);
+  assert.equal(await evaluate(`window.sent.filter(m=>m.type==='continue').length`),countBeforeFailure);
+  assert.match(await evaluate(`document.getElementById('status').textContent`),/forced export failure/);
+  await evaluate(`LForms.Util.getFormFHIRData=window.savedExport`);
+  await input(0,'recovered');await mounted();
+  assert.deepEqual(await values(),['recovered']);
+  // A retained forward condition cannot lose its source; undo recovers the intact pair.
+  const forwardQ=structuredClone(questionnaire);
+  forwardQ.item[0].enableWhen=[{question:'c',operator:'exists',answerBoolean:true}];
+  await post({type:'result',token:4,questionnaire:forwardQ,response,activities:[],subject:'Patient/p'});await mounted();
+  await input(0,'changed');
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),true);
+  assert.match(await evaluate(`document.getElementById('status').textContent`),/depends on a removed question through enableWhen/);
+  await input(0,'A');await mounted();
+  assert.deepEqual(await values(),['A','B','C']);
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),false,'undo recovers a rejected trim');
+  const unsupportedQ={...questionnaire,item:[questionnaire.item[0],{linkId:'unsupported',type:'url',text:'Unsupported later question'}]};
+  const unsupportedResponse={...response,item:[response.item[0]]};
+  await post({type:'result',token:4,questionnaire:unsupportedQ,response:unsupportedResponse,activities:[],subject:'Patient/p',unsupported:['url']});
+  await until(()=>evaluate(`document.getElementById('form').getAttribute('aria-busy')==='false'`),'blocked form ready');
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),true);
+  await input(0,'changed');await mounted();
+  assert.deepEqual(await values(),['changed']);
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),false,'removing unsupported later question unblocks Continue');
+  await evaluate(`document.getElementById('continue').click()`);
+  const unblocked=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
+  assert.deepEqual(unblocked.questionnaire.item.map(i=>i.linkId),['a']);
+  await post({type:'error',token:4,message:'Retain form'});
+  const stillUnsupported={...questionnaire,extension:[{url:'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-preferredTerminologyServer',valueUrl:'https://example.invalid'}]};
+  await post({type:'result',token:4,questionnaire:stillUnsupported,response,activities:[],subject:'Patient/p',unsupported:['preferredTerminologyServer']});
+  await until(()=>evaluate(`document.getElementById('form').getAttribute('aria-busy')==='false'`),'unsupported root ready');
+  await input(0,'changed');
+  await until(()=>evaluate(`document.getElementById('form').getAttribute('aria-busy')==='false'`),'unsupported root remount');
+  assert.deepEqual(await values(),['changed']);
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),true,'retained unsupported features still block Continue');
+  await evaluate(`window.savedExport=LForms.Util.getFormFHIRData;LForms.Util.getFormFHIRData=()=>{throw Error('blocked export failure')}`);
+  await input(0,'changed');
+  assert.match(await evaluate(`document.getElementById('status').textContent`),/blocked export failure/);
+  await evaluate(`LForms.Util.getFormFHIRData=window.savedExport`);
+  await input(0,'changed');
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),true);
+  assert.match(await evaluate(`document.getElementById('status').textContent`),/renderer does not support.*preferredTerminologyServer/);
   fs.writeFileSync(path.join(root,'panel.png'),Buffer.from((await rpc('Page.captureScreenshot',{format:'png'})).data,'base64'));
   console.log(JSON.stringify({browser:'passed',fastChangeMs,pruned:true,clear:true,errorRetention:true,staleReplyIgnored:true,selectorAck:true,keyboardFocus:true}));
   if(process.env.CRL_IQ_NATIVE){
     const native=load('packages/crl-vscode/src/interactiveQuestionnaire.ts');
-    const {applySession}=require(path.resolve('packages/crl-vscode/dist/apply-session.js'));
+    const {applySession}=require(installed?path.join(installed,'dist/apply-session.js'):path.resolve('packages/crl-vscode/dist/apply-session.js'));
     const prepared=native.prepareInteractivePolicy(path.resolve('packages/crl-vscode/src/testdata/interactive-questionnaire/src/cel/mv/cases.cel'));
     const initial=prepared.initialStates[0];
     const session=new native.InteractiveSession(prepared.definitions,prepared.planId,native.nativeInteractiveRunner(applySession,root));session.reset(initial);
@@ -94,21 +174,32 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
     await post({type:'result',token:3,...result,subject:initial.subject});await mounted();
     fs.writeFileSync(path.join(root,'native-start.json'),JSON.stringify(result,null,2));
     // Actual browser-produced answers, never manually injected Observations or extraction output.
-    await input(0,'first');await evaluate(`document.getElementById('continue').click()`);
-    let sent=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1).response`);fs.writeFileSync(path.join(root,'browser-qr-1.json'),JSON.stringify(sent,null,2));
-    result=await session.evaluate(sent);fs.writeFileSync(path.join(root,'native-answer-1.json'),JSON.stringify(result,null,2));
+    await input(0,'first');await mounted();await evaluate(`document.getElementById('continue').click()`);
+    let pair=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`), sent=pair.response;fs.writeFileSync(path.join(root,'browser-qr-1.json'),JSON.stringify(sent,null,2));
+    result=await session.evaluate(sent,pair.questionnaire);fs.writeFileSync(path.join(root,'native-answer-1.json'),JSON.stringify(result,null,2));
     await post({type:'result',token:3,...result,subject:initial.subject});await mounted();
-    await input(1,'second');await evaluate(`document.getElementById('continue').click()`);
-    sent=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1).response`);
-    result=await session.evaluate(sent);fs.writeFileSync(path.join(root,'native-answer-2.json'),JSON.stringify(result,null,2));
+    await input(1,'second');await mounted();await evaluate(`document.getElementById('continue').click()`);
+    pair=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);sent=pair.response;
+    result=await session.evaluate(sent,pair.questionnaire);fs.writeFileSync(path.join(root,'native-answer-2.json'),JSON.stringify(result,null,2));
     assert.deepEqual(result.activities,['Complete'],'show the terminal activity, not intermediate orchestration actions');
     await post({type:'result',token:3,...result,subject:initial.subject});await mounted();
     await input(0,'changed');await mounted();await input(0,'first');
     await evaluate(`document.getElementById('continue').click()`);
-    sent=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1).response`);fs.writeFileSync(path.join(root,'browser-qr-pruned.json'),JSON.stringify(sent,null,2));
-    result=await session.evaluate(sent);fs.writeFileSync(path.join(root,'native-pruned.json'),JSON.stringify(result,null,2));
+    pair=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);sent=pair.response;fs.writeFileSync(path.join(root,'browser-qr-pruned.json'),JSON.stringify(sent,null,2));
+    result=await session.evaluate(sent,pair.questionnaire);fs.writeFileSync(path.join(root,'native-pruned.json'),JSON.stringify(result,null,2));
     assert.equal(result.activities.length,0,'discarded second answer must pause again');
     assert.ok(!flatten(result.response?.item).some(i=>(i.answer||[]).some(a=>a.valueString==='second')),'no stale second answer');
-    console.log('Native browser-exported Start -> first -> second -> earlier-change-back: passed');
+    await post({type:'result',token:3,...result,subject:initial.subject});await mounted();
+    await input(0,'');await mounted();
+    assert.equal((await values()).length,1,'later unanswered question removed from rendered Q');
+    await evaluate(`document.getElementById('continue').click()`);
+    pair=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
+    const answerable=q=>flatten(q.item).filter(i=>!['group','display'].includes(i.type));
+    assert.equal(answerable(pair.questionnaire).length,1,'submitted Q is trimmed too');
+    result=await session.evaluate(pair.response,pair.questionnaire);
+    fs.writeFileSync(path.join(root,'native-cleared.json'),JSON.stringify(result,null,2));
+    assert.ok(!flatten(result.response?.item).some(i=>(i.answer||[]).length),'cleared answers must stay empty');
+    assert.equal(result.activities.length,0);
+    console.log('Native browser-exported pair: completion, earlier-change-back, and clear with trimmed input Q: passed');
   }
 })().catch(async e=>{console.error(e);if(ws)try{console.error(await evaluate(`({text:document.body.innerText,html:document.getElementById('form').innerHTML.slice(0,1200),sent:window.sent})`));}catch{}process.exitCode=1}).finally(async()=>{if(ws)try{await rpc('Browser.close')}catch{};ws?.close();child?.kill();server?.close();});

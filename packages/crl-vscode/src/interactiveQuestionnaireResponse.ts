@@ -1,5 +1,33 @@
-/** Runs unchanged in the webview and in unit tests. Only Q/QR structures are edited. */
-export function pruneInteractiveResponse(questionnaire: any, previous: any, incoming: any): { response: any; changed?: string; pruned: boolean } {
+/** Keep authoritative Q metadata and order. Accept hierarchical subsets; the caller chooses the prefix.
+ * Host submission and browser edit preparation both reject invalid trees; the browser blocks Continue on failure. */
+export function retainInteractiveQuestionnaire(questionnaire: any, retained: any): any {
+  const q = JSON.parse(JSON.stringify(questionnaire));
+  const walk = (questions: any[], items: any[]): any[] => {
+    for (const item of items ?? []) {
+      if (!(questions ?? []).some(q => q.linkId === item.linkId)) throw new Error("Retained questionnaire contains an unknown item.");
+    }
+    return (questions ?? []).filter(q => (items ?? []).some(i => i.linkId === q.linkId)).map(q => {
+      const matches = (items ?? []).filter(i => i.linkId === q.linkId);
+      const children = matches.flatMap(i => [...(i.item ?? []), ...(i.answer ?? []).flatMap((a: any) => a.item ?? [])]);
+      const kept = walk(q.item, children);
+      if (kept.length) q.item = kept; else delete q.item;
+      return q;
+    });
+  };
+  q.item = walk(q.item, retained.item);
+  const all: any[] = [];
+  const collect = (items: any[]) => { for (const item of items ?? []) { all.push(item); collect(item.item); } };
+  collect(q.item);
+  const ids = new Set(all.map(item => item.linkId));
+  if (all.some(item => item.enableWhen?.some((condition: any) => !ids.has(condition.question))))
+    throw new Error("Cannot trim this questionnaire: a retained question depends on a removed question through enableWhen. Undo the edit or Reset.");
+  return q;
+}
+
+/** Runs unchanged in the webview and in unit tests. Only Q/QR structures are edited.
+ * Serialized browser callers must pass retain explicitly; the default exists only in module scope. */
+export function pruneInteractiveResponse(questionnaire: any, previous: any, incoming: any,
+  retain = retainInteractiveQuestionnaire): { questionnaire: any; response: any; changed?: string; pruned: boolean } {
   const copy = (x: any) => JSON.parse(JSON.stringify(x));
   const value = (item: any) => JSON.stringify((item?.answer ?? []).map((a: any) =>
     Object.fromEntries(Object.keys(a).filter(k => k.startsWith("value")).sort().map(k => [k, a[k]]))));
@@ -40,10 +68,12 @@ export function pruneInteractiveResponse(questionnaire: any, previous: any, inco
     return result;
   };
   const response = { ...copy(previous ?? {}), ...copy(incoming), item: walk(questionnaire.item, previous?.item, incoming.item, "") };
-  return { response, changed, pruned };
+  const kept = changed ? retain(questionnaire, response) : copy(questionnaire);
+  pruned ||= JSON.stringify(kept.item) !== JSON.stringify(questionnaire.item);
+  return { questionnaire: kept, response, changed, pruned };
 }
 
-/** Returned Q remains authoritative for $apply; rendering must not resurrect discarded initial values. */
+/** Rendering must not resurrect discarded initial values in the current retained Q. */
 export function questionnaireWithoutDefaults(questionnaire: any): any {
   const q = JSON.parse(JSON.stringify(questionnaire));
   const walk = (items: any[]) => { for (const i of items ?? []) { delete i.initial; walk(i.item); } };

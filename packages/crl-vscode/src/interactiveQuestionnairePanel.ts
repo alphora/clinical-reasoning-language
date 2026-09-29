@@ -37,7 +37,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
           session = new InteractiveSession(prepared.definitions, prepared.planId, nativeInteractiveRunner(adapter.applySession));
           if (selected) session.reset(selected);
           post({ type: "initial", states: states.map(({ id, label }) => ({ id, label })), subject: selected?.subject,
-            error: prepared.warnings.length ? "Definition warnings: " + prepared.warnings.join("; ") : undefined });
+            warnings: prepared.warnings });
         } catch (e) { post({ type: "initial", states: [], error: String(e) }); }
       };
       const listener = panel.webview.onDidReceiveMessage(async message => {
@@ -57,14 +57,15 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
         }
         if (!["start", "continue"].includes(message.type) || !selected || busy) return;
         if (message.type === "start" && session.result) return;
-        if (message.type === "continue" && (!session.result?.questionnaire || message.response?.resourceType !== "QuestionnaireResponse")) {
-          post({ type: "error", message: "There is no current QuestionnaireResponse to submit." }); return;
+        if (message.type === "continue" && (!session.result?.questionnaire || message.response?.resourceType !== "QuestionnaireResponse" || message.questionnaire?.resourceType !== "Questionnaire")) {
+          post({ type: "error", message: "A current Questionnaire and QuestionnaireResponse are required to continue." }); return;
         }
         if (message.type === "start") session.reset(selected);
         busy = true;
         const mine = token, active = session;
         try {
-          const result = await active.evaluate(message.type === "continue" ? message.response : undefined);
+          const result = await active.evaluate(message.type === "continue" ? message.response : undefined,
+            message.type === "continue" ? message.questionnaire : undefined);
           if (current !== panel || mine !== token || !result) return;
           post({ type: "result", ...result, subject: selected.subject, unsupported: inspectQuestionnaire(result.questionnaire) });
         } catch (e) { if (current === panel && mine === token) post({ type: "error", message: String(e) }); }
@@ -73,7 +74,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
       panel.onDidDispose(() => { listener.dispose(); if (current === panel) { session?.cancel(); session = undefined; current = undefined; owner = undefined; ++token; } });
       const root = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
       panel.webview.html = interactiveQuestionnaireHtml(randomUUID(), panel.webview.cspSource,
-        name => panel.webview.asWebviewUri(vscode.Uri.joinPath(root, name)).toString());
+        name => panel.webview.asWebviewUri(vscode.Uri.joinPath(root, name)).toString(), inspectQuestionnaire);
     },
   };
 }
