@@ -2,7 +2,7 @@
 
 ## 6.4.26 cumulative language/tooling maintenance — schema 2.19
 
-Baseline: `88b0440dc1ddaa4ae536df61f5cb924fa82e8def`. Target: pending reviewed content commit; finalized by the separate audit stamp. Kit hash: `320e43eb9e98e6dc0d6dbd6c56cee01046e539b82321e021208afe76fa897011`. This section covers the complete delta through the isolated release candidate, including uncommitted and untracked source. It does not claim a completed audit until the target and evidence are finalized.
+Baseline: `88b0440dc1ddaa4ae536df61f5cb924fa82e8def`. Target: `560cb6ff4e654c392c7393fc69714c3c01fb02f1`. Kit hash: `320e43eb9e98e6dc0d6dbd6c56cee01046e539b82321e021208afe76fa897011`. This section covers the complete delta through the isolated release candidate, including uncommitted and untracked source. The reviewed source/teaching audit is complete; later release-version and audit-stamp changes are metadata-only and installed qualification is separate.
 
 Intent: release the latest qualified features while preserving original answer values, unknown/error distinctions, explicit available-value semantics, source-owned explanatory wording and the native Q/QR testing contract. The current north star and named-answer/aggregate/interactive docs describe scope. Existing tests measure behavior, not clinical intent. No customer-policy certification or broader #320 completion is claimed.
 
@@ -23,7 +23,7 @@ Added tags above cover existing owning assertions, not new duplicate behavior te
 
 The new guidance introduces no new positive standalone example. Syntax references are bounded forms exercised by the named owning fixtures. Existing shared kit artifacts continue through validation/emission/CRE packaging gates; no untested customer example is added. Retrieval aliases and prerequisites make all three new rules and criterion descriptions discoverable.
 
-Validation and review: core 5,389 passed/32 skipped plus the sole overview-size failure corrected and all72 query checks passed; extension1,336 passed/3expected failures. Core/extension builds and typechecks passed. All three standalone browser harnesses passed (criterion descriptions, tree inputs and interactive questionnaire). Source/kit review896 native0critical/0important/0nit converged. Core real-MCP smoke and installed artifact evidence are tracked in the release receipts. Plan review 895: native three important findings accepted, external exhausted its model-turn budget with no usable critique. Complete code/source review is required before the content commit. Release qualification receipts live separately from this semantic audit.
+Validation and review: core 5,389 passed/32 skipped plus the sole overview-size failure corrected and all72 query checks passed; extension1,336 passed/3expected failures. Core/extension builds and typechecks passed. All three standalone browser harnesses passed (criterion descriptions, tree inputs and interactive questionnaire). Source/kit review896 native0critical/0important/0nit converged. Core real-MCP smoke passed; installed artifact evidence is tracked in the release receipts. Plan review 895: native three important findings accepted, external exhausted its model-turn budget with no usable critique. Code/source review896 completed before the content commit. Release qualification receipts live separately from this semantic audit.
 
 ### Complete changed-path disposition
 

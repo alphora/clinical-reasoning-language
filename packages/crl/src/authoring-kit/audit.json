@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "88b0440dc1ddaa4ae536df61f5cb924fa82e8def",
-  "auditedSchemaVersion": "2.18",
-  "auditedContentHash": "30e932e249f5c8f7b1d4f8d7b780b67fe21898339e1163c57e794553842f25a3",
-  "scope": "Kit schema 2.18 delta audit: removal of two invalid clause anchors on the verify-loop rule. Both RecordSet-preview clauses are force default yet carried a `test`, which types.ts reserves for an invariant clause, and their values named the rule id rather than the verifyLoop: methodology namespace, so neither resolved — the K4 fake-green the type documentation forbids. The fields are deleted, not given requirements to point at: adding methodologyRequirements would have created a per-policy obligation on every KE, since they are served as retrieval context. Clause text is unchanged and no requirement was added, so no teaching moved; the clauses retain their evidence through the existing @kit tags on conditionStatus.test.ts. assertForceCoverage is now bidirectional and was watched failing in both directions before being trusted. 198 kit tests pass. No compiler, CRE, emitter or engine implementation changed. Installed delivery qualification is recorded separately.",
+  "auditedRevision": "560cb6ff4e654c392c7393fc69714c3c01fb02f1",
+  "auditedSchemaVersion": "2.19",
+  "auditedContentHash": "320e43eb9e98e6dc0d6dbd6c56cee01046e539b82321e021208afe76fa897011",
+  "scope": "Kit schema 2.19 cumulative delta audit from 88b0440dc1ddaa4ae536df61f5cb924fa82e8def: typed request-code sources, direct answer-option guards, ordinary and available-value membership, criterion descriptions and interactive native testing. Complete changed-path dispositions and owning assertion/fixture limits are recorded in coverage.md. Native source review896 converged; external unavailable after budget exhaustion. Core tests, extension tests, real MCP smoke, builds/types and three browser harnesses passed after the documented overview-bound correction. This stamp certifies bounded source/teaching alignment, not customer-policy correctness or installed/native release qualification; those have separate receipts.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
