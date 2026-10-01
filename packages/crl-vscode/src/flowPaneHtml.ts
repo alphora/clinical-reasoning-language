@@ -36,6 +36,7 @@ const OUTLINE_BASE = 16; // x offset of an indent-0 outline row from its `when`'
 const OUTLINE_INDENT = 15; // x added per indent level
 const OUTLINE_ADVANCE = 0.7; // slot units an outline row advances the global cursor (compact; sized for OUTLINE_H + ~6.7px gap over ROW)
 const OUTLINE_NODE_W = 150; // a leaf box in the outline (narrower than a decision NODE_W, since it indents)
+const INPUT_NODE_W = 210; // reserve separate in-row question and MV/KE flag gutters, even before flags arrive
 const OUTLINE_H = 34; // a leaf box height in the outline — sized for up to TWO wrapped lines (#208)
 const OUTLINE_LABEL_MAX = 20; // chars PER LINE before wrapping/truncation (the min that de-collides the screenshot's outline leaves + box-fit margin)
 
@@ -55,7 +56,7 @@ export interface RenderedFlow {
    *  literally "structure-only". */
   anchors: Record<string, FlowAnchor>;
   /** opaque key → a node-body select ({nodeKey}, a crlNode), a concept/guard peek ({conceptNodeKey}), a tree sub-question
-   *  ({subQuestionLeafKey}), or a #233 criterion collapse chevron ({criterionToggle}, a `leaf::` position key). The first
+   *  ({subQuestionLeafKey}), or a criterion/choices/INPUT collapse chevron ({criterionToggle}, a `leaf::` position key). The first
    *  two mirror RenderedCrl; the latter two are flow-only and are DIVERTED before the engine-selection path host-side. */
   reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string } | { criterionOccurrence: { lib: string; name: string; bodyHash: string; elided: boolean } }>;
   /** #187 Todo 5: def-leaf anchor key (the same `leaf::` key used in `anchors`) → its leaf concept identity + the OWNING
@@ -64,7 +65,10 @@ export interface RenderedFlow {
   leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>;
   /** #203 Todo 4b Slice A — every rendered node that REPRESENTS a concept (a `when`'s gating concept + each def-leaf),
    *  with its `<g>` id and the concept's `{lib,name}` identity. The cockpit maps a CONCEPT-scope flag `{libraryName,
-   *  targetName}` to these gids to paint the per-node flag badge (a concept may render as SEVERAL `when` nodes / def-leaves
+   *  targetName}` to these gids to paint the per-node flag badge. Collapsed INPUT rows also carry the identities of
+   *  dependencies their expanded outline would display, for review-only flag rollup. Their SVG data-flow-input state
+   *  and data-flow-hidden-inputs identity tuples let pinned routes mark contained questions while folded.
+   *  A concept may render as SEVERAL `when` nodes / def-leaves
    *  → badge ALL; matched on (lib,name), never name alone — cross-lib same-name concepts exist). Decision-scope flags reuse
    *  `anchors[decisionNodeKey]`; activity/`otherwise` nodes carry no meta so they never appear here (they can't be flagged). */
   conceptOccurrences: { gid: string; lib: string; name: string; flagGid?: string }[];
@@ -222,6 +226,7 @@ interface LaidNode {
    * nineteen boolean leaves into four coded questions is invisible in the surface a clinician reads.
    */
   optionsRow?: { posKey: string; collapsed: boolean; count: number };
+  inputRow?: { collapsed: boolean; count: number; bodyConcepts: { lib: string; name: string }[] };
   /** #187 Todo 5: on a def-leaf, the structure nodeKey of the OWNING composite `when` (the leaf's top ancestor, threaded
    *  unchanged through nested operands). The per-case leaf-verdict overlay gates on THIS when being on the fired-satisfied
    *  path — so an off-path composite's leaves stay un-answered (parity with the questionnaire's on-path-only expansion). */
@@ -233,6 +238,8 @@ interface LaidNode {
    *  `indent` drives x; `absX` is the precomputed left (indent-based). */
   outline?: boolean;
   outlineRow?: "topor" | "op" | "leaf" | "external" | "more" | "crit" | "option";
+  /** REFACTOR:grounded: owner text is display metadata, never a geometry/input dependency. */
+  criterionDescription?: string;
   /** #233 Todo 2a: set on a `"crit"` outline row (a NON-ROOT criterion boundary) — the criterion IDENTITY (`lib`/`name`),
    *  its `collapsed` state (default collapsed; independent, position-keyed), the addressable leaf identities inside its body
    *  (collapsed-box flag rollup, like `criterionCollapse.bodyConcepts`), and the POSITION collapse key (`n.nodeKey`, flipped
@@ -278,12 +285,13 @@ export function toggleCriterionExpansion(current: Set<string>, key: string, stru
   if (next.delete(key)) return next;
   const {roots} = buildLaid(projectFlowStructure(structure), new Map((opts.concepts ?? []).map(c=>[c.nodeKey,c])), {...opts,expandAllCriteria:true});
   const open = (n: LaidNode) => {
+    if (n.inputRow) return; // INPUT stays independently collapsed when opening a criterion.
     if (n.criterionCollapse || n.critRow) next.add(n.nodeKey);
     if (n.optionsRow) next.add(n.optionsRow.posKey);
     n.children.filter(c=>c.outline).forEach(open);
   };
   const find = (n: LaidNode): void => {
-    if (n.nodeKey === key || n.optionsRow?.posKey === key) {open(n);next.add(key);return;}
+    if (n.nodeKey === key || n.optionsRow?.posKey === key) {if (!n.inputRow) open(n);next.add(key);return;}
     n.children.forEach(find);
   };
   roots.forEach(find); return next;
@@ -437,7 +445,8 @@ function buildLaid(
         if (!collapsed) cursor.y += 12 / ROW; // cursor uses slots; reserve 12 pixels for the closing border
         return {
           ...base, nodeKey: posKey, kind: "leaf", outlineRow: "crit",
-          label: s.name, full: `${s.name} — criterion "${s.lib}"`,
+          label: s.name, full: `${s.name} — criterion "${s.lib}"${s.description !== undefined ? `\n${s.description}` : ""}`,
+          criterionDescription: s.description,
           critRow: { lib: s.lib, name: s.name, bodyHash: s.bodyHash, elided: s.elided === true, collapsed, bodyConcepts, posKey },
           y, children,
         };
@@ -452,9 +461,21 @@ function buildLaid(
     if (seen.has(key)) return [];
     const inputs = valueInputs(lib,name);
     if (!inputs.length) return [];
+    const posKey = outlineKey(whenKey,path,"inputs");
+    const collapsed = !transparent && !opts.expandAllCriteria && !opts.expandedGuardWhens?.has(posKey);
+    const bodyConcepts: {lib:string;name:string}[] = [];
+    const collected = new Set<string>([key]);
+    const collect = (c: CrlConceptNode): void => {
+      const identity = JSON.stringify([c.lib,c.name]);
+      if (collected.has(identity)) return;
+      collected.add(identity);bodyConcepts.push({lib:c.lib,name:c.name});
+      // Match the dependencies that opening this outline can actually reveal.
+      for (const dep of valueInputs(c.lib,c.name)) collect(dep);
+    };
+    inputs.forEach(collect);
     const y = cursor.y; if (!transparent) cursor.y += OUTLINE_ADVANCE;
-    const children = inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+(transparent ? 0 : 1), `${path}.${i}`, cursor, new Set([...seen,key]), inCriterion));
-    return [{visualElided:transparent,nodeKey:outlineKey(whenKey,path,"inputs"),kind:"leaf",useDecision:false,outline:true,outlineRow:"op",indent,absX:outlineX(left,indent),depth:0,topWhenKey:whenKey,label:"input",full:"Input to this condition",y,children}];
+    const children = collapsed ? [] : inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+(transparent ? 0 : 1), `${path}.${i}`, cursor, new Set([...seen,key]), inCriterion));
+    return [{visualElided:transparent,nodeKey:posKey,kind:"leaf",useDecision:false,outline:true,outlineRow:"op",indent,absX:outlineX(left,indent),depth:0,topWhenKey:whenKey,label:"input",full:"Input to this condition",y,children,...(!transparent ? {inputRow:{collapsed,count:inputs.length,bodyConcepts}} : {})}];
   };
 
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
@@ -512,7 +533,8 @@ function buildLaid(
     // A when node IS its concept → title it with the CONCEPT's own lib (cross-lib concepts share a bare name). Other nodes
     // title with the owning decision row's lib. (Action TARGET lib isn't resolved here — the target's lib lives in its
     // nodeKey, not parsed in v1; the guard concept's lib rides its peek <title> via conceptName/conceptLib below.)
-    const full = n.kind === "when" && cf.conceptName ? `${cf.conceptName} — concept "${cf.conceptLib}"` : `${display} — ${n.lib}`;
+    const full = (n.kind === "when" && cf.conceptName ? `${cf.conceptName} — concept "${cf.conceptLib}"` : `${display} — ${n.lib}`)
+      + (sole?.description !== undefined ? `\n${sole.description}` : "");
     // A BODY-LESS node (no branch body) reserves its OWN slot NOW, so its `y` is fixed before any outline hangs below it.
     const selfSlot = structureChildren.length === 0 ? slot++ : undefined;
     // Center a `when` on its CONTROL-FLOW spine (its branch body); a body-less node sits at its own reserved slot.
@@ -561,21 +583,9 @@ function buildLaid(
       outlineRoots.push(...buildInputs(cf.conceptLib,cf.conceptName,PAD+depth*COL,n.nodeKey,0,"inputs",cursor));
       if (outlineRoots.length) slot = Math.max(slot,cursor.y);
     }
-    // ⭐⭐ #189 — THE CANONICAL SHAPE, which BOTH branches above decline.
-    //
-    // ⚠ MEASURED (0 chevrons) before this existed, on `coded-question.crl:59` — our OWN reference fixture
-    // for this feature, and `example-direct.crl:12`. A bare single-ref `when "Q"` has NO `guardOutline`
-    // (`buildGuardOutlines` skips a `BranchConditionRef`), and the #189 wrapper is `definition is "…" in
-    // …` — a REDUCTION, so `hasDefinedAs` is false. Neither arm hangs an outline, so no leaf exists for
-    // `answerOptionsByConcept` to be consulted against, and the question renders as one flat box.
-    //
-    // ⚠ WHY IT SURVIVED A REAL-POLICY MEASUREMENT: every question in the policy I measured sat inside a
-    // COMPOUND guard, which takes the `guardOutline` arm. 8 chevrons appeared and this hole did not. A
-    // measurement against live content is worth more than a fixture AND is still only evidence about the
-    // shapes that content happens to use.
-    //
-    // Keyed on `n.outlineRoots.length === 0` rather than on the negation of the two conditions above, so a
-    // future third outline path cannot silently reintroduce a double render.
+    // A direct concept guard already owns its question identity. Attach choices to that box;
+    // negated/compound operands keep their distinct outline leaves.
+    let optionsRow: LaidNode["optionsRow"];
     const selfAnswers = n.kind === "when" && cf.conceptKey !== undefined ? opts.answerOptionsByConcept?.get(cf.conceptKey) : undefined;
     const selfAnswersFrom =
       n.kind === "when" && cf.conceptKey !== undefined && !selfAnswers?.length
@@ -596,12 +606,10 @@ function buildLaid(
     }
     if (outlineRoots.length === 0 && selfAnswers && selfAnswers.length > 0) {
       const whenLeft = PAD + depth * COL;
-      const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
+      const cursor = { y: nodeY + (NODE_H + 26) / ROW };
       const posKey = outlineKey(n.nodeKey, "self", "opts");
       const optCollapsed = !opts.expandAllCriteria && !(opts.expandedGuardWhens?.has(posKey) ?? false);
-      const y = cursor.y;
-      cursor.y += OUTLINE_ADVANCE;
-      cursor.y += 24 / ROW;
+      optionsRow = { posKey, collapsed: optCollapsed, count: selfAnswers.length };
       const optChildren: LaidNode[] = [];
       if (!optCollapsed) {
         for (const [oi, o] of selfAnswers.entries()) {
@@ -616,25 +624,15 @@ function buildLaid(
           cursor.y += OUTLINE_ADVANCE;
         }
       }
-      // The question itself renders as a leaf so the chevron and the rows sit where they do in every other
-      // shape — one rendering path for option rows, not a second one on the structure box.
-      outlineRoots.push({
-        nodeKey: outlineKey(n.nodeKey, "self", "q"),
-        kind: "leaf", useDecision: false, outline: true, outlineRow: "leaf", isDefLeaf: true,
-        indent: 0, absX: outlineX(whenLeft, 0),
-        label: cf.conceptName ?? "", full: `${cf.conceptName} — concept "${cf.conceptLib}"`,
-        conceptKey: cf.conceptKey, conceptName: cf.conceptName, conceptLib: cf.conceptLib, isSource: cf.isSource,
-        optionsRow: { posKey, collapsed: optCollapsed, count: selfAnswers.length },
-        depth: 0, topWhenKey: n.nodeKey, y, children: optChildren,
-      });
+      outlineRoots.push(...optChildren);
       slot = Math.max(slot, cursor.y);
     }
     const children = [...structureChildren, ...outlineRoots];
     return {
-      nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf,
+      nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf, optionsRow,
       incomingOutcome: (n as ProjectedFlowNode).incomingOutcome,
       delegatedDecisionKey: useDecision ? n.refKeys[0] : undefined,
-      ...(sole ? { criterionCollapse: { collapsed, lib: sole.lib, name: sole.name, bodyConcepts: critBodyConcepts } } : {}),
+      ...(sole ? { criterionDescription: sole.description, criterionCollapse: { collapsed, lib: sole.lib, name: sole.name, bodyConcepts: critBodyConcepts } } : {}),
     };
   };
 
@@ -715,7 +713,7 @@ export function renderFlowPane(
   // (an op row always has an operand at indent+1 that extends ≥OUTLINE_NODE_W further right; a top-OR sits above the body
   // root) — but it keeps the extent honest if the outline shape ever changed.
   const nodeW = (n: LaidNode): number =>
-    n.kind === "otherwise" && n.label === "No" ? 42 : n.outline ? (n.outlineRow === "op" || n.outlineRow === "topor" ? 60 : OUTLINE_NODE_W) : NODE_W;
+    n.kind === "otherwise" && n.label === "No" ? 42 : n.outline ? (n.inputRow ? (n.inputRow.collapsed ? INPUT_NODE_W : OUTLINE_NODE_W) : n.outlineRow === "op" || n.outlineRow === "topor" ? 60 : OUTLINE_NODE_W) : NODE_W;
   // left x: an OUTLINE row uses its precomputed INDENT-based `absX`; a structure node uses its depth column.
   const left = (n: LaidNode): number => n.absX ?? PAD + n.depth * COL;
   const top = (n: LaidNode): number => Math.round(PAD + n.y * ROW); // node top y (rounded)
@@ -817,6 +815,21 @@ export function renderFlowPane(
       continue;
     }
 
+    if (n.inputRow) {
+      const row=n.inputRow,togKey=`${prefix}i${gid}`;
+      reveals[togKey]={criterionToggle:n.nodeKey};
+      if(row.collapsed) {
+        row.bodyConcepts.forEach(c=>conceptOccurrences.push({gid,...c}));
+        flaggableGids.push(gid);
+      }
+      body += `<g id="${escapeHtml(gid)}" class="flow-outline flow-input-row" data-reveal="${escapeHtml(togKey)}">` +
+        `<title>${row.count} direct inputs${row.collapsed ? "; expand to inspect nested dependencies" : ""}</title>` +
+        `<rect x="${x}" y="${y}" width="${nodeW(n)}" height="${OUTLINE_H}"/>` +
+        critToggle(x+8,y+OUTLINE_H/2,row.collapsed,togKey,`inputs (${row.count})`).replace('<g ', '<g data-flow-input-toggle="1" ').replace('</g>',`<text x="${x+20}" y="${y+OUTLINE_H/2+4}">INPUT (${row.count})</text></g>`) +
+        (row.collapsed ? flagBadge(x+INPUT_NODE_W-13,y+OUTLINE_H/2,gid,false) : "") + `</g>`;
+      continue;
+    }
+
     // #187 Option-C: OUTLINE render-only rows — an operator/top-OR LABEL (no box) or an external/more STUB box.
     if (n.outline && n.outlineRow !== "leaf") {
       if (n.outlineRow === "op" || n.outlineRow === "topor") {
@@ -835,6 +848,12 @@ export function renderFlowPane(
       continue;
     }
 
+    const choicesControl = (height: number): string => {
+      const row=n.optionsRow;if(!row)return "";
+      const toggleKey=`${prefix}o${gid}`;
+      reveals[toggleKey]={criterionToggle:row.posKey};
+      return critToggle(x+8,y+height+13,row.collapsed,toggleKey,`answer choices (${row.count})`).replace('<g ', '<g data-flow-choices-toggle="1" ').replace('</g>',`<text x="${x+20}" y="${y+height+17}">Answer choices (${row.count})</text></g>`);
+    };
     // #187 Option-C: an OUTLINE LEAF row (a `defined as` concept operand). Its synthetic `leaf::` key (`n.nodeKey`,
     // path-bearing → collision-free) anchors it + joins the Todo-5 verdict overlay. #187 Todo 3: carries a hidden on-path
     // RING revealed when the operand is TRUE (`markLeaves` toggles `.flow-leaf-yes`); a false / unknown operand shows nothing.
@@ -859,15 +878,6 @@ export function renderFlowPane(
       const classes = ["flow-row", "flow-leaf"];
       if (n.isSource === false) classes.push("flow-inferred"); // inferred sub-question → purple (kept under the ring)
       else classes.push("flow-greyborder"); // a source sub-question's grey border hides under the on-path ring (Todo 3b)
-      // ⭐ #189: a CODED QUESTION gets a ▸/▾ chevron that expands its answer options. Reuses the criterion
-      // toggle channel (`{criterionToggle}` → `toggleCriterionExpand`) with its own disjoint `opts`-suffixed
-      // position key, so no new message type, no new state set, and no new host plumbing.
-      const optRow = n.optionsRow;
-      let optTogKey = "";
-      if (optRow) {
-        optTogKey = `${prefix}o${gid}`;
-        reveals[optTogKey] = { criterionToggle: optRow.posKey };
-      }
       body +=
         `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
@@ -875,7 +885,7 @@ export function renderFlowPane(
         // per line out of OUTLINE_LABEL_MAX = 20, so every coded question wrapped to two 8-char fragments.
         // The crit-row precedent above reserves 5 chars for a 20px gutter; 12px is ~2 chars at ~5.9px/char.
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
-        (optRow ? critToggle(x + 8, y + OUTLINE_H + 13, optRow.collapsed, optTogKey, `answer choices (${optRow.count})`).replace('<g ', '<g data-flow-choices-toggle="1" ').replace('</g>', `<text x="${x+20}" y="${y+OUTLINE_H+17}">Answer choices (${optRow.count})</text></g>`) : "") +
+        choicesControl(OUTLINE_H) +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
         (leafConcept ? flagBadge(x + OUTLINE_NODE_W - 13, y + OUTLINE_H - 10, gid) : "") +
         `</g>`;
@@ -974,6 +984,7 @@ export function renderFlowPane(
       (n.kind === "when" ? `<text class="flow-truth-unknown" x="${x - 14}" y="${y + 16}"><title>Not answered — evaluation paused here</title>?</text>` +
         (!n.children.some(c => c.incomingOutcome === "No") ? `<path class="flow-false-stop" d="M${x + NODE_W} ${y + NODE_H / 2} h24 m0 -4 v8"><title>Condition false — this branch stops here</title></path>` : "") : "") +
       guardTab +
+      choicesControl(NODE_H) +
       critToggleMarkup +
       critVerdictMarkup +
       critFlagMarkup +
@@ -1001,11 +1012,13 @@ export function renderFlowPane(
     for (let p = logicParent(n); p; p=logicParent(p)) groupDepth++;
     const metadata = (n.visualElided ? ' display="none" data-flow-elided="1" aria-hidden="true"' : '') +
       (n.optionsRow ? ' data-flow-has-choices="1"' : '') +
+      (n.inputRow ? ` data-flow-input="${n.inputRow.collapsed ? "collapsed" : "expanded"}" aria-expanded="${!n.inputRow.collapsed}"` : "") +
+      (n.inputRow?.collapsed ? ` data-flow-hidden-inputs="${escapeHtml(JSON.stringify(n.inputRow.bodyConcepts.map(c=>[c.lib,c.name])))}"` : "") +
       (n.choice ? ` data-flow-choice="${escapeHtml(JSON.stringify(n.choice))}" data-flow-choice-for="${escapeHtml(n.choiceFor!)}"` : '') +
       (isLogic(n) ? ` data-flow-logic="${escapeHtml(n.nodeKey)}" data-flow-logic-parent="${escapeHtml(logicParent(n)?.nodeKey ?? "")}" data-flow-logic-depth="${groupDepth}" data-flow-logic-kind="${n.label === "any of" ? "any" : "all"}" role="button" tabindex="0" aria-pressed="false"` : '') +
       ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
       (n.outlineRow === "option" ? ' data-flow-decoration="choices"' : n.outlineRow === "op" && n.label === "input" ? ' data-flow-decoration="input"' : '') +
-      (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit") ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.label)}"` : "") +
+      (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit" || n.inputRow) ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.inputRow ? `Inputs (${n.inputRow.count})` : n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
       (n.criterionCollapse || n.critRow ? ` data-flow-component="${(n.criterionCollapse ?? n.critRow)!.collapsed ? "collapsed" : "expanded"}"` : "") +
       (n.criterionCollapse ? ` data-flow-criterion="${escapeHtml(JSON.stringify([n.criterionCollapse.lib,n.criterionCollapse.name]))}"` : "") +
@@ -1038,7 +1051,21 @@ export function renderFlowPane(
     `<button type="button" data-zoom="reset" class="flow-zoom-pct" title="Reset zoom (or Ctrl+scroll to zoom)" aria-label="Reset zoom">100%</button>` +
     `<button type="button" data-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>` +
     `</div>`;
-  return { html: `<div class="flow-wrap">${svg}</div>${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
+  // REFACTOR:grounded: selectable, keyboard-accessible owner text outside SVG geometry.
+  // Only rendered criterion identities participate; repeated occurrences share one entry.
+  const renderedCriteria = new Set(criterionOccurrences.map((c) => JSON.stringify([c.lib, c.name])));
+  const descriptions = new Map<string, { name: string; lib: string; text: string }>();
+  for (const n of all) {
+    const owner = n.critRow ?? n.criterionCollapse;
+    if (!owner || n.criterionDescription === undefined) continue;
+    const key = JSON.stringify([owner.lib, owner.name]);
+    if (renderedCriteria.has(key)) descriptions.set(key, { name: owner.name, lib: owner.lib, text: n.criterionDescription });
+  }
+  const descriptionHtml = descriptions.size === 0 ? "" :
+    `<details class="flow-criterion-descriptions"><summary>Criterion descriptions</summary><dl>` +
+    [...descriptions.values()].map((d) => `<dt>${escapeHtml(d.name)} — ${escapeHtml(d.lib)}</dt><dd>${escapeHtml(d.text)}</dd>`).join("") +
+    `</dl></details>`;
+  return { html: `<div class="flow-wrap">${svg}</div>${descriptionHtml}${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
 }
 
 // Bottom-right flag: grey adds, yellow opens unresolved MV flags, green opens resolved MV flags. Rollup-only badges remain hidden until
@@ -1097,6 +1124,9 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   `.flow-condition-false>.flow-false-stop{display:inline;fill:none;stroke-width:1.75;vector-effect:non-scaling-stroke}` +
   `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-foreground,#ddd);font-weight:bold}` +
   `.flow-wrap{display:inline-block;min-width:100%}` +
+  `.flow-criterion-descriptions{margin:12px;padding:8px;border:1px solid var(--vscode-panel-border);border-radius:4px}` +
+  `.flow-criterion-descriptions summary{cursor:pointer}.flow-criterion-descriptions dt{font-weight:600;margin-top:8px}` +
+  `.flow-criterion-descriptions dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 12px}` +
   // `cursor:grab` = the grab-drag pan affordance on the tree background (a `.flow-row` overrides it with `pointer`, so nodes
   // still read as clickable); `user-select:none` so a pan-drag over node text doesn't select it.
   `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif);cursor:grab;user-select:none}` +
@@ -1167,8 +1197,10 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   // `.flow-row.has-flag .flow-flag-badge` selector wouldn't match). The verdict chip + right-click verdict land in 2b.
   `.flow-crit-row{cursor:default}` +
   `.flow-crit-row>rect{fill:var(--vscode-editorHoverWidget-background,#2c2c2d);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.2}` +
-  `[data-flow-choices-toggle] .flow-crit-hit{fill:var(--vscode-button-secondaryBackground,#333);stroke:var(--vscode-descriptionForeground,#aaa);stroke-width:1}[data-flow-choices-toggle] .flow-crit-chevron{fill:var(--vscode-foreground,#fff);stroke:var(--vscode-foreground,#fff);stroke-width:1}[data-flow-choices-toggle]>text{font-size:12px;fill:var(--vscode-foreground,#ddd);font-weight:600}.flow-crit-row>text{fill:var(--vscode-foreground,#cccccc);font-size:11px}` +
+  `[data-flow-choices-toggle] .flow-crit-hit,[data-flow-input-toggle] .flow-crit-hit{fill:var(--vscode-button-secondaryBackground,#333);stroke:var(--vscode-descriptionForeground,#aaa);stroke-width:1}[data-flow-choices-toggle] .flow-crit-chevron,[data-flow-input-toggle] .flow-crit-chevron{fill:var(--vscode-foreground,#fff);stroke:var(--vscode-foreground,#fff);stroke-width:1}[data-flow-choices-toggle]>text,[data-flow-input-toggle]>text{font-size:12px;fill:var(--vscode-foreground,#ddd);font-weight:600}.flow-crit-row>text{fill:var(--vscode-foreground,#cccccc);font-size:11px}` +
   `.flow-crit-row.has-flag .flow-flag-badge{display:inline}` +
+  `.flow-input-row.has-flag .flow-flag-badge{display:inline}` +
+  `.flow-input-row>rect{fill:transparent;stroke:none;pointer-events:none}` +
   // #187 Todo 3: the on-path RING — a hidden `<rect>` in `.flow-ring`, revealed by `.current` (main path) or
   // `.flow-leaf-yes` (a TRUE operand). Deterministic rect-stroke (NOT a CSS outline), composes with the node's own
   // identity border (a separate axis) — `.current` no longer recolors the base border. NEUTRALIZE every shell `outline`

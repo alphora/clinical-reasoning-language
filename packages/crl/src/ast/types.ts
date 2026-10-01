@@ -165,6 +165,8 @@ export interface Decision extends ASTNode {
 export interface Criterion extends ASTNode {
   type: "Criterion";
   name: string;
+  /** REFACTOR:grounded: explanatory wording owned by this group, not an answer or predicate. */
+  description?: string;
   condition: BranchCondition;
   location: Location;
   /** REFACTOR:grounded: compiler-only PlanDefinition condition carrier, never authored syntax. */

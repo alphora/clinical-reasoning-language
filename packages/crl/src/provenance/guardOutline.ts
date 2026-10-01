@@ -65,8 +65,10 @@ export interface GuardOutline {
 /** A stable, short content fingerprint of a rendered guard body — the verdict staleness key. `JSON.stringify` is
  *  deterministic given the builder's fixed field order (branchConditionToDefStruct / buildDefStruct), so the SAME body
  *  hashes identically every build and any structural change (a concept added, a composite edited, a cap tripped) flips it. */
-const hashExpr = (e: DefStructExpr): string =>
-  "sha256:" + createHash("sha256").update(JSON.stringify(e), "utf8").digest("hex").slice(0, 16);
+// REFACTOR:grounded: own wording and expanded child wording participate in review staleness.
+// Preserve the existing hash payload for criteria without their own description.
+const hashExpr = (e: DefStructExpr, description?: string): string =>
+  "sha256:" + createHash("sha256").update(JSON.stringify(description === undefined ? e : { description, operand: e }), "utf8").digest("hex").slice(0, 16);
 
 /** Does the rendered body contain a `…`/`+N more` elision stub? A `more` node means content was dropped (breach or cap),
  *  so `bodyHash` is not a faithful fingerprint — see `CriterionIdentity.elided` + the criterion node's in-situ `elided`. */
@@ -108,9 +110,9 @@ const MISSING_BODY_HASH = "sha256:missing";
  *  Todo 2 uses this for root-absorption (the sole render stays byte-identical) and to retire `soleCriterion` host reads. */
 export const topCriterion = (
   expr: DefStructExpr,
-): { lib: string; name: string; bodyHash: string; elided?: true } | undefined =>
+): { lib: string; name: string; bodyHash: string; description?: string; elided?: true } | undefined =>
   expr.kind === "criterion"
-    ? { lib: expr.lib, name: expr.name, bodyHash: expr.bodyHash, ...(expr.elided ? { elided: true as const } : {}) }
+    ? { lib: expr.lib, name: expr.name, bodyHash: expr.bodyHash, ...(expr.description !== undefined ? { description: expr.description } : {}), ...(expr.elided ? { elided: true as const } : {}) }
     : undefined;
 
 /** #247: every `BranchConditionCriterionRef` in a guard subtree (recursing `and`/`or`/`not`). Used to SURFACE the distinct
@@ -239,16 +241,18 @@ export function branchConditionToDefStruct(
         // no map entry → a stable MISSING token (the node still keeps its name — #233).
         const bodyHash = criterionIdentities.get(criterionKey(decisionLib, name))?.bodyHash ?? MISSING_BODY_HASH;
         const crit = criterionTable.get(name);
+        // REFACTOR:grounded: retain owner wording even when its body is collapsed or elided.
+        const description = crit?.description !== undefined ? { description: crit.description } : {};
         // #233: WRAP FIRST, then elide — a missing OR cyclic criterion keeps its NAME as a `criterion` node with a
         // `…` body (was: a name-erasing `external` stub). The `…` honestly signals "a criterion body is here but
         // can't be shown"; the boundary + name is the whole point of #233.
         if (!crit || visiting.has(name)) {
-          return { kind: "criterion", name, lib: decisionLib, bodyHash, elided: true, operand: { kind: "more", count: 0 } };
+          return { kind: "criterion", name, lib: decisionLib, bodyHash, ...description, elided: true, operand: { kind: "more", count: 0 } };
         }
         // Hop cap (or a `maxHops: 0` breach budget) → wrap FIRST, THEN cap the body → a NAMED elided node
         // ("Substantial Co-Morbidity …", not bare "…"). At budget 0 the FIRST ref (hops 0) elides immediately.
         if (hops >= maxHops) {
-          return { kind: "criterion", name, lib: decisionLib, bodyHash, elided: true, operand: { kind: "more", count: 0 } };
+          return { kind: "criterion", name, lib: decisionLib, bodyHash, ...description, elided: true, operand: { kind: "more", count: 0 } };
         }
         const operand = go(crit.condition, new Set(visiting).add(name), hops + 1);
         // `elided` is the IN-SITU render fact: this occurrence's body dropped content to a `…` (a nested breach/cap),
@@ -258,6 +262,7 @@ export function branchConditionToDefStruct(
           name,
           lib: decisionLib,
           bodyHash,
+          ...description,
           operand,
           ...(exprHasMore(operand) ? { elided: true as const } : {}),
         };
@@ -394,7 +399,7 @@ export function buildCriterionIdentities(
       // `node` is always a `criterion` wrapper (the input is a criterion ref to a declared criterion). Its `.operand`
       // is the canonical body; `.elided` (== exprHasMore(operand)) is the canonical elision that a root render shows.
       const canonicalBody = node.kind === "criterion" ? node.operand : node;
-      out.set(criterionKey(lib, name), { lib, name, bodyHash: hashExpr(canonicalBody), elided: exprHasMore(canonicalBody) });
+      out.set(criterionKey(lib, name), { lib, name, bodyHash: hashExpr(canonicalBody, crit.description), elided: exprHasMore(canonicalBody) });
     }
   }
   return out;

@@ -651,7 +651,7 @@ function publicationCondition(condition: BranchCondition, ctx: EmitCtx, negated 
   if (missing) return null;
   // REFACTOR:grounded: preserve the complete authored publication guard in one
   // named CQL definition, including its null/error boundary.
-  return namedPlanCondition(condition, negated);
+  return describeCriterionCondition(namedPlanCondition(condition, negated), condition, ctx, negated);
 
 }
 
@@ -776,6 +776,18 @@ function namedPlanCondition(condition: BranchCondition, negated = false, carrier
   return { kind: "applicability", expression: {
     language: "text/cql-identifier", expression: planConditionDefineName(condition, negated, carrier),
   } };
+}
+
+// REFACTOR:grounded: use the authored owner, not the generated CQL identifier. Positive
+// descriptions must not silently describe negations, compound guards or priority complements.
+function describeCriterionCondition(
+  emitted: Record<string, unknown>, source: BranchCondition, ctx: EmitCtx, negated = false,
+): Record<string, unknown> {
+  const description = !negated && source.type === "BranchConditionCriterionRef"
+    ? ctx.criterionTable.get(getRefName(source.ref))?.description : undefined;
+  return description === undefined ? emitted : {
+    ...emitted, expression: { ...(emitted.expression as Record<string, unknown>), description },
+  };
 }
 
 function guardApplicabilityCondition(
@@ -1225,13 +1237,13 @@ function emitCompoundWhenBlock(
         info.kind === "concept"
           ? conceptAtomKey(normalizeLocalRef(info.atom.ref, ctx.libraryName))
           : criterionAtomKey(getRefName(info.atom.ref));
-      return guardApplicabilityCondition(
+      return describeCriterionCondition(guardApplicabilityCondition(
         info.polarity,
         resolvedByKey.get(key)!,
         "branch-guard",
         info.kind === "concept" && publicationGuard(info.atom.ref, ctx),
         info.atom,
-      );
+      ), info.atom, ctx, info.polarity === "negated");
     });
     // Arm-aware `input`: a CONCEPT atom contributes itself (non-qualified only); a CRITERION atom
     // contributes its RECURSIVE ATOM CLOSURE (the concepts under it, #236 step E) — DTR surfaces

@@ -47,6 +47,57 @@ case "c":
 - subject is "Pat".
 - result is "D" is "X".`;
 
+// REFACTOR:grounded: reviewed wording invalidates its owner and expanded ancestors,
+// independently of use-site count. Ordinary predicate changes still invalidate them.
+describe("criterion description review identity", () => {
+  const src = (description = "", operand = '"A"') => `library "T".
+concept "A": - type is Observation. - code is \`a\`.
+concept "B": - type is Observation. - code is \`b\`.
+criterion "Child": ${description ? '- description is "' + description + '".' : ''} - when (${operand}).
+criterion "Parent": - when ("Child" and "Child").
+activity "X": - request CPGCommunicationRequest. - with \`x\`.
+decision "D": first:
+- when "Child" then recommend activity "X".
+- when "Parent" then recommend activity "X".
+- when not "Child" then recommend activity "X".`;
+  const identities = (description: string, operand?: string) => {
+    const graph = graphFrom(src(description, operand), CEL);
+    return buildCriterionIdentities(graph, defIndexOf(graph));
+  };
+  it("changes owner/ancestor identities for text edits and predicate edits", () => {
+    const plain = identities("");
+    const a = identities("First explanation");
+    const b = identities("Changed explanation");
+    const changedPredicate = identities("First explanation", '"B"');
+    for (const name of ["Child", "Parent"]) {
+      const key = criterionKey("T", name);
+      expect(a.get(key)!.bodyHash).not.toBe(plain.get(key)!.bodyHash);
+      expect(a.get(key)!.bodyHash).not.toBe(b.get(key)!.bodyHash);
+      expect(a.get(key)!.bodyHash).not.toBe(changedPredicate.get(key)!.bodyHash);
+      expect(identities("First explanation").get(key)).toEqual(a.get(key));
+    }
+  });
+  it("keeps owner text and identity at standalone, repeated, negated and capped occurrences", () => {
+    const graph = graphFrom(src("Supporting text"), CEL);
+    const index = defIndexOf(graph);
+    const expected = buildCriterionIdentities(graph, index).get(criterionKey("T", "Child"))!;
+    const outlines = buildGuardOutlines(graph, index);
+    const nodes: DefStructExpr[] = [];
+    const walk = (e: DefStructExpr) => {
+      if (e.kind === "criterion") { if (e.name === "Child") nodes.push(e); walk(e.operand); }
+      else if (e.kind === "and" || e.kind === "or") e.operands.forEach(walk);
+      else if (e.kind === "not") walk(e.operand);
+    };
+    for (const outline of outlines.values()) walk(outline.expr);
+    expect(nodes).toHaveLength(4);
+    for (const n of nodes) expect(n).toMatchObject({description: "Supporting text", bodyHash: expected.bodyHash});
+    expect(topCriterion(outlines.get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr)?.description).toBe("Supporting text");
+    const table = buildCriterionTable(graph.coversTarget!.ast.statements);
+    const capped = branchConditionToDefStruct({type:"BranchConditionCriterionRef", ref:"Child", location: table.get("Child")!.location}, table, () => undefined, "T", buildCriterionIdentities(graph,index), 0);
+    expect(capped).toMatchObject({description: "Supporting text", elided:true, bodyHash:expected.bodyHash});
+  });
+});
+
 // A criterion (`Elig` = `Inf and C`, where `Inf` is a `defined as` composite `A sem-or B`) plus a PLAIN compound
 // guard (`A and C`, no criterion) — #242: the plain compound now ALSO gets an outline (it is no longer omitted).
 const CRL = `library "T".

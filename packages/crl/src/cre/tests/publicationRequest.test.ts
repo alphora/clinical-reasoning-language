@@ -47,6 +47,7 @@ case "Case": - subject is "P". - result is "D" is "${expected}".
 }
 
 describe.each(["MedicationRequest", "ServiceRequest"])("CRE %s source projection", type => {
+  // @kit request-code-sources:cre
   it("continues for one matching request", () => {
     const run = evaluate(type, [{}]);
     expect(run.status, JSON.stringify(run.diagnostics)).toBe("pass");

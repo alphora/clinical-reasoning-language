@@ -324,6 +324,14 @@ Unrecognized coding or unavailable terminology resolution must remain distinguis
 nonmembership; exact diagnostic/unknown handling is still open. A filtered retrieve followed by
 existence cannot substitute for selected-value membership.
 Do not collapse unknown operands to false before negation without an explicit semantic basis.
+The explicit `any available value of` aggregate tests membership over the finite current selected
+values of its named operands. Missing selections and valueless selections contribute no member;
+an empty available set yields false. It does not classify missing clinical answers as false.
+All present inputs must be interpreted before reducing the result: a positive member cannot mask
+an invalid, conflicting, or failed input. Ordinary `any of` membership retains three-state logic.
+Both operations carry only the authored anchor's actual optional validity, without substituting
+evaluation time. Terminal uncertainty checks use the available-value operation over the reached
+group/path; prerequisite eligibility conditions still determine whether that terminal is reached.
 Resource/datum type and the type of a computed result are distinct: existence over Condition records
 can produce a boolean without making the records boolean-valued. No particular current spelling is
 mandated by these examples.

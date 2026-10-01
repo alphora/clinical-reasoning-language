@@ -2,7 +2,7 @@ import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { checkPresentationReachability } from "./presentationReachability";
 import { createPresentationCatalog } from "../emit/presentation";
-import { publicationProducerOperands } from "../emit/publicationProgram";
+import { publicationProducerOperands, supportsPublicationGuard } from "../emit/publicationProgram";
 /**
  * CRL → FHIR Definition emit — closure orchestrator (Todo 4 of #73).
  *
@@ -1970,13 +1970,14 @@ export function emitFhirDefClosure(
         guardQualifierLibraryName,
         (ref) => {
           const hit = prepared.publications.lookup(lib.filePath, ref);
-          return hit.kind === "publication" && hit.descriptor.valueType === "boolean";
+          // REFACTOR:grounded: coded answer guards retain the whole publication condition and inputs.
+          return hit.kind === "publication" && supportsPublicationGuard(hit.descriptor);
         },
         // REFACTOR:grounded (#320, review 563): a direct foreign guard consumes the same
         // prepared public Record and emitted Library identity as its named-criterion spelling.
         (ref) => {
           const hit = prepared.publications.lookup(lib.filePath, ref);
-          if (hit.kind !== "publication" || hit.descriptor.valueType !== "boolean") return undefined;
+          if (hit.kind !== "publication" || !supportsPublicationGuard(hit.descriptor)) return undefined;
           const target = publicationTargets.get(hit.descriptor.identity.key);
           const entry = target && cqlByLibrary.find((candidate) => candidate.libraryName === target.libraryName);
           return target && entry ? { ...target, canonical: libraryCanonicalUrl(metadata, identityForEntry(entry)) } : undefined;

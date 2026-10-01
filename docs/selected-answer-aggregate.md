@@ -19,4 +19,6 @@ The producer constructs one ephemeral Boolean Observation, including for a null 
 
 Omit `code is` for a calculation that must not become an editable question. For a terminal answer-quality check, list only the inputs on that route. Distinct incoming routes require their own checks before convergence: including an unvisited alternative can incorrectly introduce unknown or a flagged answer. This calculation does not implement interview history, QR pruning, or session state. The client supplies the current pruned QR; native extraction produces the resources evaluated by the policy.
 
-This is a locally tested development capability. It is not an accepted KE authoring-kit or deployment upgrade. Evidence and review are recorded in discussions866/867 and the bounded reference's native acceptance records.
+The explicit `any available value of` form uses the same operand list, target terminology and validity anchor, but ignores absent or selected valueless operands. Its empty available set returns false. Errors still propagate, including beside a positive member. This describes only the enumerated available values; it does not make required unanswered questions false or prove evidence completeness. Keep required-input prerequisites separate from a terminal check over available answers.
+
+The bundled authoring kit teaches both operations under `selected-answer-aggregate`. Verify each policy's route scope, missing-input behavior and native execution independently. Source tests, installed tooling checks and customer-policy acceptance establish different things.

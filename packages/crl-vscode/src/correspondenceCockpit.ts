@@ -2625,7 +2625,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // lookup, never a webview-supplied path), then flip its state + re-render the tree (layout change). #233 Todo 2a:
       // a ROOT criterion resolves to its `when` nodeKey; a NON-ROOT criterion box resolves to `{criterionToggle: posKey}`.
       // Both flip a string in `expandedGuardWhens` (disjoint keyspaces — a JSON-array nodeKey vs a `leaf::` position key,
-      // the latter TAGGED: `"crit"` for a criterion body, `"opts"` for a #189 coded question's answer options).
+      // the latter TAGGED: `"crit"` for a criterion body, `"opts"` for answer options, `"inputs"` for value inputs).
       const hit = v.reveals[msg.key];
       if (hit && "nodeKey" in hit) toggleCriterionExpand(hit.nodeKey, msg.token);
       else if (hit && isCriterionToggleHit(hit)) toggleCriterionExpand(hit.criterionToggle, msg.token);
@@ -4878,7 +4878,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** #224 ii.3 Slice 2 / #233 Todo 2a: flip a criterion's collapse state and re-render the TREE pane only — collapse
    *  changes the flow LAYOUT (the criterion body appears/disappears), so it needs a re-render, not a CSS re-apply like
    *  zoom. `collapseKey` is a ROOT criterion's `when` nodeKey (a JSON array) OR a NON-ROOT criterion's `leaf::` position
-   *  key (`{criterionToggle}`); both live in the one `expandedGuardWhens` set (disjoint keyspaces). Mirrors
+   *  key (`{criterionToggle}`, tagged "crit", "opts" or "inputs"); both live in the one `expandedGuardWhens` set (disjoint keyspaces). Mirrors
    *  `applyShowKeys`'s tail: the tree ack re-drives every overlay, and re-dispatching the selection restores the
    *  highlight the innerHTML swap dropped. Ephemeral: `expandedGuardWhens` is not persisted. */
   function toggleCriterionExpand(collapseKey: string, focusToken?: unknown): void {

@@ -5,6 +5,9 @@ export type KitContent = Omit<AuthoringKit, "contentHash" | "navigation" | "audi
 
 /** Authored discovery terms, hashed with the kit. Retired spellings lead to current guidance. */
 const ALIASES: Record<string, string[]> = {
+  "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
+  "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers"],
+  "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
   "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API"],
   "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
   "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start"],
@@ -16,7 +19,7 @@ const ALIASES: Record<string, string[]> = {
   "bmi-publication": ["BMI", "height weight calculation", "body mass index"],
   "patient-age-projection": ["Patient age", "age today", "birth date", "same day override"],
   "decision-composition": ["decision tree", "Concept Criterion Decision", "vertical AND", "horizontal AND", "sem-or", "sem-and", "defined as", "alternatives"],
-  "criterion": ["criterion", "reusable condition", "one use condition"],
+  "criterion": ["criterion", "reusable condition", "one use condition", "criterion description", "description is"],
   "chaining-necessity": ["shared continuation", "internal helper", "remaining interview", "use decision"],
   "guards": ["guard", "only if"],
   "branch-guards": ["pause", "unknown", "null", "missing answer", "explicit false"],
@@ -38,6 +41,9 @@ const ALIASES: Record<string, string[]> = {
 // rule's contract. Artifact-to-rule prerequisites supply each example's context.
 // REFACTOR:grounded (#322): typed intake teaching is discoverable with its prerequisites.
 const RELATED: Record<string, string[]> = {
+  "request-code-sources": ["rule:concept-form", "rule:publication-selection"],
+  "selected-answer-aggregate": ["rule:named-answer-options", "rule:publication-selection", "rule:branch-guards"],
+  "interactive-questionnaire": ["rule:produce-results", "rule:verify-loop"],
   "native-apply-session": ["rule:produce-results", "rule:text-answers", "rule:verify-loop"],
   "fhir-packaging": ["rule:verify-loop", "rule:emitted-trees-are-ours"],
   "text-answers": ["rule:concept-form", "rule:publication-selection", "rule:concept-presentation"],

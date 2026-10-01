@@ -44,6 +44,7 @@ describe("interactive initial states", () => {
     delete b.entry[1].resource[field];
     expect(() => validateInitialBundle(b)).toThrow("must reference the initial Patient");
   });
+  // @kit interactive-questionnaire:request-preservation
   it("discovers mixed request codes and preserves the complete initial Bundle in the apply payload", () => {
     const root = mkdtempSync(join(tmpdir(), "iq-test-"));
     try {

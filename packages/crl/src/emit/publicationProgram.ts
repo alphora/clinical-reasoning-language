@@ -37,11 +37,24 @@ export interface PublicationDescriptor {
   readonly selector: { readonly kind: "mostRecent"; readonly equalTime: "error" | "preferLocal" };
   readonly valueDomain?: readonly PublicationCode[];
   readonly answerOptions?: { readonly valueSetUrl: string; readonly codes: readonly PublicationCode[] };
+  readonly guardQualification?: { readonly domain: readonly PublicationCode[]; readonly qualifying: readonly PublicationCode[] };
   readonly producer?: PublicationProducer;
   readonly sources?: readonly PublicationSource[];
 }
 
 export type PublicationValueType = "boolean" | "string" | "dateTime" | "CodeableConcept" | "Quantity";
+
+/** REFACTOR:grounded: an explicitly bound answer domain supplies the authored guard interpretation.
+ * Other coded publications still need an explicit membership predicate. */
+export function isPublicationAnswerGuard(concept: Readonly<Concept>): boolean {
+  return publicationAdmissionReason(concept) === undefined && concept.valueTypes[0] === "CodeableConcept" &&
+    concept.valueFrom !== undefined && concept.valueDomain?.terms.length === 1 &&
+    concept.valueDomain.terms[0].type === "AnswerOptionsDomainTerm";
+}
+
+export function supportsPublicationGuard(descriptor: PublicationDescriptor): boolean {
+  return descriptor.valueType === "boolean" || descriptor.guardQualification !== undefined;
+}
 // REFACTOR:grounded (#322): presence is defined only for these answer types.
 export interface PublicationHasValueProducer {
   readonly kind: "hasValue";
@@ -73,6 +86,8 @@ export interface PublicationBMIProducer {
 }
 export interface PublicationAnyMembershipProducer {
   readonly kind: "anyMembership";
+  // REFACTOR:grounded — this mode belongs to the authored operation, never a global null policy.
+  readonly availableValuesOnly: boolean;
   readonly producerId: string;
   readonly operands: readonly QualifiedConceptIdentity[];
   readonly domains: readonly (readonly PublicationCode[])[];
@@ -320,6 +335,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
           : Object.freeze({ kind: "serviceRequestWitness", ...common });
       });
       let answerOptions: PublicationDescriptor["answerOptions"];
+      let guardQualification: PublicationDescriptor["guardQualification"];
       // REFACTOR:grounded (#320, 615): only named answer ValueSets are supported.
       if (concept.valueFrom !== undefined) {
         const term = declarations.lookupTerminology(library.sourceIdentity, concept.valueFrom.terminologyName, concept.valueFrom.location);
@@ -329,6 +345,11 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
             fail("An offered terminology requires its owning canonical base and policy identity for FHIR publication.", concept.valueFrom.location, "publication-answer-identity-missing");
           answerOptions = Object.freeze({ valueSetUrl: emittedValueSetUrl(term.node as import("../ast/types").Terminology,
             term.library.artifact.canonicalBase!, term.library.artifact.policyId!), codes: offered(library, concept) });
+          if (isPublicationAnswerGuard(concept)) {
+            const answer = resolveAnswerDomain(concept.valueFrom, term.node);
+            if (answer.kind === "error") return fail(answer.message, answer.location, answer.code);
+            guardQualification = Object.freeze({ domain: valueDomain!, qualifying: normalized(answer.qualifying) });
+          }
         }
       }
       if (concept.valueFrom && !concept.valueFrom.notQualifying?.length) warnings.push(Object.freeze({
@@ -398,7 +419,8 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         const domains = inputs.map(p => p.valueDomain!);
         if (domains.some(domain => qualifying.some(code => !domain.some(d => publicationCodeKey(d) === publicationCodeKey(code)))))
           return fail("Every qualifying code must belong to every operand domain.", aggregate.terminology.location, "publication-membership-domain-coverage");
-        producer = Object.freeze({ kind: "anyMembership", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["anyMembership", 0]]))}`,
+        producer = Object.freeze({ kind: "anyMembership", availableValuesOnly: aggregate.availableValuesOnly,
+          producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, [aggregate.availableValuesOnly ? "anyAvailableMembership" : "anyMembership", 0]]))}`,
           operands: Object.freeze(inputs.map(p => p.identity)), domains: Object.freeze(domains), qualifying: normalized(qualifying), validityOperand });
       }
       const presence = readPublicationHasValue(concept);
@@ -452,6 +474,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         selector: Object.freeze({ kind: "mostRecent", equalTime: concept.shapeReduction!.equalTime }),
         ...(valueDomain === undefined ? {} : { valueDomain }), ...(producer === undefined ? {} : { producer }),
         ...(answerOptions === undefined ? {} : { answerOptions }),
+        ...(guardQualification === undefined ? {} : { guardQualification }),
         ...(sources.length === 0 ? {} : { sources: Object.freeze(sources) }),
       });
       byIdentity.set(hit.identity.key, descriptor);

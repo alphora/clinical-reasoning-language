@@ -607,6 +607,41 @@ terminology "Publication Procedure Answer Options":
 - code is \`yes\` display is \`Yes\`.
 - code is \`no\` display is \`No\`.
 `;
+
+// REFACTOR:grounded: direct guards classify authored answers without a second concept or record conversion.
+describe("direct selected coded answer guards", () => {
+  const policy = membershipPolicy.replace(/concept "Answer":[\s\S]*?activity "Approve":/, 'activity "Approve":')
+    .replace('  - not qualifying is `no`.', '  - not qualifying is `no`.\n  - not qualifying is `unknown-no`.')
+    + '\nterminology "Extra": - system is `urn:extra`. - code is `extra`.\n';
+  const four = policy.replace('- code is `no` display is `No`.', '- code is `no` display is `No`.\n- code is `unknown-yes` display is `Unknown yes`.\n- code is `unknown-no` display is `Unknown no`.');
+  const decision = DECISION.replaceAll('"Answer"', '"Procedure"');
+  // @kit named-answer-options:direct-guard
+  it.each([['yes','Approve'], ['no','Deny'], ['unknown-yes','Approve'], ['unknown-no','Deny']])("routes %s and keeps its coded value", (code, expected) => {
+    const result = evaluate(procedureFact("Selected", '`'+code+'`'), ["Selected"], decision, "", expected, "", {policy:four});
+    expect(result.validation.errors).toEqual([]);
+    expect(result.run.status, JSON.stringify(result.run)).toBe("pass");
+    expect(result.emission.emittedCases[0].resources.find(r=>r.resourceType === "Observation")?.body.valueCodeableConcept).toMatchObject({coding:[{code}]});
+  });
+  it.each([false,true])("pauses with absent/valueless selected answer (%s)", present => {
+    const result = evaluate(present ? procedureFact("Selected") : "", present ? ["Selected"] : [], decision, "", "Approve", "", {policy:four});
+    expect(result.run.produced).toEqual([]);
+    expect(result.run.trace[0].blockedUnknown).toBe(true);
+  });
+  it("negates qualification and preserves recency selection", () => {
+    const facts = procedureFact("Old", "`yes`", "2026-01-01") + procedureFact("New", "`unknown-no`", "2026-02-01");
+    const result = evaluate(facts, ["Old","New"], decision.replace('when "Procedure"','when not "Procedure"'), "", "Approve", "", {policy:four});
+    expect(result.run.status, JSON.stringify(result.run)).toBe("pass");
+  });
+  it("preserves a direct criterion's classification", () => {
+    const result = evaluate(procedureFact("Selected", "`unknown-no`"), ["Selected"], decision.replace('when "Procedure"','when "Qualified"'), '\ncriterion "Qualified": - when ("Procedure").', "Deny", "", {policy:four});
+    expect(result.run.status, JSON.stringify(result.run)).toBe("pass");
+  });
+  it("rejects a coded guard without the explicit answer domain", () => {
+    const result = evaluate(procedureFact("Selected", "`yes`"), ["Selected"], decision, "", "Approve", "", {policy:four.replace('value domain is answer options.', 'value domain is answer options, "Extra".')});
+    expect(result.run.status).toBe("error"); expect(result.run.produced).toEqual([]);
+    expect(result.run.diagnostics.join('\n')).toContain("publication-unsupported-context");
+  });
+});
 const procedureFact = (name: string, value?: string, date?: string) => fact(name, value?.startsWith("`") ? JSON.stringify(value.slice(1, -1)) : value, date).replace('"Publication"."Answer"', '"Publication"."Procedure"');
 
 describe("CRE selected-datum membership production", () => {
@@ -634,8 +669,8 @@ describe("CRE selected-datum membership production", () => {
       expect(left).toEqual(right);
     } finally { spy.mockRestore(); }
   });
-  it("refuses a direct non-Boolean publication guard", () => {
-    const {run} = evaluate(procedureFact("Selected", "`yes`"), ["Selected"], DECISION.replace('when "Answer"', 'when "Procedure"'), "", "Deny", "", {policy:membershipPolicy});
+  it("refuses a direct coded guard with a separately named interpreted domain", () => {
+    const {run} = evaluate(procedureFact("Selected", "`yes`"), ["Selected"], DECISION.replace('when "Answer"', 'when "Procedure"'), "", "Deny", "", {policy:membershipPolicy.replace('value domain is answer options.', 'value domain is "Publication Procedure Answer Options".')});
     expect(run.status).toBe("error");
     expect(run.produced).toEqual([]);
     expect(run.diagnostics.join("\n")).toContain("publication-unsupported-context");
@@ -774,6 +809,13 @@ describe("CRE selected-datum membership production", () => {
     expect(view?.tree[independentFirst ? 0 : 1].children?.[0].invalidated).not.toBe(true);
     expect(view?.tree[independentFirst ? 1 : 0].publicationErrors?.map((error) => error.code)).toEqual(["publication-ambiguous-coded-value"]);
     expect(view?.tree[independentFirst ? 1 : 0].invalidated).not.toBe(true);
+  });
+
+  it("does not let a true OR sibling hide a direct coded guard classification error", () => {
+    const decision = 'decision "D":\nfirst:\n- when ("Photo" or "Procedure") then recommend activity "Approve".\n- otherwise then recommend activity "Deny".';
+    const {run} = withConflictingProcedure(() => evaluate(photoAndVisual, ["Photo", "Visual"], decision, "", "Approve", "", {policy:photoPolicy}));
+    expect(run.status).toBe("error"); expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join('\n')).toContain("publication-ambiguous-coded-value");
   });
 
   it("does not replay a failed nested criterion as true, false, or unknown", () => {

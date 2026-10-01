@@ -118,6 +118,8 @@ export type DefStructExpr =
   // UNREACHABLE (e.g. the Questionnaire's `enrich` throws in its arm; only the Flow guard-outline path renders it).
   | {
       kind: "criterion";
+      /** REFACTOR:grounded: text owned by this criterion, independent of expanded operands. */
+      description?: string;
       name: string;
       lib: string;
       /** CANONICAL body fingerprint — the criterion's body expanded ONCE from hop 0, occurrence-INDEPENDENT.

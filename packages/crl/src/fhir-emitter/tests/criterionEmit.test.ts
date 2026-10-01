@@ -100,7 +100,7 @@ function decision(name: string, statements: BranchBlock[], qualifier?: "first" |
 }
 
 type EmitResult = { resource: PlanDefLike | null; errors: { kind: string }[]; unmatched: { kind: string }[] };
-type CondExpr = { language: string; expression: string };
+type CondExpr = { language: string; expression: string; description?: string };
 type ActionLike = { title?: string; condition?: { expression?: CondExpr }[]; action?: ActionLike[]; definitionCanonical?: string };
 type PlanDefLike = { action?: ActionLike[]; library?: string[] };
 
@@ -134,6 +134,18 @@ function conditionExprs(resource: PlanDefLike | null): CondExpr[] {
   for (const a of resource?.action ?? []) walk(a);
   return out;
 }
+
+// REFACTOR:grounded: legacy/direct named conditions retain owner wording only for
+// a positive authored criterion; generated exclusions carry no positive explanation.
+it("preserves criterion descriptions on direct positive guards only", () => {
+  const c = {...criterion("Eligible", refC("A")),description:"Evidence grouped for review."};
+  const positive = emit(decision("D",[whenC(critRefC("Eligible"),leaf(recommend("X")))]),[c]);
+  expect(positive.errors).toEqual([]);
+  expect(conditionExprs(positive.resource)).toEqual([{language:"text/cql-identifier",expression:"Eligible",description:c.description}]);
+  const negative = emit(decision("D",[whenC(notC(critRefC("Eligible")),leaf(recommend("X")))]),[c]);
+  expect(negative.errors).toEqual([]);
+  expect(conditionExprs(negative.resource).every(x=>x.description === undefined)).toBe(true);
+});
 // Every action title in DFS order (a leaf-action title == the emitted CQL identifier it references).
 function actionTitles(resource: PlanDefLike | null): string[] {
   const out: string[] = [];

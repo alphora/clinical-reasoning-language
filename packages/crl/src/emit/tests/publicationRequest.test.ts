@@ -42,6 +42,7 @@ const request = (type: string, code = "covered") => ({
   authoredOn: "2026-01-01",
 });
 describe("request code publication", () => {
+  // @kit request-code-sources:projection
   it.each(["MedicationRequest", "ServiceRequest"])("preserves %s source code without an answer profile", type => {
     const { d, ast, opts } = prepared(type);
     const raw = request(type), before = structuredClone(raw);

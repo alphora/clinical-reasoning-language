@@ -188,20 +188,22 @@ describe("selected-datum membership publication emit", () => {
     expect(result.errors?.some((error) => typeof error === "object" && error.kind === "publication-unsupported-context")).toBe(true);
   });
 
-  it("refuses a CodeableConcept publication used directly as a Boolean guard", () => {
-    const result = emit(membershipSource + '\ncriterion "Wrong Type":\n- when ("Procedure").\n');
+  // REFACTOR:grounded: direct qualification is explicit in answer-options domain; unrelated domains stay refused.
+  const separateDomain = membershipSource.replace('value domain is answer options.', 'value domain is "P Procedure Answer Options".');
+  it("refuses a separately named coded domain used directly as a criterion guard", () => {
+    const result = emit(separateDomain + '\ncriterion "Wrong Type":\n- when ("Procedure").\n');
     expect(result.success).toBe(false);
     expect(result.errors?.some((error) => typeof error === "object" && error.kind === "publication-unsupported-context")).toBe(true);
   });
 
-  it("refuses a decision-level CodeableConcept guard through validator-free direct emit", () => {
-    const result = emit(membershipSource + '\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with `APPROVED`.\ndecision "D":\nfirst:\n- when "Procedure" then recommend activity "Approve".\n');
+  it("refuses a separately named coded domain through validator-free decision emit", () => {
+    const result = emit(separateDomain + '\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with `APPROVED`.\ndecision "D":\nfirst:\n- when "Procedure" then recommend activity "Approve".\n');
     expect(result.success).toBe(false);
     expect(result.errors?.some((error) => typeof error === "object" && error.kind === "publication-unsupported-context")).toBe(true);
   });
 
-  it.each(['"Procedure"', '"P"."Procedure"'])("refuses an already-lowered non-Boolean guard without a scope (%s)", (guard) => {
-    const parsed = buildCRL(membershipSource + `\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with \`APPROVED\`.\ndecision "D":\nfirst:\n- when ${guard} then recommend activity "Approve".\n`);
+  it.each(['"Procedure"', '"P"."Procedure"'])("refuses an already-lowered separately named coded domain without a scope (%s)", (guard) => {
+    const parsed = buildCRL(separateDomain + `\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with \`APPROVED\`.\ndecision "D":\nfirst:\n- when ${guard} then recommend activity "Approve".\n`);
     expect(parsed.success).toBe(true);
     const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org", policyId: "membership-policy" });
     expect(lowered.errors).toEqual([]);

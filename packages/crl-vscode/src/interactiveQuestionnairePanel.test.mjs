@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
 const harness = vi.hoisted(() => ({ panels: [], sessions: [] }));
 vi.mock("vscode", () => ({
   ViewColumn: { Beside: 2 },
@@ -24,10 +26,10 @@ vi.mock("./interactiveQuestionnaire", () => ({
 import { createInteractiveQuestionnairePanel } from "./interactiveQuestionnairePanel.ts";
 
 describe("interactive panel ownership", () => {
-  const context = () => ({ extensionPath: resolve("packages/crl-vscode"), extensionUri: { fsPath: resolve("packages/crl-vscode") }, subscriptions: [] });
+  const context = () => ({ extensionPath: extensionRoot, extensionUri: { fsPath: extensionRoot }, subscriptions: [] });
   const init = async () => {
     // Existing standalone module exists after the test project's mandatory build.
-    createRequire(import.meta.url)(resolve("packages/crl-vscode/dist/apply-session.js"));
+    createRequire(import.meta.url)(resolve(extensionRoot, "dist/apply-session.js"));
     const controller = createInteractiveQuestionnairePanel(context()); controller.open("policy-a.cel");
     const panel = harness.panels.at(-1); await panel.receive({ type: "ready" });
     return { controller, panel, session: harness.sessions.at(-1), token: panel.messages.at(-1).token };

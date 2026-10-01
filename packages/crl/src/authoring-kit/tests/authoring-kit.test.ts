@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.18");
+    expect(kit.schemaVersion).toBe("2.19");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -667,8 +667,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.18");
-    expect(kit.contentHash).toBe("30e932e249f5c8f7b1d4f8d7b780b67fe21898339e1163c57e794553842f25a3");
+    expect(kit.schemaVersion).toBe("2.19");
+    expect(kit.contentHash).toBe("320e43eb9e98e6dc0d6dbd6c56cee01046e539b82321e021208afe76fa897011");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {

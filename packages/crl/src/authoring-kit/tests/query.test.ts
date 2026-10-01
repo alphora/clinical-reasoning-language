@@ -53,9 +53,9 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview).not.toHaveProperty("rules");
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
-    // REFACTOR:grounded (#322): intake adds one rule and two complete index entries.
-    // Four additional complete reference entries remain in the discoverable index.
-    expect(JSON.stringify(overview).length).toBeLessThan(34000);
+    // REFACTOR:grounded: kit 2.19 adds three complete rule entries and their aliases/prerequisites.
+    // Keep the untruncated index bounded (measured 34,961 bytes with the prior audit metadata).
+    expect(JSON.stringify(overview).length).toBeLessThan(36000);
     const fullSize = JSON.stringify(query({ view: "full" })).length;
     for (const id of ["rule:criterion", "rule:decision-composition"]) {
       expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);

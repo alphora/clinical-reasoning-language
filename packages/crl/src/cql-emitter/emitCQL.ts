@@ -30,7 +30,7 @@
  */
 
 import { buildCRL } from "../index";
-import { publicationHasValueFormError, readPublicationHasValue, publicationProducerOperands, prepareSingleLibraryPublication, publicationBooleanRead, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
+import { publicationHasValueFormError, readPublicationHasValue, publicationProducerOperands, prepareSingleLibraryPublication, publicationBooleanRead, supportsPublicationGuard, hasLocalPublicationContribution, type PublicationDescriptor, type PublicationEmitScope } from "../emit/publicationProgram";
 import { visitConceptDefinitionRefs } from "../imports/computeEmitClosure";
 import { renderPublicationBMIHelpers, BMI_CQL } from "./renderPublicationBMI";
 import { renderPublicationThresholdHelpers, QUANTITY_CQL } from "./renderPublicationQuantity";
@@ -1379,12 +1379,16 @@ class Emitter {
           const localRef = normalizeLocalRef(ref, this.ast.library.name);
           const record = this.renderPublicationReference(localRef);
           const descriptor = this.publicationDescriptorOf(localRef);
-          if (descriptor !== undefined && descriptor.valueType !== "boolean") {
+          if (descriptor !== undefined && !supportsPublicationGuard(descriptor)) {
             this.emitErrors.push({ type: "Validation", kind: "publication-unsupported-context",
-              message: `Criterion "${c.name}" needs a Boolean value; publication "${getRefName(ref)}" publishes ${descriptor.valueType}.` });
+              message: `Criterion "${c.name}" requires a Boolean publication or a coded answer with value domain is answer options; "${getRefName(ref)}" publishes ${descriptor.valueType}. Use an explicit membership predicate for other coded domains.` });
             return "null /* non-Boolean publication guard; emit fails */";
           }
-          return descriptor !== undefined ? publicationBooleanRead(record) : record;
+          // REFACTOR:grounded: project qualification only in the guard; preserve the selected coded record.
+          const qualification = descriptor?.guardQualification;
+          return qualification !== undefined
+            ? `(${renderAnswerClassification(`(${record}).value as FHIR.CodeableConcept`, renderPublicationCodeTable(qualification.domain), renderPublicationCodeTable(qualification.qualifying), cqlStringLiteral(descriptor!.conceptId))})`
+            : descriptor !== undefined ? publicationBooleanRead(record) : record;
         }, cqlIdent);
         // REFACTOR:grounded: a branch NOT preserves null; legacy action-unless totalizes
         // its complete operand first. Keep this distinction out of authored Criterion syntax.
@@ -1393,6 +1397,12 @@ class Emitter {
           const body = cql.slice(prefix.length);
           cql = prefix + (c.__planCondition.carrier === "action"
             ? "not Coalesce((" + body + "), false)" : "not (" + body + ")");
+        }
+        // REFACTOR:grounded: metadata stays on its named definition, after predicate lowering.
+        // Neutralize comment delimiters and prefix every line so authored text cannot become CQL.
+        if (c.description !== undefined) {
+          const lines = c.description.replace(/\*\//g, "* /").replace(/\/\*/g, "/ *").split(/\r\n|\r|\n/);
+          cql = `/*\n${lines.map((line) => ` * ${line}`).join("\n")}\n */\n${cql}`;
         }
         this.enrollCriterion(c.name, cql, c.__planCondition?.carrier === "action" && c.__planCondition.negated);
         return cql;
@@ -1408,12 +1418,12 @@ class Emitter {
     const visit = (branch: BranchBlock): void => {
       if (branch.type === "WhenBlock") for (const atom of branchConditionRefs(branch.condition)) {
         const descriptor = this.publicationDescriptorOf(atom.ref);
-        if (descriptor !== undefined && descriptor.valueType !== "boolean") this.emitErrors.push({
+        if (descriptor !== undefined && !supportsPublicationGuard(descriptor)) this.emitErrors.push({
           type: "Validation",
           kind: "publication-unsupported-context",
           line: atom.location?.start.line,
           column: atom.location?.start.column,
-          message: `Decision guard needs a Boolean value; publication "${getRefName(atom.ref)}" publishes ${descriptor.valueType}.`,
+          message: `Decision guard requires a Boolean publication or a coded answer with value domain is answer options; "${getRefName(atom.ref)}" publishes ${descriptor.valueType}. Use an explicit membership predicate for other coded domains.`,
         });
       }
       if (branch.body.type !== "ActionStatement") for (const member of branch.body.statements) {
@@ -2497,8 +2507,9 @@ class Emitter {
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: ${title} }`
         : `FHIR.CodeableConcept { text: ${title}, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode.code)} } } } }`;
       const profile = descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl);
+      // REFACTOR:grounded — the emitted call carries the operation's explicit absence semantics.
       const produced = producer.kind === "anyMembership"
-        ? `${cqlIdent(ANY_MEMBERSHIP_CQL)}({ ${operands.map((op, i) => `Tuple { publication: ${op}, domain: ${renderPublicationCodeTable(producer.domains[i])} }`).join(", ")} }, ${renderPublicationCodeTable(producer.qualifying)}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
+        ? `${cqlIdent(ANY_MEMBERSHIP_CQL)}({ ${operands.map((op, i) => `Tuple { publication: ${op}, domain: ${renderPublicationCodeTable(producer.domains[i])} }`).join(", ")} }, ${renderPublicationCodeTable(producer.qualifying)}, ${producer.availableValuesOnly}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
         : producer.kind === "bodyMassIndex"
         ? `${cqlIdent(BMI_CQL.candidate)}(${operands[0]}, ${operands[1]}, ${producer.validityOperand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, 'Patient/' + Patient.id.value)`
         : producer.kind === "hasValue"

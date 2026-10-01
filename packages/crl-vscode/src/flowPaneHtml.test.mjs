@@ -5,7 +5,18 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-import { renderFlowPane, FLOW_STYLE, flowLegendChrome, wrapLabel, collectDispositionLeafKeys, toggleCriterionExpansion } from "./flowPaneHtml.ts";
+import { renderFlowPane as renderUnchecked, FLOW_STYLE, flowLegendChrome as legendUnchecked, wrapLabel, collectDispositionLeafKeys, toggleCriterionExpansion } from "./flowPaneHtml.ts";
+
+const renderFlowPane = (...args) => {
+ const result=renderUnchecked(...args);
+ assert.ok(!/ style=|<style\b/.test(result.html),'Every renderer fixture must be CSP-safe');
+ return result;
+};
+const flowLegendChrome = (...args) => {
+ const html=legendUnchecked(...args);
+ assert.ok(!/ style=|<style\b/.test(html),'Every legend fixture must be CSP-safe');
+ return html;
+};
 
 const check = test;
 
@@ -792,6 +803,43 @@ const gcrit = (name, operand, { elided = false } = {}) => ({ kind: "criterion", 
 const goutC = (critExpr) => ({ expr: critExpr });
 const gout = (expr, name) => (name ? goutC(gcrit(name, expr)) : { expr });
 
+// REFACTOR:grounded: descriptions have an accessible owner surface, stay escaped,
+// and do not alter the graph's geometry or create question/criterion occurrences.
+check("criterion descriptions are selectable, deduplicated and geometry-neutral", () => {
+  const tree = [{decision:"D",lib:"Pol",nodeKey:"d:D",location:{},children:[
+    node("w:root","when","Group",[],[]), node("w:other","when","not Group",[],[]),
+  ]}];
+  const nested = gcrit("Child",gleaf("A","c:A"));
+  const group = gcrit("Group",gand(nested,nested));
+  const descriptions = (enabled) => {
+    const child = {...nested,...(enabled ? {description:'Child <script>alert(1)</script> & text'} : {})};
+    const root = {...group,operand:gand(child,child),...(enabled ? {description:'Group explanation\nSecond line'} : {})};
+    return new Map([["w:root",goutC(root)],["w:other",gout({kind:"not",operand:root})]]);
+  };
+  for (const expandAllCriteria of [false,true]) {
+    const opts = {concepts:[],revealPrefix:"description_",expandedGuardWhens:new Set()};
+    if (expandAllCriteria) for (let i=0;i<3;i++) {
+      const rendered = renderFlowPane(tree,{...opts,guardOutlines:descriptions(false)});
+      for (const reveal of Object.values(rendered.reveals)) if (reveal.criterionToggle) opts.expandedGuardWhens.add(reveal.criterionToggle);
+    }
+    const plain = renderFlowPane(tree,{...opts,guardOutlines:descriptions(false)});
+    const rich = renderFlowPane(tree,{...opts,guardOutlines:descriptions(true)});
+    assert.deepEqual(rich.criterionOccurrences,plain.criterionOccurrences);
+    assert.deepEqual(rich.conceptOccurrences,plain.conceptOccurrences);
+    assert.equal(rich.html.match(/viewBox="[^"]+"/)[0],plain.html.match(/viewBox="[^"]+"/)[0]);
+    const geometry = html => [...html.matchAll(/<(?:rect|path|line)\b[^>]*>/g)].map(m=>m[0]);
+    assert.deepEqual(geometry(rich.html),geometry(plain.html));
+    const disclosure = rich.html.slice(rich.html.indexOf('<details class="flow-criterion-descriptions">'));
+    assert.match(disclosure, /<summary>Criterion descriptions<\/summary>/);
+    assert.equal((disclosure.match(/<dt>Group — Pol<\/dt>/g)||[]).length,1);
+    assert.equal((disclosure.match(/<dt>Child — Pol<\/dt>/g)||[]).length,expandAllCriteria ? 1 : 0);
+    assert.ok(!rich.html.includes('<script>'));
+    if (expandAllCriteria) assert.ok(disclosure.includes('&lt;script&gt;alert(1)&lt;/script&gt; &amp; text'));
+    assert.ok(!plain.html.includes('flow-criterion-descriptions'));
+    assert.match(rich.html, /<title>[^<]*Group explanation\nSecond line<\/title>/);
+  }
+});
+
 // REFACTOR:grounded: actual renderer uses slot coordinates; component padding must remain pixel-sized.
 check('component closing padding is compact and deeply nested frames fit the canvas',()=>{
   const structure=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:deep','when','Rule',[],[])]}];
@@ -1205,8 +1253,11 @@ check("supporting coded inputs get their own question occurrence under direct an
   const concepts=[concept('c:H','Helper',{definitionKind:'definition-is',definitionRefs:['c:Q']}),concept('c:Q','Question',{hasLocalCode:true})];
   const tree=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:H','when','when Helper',['c:H'],[])]}];
   const direct=renderFlowPane(tree,{concepts});
-  assert.match(direct.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
-  assert.match(direct.html,/>INPUT</);
+  assert.ok(!direct.html.includes('data-flow-question='));
+  assert.match(direct.html,/>INPUT \(1\)</);
+  const inputKey=Object.values(direct.reveals).find(h=>h.criterionToggle).criterionToggle;
+  const directOpen=renderFlowPane(tree,{concepts,expandedGuardWhens:new Set([inputKey])});
+  assert.match(directOpen.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
   const body={kind:'criterion',name:'Check',lib:'Pol',bodyHash:'hash',operand:{kind:'leaf',nodeKey:'c:H',lib:'Pol',name:'Helper',isSource:false}};
   const opts={concepts,guardOutlines:new Map([['w:H',{expr:body}]])};
   const collapsed=renderFlowPane(tree,opts);
@@ -1280,7 +1331,9 @@ check("defined-as wrapper is retained when its nested value helper has an unreso
  const expr=gleaf('Outer helper','c:Outer',{isSource:false,isInferred:true,composite:gleaf('Inner helper','c:Inner',{isSource:false,isInferred:true})});
  const rr=renderFlowPane(critStruct(),{concepts:[outer,inner,q],guardOutlines:new Map([['w:crit',{expr:gcrit('Container',expr)}]]),expandedGuardWhens:new Set(['w:crit'])});
  assert.ok(!rr.html.includes('data-flow-elided'));
- assert.ok(Object.values(rr.leafConcepts).some(v=>v.name==='Q'),'known input remains visible');
+ const inputKey=Object.values(rr.reveals).find(h=>h.criterionToggle?.endsWith('"inputs"]')).criterionToggle;
+ const opened=renderFlowPane(critStruct(),{concepts:[outer,inner,q],guardOutlines:new Map([['w:crit',{expr:gcrit('Container',expr)}]]),expandedGuardWhens:new Set(['w:crit',inputKey])});
+ assert.ok(Object.values(opened.leafConcepts).some(v=>v.name==='Q'),'known input remains accessible by disclosure');
 });
 
 check("resolved imported input is preserved when its local helper header is suppressed",()=>{
@@ -1311,6 +1364,93 @@ check("full display labels are escaped and retained for wider question layouts",
  const name='Individual Blepharoplasty Documentation & <complete> "wording"';
  const rr=renderFlowPane([{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:long','when','when Long',['c:Long'],[])]}],{concepts:[concept('c:Long',name)]});
  assert.match(rr.html,/data-flow-label="Individual Blepharoplasty Documentation &amp; &lt;complete&gt; &quot;wording&quot;"/);
+});
+
+check('direct question owns one box, one flag target and independently expandable choices',()=>{
+ const opts={concepts:[concept('c:Q','Q',{hasLocalCode:true})],answerOptionsByConcept:new Map([['c:Q',ANSWERS]])};
+ const folded=renderFlowPane(codedStructure,opts);
+ assert.equal(folded.conceptOccurrences.filter(o=>o.name==='Q').length,1);
+ assert.equal(Object.values(folded.leafConcepts).length,0);
+ assert.deepEqual(folded.reveals[Object.keys(folded.reveals).find(k=>folded.reveals[k].nodeKey==='w:Q')],{nodeKey:'w:Q'});
+ assert.equal((folded.html.match(/data-flow-question=/g)||[]).length,1);
+ const key=Object.values(folded.reveals).find(h=>h.criterionToggle).criterionToggle;
+ const state=toggleCriterionExpansion(new Set(),key,codedStructure,opts);
+ const open=renderFlowPane(codedStructure,{...opts,expandedGuardWhens:state});
+ assert.equal(optRows(open.html),ANSWERS.length);
+ assert.equal(open.conceptOccurrences.filter(o=>o.name==='Q').length,1);
+ assert.equal(optRows(renderFlowPane(codedStructure,{...opts,expandedGuardWhens:toggleCriterionExpansion(state,key,codedStructure,opts)}).html),0);
+ const negated=renderFlowPane(codedStructure,{...opts,guardOutlines:new Map([['w:Q',{expr:{kind:'not',operand:gleaf('Q','c:Q')}}]])});
+ assert.match(negated.html,/>NOT</);
+ assert.equal(Object.values(negated.leafConcepts).filter(o=>o.name==='Q').length,1,'NOT keeps its operand');
+});
+
+check('INPUT defaults collapsed, rolls up imported flags, and preserves nested state per occurrence',()=>{
+ const h=concept('c:H','Helper',{definitionKind:'definition-is',definitionRefs:['c:Nested','Imported:Q']});
+ const nested=concept('c:Nested','Nested',{definitionKind:'definition-is',definitionRefs:['Imported:Q','c:H']});
+ const q={...concept('Imported:Q','Question',{hasLocalCode:true}),lib:'Imported'};
+ const tree=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:1','when','Helper',['c:H']),node('w:2','when','Helper',['c:H'])]}];
+ const opts={concepts:[h,nested,q],answerOptionsByConcept:new Map([['Imported:Q',ANSWERS]])};
+ const folded=renderFlowPane(tree,opts);
+ const keys=Object.values(folded.reveals).filter(h=>h.criterionToggle).map(h=>h.criterionToggle);
+ assert.equal(keys.length,2);assert.notEqual(keys[0],keys[1]);
+ assert.equal(Object.values(folded.leafConcepts).length,0);
+ assert.equal((folded.html.match(/data-flow-input="collapsed"/g)||[]).length,2);
+ const rollup=folded.conceptOccurrences.find(o=>o.lib==='Imported');
+ assert.ok(rollup && folded.flaggableGids.includes(rollup.gid));
+ let state=toggleCriterionExpansion(new Set(),keys[0],tree,opts);
+ let open=renderFlowPane(tree,{...opts,expandedGuardWhens:state});
+ assert.equal((open.html.match(/data-flow-input="expanded"/g)||[]).length,1);
+ assert.equal((open.html.match(/data-flow-input="collapsed"/g)||[]).length,2,'nested and second occurrence remain folded');
+ assert.equal(optRows(open.html),0,'opening inputs does not open choices');
+ const choice=Object.values(open.reveals).find(h=>h.criterionToggle?.endsWith('"opts"]')).criterionToggle;
+ state=toggleCriterionExpansion(state,choice,tree,opts);
+ state=toggleCriterionExpansion(state,keys[0],tree,opts);
+ assert.ok(state.has(choice));
+ state=toggleCriterionExpansion(state,keys[0],tree,opts);
+ open=renderFlowPane(tree,{...opts,expandedGuardWhens:state});
+ assert.equal(optRows(open.html),ANSWERS.length);
+ assert.ok(!state.has(keys[1]));
+});
+
+check('opening a criterion leaves visible INPUT groups folded',()=>{
+ const helper=concept('c:H','Aggregate',{definitionKind:'definition-is',definitionRefs:['c:A','c:B']});
+ const opts={concepts:[helper,...critCs()],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',gleaf('Aggregate','c:H',{isSource:false,isInferred:true}))}]])};
+ const state=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);
+ const rr=renderFlowPane(critStruct(),{...opts,expandedGuardWhens:state});
+ assert.match(rr.html,/data-flow-input="collapsed"/);
+ assert.ok(!Object.values(rr.leafConcepts).some(x=>x.name==='A'));
+});
+
+check('INPUT rollup excludes dependencies that its expanded outline cannot display',()=>{
+ const h=concept('c:H','Helper',{definitionKind:'definition-is',definitionRefs:['c:Q','c:P','c:D']});
+ const q=concept('c:Q','Coded',{hasLocalCode:true,definitionKind:'definition-is',definitionRefs:['c:Hidden']});
+ const p=concept('c:P','Projected',{definitionKind:'definition-is',hasValueProjection:true,definitionRefs:['c:Hidden']});
+ const d=concept('c:D','Defined',{definitionKind:'defined-as',definitionRefs:['c:Hidden']});
+ const tree=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:H','when','Helper',['c:H'])]}];
+ const opts={concepts:[h,q,p,d,concept('c:Hidden','Hidden')]};
+ const folded=renderFlowPane(tree,opts);
+ assert.deepEqual(folded.conceptOccurrences.map(c=>c.name).sort(),['Coded','Defined','Helper','Projected']);
+ assert.match(folded.html,/data-flow-hidden-inputs=/);
+ assert.ok(!folded.html.includes('&quot;Hidden&quot;'));
+ const key=Object.values(folded.reveals).find(h=>h.criterionToggle).criterionToggle;
+ const open=renderFlowPane(tree,{...opts,expandedGuardWhens:toggleCriterionExpansion(new Set(),key,tree,opts)});
+ assert.deepEqual(Object.values(open.leafConcepts).map(c=>c.name).sort(),['Coded','Defined','Projected']);
+});
+
+check('INPUT includes transitive-only questions and cannot create flags',()=>{
+ const concepts=[concept('c:H','Helper',{definitionKind:'definition-is',definitionRefs:['c:Mid']}),concept('c:Mid','Mid',{definitionKind:'definition-is',definitionRefs:['c:Deep']}),concept('c:Deep','Deep',{hasLocalCode:true})];
+ const tree=[{decision:'D',lib:'Pol',nodeKey:'d:D',location:{},children:[node('w:H','when','Helper',['c:H'])]}];
+ const opts={concepts},folded=renderFlowPane(tree,opts);
+ assert.ok(!/ style=|<style\b/.test(folded.html),'INPUT geometry is CSP-safe');
+ const deep=folded.conceptOccurrences.find(c=>c.name==='Deep');assert.ok(deep);
+ const inputMarkup=folded.html.slice(folded.html.indexOf(`id="${deep.gid}"`),folded.html.indexOf('</svg>'));
+ assert.match(inputMarkup,/data-flow-hidden-inputs="[^\"]*&quot;Deep&quot;/);
+ assert.ok(!inputMarkup.includes('flow-flag-create'),'INPUT offers review only');
+ const key=Object.values(folded.reveals).find(h=>h.criterionToggle).criterionToggle;
+ const open=renderFlowPane(tree,{...opts,expandedGuardWhens:toggleCriterionExpansion(new Set(),key,tree,opts)});
+ assert.equal((open.html.match(/data-flow-input="collapsed"/g)||[]).length,1);
+ assert.ok(open.conceptOccurrences.some(c=>c.name==='Deep'));
+ assert.match(open.html,/data-flow-hidden-inputs="[^\"]*&quot;Deep&quot;/);
 });
 
 check("shared target navigation exists only for a rendered definition", () => {

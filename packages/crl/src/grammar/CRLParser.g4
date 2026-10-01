@@ -98,14 +98,19 @@ decisionStatement
 // ============================
 //
 // A named, reusable decision-guard sub-expression: `criterion "X": - when ( <cond> ).`
-// The body reuses the SAME `branchCondition` rule as a `when` branch (monotone
-// and/or over concept/criterion refs; no `not`). The parens are REQUIRED (unlike a
+// The body reuses the SAME `branchCondition` rule as a `when` branch (and/or/not
+// over concept/criterion refs). The parens are REQUIRED (unlike a
 // bare `when` branch, which uses `THEN` as its right edge) so `RPAREN DOT` is a
 // clean statement edge — `DOT` is also the qualified-ref separator, so an
 // unparenthesized `... "Lib"."X".` tail would be ambiguous. The KE authoring house
 // style parenthesizes regardless.
 criterionStatement
-    : CRITERION criterionIdentifier COLON DASH WHEN LPAREN branchCondition RPAREN DOT
+    : CRITERION criterionIdentifier COLON criterionDescription? DASH WHEN LPAREN branchCondition RPAREN DOT
+    ;
+
+// REFACTOR:grounded: one optional description; never part of the Boolean body.
+criterionDescription
+    : DASH DESCRIPTION_IS (QUOTED_STRING | backtickString) DOT
     ;
 
 // The top-level decision block: `when`/`otherwise` branches with an optional
@@ -698,7 +703,7 @@ narrativeElement
     // ⚠ QUALIFYING and DISPLAY_IS are admitted here because the membership predicate is NARRATIVE:
     //   `- definition is "Patient Complaint" in qualifying.`
     // Without this the keyword would eat its own use site and the predicate could not parse.
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

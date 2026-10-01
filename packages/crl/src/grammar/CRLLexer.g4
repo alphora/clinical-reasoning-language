@@ -6,6 +6,8 @@ PRESENTATION_DECISION : 'in decision';
 PRESENTATION_CRITERION : 'in criterion';
 QUESTION_TEXT_IS : 'question text is';
 QUESTION_DESCRIPTION_IS : 'question description is';
+// REFACTOR:grounded: criterion-owned explanatory metadata, separate from questions.
+DESCRIPTION_IS : 'description is';
 RECOMMEND_ACTIVITY  : 'recommend activity';
 USE_DECISION        : 'use decision';
 TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);

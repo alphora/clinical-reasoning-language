@@ -35,7 +35,7 @@ import {
 } from "../template-match/operandConstraints";
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
-import { publicationAdmissionReason, readPublicationHasValue, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
+import { publicationAdmissionReason, isPublicationAnswerGuard, readPublicationHasValue, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
 import { readPublicationBMI } from "../emit/publicationBMI";
 import { readPublicationAnyMembership } from "../template-match/anyMembership";
 import type {
@@ -824,6 +824,9 @@ export class UseSiteTypeValidator {
     // flip (a record stream is not a boolean) — a guard cell the A.10 relaxation left NOT leading the flip.
     const res = resolveOperand(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx, /*allowParameter*/ false);
     if (res.status !== "typed") return;
+    // REFACTOR:grounded: direct coded guards use the answer's authored qualification, never code spelling.
+    const publication = resolveLib(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx)?.types.concepts.get(getRefName(ref))?.publication;
+    if (publication !== undefined && isPublicationAnswerGuard(publication)) return;
     if (res.valueType !== "boolean") {
       // #189 IMPL 2b — the FAILURE is unchanged (a guard consumes a boolean; a typed non-boolean
       // operand is still a hard error). The MESSAGE now steers a RECORD-valued operand (`shape`

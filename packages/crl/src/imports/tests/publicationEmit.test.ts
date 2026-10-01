@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { emitCQLImports, emitCQLImportsFromPrepared } from "../emit";
 import { resolveImports } from "../index";
 import { preparePublicationContext } from "../preparePublicationContext";
+import { emitCrlTwoLane } from "../../emit-two-lane";
+import { validateCRLImports } from "../validate";
 
 // REFACTOR:grounded (#320, review 560) — actual split identities and raw scoped admission
 // are the contract. These tests verify generated routing, not runtime selector correctness.
@@ -41,6 +43,36 @@ const membership = (operand: string) => `concept "Result":
 - definition is ${operand} in qualifying.
 - shape reduction is most recent.
 `;
+
+// REFACTOR:grounded: imported direct answers retain publication routing and authored qualification.
+describe("direct coded guard routing", () => {
+  it.each(['"Answers"."Choice"', 'not "Answers"."Choice"', '("Answers"."Choice" or "Other")', '"Qualified"'])("emits %s through the whole publication condition", guard => {
+    const directory = project({
+      'root.crl': `library "Consumer".\n${publication("Other", "other")}\ncriterion "Qualified": - when ("Answers"."Choice").\nactivity "Proceed": - request CPGCommunicationRequest. - with \`OK\`.\ndecision "D": first:\n- when ${guard} then recommend activity "Proceed".\n- otherwise then recommend activity "Proceed".`,
+      'answers.crl': 'library "Answers".\n'+choice,
+    });
+    const entry = path.join(directory, 'root.crl');
+    const validation = validateCRLImports(entry);
+    expect(validation.success, JSON.stringify(validation)).toBe(true);
+    const result = emitCrlTwoLane(entry, {date:"2026-09-28"});
+    expect(result.success, JSON.stringify(result.hardErrors)).toBe(true);
+    const joined = result.cqlLibraries.map(x=>x.cql).join('\n');
+    expect(joined).toContain('publication-ambiguous-coded-value');
+    expect(joined).toContain("code: 'no'");
+    const target = [...result.cql.publicationTargets!.values()].find(x=>x.define === 'Choice')!;
+    const iface = result.cql.cqlByLibrary.find(x=>x.sourceLibraryName === 'Consumer' && x.role === 'interface')!;
+    const classifiedDefine = guard === '"Qualified"' ? 'Qualified' : 'CRL branch ';
+    const defineStart = iface.cql.indexOf('define "'+classifiedDefine);
+    expect(defineStart).toBeGreaterThanOrEqual(0);
+    const define = iface.cql.slice(defineStart).split(/\n\ndefine /)[0];
+    expect(define).toContain(`(${target.libraryName}."Choice").value as FHIR.CodeableConcept`);
+    expect(define).toContain('publication-ambiguous-coded-value');
+    const pd = result.fhir.resources.filter(x=>x.resourceType === 'PlanDefinition').map(x=>x.resource);
+    expect(JSON.stringify(pd)).toContain('/StructureDefinition/publication-answers-choice');
+    expect(JSON.stringify(pd)).toContain('CRL branch ');
+    expect(result.fhir.resources.filter(x=>x.resourceType === 'StructureDefinition')).toHaveLength(guard.includes('"Other"') ? 2 : 1);
+  });
+});
 function project(files: Record<string, string>): string {
   const directory = mkdtempSync(path.join(tmpdir(), "crl-publication-emit-"));
   directories.push(directory);

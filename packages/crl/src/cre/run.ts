@@ -118,11 +118,11 @@ import { celIdentityDiagnostics, celResourceId, emitCelToFhir, prepareCelPublica
 import type { EmittedResource } from "../cel/emitter/types";
 import {
   adaptPublicationCandidate, hasLocalPublicationContribution, prepareSingleLibraryPublication,
-  isLocalBooleanPublication,
+  isLocalBooleanPublication, supportsPublicationGuard,
   type PublicationProgram,
 } from "../emit/publicationProgram";
 import { selectPublicationCandidate, type PublicationCandidate } from "../emit/publicationSelection";
-import { interpretPublicationCodeableValue } from "../emit/publicationDomain";
+import { interpretPublicationCodeableValue, classifyPublicationMembership } from "../emit/publicationDomain";
 import { produceHasValueCandidate } from "../emit/publicationHasValue";
 import { produceAnyMembershipCandidate } from "../emit/publicationAnyMembership";
 import { produceMembershipCandidate } from "../emit/publicationProducer";
@@ -1506,14 +1506,26 @@ function conceptSatisfied(
       : `unsupported-reference: unresolved guard "${name}" in library "${lib}".`);
     return { sat: null, facts: [] };
   }
-  if (target?.shapeReduction !== undefined && target.valueTypes[0] !== "boolean") {
+  const entry = ctx.concepts.get(id)!;
+  const lookup = target.shapeReduction === undefined ? undefined : ctx.publicationProgram?.lookup(entry.filePath, target.name);
+  const descriptor = lookup?.kind === "publication" ? lookup.descriptor : undefined;
+  if (target.shapeReduction !== undefined && (descriptor === undefined || !supportsPublicationGuard(descriptor))) {
     ctx.runtimeError = true;
-    ctx.diagnostics.push(`publication-unsupported-context: guard "${getRefName(ref)}" requires a Boolean publication.`);
+    ctx.diagnostics.push(`publication-unsupported-context: guard "${getRefName(ref)}" requires a Boolean publication or a coded answer with value domain is answer options. Use an explicit membership predicate for other coded domains.`);
     return { sat: null, facts: [] };
   }
   const ev = evalConcept(id, ctx);
+  // REFACTOR:grounded: guard classification never changes the selected coded record or poisons other readers.
+  let sat = ev.sat;
+  if (descriptor?.guardQualification !== undefined && ev.publicationResult?.state === "selected") {
+    const classified = classifyPublicationMembership(descriptor.guardQualification, ev.publicationResult.candidate.resource);
+    if (classified.kind === "error") {
+      reportPublicationFailure(ctx, { code: classified.code, message: `${labelOf(entry.lib, target.name)}: ${classified.message}` });
+      sat = null;
+    } else sat = classified.kind === "known" ? classified.value : null;
+  }
   return {
-    sat: ev.sat,
+    sat,
     facts: ctx.factsByConcept.get(id) ?? [],
     ...(ev.composition ? { composition: ev.composition } : {}),
   };

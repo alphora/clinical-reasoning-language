@@ -24,19 +24,16 @@ concept "Documented Complaint":
 - value from is "Policy Documented Complaint Answer Options":
   - not qualifying is `none`.
 
-concept "Complaint Qualifies":
-- shape is Record.
-- type is Observation.
-- value type is boolean.
-- definition is "Documented Complaint" in qualifying.
-- shape reduction is most recent.
-
 presentation for "Documented Complaint":
 - question text is "Which complaint supports this request?".
 - question description is "Select the complaint documented for the requested procedure.".
 ```
 
 Every recognized offered member qualifies except those named by `not qualifying is`. Omitting exceptions is legal and warns, even without a qualifying predicate. Every member may be nonqualifying. Unknown exceptions, ambiguous bare-code exceptions, duplicate system/code members, and missing member displays are errors. Exception tokens must uniquely identify a code within the answer ValueSet; system-qualified exception syntax is not part of this release.
+
+A selected `Record`/`Observation`/`CodeableConcept` with exactly `value domain is answer options` and a named `value from is` binding can be used directly in decision and Criterion guards: `when "Documented Complaint" then ...`. The guard classifies the selected answer by those authored exceptions. Negation and compound guards preserve the same missing-value and error behavior. No intermediate Boolean concept is needed, and case-feature expressions still publish the original coded Observation. Menu action guards remain outside this supported publication surface. Other coded domains require an explicit membership calculation.
+
+For four directional answers, mark `false` and `unknown-false` as nonqualifying; leave `true` and `unknown-true` qualifying. These are ordinary authored codes, with no compiler-reserved spelling. A separate uncoded terminal calculation can inspect the original answers for uncertainty without adding a question.
 
 The selected answer remains unknown when absent. An answer with no recognized domain coding, or one mixing recognized qualifying and nonqualifying codings, raises an evaluation error; it must not silently become a clinical determination. Additional out-of-domain codings do not change the classification supplied by recognized domain codings. An unrelated `in "Other Terminology"` predicate tests that separate set and does not use the question's exceptions. It can return false for an interpreted value that is outside that set but inside the concept's explicitly declared `value domain`. A selected value whose codings are all outside the interpreted domain is still an error. Use `in qualifying` for question-option qualification; use named-set membership for a separate predicate over a declared broader domain. Neither spelling turns unrecognized data into false.
 
@@ -55,6 +52,22 @@ Question text emits `http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-te
 A base declaration supplies default wording. Optional repeated `in decision "Name"` and `in criterion "Name"` entries select alternative contexts. A scoped declaration supplies its own required question text and inherits an omitted description from the base. There is no syntax to clear an inherited description in this release. Overlapping scopes are errors even when wording agrees; source order does not choose a winner. A single native question profile cannot silently take the first of conflicting applicable wordings. Inputs on visited sibling guards may coexist even when only one branch wins. Different wording for the same concept is therefore allowed only when the emitted graph proves the input occurrences cannot share a form, such as descendants of mutually exclusive first-match branches; criterion-scoped wording on the sibling guards themselves can conflict. A missing presentation remains warning-only; genuinely different effective wording for co-occurring uses still conflicts, including authored wording versus the concept-name fallback. This check follows structural reachability, not CQL theorem proving.
 
 Imported inputs inherit their owning library's default presentation. Importing-library overrides remain backlog issue #321. Do not author them until supported. Future locality precedence is about import hierarchy, not declaration order.
+
+## Criterion descriptions
+
+A named criterion can own explanatory text for its grouped condition:
+
+```crl
+criterion "Evidence Group":
+- description is "Supporting documentation for the grouped evidence.".
+- when ("Finding A" and "Finding B").
+```
+
+The optional `description is` precedes `when` and accepts the same quoted or backtick text as question descriptions. Empty or duplicate descriptions are errors. The wording belongs to the criterion; it adds no answer, prerequisite or question and does not change its Boolean body.
+
+The tree shows the text in the owning criterion's tooltip and in a selectable **Criterion descriptions** disclosure below the tree. The disclosure includes each rendered criterion identity once, including collapsed owners; expand an enclosing criterion to expose a nested owner's entry. Editing a description makes the owner's medical review stale, along with enclosing criteria whose reviewed body includes it.
+
+Emission preserves the wording in a comment on the named CQL definition, neutralizing comment delimiters. A directly referenced positive criterion also supplies `Expression.description` on its PlanDefinition condition, even when that condition uses a generated CQL identifier. Negated conditions and generated priority complements do not inherit the positive wording. Nested descriptions remain on their own definitions. Operand question wording is separate; this metadata does not add a description item to the runtime Questionnaire.
 
 ## Verification
 

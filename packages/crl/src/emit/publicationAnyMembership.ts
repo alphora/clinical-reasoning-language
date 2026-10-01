@@ -14,7 +14,8 @@ export function produceAnyMembershipCandidate(d: PublicationDescriptor, operands
   const error = values.find(v => v.kind === "error");
   if (error?.kind === "error") return error;
   if (!subject.trim()) return { kind: "error" as const, code: "publication-missing-subject", message: "A produced Observation requires an evaluation subject." };
-  const value = values.some(v => v.kind === "known" && v.value) ? true : values.every(v => v.kind === "known") ? false : undefined;
+  // REFACTOR:grounded — errors above survive; only the explicit available-value operation ignores absence.
+  const value = values.some(v => v.kind === "known" && v.value) ? true : p.availableValuesOnly || values.every(v => v.kind === "known") ? false : undefined;
   const anchor = operands[p.validityOperand];
   const refs = [...new Set(operands.flatMap(c => typeof c?.resource.id === "string" && /^[A-Za-z0-9.-]{1,64}$/.test(c.resource.id) ? [`Observation/${c.resource.id}`] : []))];
   const candidate: Candidate = {

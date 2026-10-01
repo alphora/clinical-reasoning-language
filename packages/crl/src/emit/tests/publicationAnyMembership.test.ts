@@ -77,6 +77,7 @@ describe("aggregate selected-answer membership", () => {
     expect(JSON.stringify(emitted.hardErrors)).toContain("publication-name-collision");
     expect(JSON.stringify(emitted.hardErrors)).not.toContain("unresolved-reference");
   });
+  // @kit selected-answer-aggregate:three-state
   it.each([
     ["known", "known", false], ["flagged", "known", true], ["known", "flagged", true],
     ["flagged", undefined, true], [undefined, "flagged", true], ["known", undefined, undefined], [undefined, undefined, undefined],
@@ -136,11 +137,11 @@ describe("aggregate selected-answer membership", () => {
       expect(result.candidate.resource.effectiveDateTime).toBe("2026-01");
     }
   });
-  it("resolves imported operand and terminology through validation, CRE and emission", () => {
+  it.each(["any of", "any available value of"])("resolves imported operands and terminology for %s through validation, CRE and emission", (operation) => {
     const term = 'terminology "Flagged Answers":\n- system is `urn:answers`.\n- code is `flagged`.\n';
     const text = 'library "Aggregate".\n' + source.slice(source.indexOf('concept "Flagged":'))
       .replace('any of "A" and "B" in "Flagged Answers" using validity of "A"', 'any of "Foreign"."A" and "Foreign"."B" in "Foreign"."Flagged Answers" using validity of "Foreign"."A"');
-    const path = fixture(text);
+    const path = fixture(text.replaceAll("any of", operation));
     writeFileSync(join(dirname(path), "foreign.crl"), 'library "Foreign".\n'+source.slice(source.indexOf('terminology "Answers":'), source.indexOf('terminology "Flagged Answers":'))+term+answer("A")+answer("B"));
     expect(validateCRLImports(path).success).toBe(true);
     const emitted = emitCQLImports(path); expect(emitted.success, JSON.stringify(emitted.errors)).toBe(true);
@@ -150,10 +151,42 @@ fact "Patient": - name is "Synthetic". - birth date is "1970-01-01". - defined b
 fact "A": - value is "known". - date is "2026-09-27". - defined by "Foreign"."A".
 fact "B": - value is "known". - date is "2026-09-27". - defined by "Foreign"."B".
 case "Known": - subject is "Patient". - fact is "A". - fact is "B". - result is "Aggregate" is "Passed".
-case "Missing": - subject is "Patient". - fact is "A". - result is "Aggregate" is pause.
+case "Missing": - subject is "Patient". - fact is "A". - result is "Aggregate" is ${operation === "any of" ? 'pause' : '"Passed"'}.
 `);
     const graph = resolveCelImports(cases);
     expect(validateCEL(graph).errors).toEqual([]);
     expect(runCel(graph).runs.map(r => r.status)).toEqual(["pass", "pass"]);
+  });
+  // REFACTOR:grounded — available-set membership and ordinary missing answers have distinct semantics.
+  // @kit selected-answer-aggregate:available-values
+  it.each([
+    ["known", undefined, false], [undefined, "known", false], [undefined, undefined, false],
+    ["flagged", undefined, true], [undefined, "flagged", true], ["known", "known", false],
+  ])("checks only available values: %s + %s => %s", (a, b, expected) => {
+    const d = program(source.replace("any of", "any available value of")).descriptors.find(d => d.title === "Flagged")!;
+    const result = produceAnyMembershipCandidate(d, [a === undefined ? undefined : candidate(a), b === undefined ? undefined : candidate(b, "b")], "Patient/p");
+    expect(result).toMatchObject({ kind: "candidate", candidate: { resource: { valueBoolean: expected } } });
+    if (result.kind === "candidate") expect(result.candidate.validity).toBeUndefined();
+  });
+  it("ignores selected valueless clears but preserves errors and anchor metadata", () => {
+    const d = program(source.replace("any of", "any available value of")).descriptors.find(d => d.title === "Flagged")!;
+    const cleared = { ...candidate(undefined), validity: "2026-01", resource: { ...candidate(undefined).resource, effectiveDateTime: "2026-01" } };
+    expect(produceAnyMembershipCandidate(d, [cleared, undefined], "Patient/p")).toMatchObject({ kind: "candidate", candidate: { validity: "2026-01", resource: { valueBoolean: false, effectiveDateTime: "2026-01", derivedFrom: [{ reference: "Observation/input" }] } } });
+    expect(produceAnyMembershipCandidate(d, [candidate("flagged"), candidate("invalid", "b")], "Patient/p")).toMatchObject({ kind: "error", code: "publication-uninterpretable-value" });
+    const mixed = candidate("flagged", "b"); mixed.resource.valueCodeableConcept!.coding.push({ system: "urn:answers", code: "known" });
+    expect(produceAnyMembershipCandidate(d, [candidate("flagged"), mixed], "Patient/p")).toMatchObject({ kind: "error", code: "publication-ambiguous-coded-value" });
+  });
+  it("keeps both operations distinct in a single emitted library and in producer identities", () => {
+    const available = source.slice(source.indexOf('concept "Flagged":'), source.indexOf('activity "Passed":')).replace('concept "Flagged":', 'concept "Available Flagged":').replace("any of", "any available value of");
+    const text = source.replace('activity "Passed":', available + 'activity "Passed":');
+    const p = program(text); expect(p.diagnostics).toEqual([]);
+    const descriptors = p.descriptors.filter(d => d.producer?.kind === "anyMembership");
+    expect(descriptors.map(d => d.producer?.kind === "anyMembership" && d.producer.availableValuesOnly)).toEqual([false, true]);
+    const oldId = program().descriptors.find(d => d.title === "Flagged")!.producer!.producerId;
+    const newId = program(source.replace("any of", "any available value of")).descriptors.find(d => d.title === "Flagged")!.producer!.producerId;
+    expect(oldId).not.toBe(newId);
+    const emitted = emitCQLImports(fixture(text)); expect(emitted.success, JSON.stringify(emitted.errors)).toBe(true);
+    const serialized = JSON.stringify(emitted);
+    expect(serialized).toContain(", false, 0,"); expect(serialized).toContain(", true, 0,");
   });
 });

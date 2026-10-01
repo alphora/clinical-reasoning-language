@@ -199,8 +199,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const byKey = new Map(nodes.map(n => [n.dataset.flowKey!, n]));
     const hide = (el: Element) => set(el,"display","none");
     // Questions on: choices live in cards. Questions off: preserve their dotted tree disclosure.
-    // INPUT is a display-only grouping; preserve its actual dependency edge.
-    const elided = new Set(nodes.filter(n=>n.dataset.flowDecoration === "input" || (questionsVisible && n.dataset.flowDecoration === "choices")));
+    // Keep interactive INPUT disclosures available in either Questions mode.
+    const elided = new Set(nodes.filter(n=>(n.dataset.flowDecoration === "input" && !n.dataset.flowInput) || (questionsVisible && n.dataset.flowDecoration === "choices")));
     for(const n of elided)hide(n);
     if(questionsVisible)for(const toggle of Array.from(root.querySelectorAll('[data-flow-choices-toggle]')))hide(toggle);
     for(const option of nodes.filter(n=>n.dataset.flowChoice)) {
@@ -234,12 +234,21 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const nodeWidth = questionsVisible && !external ? 320 : 260;
     const cardWidth = nodeWidth;
     const hidden = new Map<SVGGElement, number[]>();
+    const hiddenInputs = new Map(visible.filter(n=>n.dataset.flowHiddenInputs).map(n=>[
+      n, {identities:new Set<string>(JSON.parse(n.dataset.flowHiddenInputs!).map((c:string[])=>JSON.stringify(c))),path:JSON.stringify(criterionPath(n))}
+    ]));
     // DOM textContent for every authored string; no authored HTML enters the canvas.
     for (const [index, card] of (questionsVisible || external ? snapshot.cards : []).entries()) {
       const identity = JSON.stringify([card.library,card.concept]);
       const number=card.questionNumber ?? index+1;
       const associations=occurrences(card).map(o=>({ownerKey:o.ownerKey,paths:o.criterionPaths.map((p:any[])=>p.map(c=>JSON.stringify([c.lib,c.name])))}));
       const owners = visible.filter(n => n.dataset.flowQuestion === identity && associations.some(o=>n.dataset.flowWhen===o.ownerKey && o.paths.some((p:string[])=>JSON.stringify(p)===JSON.stringify(criterionPath(n)))));
+      for (const [collapse, {identities,path}] of hiddenInputs) {
+        const alreadyVisible=owners.some(n=>n.dataset.flowWhen===collapse.dataset.flowWhen && JSON.stringify(criterionPath(n))===path);
+        if (!alreadyVisible && identities.has(identity) && associations.some(o=>collapse.dataset.flowWhen===o.ownerKey && o.paths.some((p:string[])=>JSON.stringify(p)===path))) {
+          hidden.set(collapse,[...new Set([...(hidden.get(collapse) ?? []),number])]);
+        }
+      }
         for (const collapse of visible.filter(n => n.dataset.flowHiddenCriterion && associations.some(o=>n.dataset.flowWhen===o.ownerKey && o.paths.some((path:string[])=>{
           const prefix=criterionPath(n);return prefix.length>0 && prefix.length<=path.length && prefix.every((c,i)=>c===path[i]);
         })))) {
@@ -320,9 +329,12 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     }
     const badge=(owner:SVGGElement,label:string,title:string)=>{
       const box=positions.get(owner);if(!box)return;
-      const g=svgEl("g",{class:"route-question-badge",role:"img","aria-label":title});const t=svgEl("title",{});t.textContent=title;g.append(t);
+      const g=svgEl("g",{class:"route-question-badge",role:"img","aria-label":title,"data-owner-key":owner.dataset.flowKey!});const t=svgEl("title",{});t.textContent=title;g.append(t);
       const verdictSpace=owner.querySelector(':scope > .flow-crit-verdict')?24:0;
-      const width=Math.max(24,label.length*7+12),x=box.x+box.width-width-3-verdictSpace,y=box.y-10;
+      const input=!!owner.dataset.flowInput;
+      // INPUT flag inset13 + KE pill offset30 + clearance12; browser tests measure both painted controls.
+      const inputFlagSpace=13+30+12;
+      const width=Math.max(24,label.length*7+12),x=box.x+box.width-width-3-(input?inputFlagSpace:verdictSpace),y=input?box.y+(box.height-19)/2:box.y-10;
       g.append(svgEl("rect",{x,y,width,height:19,rx:8}));const text=svgEl("text",{x:x+width/2,y:y+13,"text-anchor":"middle"});text.textContent=label;g.append(text);layer!.append(g);
     };
     for(const owner of new Set(external?placements.map(p=>p.owner):[])) {
@@ -331,7 +343,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const complex=questions.some(p=>p.card.value && !/^(Yes|No|Not answered|Determination: (True|False|Unknown))$/.test(p.card.value));
       badge(owner,answers.join(", ")+(complex?' …':''),(complex?'See questionnaire for the full answer. ':'')+questions.map(p=>`Question ${p.card.number}: ${p.card.value}`).join(", "));
     }
-    for(const [owner,numbers] of hidden)badge(owner,"? "+numbers.length,"Hidden questions: "+numbers.map(n=>"Q"+n).join(", ")+". Expand this condition to show them.");
+    for(const [owner,numbers] of hidden)badge(owner,"? "+numbers.length,"Hidden questions: "+numbers.map(n=>"Q"+n).join(", ")+(owner.dataset.flowInput ? ". Expand these inputs to show them." : ". Expand this condition to show them."));
     const pinned = root.querySelector<SVGGElement>(".flow-pinned") ?? byKey.get(snapshot.pinKey);
     const pinBox = pinned && positions.get(pinned);
     if (pinBox) {

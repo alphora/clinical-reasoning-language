@@ -385,7 +385,12 @@ export class CRLAstBuilder
   visitCriterionStatement(ctx: CriterionStatementContext): Criterion {
     const name = ctx.criterionIdentifier().text.slice(1, -1);
     const condition = this.branchConditionFrom(ctx.branchCondition());
-    return { type: "Criterion", name, condition, location: getLocation(ctx) };
+    // REFACTOR:grounded: use the question-presentation literal contract; preserve authored text.
+    const desc = ctx.criterionDescription();
+    const description = (desc?.QUOTED_STRING()?.text ?? desc?.backtickString()?.text)?.slice(1, -1);
+    if (description !== undefined && !description.trim()) this.reportError("AstError", desc!,
+      { message: "Criterion description must be nonempty." });
+    return { type: "Criterion", name, condition, ...(description !== undefined ? { description } : {}), location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {

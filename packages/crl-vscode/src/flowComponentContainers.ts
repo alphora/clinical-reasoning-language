@@ -34,6 +34,9 @@ export function installFlowComponentContainers(root: HTMLElement) {
     for (const n of visibleNodes) {
       const r=n.querySelector(':scope > rect');const boxes=r?[box(r)]:[];
       const choices=n.querySelector('[data-flow-choices-toggle]');if(choices&&visible(choices))boxes.push(box(choices));
+      if(n.dataset.flowInput)for(const control of Array.from(n.querySelectorAll(':scope > [data-flow-input-toggle], :scope > .flow-flag-badge'))) {
+        if(visible(control))boxes.push(box(control));
+      }
       bodies.set(n,boxes);
       const flag=n.querySelector<SVGGElement>(':scope > .flow-flag-badge');
       if(flag&&visible(flag)){
