@@ -1,0 +1,121 @@
+{
+  "removed": [
+    "httpclient5-5.4.3.jar",
+    "httpcore5-5.3.4.jar",
+    "httpcore5-h2-5.3.4.jar"
+  ],
+  "added": [
+    "okhttp-jvm-5.3.2.jar",
+    "okio-jvm-3.16.4.jar"
+  ],
+  "changed": [
+    {
+      "before": "Saxon-HE-11.6.jar",
+      "after": "Saxon-HE-13.0.jar"
+    },
+    {
+      "before": "cqf-fhir-cql-0.1.0-detached-dcac972-SNAPSHOT.jar",
+      "after": "cqf-fhir-cql-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+    },
+    {
+      "before": "cqf-fhir-cr-0.1.0-detached-dcac972-SNAPSHOT.jar",
+      "after": "cqf-fhir-cr-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+    },
+    {
+      "before": "cqf-fhir-utility-0.1.0-detached-dcac972-SNAPSHOT.jar",
+      "after": "cqf-fhir-utility-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+    },
+    {
+      "before": "jackson-annotations-2.21.jar",
+      "after": "jackson-annotations-2.22.jar"
+    },
+    {
+      "before": "jackson-core-2.21.1.jar",
+      "after": "jackson-core-2.22.3.jar"
+    },
+    {
+      "before": "jackson-databind-2.21.1.jar",
+      "after": "jackson-databind-2.22.3.jar"
+    },
+    {
+      "before": "jackson-datatype-jsr310-2.21.1.jar",
+      "after": "jackson-datatype-jsr310-2.22.3.jar"
+    },
+    {
+      "before": "opentelemetry-api-1.60.1.jar",
+      "after": "opentelemetry-api-1.61.0.jar"
+    },
+    {
+      "before": "opentelemetry-common-1.60.1.jar",
+      "after": "opentelemetry-common-1.61.0.jar"
+    },
+    {
+      "before": "opentelemetry-context-1.60.1.jar",
+      "after": "opentelemetry-context-1.61.0.jar"
+    },
+    {
+      "before": "opentelemetry-instrumentation-annotations-2.26.1.jar",
+      "after": "opentelemetry-instrumentation-annotations-2.27.0.jar"
+    },
+    {
+      "before": "org.hl7.fhir.convertors-6.9.4.1.jar",
+      "after": "org.hl7.fhir.convertors-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.dstu2-6.9.4.1.jar",
+      "after": "org.hl7.fhir.dstu2-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.dstu2016may-6.9.4.1.jar",
+      "after": "org.hl7.fhir.dstu2016may-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.dstu3-6.9.4.1.jar",
+      "after": "org.hl7.fhir.dstu3-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.dstu3.support-6.9.4.1.jar",
+      "after": "org.hl7.fhir.dstu3.support-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.model-6.9.4.1.jar",
+      "after": "org.hl7.fhir.model-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.r4-6.9.4.1.jar",
+      "after": "org.hl7.fhir.r4-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.r4b-6.9.4.1.jar",
+      "after": "org.hl7.fhir.r4b-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.r5-6.9.4.1.jar",
+      "after": "org.hl7.fhir.r5-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.support-6.9.4.1.jar",
+      "after": "org.hl7.fhir.support-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.utilities-6.9.4.1.jar",
+      "after": "org.hl7.fhir.utilities-6.9.12.jar"
+    },
+    {
+      "before": "org.hl7.fhir.validation-6.9.4.1.jar",
+      "after": "org.hl7.fhir.validation-6.9.12.jar"
+    },
+    {
+      "before": "sqlite-jdbc-3.50.3.0.jar",
+      "after": "sqlite-jdbc-3.53.2.0.jar"
+    },
+    {
+      "before": "xmlresolver-5.2.1.jar",
+      "after": "xmlresolver-6.0.23.jar"
+    },
+    {
+      "before": "xmlresolver-5.2.1-data.jar",
+      "after": "xmlresolver-6.0.23-data.jar"
+    }
+  ]
+}

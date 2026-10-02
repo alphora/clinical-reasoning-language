@@ -158,14 +158,14 @@ export async function resolveJavaAsync(
  * `classify` would otherwise render as a bare "driver exited 1" for every case with no cause named.
  */
 // REFACTOR:grounded (#320, plan597): the delivered engine has a distinct identity and cache.
-/** Maintainer build of the unmodified upstream definition-based population branch. */
+/** Maintainer build of the upstream definition-based population branch with recorded security dependency overrides. */
 export const ENGINE_JAR_SOURCE = {
-  buildId: "cqf-definition-dcac972f",
+  buildId: "cqf-definition-dcac972f-security-20261002",
   upstreamBase: "feature-definition-based-population",
   sourceCommit: "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/v4.122.0/cqf-fhir-cr-cli-definition-dcac972f.jar",
-  sha256: "fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f",
-  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-definition-dcac972f.jar",
+  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-security-20261002/cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
+  sha256: "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
+  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
 } as const;
 
 /** One identified cache location; never replace or discover an upstream Maven artifact. */
@@ -213,7 +213,7 @@ export function verifyJar(jarPath: string, expectedSha256: string): JarVerificat
   if (actual !== expectedSha256.toLowerCase()) {
     return { ok: false, reason: "sha-mismatch", actualSha256: actual };
   }
-  // ⚠ SAME READ. The buffer is already here and the jar is 216 MB; scanning it for the launcher entry
+  // ⚠ SAME READ. The buffer is already here and the jar is approximately 217 MB; scanning it for the launcher entry
   // costs nothing, while reading the file twice to answer a second question about it costs a lot.
   // A zip stores entry names uncompressed in both the local header and the central directory, so a
   // plain substring search answers "is this class in the archive" without a zip reader.

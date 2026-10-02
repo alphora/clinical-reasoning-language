@@ -1,10 +1,12 @@
 # CQFramework runtime
 
-The current runtime is a maintainer build of the unmodified upstream
+The current runtime is a maintainer build with dependency security overrides on upstream
 `feature-definition-based-population` branch at
 `dcac972fc38bc9a29aae2c662dfb5c4917d27234`.
 [cli-build.json](cli-build.json) records the exact source, artifact and SHA-256.
-It is a branch snapshot, not an upstream numbered release.
+It is a branch snapshot with the [security dependency patch](security-20261002/dependencies.patch), not an upstream numbered release. Exact nested JAR hashes are recorded in [the inventory](security-20261002/nested-jars.json).
+
+The override aligns HL7 core 6.9.12 and Jackson through BOM 2.22.3. HL7 updates replace the HTTP/5 stack with OkHttp; the HTTP Core 5.4.4 constraint is a regression guard and is not selected in this build. Java engine source is unchanged, but dependency behavior and the build toolchain changed. The complete resolved graph delta is recorded in [runtime-delta.json](security-20261002/runtime-delta.json). [Build and scan procedure](security-20261002/README.md) records the qualification scope.
 
 This source includes upstream extraction and generated-ID changes, the upstream
 unknown-applicability behavior, PR1121's `asked-unknown` condition-result metadata,

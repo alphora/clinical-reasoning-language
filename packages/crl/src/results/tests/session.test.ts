@@ -1,6 +1,6 @@
 // REFACTOR:grounded: exercise the public session boundary with controlled native failures and artifact bytes.
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -11,6 +11,7 @@ vi.mock("../spawn", async importOriginal => ({ ...await importOriginal<typeof im
   resolveJavaAsync: async (_env: unknown, _windows: unknown, probe: (exe: string) => Promise<string | undefined>) =>
     await probe("java") ? { ok: true, javaExe: "java", major: 17 } : { ok: false, reason: "probe failed" } }));
 import { applySession, type ApplySessionRequestV1 } from "../session";
+import { ENGINE_JAR_SOURCE } from "../spawn";
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const roots: string[] = [];
 let dir: string;
@@ -35,6 +36,17 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 // @kit native-apply-session:failure-boundary
 describe("applySession boundary", () => {
+  it("selects the package-pinned engine from the default home cache", async () => {
+    vi.stubEnv("HOME", dir); vi.stubEnv("USERPROFILE", dir);
+    const jar = path.join(dir, ...ENGINE_JAR_SOURCE.cacheRelativePath.split("/"));
+    mkdirSync(path.dirname(jar), { recursive: true }); writeFileSync(jar, "fixture");
+    native.verify.mockReturnValue({ ok: true, hasLauncher: true, sha256: ENGINE_JAR_SOURCE.sha256 });
+    const req = request(); delete req.engine;
+    const result = await applySession(req, { outDir: path.join(dir, "default") });
+    expect(result.ok).toBe(true);
+    expect(native.verify).toHaveBeenCalledWith(jar, ENGINE_JAR_SOURCE.sha256);
+    expect(result.runtime).toMatchObject({ enginePath: jar, engineSha256: ENGINE_JAR_SOURCE.sha256 });
+  });
   it("uses the validated snapshot when caller fields change during Java discovery", async () => {
     let release!: (value: unknown) => void;
     native.run.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));

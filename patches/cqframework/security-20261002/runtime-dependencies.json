@@ -1,0 +1,776 @@
+[
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-base:8.10.0",
+        "file": "hapi-fhir-base-8.10.0.jar",
+        "sha256": "d9ac4647f63d494c55d3ff3bb9f68c4ba248adbe674acfad5e8420965e89878c",
+        "bytes": 1280202
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-caching-api:8.10.0",
+        "file": "hapi-fhir-caching-api-8.10.0.jar",
+        "sha256": "6a7ec2d7a35a2529388b147c671d3edeb344edfa71263d523da6e973b12a2eaf",
+        "bytes": 5423
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-caching-caffeine:8.10.0",
+        "file": "hapi-fhir-caching-caffeine-8.10.0.jar",
+        "sha256": "665698a322e6254e3f37d5ff2820955c03253ca5cd889bcac3369c3c8af6621e",
+        "bytes": 6228
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-client:8.10.0",
+        "file": "hapi-fhir-client-8.10.0.jar",
+        "sha256": "6ce24ba4992167e47df45225a54929be1cde1313753cf1264797b42c9e20521a",
+        "bytes": 274465
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-converter:8.10.0",
+        "file": "hapi-fhir-converter-8.10.0.jar",
+        "sha256": "c51ad9f55cfda97e7a2dd2c809b70fd1a2b0cba459be64228671ea787132fe9a",
+        "bytes": 34703
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-structures-dstu2:8.10.0",
+        "file": "hapi-fhir-structures-dstu2-8.10.0.jar",
+        "sha256": "3e0b05f12650f89ccbc31a9f1c0885b67ad131f0bcf9a8d56ac9ea9a6d5aed9d",
+        "bytes": 1601565
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-structures-dstu3:8.10.0",
+        "file": "hapi-fhir-structures-dstu3-8.10.0.jar",
+        "sha256": "0db3e820732636e675beb36a69bac3b0b29589eb1aac8da3ede9243223c69b51",
+        "bytes": 42461
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-structures-hl7org-dstu2:8.10.0",
+        "file": "hapi-fhir-structures-hl7org-dstu2-8.10.0.jar",
+        "sha256": "5c955477ecf5da4451dcbce28f2ea7668c2013dae6ebb5f50c54288a2940fa76",
+        "bytes": 29324
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-structures-r4:8.10.0",
+        "file": "hapi-fhir-structures-r4-8.10.0.jar",
+        "sha256": "fea1c9941b057cdb4f4bc755475c238cdc2ef1eb622be5c27e71a066ff093c4a",
+        "bytes": 32233
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-structures-r4b:8.10.0",
+        "file": "hapi-fhir-structures-r4b-8.10.0.jar",
+        "sha256": "146fb50d82301f3bba71398b3c239534a3e9d9b818ae72ed87257d79362dd4a0",
+        "bytes": 30713
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-structures-r5:8.10.0",
+        "file": "hapi-fhir-structures-r5-8.10.0.jar",
+        "sha256": "8f01f43aaaba7e4604d08e3578a70e8f083b299d26e05b273ce8e66902e7969f",
+        "bytes": 30631
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-dstu3:8.10.0",
+        "file": "hapi-fhir-validation-resources-dstu3-8.10.0.jar",
+        "sha256": "fedba41b2675243b7dd202fa2671fd044f9552af5df91083264f284259aa59a5",
+        "bytes": 7127238
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-r4:8.10.0",
+        "file": "hapi-fhir-validation-resources-r4-8.10.0.jar",
+        "sha256": "4834b1e98b3c4648b5b6fd5675bc999cb82028d8c3762e9390d28bd324a58280",
+        "bytes": 5740096
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-r4b:8.10.0",
+        "file": "hapi-fhir-validation-resources-r4b-8.10.0.jar",
+        "sha256": "d28e3f876dd556809336e707e109cf771d6036ef1221011c2a6f268b9dd14923",
+        "bytes": 3741285
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-r5:8.10.0",
+        "file": "hapi-fhir-validation-resources-r5-8.10.0.jar",
+        "sha256": "d3605dd1d2ea196836c6b57418be619a36f2df998d2ee0b92f977d063715e4b9",
+        "bytes": 24321182
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:hapi-fhir-validation:8.10.0",
+        "file": "hapi-fhir-validation-8.10.0.jar",
+        "sha256": "cf4d24f810bcd29760296fc5f9f5908196e4253755d8194afd610dc456009deb",
+        "bytes": 302153
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.convertors:6.9.12",
+        "file": "org.hl7.fhir.convertors-6.9.12.jar",
+        "sha256": "9bfa74172b92f398e02a97cfbc00e69d55c22bf3a452271599abd069d26f8000",
+        "bytes": 6576142
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.dstu2016may:6.9.12",
+        "file": "org.hl7.fhir.dstu2016may-6.9.12.jar",
+        "sha256": "92423f4c4bfc1f1602a21a314d7a6ced49514ec0b26b66b258e0fba9f81135d4",
+        "bytes": 8479893
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.dstu2:6.9.12",
+        "file": "org.hl7.fhir.dstu2-6.9.12.jar",
+        "sha256": "9c3e6b9070b5ba18734a67d28d576b4a80d41ef403fcad97990346289475ff1f",
+        "bytes": 3220710
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.dstu3.support:6.9.12",
+        "file": "org.hl7.fhir.dstu3.support-6.9.12.jar",
+        "sha256": "f040f2eead369c145040ad29cb681569f661415ae8a4b27c5eff652768441955",
+        "bytes": 275513
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.dstu3:6.9.12",
+        "file": "org.hl7.fhir.dstu3-6.9.12.jar",
+        "sha256": "1aab5c401741ba3afd7ba1ede508e1b8741455e7131be5768d5d3ca086297246",
+        "bytes": 9625481
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.model:6.9.12",
+        "file": "org.hl7.fhir.model-6.9.12.jar",
+        "sha256": "6c627c83a7d8808ed7b84996da5ae34ffffc400845846d1a338a228c54b1ed7c",
+        "bytes": 2178
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.r4:6.9.12",
+        "file": "org.hl7.fhir.r4-6.9.12.jar",
+        "sha256": "eb95034c79c5a3a6de2a82afaad3a8beec6ed6b2c720da430a40b2d0924bf0f8",
+        "bytes": 13103980
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.r4b:6.9.12",
+        "file": "org.hl7.fhir.r4b-6.9.12.jar",
+        "sha256": "3e8f3a1b7c2bcc6918341d2b005f8b817acbba80172007d266a9ab65bdbd543b",
+        "bytes": 9396972
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.r5:6.9.12",
+        "file": "org.hl7.fhir.r5-6.9.12.jar",
+        "sha256": "54c640ecfad372fc521213ac0332d9cb58c3e32b67331f914068cd6776b97b82",
+        "bytes": 13538254
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.support:6.9.12",
+        "file": "org.hl7.fhir.support-6.9.12.jar",
+        "sha256": "96703a8e9bda65fa06df6a52c4afcb88eaee11837bdc3b97294869691e9114bf",
+        "bytes": 2192
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.utilities:6.9.12",
+        "file": "org.hl7.fhir.utilities-6.9.12.jar",
+        "sha256": "f36f062e9cb561143691bf7908c6fb6ecbcefacda53e478fada82b1b534788eb",
+        "bytes": 3166875
+    },
+    {
+        "coordinate": "ca.uhn.hapi.fhir:org.hl7.fhir.validation:6.9.12",
+        "file": "org.hl7.fhir.validation-6.9.12.jar",
+        "sha256": "c7bf3ae46ba5d1dd6fe7dcdaf3a8946d1c518fa78af6b16dc9e06330f4ac717f",
+        "bytes": 1168007
+    },
+    {
+        "coordinate": "codes.rafael.jaxb2_commons:jaxb2-basics-runtime:3.0.0",
+        "file": "jaxb2-basics-runtime-3.0.0.jar",
+        "sha256": "c913f8a4e176af9023943b661b5afec8190197e7a5865df9124af1c1edfbb91a",
+        "bytes": 169870
+    },
+    {
+        "coordinate": "codes.rafael.jaxb2_commons:jaxb2-basics-tools:3.0.0",
+        "file": "jaxb2-basics-tools-3.0.0.jar",
+        "sha256": "1adb99305c823bdb8a2c1f87d1d544bf5a3d81acee9e23dd1b2ce9a4f48f858f",
+        "bytes": 143342
+    },
+    {
+        "coordinate": "codes.rafael.jaxb2_commons:jaxb2-basics:3.0.0",
+        "file": "jaxb2-basics-3.0.0.jar",
+        "sha256": "2f0db69758d1c20491b47ff374f2b31cdfda689de940cd768b11efb66be4909f",
+        "bytes": 144113
+    },
+    {
+        "coordinate": "codes.rafael.jaxb2_commons:jaxb2-fluent-api:3.0.0",
+        "file": "jaxb2-fluent-api-3.0.0.jar",
+        "sha256": "d5393e72c111705925d3d1a96f80dfa4ca51f8046a5c5d20ef9f03ca3531f3b4",
+        "bytes": 14434
+    },
+    {
+        "coordinate": "com.fasterxml.jackson.core:jackson-annotations:2.22",
+        "file": "jackson-annotations-2.22.jar",
+        "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
+        "bytes": 84211
+    },
+    {
+        "coordinate": "com.fasterxml.jackson.core:jackson-core:2.22.3",
+        "file": "jackson-core-2.22.3.jar",
+        "sha256": "8a501126a385b25841915d839508f8a66e2a0dbc8a6709d055ef3b3e852b094c",
+        "bytes": 594776
+    },
+    {
+        "coordinate": "com.fasterxml.jackson.core:jackson-databind:2.22.3",
+        "file": "jackson-databind-2.22.3.jar",
+        "sha256": "556db5439e206114346043f68d200497dc96a0bca62a360a81784092ebd0e0a9",
+        "bytes": 1709604
+    },
+    {
+        "coordinate": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.3",
+        "file": "jackson-datatype-jsr310-2.22.3.jar",
+        "sha256": "ec7052ee48c9d873bb8148338a643f02cf89c01d035dd219411473030d6d2b22",
+        "bytes": 136875
+    },
+    {
+        "coordinate": "com.fasterxml.woodstox:woodstox-core:7.1.0",
+        "file": "woodstox-core-7.1.0.jar",
+        "sha256": "81266920a1cdc47306a8a2b4726c99ec89b3fbf31c2470e4f5e477d9d857ca9f",
+        "bytes": 1608803
+    },
+    {
+        "coordinate": "com.github.ben-manes.caffeine:caffeine:3.1.8",
+        "file": "caffeine-3.1.8.jar",
+        "sha256": "7dd15f9df1be238ffaa367ce6f556737a88031de4294dad18eef57c474ddf1d3",
+        "bytes": 889211
+    },
+    {
+        "coordinate": "com.google.code.findbugs:jsr305:3.0.2",
+        "file": "jsr305-3.0.2.jar",
+        "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+        "bytes": 19936
+    },
+    {
+        "coordinate": "com.google.code.gson:gson:2.13.1",
+        "file": "gson-2.13.1.jar",
+        "sha256": "94855942d4992f112946d3de1c334e709237b8126d8130bf07807c018a4a2120",
+        "bytes": 286972
+    },
+    {
+        "coordinate": "com.google.code.javaparser:javaparser:1.0.11",
+        "file": "javaparser-1.0.11.jar",
+        "sha256": "d3bfe5fe6fea64af17b919b9f27958f5c32f99125bb808cc82d1055b99597d82",
+        "bytes": 289629
+    },
+    {
+        "coordinate": "com.google.errorprone:error_prone_annotations:2.38.0",
+        "file": "error_prone_annotations-2.38.0.jar",
+        "sha256": "6661d5335090a5fc61dd869d2095bc6c1e2156e3aa47a6e4ababdf64c99a7889",
+        "bytes": 20389
+    },
+    {
+        "coordinate": "com.google.guava:failureaccess:1.0.2",
+        "file": "failureaccess-1.0.2.jar",
+        "sha256": "8a8f81cf9b359e3f6dfa691a1e776985c061ef2f223c9b2c80753e1b458e8064",
+        "bytes": 4740
+    },
+    {
+        "coordinate": "com.google.guava:guava:33.2.1-jre",
+        "file": "guava-33.2.1-jre.jar",
+        "sha256": "452b2d9787b7d366fa8cf5ed9a1c40404542d05effa7a598da03bbbbb76d9f31",
+        "bytes": 3051356
+    },
+    {
+        "coordinate": "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava",
+        "file": "listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+        "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+        "bytes": 2199
+    },
+    {
+        "coordinate": "com.googlecode.javaewah:JavaEWAH:1.2.3",
+        "file": "JavaEWAH-1.2.3.jar",
+        "sha256": "d65226949713c4c61a784f41c51167e7b0316f93764398ebba9e4336b3d954c2",
+        "bytes": 170567
+    },
+    {
+        "coordinate": "com.ibm.icu:icu4j:78.1",
+        "file": "icu4j-78.1.jar",
+        "sha256": "bbb70d3be23110d7295823eee0c2e896ac3b619b3c0f26168f65eb972df51d2a",
+        "bytes": 15155186
+    },
+    {
+        "coordinate": "com.ionspin.kotlin:bignum-jvm:0.3.10",
+        "file": "bignum-jvm-0.3.10.jar",
+        "sha256": "c5c718466ef822290ed6ea2013dee788c468a993fa53f34d0e07acc8d6ef087d",
+        "bytes": 240091
+    },
+    {
+        "coordinate": "com.nimbusds:nimbus-jose-jwt:10.0.2",
+        "file": "nimbus-jose-jwt-10.0.2.jar",
+        "sha256": "960b978a6cd6cbc3319648adc73959789f6742a2bf1e8dd0c843dbc91624218a",
+        "bytes": 800610
+    },
+    {
+        "coordinate": "com.squareup.okhttp3:okhttp-jvm:5.3.2",
+        "file": "okhttp-jvm-5.3.2.jar",
+        "sha256": "c771f48075b763f6c322055e21129a94b7de4c1faf3f8f58ace320b0c9517a30",
+        "bytes": 868403
+    },
+    {
+        "coordinate": "com.squareup.okio:okio-jvm:3.16.4",
+        "file": "okio-jvm-3.16.4.jar",
+        "sha256": "2196b993cd34dbbd919e7e01f57a4781b58bee80f86106163e287c20343a96a7",
+        "bytes": 383010
+    },
+    {
+        "coordinate": "com.strumenta:antlr-kotlin-runtime-jvm:1.0.12",
+        "file": "antlr-kotlin-runtime-jvm-1.0.12.jar",
+        "sha256": "0bf5561d9a90e029e5ba2c99d52584c0b9f5d28baf527cb226b45b05bb2cca79",
+        "bytes": 520901
+    },
+    {
+        "coordinate": "com.sun.istack:istack-commons-runtime:4.1.2",
+        "file": "istack-commons-runtime-4.1.2.jar",
+        "sha256": "7fd6792361f4dd00f8c56af4a20cecc0066deea4a8f3dec38348af23fc2296ee",
+        "bytes": 25788
+    },
+    {
+        "coordinate": "commons-beanutils:commons-beanutils:1.11.0",
+        "file": "commons-beanutils-1.11.0.jar",
+        "sha256": "9e44ba68ec9a3f21286fa2a8bbb003b735c0f69101bb43144b79f4f8aaa74709",
+        "bytes": 246806
+    },
+    {
+        "coordinate": "commons-codec:commons-codec:1.21.0",
+        "file": "commons-codec-1.21.0.jar",
+        "sha256": "4da851cb6abfb98bfe9eb77c5e5fc47f5414fa28b94e21b7fd9a646705dc167f",
+        "bytes": 402494
+    },
+    {
+        "coordinate": "commons-collections:commons-collections:3.2.2",
+        "file": "commons-collections-3.2.2.jar",
+        "sha256": "eeeae917917144a68a741d4c0dff66aa5c5c5fd85593ff217bced3fc8ca783b8",
+        "bytes": 588337
+    },
+    {
+        "coordinate": "commons-io:commons-io:2.20.0",
+        "file": "commons-io-2.20.0.jar",
+        "sha256": "df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72",
+        "bytes": 563971
+    },
+    {
+        "coordinate": "commons-logging:commons-logging:1.2",
+        "file": "commons-logging-1.2.jar",
+        "sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636",
+        "bytes": 61829
+    },
+    {
+        "coordinate": "info.picocli:picocli:4.7.7",
+        "file": "picocli-4.7.7.jar",
+        "sha256": "f86e30fffd10d2b13b8caa8d4b237a7ee61f2ffccf5b1941de718b765d235bf8",
+        "bytes": 417640
+    },
+    {
+        "coordinate": "io.github.oshai:kotlin-logging-jvm:8.0.01",
+        "file": "kotlin-logging-jvm-8.0.01.jar",
+        "sha256": "555b08c841370bd21871f41aed6562f19372def45cca505b96ebc94af17159f9",
+        "bytes": 119787
+    },
+    {
+        "coordinate": "io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations:2.27.0",
+        "file": "opentelemetry-instrumentation-annotations-2.27.0.jar",
+        "sha256": "5fb44897f9f1847d6f7d50f159a5d2eeba7f5ae2cc6b40a82957458ba3efd8f4",
+        "bytes": 2864
+    },
+    {
+        "coordinate": "io.opentelemetry:opentelemetry-api:1.61.0",
+        "file": "opentelemetry-api-1.61.0.jar",
+        "sha256": "ff5d610db14da2881eaa8f543f3bd6578a306163d02675254ff0669286c89158",
+        "bytes": 171455
+    },
+    {
+        "coordinate": "io.opentelemetry:opentelemetry-common:1.61.0",
+        "file": "opentelemetry-common-1.61.0.jar",
+        "sha256": "618bd894feb3f65a563209603d27cbab534310be22705f78c525fc0e799e8e91",
+        "bytes": 2679
+    },
+    {
+        "coordinate": "io.opentelemetry:opentelemetry-context:1.61.0",
+        "file": "opentelemetry-context-1.61.0.jar",
+        "sha256": "2325b9b9081e506b5b58c54053109aa446f774e233e90511dc17fd8b20500558",
+        "bytes": 49584
+    },
+    {
+        "coordinate": "jakarta-regexp:jakarta-regexp:1.4",
+        "file": "jakarta-regexp-1.4.jar",
+        "sha256": "85ea3985d7fec552d6de6f02d8e18789c3fcd539081eb8c7c444eabf6cb3f7bc",
+        "bytes": 28576
+    },
+    {
+        "coordinate": "jakarta.activation:jakarta.activation-api:2.1.3",
+        "file": "jakarta.activation-api-2.1.3.jar",
+        "sha256": "01b176d718a169263e78290691fc479977186bcc6b333487325084d6586f4627",
+        "bytes": 66514
+    },
+    {
+        "coordinate": "jakarta.annotation:jakarta.annotation-api:2.1.1",
+        "file": "jakarta.annotation-api-2.1.1.jar",
+        "sha256": "5f65fdaf424eee2b55e1d882ba9bb376be93fb09b37b808be6e22e8851c909fe",
+        "bytes": 26141
+    },
+    {
+        "coordinate": "jakarta.mail:jakarta.mail-api:2.1.3",
+        "file": "jakarta.mail-api-2.1.3.jar",
+        "sha256": "8051b58d75f982f9a5b963b3765426e824b2a64865ef0af17205e455b98db05c",
+        "bytes": 236454
+    },
+    {
+        "coordinate": "jakarta.xml.bind:jakarta.xml.bind-api:4.0.2",
+        "file": "jakarta.xml.bind-api-4.0.2.jar",
+        "sha256": "0d6bcfe47763e85047acf7c398336dc84ff85ebcad0a7cb6f3b9d3e981245406",
+        "bytes": 131033
+    },
+    {
+        "coordinate": "junit:junit:4.13.2",
+        "file": "junit-4.13.2.jar",
+        "sha256": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
+        "bytes": 384581
+    },
+    {
+        "coordinate": "net.sf.saxon:Saxon-HE:13.0",
+        "file": "Saxon-HE-13.0.jar",
+        "sha256": "258fb4788b8e1bd986f9aed14269669412da88c7bb289b747878d4353f6168aa",
+        "bytes": 6241783
+    },
+    {
+        "coordinate": "net.sourceforge.plantuml:plantuml-mit:1.2026.1",
+        "file": "plantuml-mit-1.2026.1.jar",
+        "sha256": "d364d790e3a1c9d3de47bf6f87cd1a3c29fe883622af0af741bdbcc975f530f9",
+        "bytes": 17255401
+    },
+    {
+        "coordinate": "ognl:ognl:3.3.4",
+        "file": "ognl-3.3.4.jar",
+        "sha256": "47fdd450407ff09b57df02f466f9b4c7d32818962d65f9d98e445c8b4d047603",
+        "bytes": 264823
+    },
+    {
+        "coordinate": "org.apache.commons:commons-compress:1.28.0",
+        "file": "commons-compress-1.28.0.jar",
+        "sha256": "e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca",
+        "bytes": 1117221
+    },
+    {
+        "coordinate": "org.apache.commons:commons-lang3:3.18.0",
+        "file": "commons-lang3-3.18.0.jar",
+        "sha256": "4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720",
+        "bytes": 702952
+    },
+    {
+        "coordinate": "org.apache.commons:commons-text:1.10.0",
+        "file": "commons-text-1.10.0.jar",
+        "sha256": "770cd903fa7b604d1f7ef7ba17f84108667294b2b478be8ed1af3bffb4ae0018",
+        "bytes": 238400
+    },
+    {
+        "coordinate": "org.apache.httpcomponents:httpclient:4.5.14",
+        "file": "httpclient-4.5.14.jar",
+        "sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6",
+        "bytes": 785639
+    },
+    {
+        "coordinate": "org.apache.httpcomponents:httpcore:4.4.16",
+        "file": "httpcore-4.4.16.jar",
+        "sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f",
+        "bytes": 327891
+    },
+    {
+        "coordinate": "org.apache.santuario:xmlsec:4.0.4",
+        "file": "xmlsec-4.0.4.jar",
+        "sha256": "8b2f8483b662ba5462126074dadf4d4f33966d8e8244889c6a81d53789da5402",
+        "bytes": 1216523
+    },
+    {
+        "coordinate": "org.attoparser:attoparser:2.0.7.RELEASE",
+        "file": "attoparser-2.0.7.RELEASE.jar",
+        "sha256": "75dd1c045492bff8e1963aabb28bfe903c2064e11e27fe2f0f0aff1ad3d84476",
+        "bytes": 246451
+    },
+    {
+        "coordinate": "org.checkerframework:checker-qual:3.42.0",
+        "file": "checker-qual-3.42.0.jar",
+        "sha256": "ccaedd33af0b7894d9f2f3b644f4d19e43928e32902e61ac4d10777830f5aac7",
+        "bytes": 230830
+    },
+    {
+        "coordinate": "org.codehaus.woodstox:stax2-api:4.2.2",
+        "file": "stax2-api-4.2.2.jar",
+        "sha256": "a61c48d553efad78bc01fffc4ac528bebbae64cbaec170b2a5e39cf61eb51abe",
+        "bytes": 195922
+    },
+    {
+        "coordinate": "org.commonmark:commonmark-ext-gfm-tables:0.21.0",
+        "file": "commonmark-ext-gfm-tables-0.21.0.jar",
+        "sha256": "fc05fe991f2254ab0c8f6ccb9f0b6ec1c2b6df350389ed3e411ac6f52e7a75e5",
+        "bytes": 19604
+    },
+    {
+        "coordinate": "org.commonmark:commonmark:0.21.0",
+        "file": "commonmark-0.21.0.jar",
+        "sha256": "81084a7035046fe306f0dbf16ef57a68d08ee5c97004ea867e62b5db46e98afb",
+        "bytes": 170750
+    },
+    {
+        "coordinate": "org.cqframework:cqf-fhir-npm:5.3.0",
+        "file": "cqf-fhir-npm-5.3.0.jar",
+        "sha256": "b87e29e026de5c016eb0ebdab9a73fdd9027de17cf5ae0af277bba24595ec452",
+        "bytes": 16526
+    },
+    {
+        "coordinate": "org.cqframework:cqf-fhir:5.3.0",
+        "file": "cqf-fhir-5.3.0.jar",
+        "sha256": "3475996f94d3058df9d73bc3fccf17deff65e03a9a3df3e63a514b0c42d943eb",
+        "bytes": 21877
+    },
+    {
+        "coordinate": "org.cqframework:cql-jvm:5.3.0",
+        "file": "cql-jvm-5.3.0.jar",
+        "sha256": "0730de161190339d02b07f3ff0b683b13e5bd0e7796cf3862d6c19ab4be25ccc",
+        "bytes": 1788684
+    },
+    {
+        "coordinate": "org.cqframework:cql-to-elm-jvm:5.3.0",
+        "file": "cql-to-elm-jvm-5.3.0.jar",
+        "sha256": "34fe17f7c63e916270e927c94f138266ac073fb40db62a3d82fea4825a1db06f",
+        "bytes": 600467
+    },
+    {
+        "coordinate": "org.cqframework:elm-fhir:5.3.0",
+        "file": "elm-fhir-5.3.0.jar",
+        "sha256": "de706f530a4a9144c2220350758d858a861d1e280246278783204a01c1785ab4",
+        "bytes": 136129
+    },
+    {
+        "coordinate": "org.cqframework:elm-jvm:5.3.0",
+        "file": "elm-jvm-5.3.0.jar",
+        "sha256": "d39fc769576ef1201069657f641b1c3e3ab3dd37bf3a1cd26c1239c473c846b9",
+        "bytes": 2704015
+    },
+    {
+        "coordinate": "org.cqframework:engine-fhir-jvm:5.3.0",
+        "file": "engine-fhir-jvm-5.3.0.jar",
+        "sha256": "4874ed056ab48300afeeb59afd2cf10df05a962f821aa8d08df9a6c35642838b",
+        "bytes": 206931
+    },
+    {
+        "coordinate": "org.cqframework:engine-jvm:5.3.0",
+        "file": "engine-jvm-5.3.0.jar",
+        "sha256": "e7fc366bd0864b4498493f351b2336edd8481740041bf15f02cd4affa2eea2ff",
+        "bytes": 824413
+    },
+    {
+        "coordinate": "org.cqframework:quick:5.3.0",
+        "file": "quick-5.3.0.jar",
+        "sha256": "62fd1d79e1a8e223f2245118c21e1bd948e3422ee2ca9486dc5a127878f94c1d",
+        "bytes": 4791234
+    },
+    {
+        "coordinate": "org.cqframework:shared-jvm:5.3.0",
+        "file": "shared-jvm-5.3.0.jar",
+        "sha256": "8e7092f670d27903115017c3db802fb7b6b6fe91f1c690ae4e0ca0fbf8816754",
+        "bytes": 34093
+    },
+    {
+        "coordinate": "org.cqframework:ucum:5.3.0",
+        "file": "ucum-5.3.0.jar",
+        "sha256": "3c4c19d2c9e8aeb03cca9cf06e0ebc24fc0b672eee993f2de698b805590266d2",
+        "bytes": 6675
+    },
+    {
+        "coordinate": "org.eclipse.angus:angus-activation:2.0.2",
+        "file": "angus-activation-2.0.2.jar",
+        "sha256": "6dd3bcffc22bce83b07376a0e2e094e4964a3195d4118fb43e380ef35436cc1e",
+        "bytes": 27050
+    },
+    {
+        "coordinate": "org.eclipse.angus:angus-mail:2.0.4",
+        "file": "angus-mail-2.0.4.jar",
+        "sha256": "87301865584bad9170662b3eeef0350aaafea4522483e38e54ae87dc3df3e958",
+        "bytes": 498833
+    },
+    {
+        "coordinate": "org.eclipse.jgit:org.eclipse.jgit:7.4.0.202509020913-r",
+        "file": "org.eclipse.jgit-7.4.0.202509020913-r.jar",
+        "sha256": "9bc7cf2d0400a130e3405e4ae9c78775d9bdb1037098d00b2d8ea79436f3a7f3",
+        "bytes": 3311630
+    },
+    {
+        "coordinate": "org.eclipse.persistence:org.eclipse.persistence.asm:9.5.0",
+        "file": "org.eclipse.persistence.asm-9.5.0.jar",
+        "sha256": "7636adcfd53733331eba9ef58792781b47123ad09733ee5dc49f30338aae95a0",
+        "bytes": 287613
+    },
+    {
+        "coordinate": "org.eclipse.persistence:org.eclipse.persistence.core:4.0.2",
+        "file": "org.eclipse.persistence.core-4.0.2.jar",
+        "sha256": "262c362f02273e0dda101eeaaad253a523a430bf75b75e5f8c2db82ea5aee2d5",
+        "bytes": 5233218
+    },
+    {
+        "coordinate": "org.eclipse.persistence:org.eclipse.persistence.moxy:4.0.2",
+        "file": "org.eclipse.persistence.moxy-4.0.2.jar",
+        "sha256": "9479a43f3b4a1e6acd2740dd67f4468fe23ab691f24d557c7a48f96d64b3c14a",
+        "bytes": 644554
+    },
+    {
+        "coordinate": "org.fhir:ucum:1.0.9",
+        "file": "ucum-1.0.9.jar",
+        "sha256": "82d3f91372667cc8ab72407cd9ef2e9ff7c917f75a27fd49bcebc526111227a0",
+        "bytes": 69810
+    },
+    {
+        "coordinate": "org.glassfish.jaxb:jaxb-core:4.0.5",
+        "file": "jaxb-core-4.0.5.jar",
+        "sha256": "ad3fd9bf00de3eda9859f70b6cfb011e2fe9904804e16a2665092888ece0fdca",
+        "bytes": 138682
+    },
+    {
+        "coordinate": "org.glassfish.jaxb:jaxb-runtime:4.0.5",
+        "file": "jaxb-runtime-4.0.5.jar",
+        "sha256": "485d8940e76373a7f300815ea5504bf5b726c234425ad30971019d133124cca4",
+        "bytes": 920213
+    },
+    {
+        "coordinate": "org.glassfish.jaxb:txw2:4.0.5",
+        "file": "txw2-4.0.5.jar",
+        "sha256": "917355bc451481f30d043b24d123110517966af34383901773882810dca480e5",
+        "bytes": 73266
+    },
+    {
+        "coordinate": "org.hamcrest:hamcrest-core:1.3",
+        "file": "hamcrest-core-1.3.jar",
+        "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
+        "bytes": 45024
+    },
+    {
+        "coordinate": "org.javassist:javassist:3.29.0-GA",
+        "file": "javassist-3.29.0-GA.jar",
+        "sha256": "62d4065362e8969ce654f2b5541de1efb5b5bca6c146dbd38a595ea4df64cd31",
+        "bytes": 794034
+    },
+    {
+        "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.0",
+        "file": "kotlin-stdlib-jdk7-2.0.0.jar",
+        "sha256": "dd958064f946b01f745365c2efa11e4c5812a22e26b6caa4433f207fb5b4a5c5",
+        "bytes": 961
+    },
+    {
+        "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0",
+        "file": "kotlin-stdlib-jdk8-2.0.0.jar",
+        "sha256": "92035a0fa8b97a97bb430d30ba03e5ad51f4cfa839cf1559e55245cba735aa94",
+        "bytes": 967
+    },
+    {
+        "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
+        "file": "kotlin-stdlib-2.3.20.jar",
+        "sha256": "0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e",
+        "bytes": 1804720
+    },
+    {
+        "coordinate": "org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1",
+        "file": "kotlinx-datetime-jvm-0.7.1.jar",
+        "sha256": "3b8b98657c9aff3be7f6b4b575e9f3fb9a3a1f452a801da0f438901734acdade",
+        "bytes": 694336
+    },
+    {
+        "coordinate": "org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm:0.8.0",
+        "file": "kotlinx-io-bytestring-jvm-0.8.0.jar",
+        "sha256": "3da805e9da2ff3cb119f744dcd11de6a18e32a5b933518f17418ba5795cfa775",
+        "bytes": 22535
+    },
+    {
+        "coordinate": "org.jetbrains.kotlinx:kotlinx-io-core-jvm:0.8.0",
+        "file": "kotlinx-io-core-jvm-0.8.0.jar",
+        "sha256": "610770cc855edf1c57d9fcd7c69fd040af57adaf8834505f91805de680783d13",
+        "bytes": 152882
+    },
+    {
+        "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.9.0",
+        "file": "kotlinx-serialization-core-jvm-1.9.0.jar",
+        "sha256": "1f0afa172110e45a7231ef1b44ae8fd84c1ebaff96f3fc3ad68ef8c48120b59c",
+        "bytes": 399128
+    },
+    {
+        "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-json-io-jvm:1.9.0",
+        "file": "kotlinx-serialization-json-io-jvm-1.9.0.jar",
+        "sha256": "98abb132b03e11b80318d45350ec9ebbb5453d26505e81331bf2eea7143b6fbe",
+        "bytes": 6933
+    },
+    {
+        "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0",
+        "file": "kotlinx-serialization-json-jvm-1.9.0.jar",
+        "sha256": "d94cc34cae39246a1af74fda63f9c4812ce12216ef641d5fa3bbbb539a6922d8",
+        "bytes": 278414
+    },
+    {
+        "coordinate": "org.jetbrains:annotations:26.0.1",
+        "file": "annotations-26.0.1.jar",
+        "sha256": "2037be378980d3ba9333e97955f3b2cde392aa124d04ca73ce2eee6657199297",
+        "bytes": 31170
+    },
+    {
+        "coordinate": "org.ogce:xpp3:1.1.6",
+        "file": "xpp3-1.1.6.jar",
+        "sha256": "6a808919712867f0c4cb6e3f77457466a6fc186a4b6c41433eef79deee01ca16",
+        "bytes": 371053
+    },
+    {
+        "coordinate": "org.opencds.cqf.fhir:cqf-fhir-cql:4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
+        "file": "cqf-fhir-cql-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar",
+        "sha256": "6f1c076b3bbec0890e3aac29f6e0d63f60f3e6f172b04919a1079f68e050a901",
+        "bytes": 130307
+    },
+    {
+        "coordinate": "org.opencds.cqf.fhir:cqf-fhir-cr:4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
+        "file": "cqf-fhir-cr-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar",
+        "sha256": "9a898404dbb0696de629b20ecf813f70d95241d886d111198c449fc2727e0c92",
+        "bytes": 1010324
+    },
+    {
+        "coordinate": "org.opencds.cqf.fhir:cqf-fhir-utility:4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
+        "file": "cqf-fhir-utility-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar",
+        "sha256": "9417b22f8c9d43183e54d456bc30342f209658b5d3478ad2021f6a0cf045f948",
+        "bytes": 837613
+    },
+    {
+        "coordinate": "org.slf4j:jcl-over-slf4j:2.0.16",
+        "file": "jcl-over-slf4j-2.0.16.jar",
+        "sha256": "5744d62c5af556e839ab922c9fa3f737f0a5971e478ba68b2eb5256b2842ec78",
+        "bytes": 18429
+    },
+    {
+        "coordinate": "org.slf4j:slf4j-api:2.0.17",
+        "file": "slf4j-api-2.0.17.jar",
+        "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832",
+        "bytes": 69908
+    },
+    {
+        "coordinate": "org.slf4j:slf4j-simple:2.0.17",
+        "file": "slf4j-simple-2.0.17.jar",
+        "sha256": "ddfea59ac074c6d3e24ac2c38622d2d963895e17f70b38ed4bdae4d780be6964",
+        "bytes": 15716
+    },
+    {
+        "coordinate": "org.thymeleaf:thymeleaf:3.1.5.RELEASE",
+        "file": "thymeleaf-3.1.5.RELEASE.jar",
+        "sha256": "4011795f8494dd69e764b7709443dd13d3068ba8ac37624f61d7084f4429cbe2",
+        "bytes": 945388
+    },
+    {
+        "coordinate": "org.unbescape:unbescape:1.1.6.RELEASE",
+        "file": "unbescape-1.1.6.RELEASE.jar",
+        "sha256": "597cf87d5b1a4f385b9d1cec974b7b483abb3ee85fc5b3f8b62af8e4bec95c2c",
+        "bytes": 173935
+    },
+    {
+        "coordinate": "org.xerial:sqlite-jdbc:3.53.2.0",
+        "file": "sqlite-jdbc-3.53.2.0.jar",
+        "sha256": "dc320e4102884c135ccc30c3c6fc3fb190b750e1586a100e3aba3be783cf33a9",
+        "bytes": 11982706
+    },
+    {
+        "coordinate": "org.xmlresolver:xmlresolver:6.0.23",
+        "file": "xmlresolver-6.0.23.jar",
+        "sha256": "8bd99540e826dada93126fa05c3a0b54f5db00701d7be98193673099307e77e2",
+        "bytes": 156557
+    },
+    {
+        "coordinate": "org.xmlresolver:xmlresolver:6.0.23",
+        "file": "xmlresolver-6.0.23-data.jar",
+        "sha256": "0614b78ce484ce33670dc842b75efc8961af9bd6145edb65a34865dc521629de",
+        "bytes": 1033132
+    }
+]

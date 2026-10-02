@@ -1,0 +1,34 @@
+diff --git a/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts b/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
+index c90af1713..457b252ec 100644
+--- a/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
++++ b/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
+@@ -23,6 +23,8 @@ repositories {
+ dependencies {
+     api(platform(libs.hapi.fhir.bom))
+     api(platform(libs.cql.bom))
++    // CRL security build: align the Jackson family, including transitive modules.
++    api(enforcedPlatform("com.fasterxml.jackson:jackson-bom:2.22.3"))
+     testImplementation(platform(libs.junit.bom))
+ 
+     compileOnly(libs.jakarta.annotation.api)
+@@ -37,6 +39,20 @@ dependencies {
+     errorprone("com.google.errorprone:error_prone_core:${libs.versions.error.prone.core.get()}")
+ }
+ 
++// Preserve dcac972f engine behavior while replacing vulnerable transitive libraries.
++configurations.configureEach {
++    resolutionStrategy.eachDependency {
++        if (requested.group == "ca.uhn.hapi.fhir" && requested.name.startsWith("org.hl7.fhir.")) {
++            useVersion("6.9.12")
++            because("CRL security build: patched HL7 core family")
++        }
++        if (requested.group == "org.apache.httpcomponents.core5") {
++            useVersion("5.4.4")
++            because("CRL security build: patched HTTP Core 5 family")
++        }
++    }
++}
++
+ tasks.withType<JavaCompile>().configureEach {
+     options.encoding = "UTF-8"
+     options.errorprone {

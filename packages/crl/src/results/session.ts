@@ -81,7 +81,7 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     if (conflicting.length) throw new SessionInputError("java-environment", "Unset Java or loader overrides for bounded session execution: " + conflicting.sort().join(", "));
     if (options.signal?.aborted) throw new SessionInputError("cancelled", "Cancelled before native execution.");
     if (request.engine !== undefined && (!request.engine || typeof request.engine.path !== "string" || !request.engine.path || typeof request.engine.sha256 !== "string" || !/^[a-fA-F0-9]{64}$/.test(request.engine.sha256))) throw new SessionInputError("engine-configuration", "An explicit engine requires both a path and SHA256.");
-    const configuredJar = request.engine?.path ?? defaultEngineJarPath();
+    const configuredJar = request.engine?.path ?? defaultEngineJarPath(environment);
     const jarPath = configuredJar ? path.resolve(configuredJar) : undefined;
     const expectedHash = request.engine?.sha256 ?? ENGINE_JAR_SOURCE.sha256;
     if (!jarPath || !/^[a-fA-F0-9]{64}$/.test(expectedHash)) throw new SessionInputError("engine-configuration", "Supply a hash-pinned engine or install this package's default engine.");

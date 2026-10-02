@@ -1,22 +1,160 @@
 {
-  "bytes": 218350816,
+  "bytes": 216635407,
   "upstreamFixes": {
     "askedUnknown": "0ade9a9de6621eabb5adb6ff99cbf01ab67d725d",
     "sharedInputDeduplication": "dcac972fc38bc9a29aae2c662dfb5c4917d27234"
   },
-  "embeddedVersionExplanation": "Gradle checkout-derived snapshot identity; exact upstream source commit is authoritative, not an upstream version 0.1.0 release.",
-  "patchManifests": [],
-  "buildLauncherJdkMajor": 23,
+  "embeddedVersionExplanation": "Gradle derives 4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT from the crl/security-20261002 branch and available 4.13.0 tag history. The old detached build reported 0.1.0 because its checkout/tag context differed. Exact source commit plus dependency patch identifies source; SHA-256 identifies delivered bytes.",
+  "patchManifests": [
+    "security-20261002/dependencies.patch"
+  ],
+  "buildLauncherJdkMajor": 17,
   "upstreamRelease": false,
   "targetJavaMajor": 17,
-  "sha256": "fea41d5f6cc669b119b0666460855dc188c3a28f316c495b4c8ff0760d6f180f",
+  "sha256": "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
   "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  "asset": "cqf-fhir-cr-cli-definition-dcac972f.jar",
-  "buildId": "cqf-definition-dcac972f",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
+  "buildId": "cqf-definition-dcac972f-security-20261002",
   "upstreamBase": "feature-definition-based-population",
   "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  "embeddedBuildVersion": "0.1.0-detached-dcac972-SNAPSHOT",
+  "embeddedBuildVersion": "4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
   "license": "Apache-2.0",
-  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=2",
-  "scope": "Complete maintainer-built CLI jar from unmodified upstream; no runtime overlay or local patch."
+  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=3",
+  "scope": "Complete maintainer-built CLI jar from upstream dcac972f with dependency security overrides. No Java engine behavior changes or runtime overlay.",
+  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-security-20261002/cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
+  "dependencyPins": {
+    "hl7Core": "6.9.12",
+    "jacksonBom": "2.22.3",
+    "httpCore5": "5.4.4 constraint if requested; absent from resolved runtime"
+  },
+  "patchSha256": "6afbc5d5bbbf295fca7fbc315f347cf62eb45e7183fd4d0f0bea9a4d41fd1739",
+  "nestedJarInventory": "security-20261002/nested-jars.json",
+  "runtimeDependencyInventory": "security-20261002/runtime-dependencies.json",
+  "resolvedGraphDelta": "security-20261002/runtime-delta.json",
+  "toolchainChange": "Build launcher changed from JDK 23 to JDK 17; Java 17 target retained. Recompiled module bytes and dependency behavior may differ; no Java source edits.",
+  "resolvedGraphChanges": {
+    "removed": [
+      "httpclient5-5.4.3.jar",
+      "httpcore5-5.3.4.jar",
+      "httpcore5-h2-5.3.4.jar"
+    ],
+    "added": [
+      "okhttp-jvm-5.3.2.jar",
+      "okio-jvm-3.16.4.jar"
+    ],
+    "changed": [
+      {
+        "before": "Saxon-HE-11.6.jar",
+        "after": "Saxon-HE-13.0.jar"
+      },
+      {
+        "before": "cqf-fhir-cql-0.1.0-detached-dcac972-SNAPSHOT.jar",
+        "after": "cqf-fhir-cql-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+      },
+      {
+        "before": "cqf-fhir-cr-0.1.0-detached-dcac972-SNAPSHOT.jar",
+        "after": "cqf-fhir-cr-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+      },
+      {
+        "before": "cqf-fhir-utility-0.1.0-detached-dcac972-SNAPSHOT.jar",
+        "after": "cqf-fhir-utility-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+      },
+      {
+        "before": "jackson-annotations-2.21.jar",
+        "after": "jackson-annotations-2.22.jar"
+      },
+      {
+        "before": "jackson-core-2.21.1.jar",
+        "after": "jackson-core-2.22.3.jar"
+      },
+      {
+        "before": "jackson-databind-2.21.1.jar",
+        "after": "jackson-databind-2.22.3.jar"
+      },
+      {
+        "before": "jackson-datatype-jsr310-2.21.1.jar",
+        "after": "jackson-datatype-jsr310-2.22.3.jar"
+      },
+      {
+        "before": "opentelemetry-api-1.60.1.jar",
+        "after": "opentelemetry-api-1.61.0.jar"
+      },
+      {
+        "before": "opentelemetry-common-1.60.1.jar",
+        "after": "opentelemetry-common-1.61.0.jar"
+      },
+      {
+        "before": "opentelemetry-context-1.60.1.jar",
+        "after": "opentelemetry-context-1.61.0.jar"
+      },
+      {
+        "before": "opentelemetry-instrumentation-annotations-2.26.1.jar",
+        "after": "opentelemetry-instrumentation-annotations-2.27.0.jar"
+      },
+      {
+        "before": "org.hl7.fhir.convertors-6.9.4.1.jar",
+        "after": "org.hl7.fhir.convertors-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.dstu2-6.9.4.1.jar",
+        "after": "org.hl7.fhir.dstu2-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.dstu2016may-6.9.4.1.jar",
+        "after": "org.hl7.fhir.dstu2016may-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.dstu3-6.9.4.1.jar",
+        "after": "org.hl7.fhir.dstu3-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.dstu3.support-6.9.4.1.jar",
+        "after": "org.hl7.fhir.dstu3.support-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.model-6.9.4.1.jar",
+        "after": "org.hl7.fhir.model-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.r4-6.9.4.1.jar",
+        "after": "org.hl7.fhir.r4-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.r4b-6.9.4.1.jar",
+        "after": "org.hl7.fhir.r4b-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.r5-6.9.4.1.jar",
+        "after": "org.hl7.fhir.r5-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.support-6.9.4.1.jar",
+        "after": "org.hl7.fhir.support-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.utilities-6.9.4.1.jar",
+        "after": "org.hl7.fhir.utilities-6.9.12.jar"
+      },
+      {
+        "before": "org.hl7.fhir.validation-6.9.4.1.jar",
+        "after": "org.hl7.fhir.validation-6.9.12.jar"
+      },
+      {
+        "before": "sqlite-jdbc-3.50.3.0.jar",
+        "after": "sqlite-jdbc-3.53.2.0.jar"
+      },
+      {
+        "before": "xmlresolver-5.2.1.jar",
+        "after": "xmlresolver-6.0.23.jar"
+      },
+      {
+        "before": "xmlresolver-5.2.1-data.jar",
+        "after": "xmlresolver-6.0.23-data.jar"
+      }
+    ]
+  },
+  "qualificationLimits": [
+    "Native session controls do not exercise remote terminology/FHIR-NPM package fetches through OkHttp or XSLT transformations through Saxon.",
+    "All four upstream integrationTest tasks returned NO-SOURCE."
+  ]
 }

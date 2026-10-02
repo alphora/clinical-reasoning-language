@@ -25,6 +25,11 @@ import {
 } from "../spawn";
 
 describe("the JVM spawn contract is bounded by construction", () => {
+  it("matches the delivered engine provenance manifest", () => {
+    const manifest = JSON.parse(readFileSync(path.resolve(__dirname, "../../../../../patches/cqframework/cli-build.json"), "utf8"));
+    expect(manifest).toMatchObject({ sha256: ENGINE_JAR_SOURCE.sha256, buildId: ENGINE_JAR_SOURCE.buildId, url: ENGINE_JAR_SOURCE.url });
+    expect(ENGINE_JAR_SOURCE.cacheRelativePath).toBe(".cache/crl/engines/" + manifest.asset);
+  });
   it("⚠ every run is heap-capped AND exits on OOM", () => {
     const flags = jvmFlags(DEFAULT_BOUNDS);
     expect(flags).toContain(`-Xmx${DEFAULT_BOUNDS.maxHeapMb}m`);
@@ -182,7 +187,7 @@ describe("the JVM spawn contract is bounded by construction", () => {
 });
 
 // ⭐ THE JAR MUST BE OBTAINABLE, not merely verifiable. Both parameters were REQUIRED, so a consumer
-// could not construct the call without already possessing a 215 MB artifact and its hash — and the
+// could not construct the call without already possessing a approximately 217 MB artifact and its hash — and the
 // refusal naming the download URL sat AFTER the call they could not make. As the IEHP KE put it: "the
 // gate is not the failure path — it is the signature." They recovered the URL by reading back an
 // agent-to-agent message thread, because it existed nowhere in the shipped tool.

@@ -1,5 +1,13 @@
 # Authoring-kit coverage ledger
 
+## 6.4.27 engine security maintenance — schema 2.20
+
+Baseline: `560cb6ff4e654c392c7393fc69714c3c01fb02f1`. Target: the source commit containing this section; audit.json records its resolved SHA after review. The intervening 6.4.26 audit stamp and release versions are metadata-only. This delta updates the engine acquisition identity interpolated into `native-execution`; schema 2.20/hash `3188854fd41afdaf6a30ba42ba1b82abd453f0ebaecbd1b607955c6cfb815de5` teach the security-patched dependency build. Language and clinical semantics are unchanged.
+
+Changed-path dispositions: `results/spawn.ts` and `authoring-kit/index.ts` update the engine identity/cache path and kit version. `results/tests/spawn.test.ts` existing hash-before-launch, launcher presence, absent cache, and distinct-cache assertions remain the owning contract; they use the live engine constants. `authoring-kit.test.ts`, core MCP and extension MCP assertions update content identity only; existing navigation/query tests remain sufficient. `qualification/session.cjs` and `typed.cjs` now exercise default engine lookup with no request override, asserting the runtime path/hash on every native step. Those are runtime qualification controls, not new language claims. `patches/cqframework` manifests, dependency patch/inventories and instructions record the actual locally patched build; acceptance README updates current acquisition guidance while retaining historical evidence. Package versions/lockfile, release documentation and later audit stamp are metadata. No owning assertion, kit tag or language example is deleted; no new example is introduced. The complete delta includes untracked provenance assets listed by the release source review.
+
+The four owning source suites passed 186 assertions before the content commit. Review 897 covers the release plan; source review and final installed Windows/Linux evidence are recorded separately. The exact candidate engine passed the dated Trivy gate (zero fixable HIGH/CRITICAL versus 32 for the prior pin). This is dependency scan evidence, not a reachability or customer-policy certification. Native and installed checks remain mandatory for compatibility; this ledger does not claim a refreshed 116-case Bleph acceptance. The previous engine's historical receipt identities below are preserved.
+
 ## 6.4.26 cumulative language/tooling maintenance — schema 2.19
 
 Baseline: `88b0440dc1ddaa4ae536df61f5cb924fa82e8def`. Target: `560cb6ff4e654c392c7393fc69714c3c01fb02f1`. Kit hash: `320e43eb9e98e6dc0d6dbd6c56cee01046e539b82321e021208afe76fa897011`. This section covers the complete delta through the isolated release candidate, including uncommitted and untracked source. The reviewed source/teaching audit is complete; later release-version and audit-stamp changes are metadata-only and installed qualification is separate.
@@ -1393,3 +1401,7 @@ After the final verification-legend correction, the 109 affected kit/example
 checks and MCP smoke passed again. Commands and logs are recorded in discussion 621. Refresh this ledger's evidence when a mapped assertion, input,
 configuration or intended behavior changes; do not retain a verified label on
 an invalidated mapping. Source kit 1.38 is unreleased until the release gates run.
+
+### Security follow-up source review 898
+
+The 2.20 delta also includes session.ts selecting its default engine with the captured environment; session.test.ts adds the no-override cache/path/hash assertion. Existing native-apply-session and native-execution teaching is sufficient. spawn.test.ts compares source acquisition identity to cli-build.json (internal provenance consistency). The native-acceptance session helper is rebuilt against the new engine; no Java helper source change. Runtime delta, toolchain, HTTP/XSLT qualification limits and BOM annotation version are documented explicitly. These are provenance/qualification changes, not changed clinical or language semantics. No owning @kit assertion was removed. Native six-step and typed four-step source controls passed; installed receipts remain separate. External review findings and dispositions are in discussion898.

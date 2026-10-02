@@ -371,8 +371,8 @@ export type {
 //   through the `@kit verify-loop:record-status-…` tags on conditionStatus.test.ts, which are a
 //   separate `<ruleId>:<claim>` namespace. The gate is now bidirectional: an invariant clause must
 //   carry a resolving anchor, and a non-invariant clause must carry none.
-// REFACTOR:grounded: schemaVersion → "2.19": request-code sources, direct answer guards, selected-answer aggregates, criterion descriptions and interactive verification.
-const SCHEMA_VERSION = "2.19";
+// REFACTOR:grounded: schemaVersion → "2.20": security-patched engine acquisition identity; language semantics unchanged.
+const SCHEMA_VERSION = "2.20";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
