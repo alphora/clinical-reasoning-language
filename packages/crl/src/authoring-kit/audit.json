@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "560cb6ff4e654c392c7393fc69714c3c01fb02f1",
-  "auditedSchemaVersion": "2.19",
-  "auditedContentHash": "320e43eb9e98e6dc0d6dbd6c56cee01046e539b82321e021208afe76fa897011",
-  "scope": "Kit schema 2.19 cumulative delta audit from 88b0440dc1ddaa4ae536df61f5cb924fa82e8def: typed request-code sources, direct answer-option guards, ordinary and available-value membership, criterion descriptions and interactive native testing. Complete changed-path dispositions and owning assertion/fixture limits are recorded in coverage.md. Native source review896 converged; external unavailable after budget exhaustion. Core tests, extension tests, real MCP smoke, builds/types and three browser harnesses passed after the documented overview-bound correction. This stamp certifies bounded source/teaching alignment, not customer-policy correctness or installed/native release qualification; those have separate receipts.",
+  "auditedRevision": "b4f3066699d3450a30c85d33e33ed20f69df2553",
+  "auditedSchemaVersion": "2.20",
+  "auditedContentHash": "3188854fd41afdaf6a30ba42ba1b82abd453f0ebaecbd1b607955c6cfb815de5",
+  "scope": "Kit 2.20 bounded delta audit from 560cb6ff4e654c392c7393fc69714c3c01fb02f1: security-patched engine acquisition identity and default execution evidence. Complete changed-path dispositions and limits in coverage.md; source review898 converged. No language or clinical semantics changed. Owning source checks and native six-step/four-step controls passed; HTTP/XSLT paths and customer deployment remain outside this evidence. This stamp certifies teaching/source alignment, not installed release or customer-policy acceptance.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
