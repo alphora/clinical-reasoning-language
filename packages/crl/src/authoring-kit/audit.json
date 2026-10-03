@@ -2,6 +2,6 @@
   "auditedRevision": "f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11",
   "auditedSchemaVersion": "2.23",
   "auditedContentHash": "441cb04b5ce32ed86895683070f2b9f8a14f59cd1621f62a89c38e88ee505a8d",
-  "scope": "Kit schema2.23 bounded delta from d9abb61871bf4f3d999cd601b52e4d24fe86aca4: singleton available-value membership preserves finite domains, validity, errors, passive question inputs and explicit negative witnesses. Existing ordinary aggregate cardinality remains unchanged. Complete changed-path dispositions and evidence in coverage.md. Native plan/code reviews914/915 converged, external unavailable. 203focused tests,19native nestedcases,8direct producer controls,13fullQR client exchanges and both rebuiltMCP suites pass. Source qualification only; no newly installed/customer-policy or generalized rendering claim.",
+  "scope": "Kit schema 2.23 bounded delta from d9abb61871bf4f3d999cd601b52e4d24fe86aca4: singleton available-value membership preserves finite domains, validity, errors, passive question inputs and explicit negative witnesses. Existing ordinary aggregate cardinality remains unchanged. Complete changed-path dispositions and evidence in coverage.md. Native plan/code reviews914/915 converged, external unavailable. 203focused tests,19native nestedcases,8direct producer controls,13fullQR client exchanges and both rebuiltMCP suites pass. Source qualification only; no newly installed/customer-policy or generalized rendering claim.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
