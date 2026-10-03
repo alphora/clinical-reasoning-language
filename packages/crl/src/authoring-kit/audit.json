@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "d9abb61871bf4f3d999cd601b52e4d24fe86aca4",
-  "auditedSchemaVersion": "2.22",
-  "auditedContentHash": "6e7ee65ddc9d048258f392a9d35e2d95929cf6283655e5f6f123b486eaf31baa",
-  "scope": "Kit schema 2.22 bounded delta from861e7d3aec35e7e5e5bebc8553096f2db8d450b6: available-value aggregates preserve full definitions without requesting absent operands; current submitted Q/QR retains omitted answered items and extraction bindings for correction. Native compiler13 checks, client9ordinary/7collision/noform5 and actual production renderer change/clear pass; source plan/code reviews905/906/908/909 converged. Coverage ledger records owning assertions, identity delivery checks and limits. No installed/customer-policy or generalized repeated native-extraction claim.",
+  "auditedRevision": "f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11",
+  "auditedSchemaVersion": "2.23",
+  "auditedContentHash": "441cb04b5ce32ed86895683070f2b9f8a14f59cd1621f62a89c38e88ee505a8d",
+  "scope": "Kit schema2.23 bounded delta from d9abb61871bf4f3d999cd601b52e4d24fe86aca4: singleton available-value membership preserves finite domains, validity, errors, passive question inputs and explicit negative witnesses. Existing ordinary aggregate cardinality remains unchanged. Complete changed-path dispositions and evidence in coverage.md. Native plan/code reviews914/915 converged, external unavailable. 203focused tests,19native nestedcases,8direct producer controls,13fullQR client exchanges and both rebuiltMCP suites pass. Source qualification only; no newly installed/customer-policy or generalized rendering claim.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
