@@ -374,7 +374,8 @@ export type {
 // REFACTOR:grounded: schemaVersion → "2.20": security-patched engine acquisition identity; language semantics unchanged.
 // REFACTOR:grounded: schemaVersion → "2.21": interactive edits preserve siblings; parent follow-ups and repeated-group limits are explicit.
 // REFACTOR:grounded: schemaVersion → "2.22": available-value reads do not request operand questions; submitted answers remain editable.
-const SCHEMA_VERSION = "2.22";
+// REFACTOR:grounded: schemaVersion → "2.23": single available-answer membership preserves passive inputs and explicit negative witnesses.
+const SCHEMA_VERSION = "2.23";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -524,7 +525,7 @@ const RULES: KitRule[] = [
     "rule": "Use definition is any of \"A\" and \"B\" in \"Flagged Answers\" using validity of \"A\" on an explicit Record/Observation/boolean publication with most-recent selection. Operands are distinct selected CodeableConcept publications with finite interpreted domains. Every target terminology member must belong to every operand domain; the validity anchor names one operand. Imported operands and terminology retain their owner identities. Any member yields true; all selected interpretable nonmembers yield false; otherwise the ordinary any of result is unknown. Selection or interpretation errors survive a positive sibling.",
     "clauses": [
       {
-        "text": "The explicit any available value of form inspects only available selected values: absent and valueless operands are ignored, so an empty available set yields false. This check does not request its operand questions; their computation and answer definitions remain available, and independently reached questions still gather normally. This result concerns the enumerated available values; it does not establish that unanswered questions are negative or that required evidence is complete. Ordinary any of remains three-state and gathers answerable operands. Both operations preserve errors, use only the anchor's actual optional validity and invent no timestamp.",
+        "text": "The explicit any available value of form accepts one or more distinct operands; ordinary any of requires two or more. It inspects only available selected values: absent and valueless operands are ignored, so an empty available set yields false. A single-answer check uses the sole operand as its validity anchor. Establish an available negative answer with membership in an explicit negative-answer terminology; negating an available positive check would incorrectly treat absence as negative. This check does not request its operand questions; their computation and answer definitions remain available, and independently reached questions still gather normally. This result concerns the enumerated available values; it does not establish that unanswered questions are negative or that required evidence is complete. Ordinary any of remains three-state and gathers answerable operands. Both operations preserve errors, use only the anchor's actual optional validity and invent no timestamp.",
         "force": "default"
       },
       {

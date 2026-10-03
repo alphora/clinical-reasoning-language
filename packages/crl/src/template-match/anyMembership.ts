@@ -17,7 +17,7 @@ export function readAnyMembership(body: NarrativeClause) {
     if (e[i]?.type !== "NConceptRef") return undefined;
   }
   const terminology = e[i + 1], validity = e[i + 5];
-  if (operands.length < 2 || !word(i, "in") || terminology?.type !== "NConceptRef" ||
+  if (operands.length < (availableValuesOnly ? 1 : 2) || !word(i, "in") || terminology?.type !== "NConceptRef" ||
       !word(i + 2, "using") || !word(i + 3, "validity") || !word(i + 4, "of") ||
       validity?.type !== "NConceptRef" || e.length !== i + 6) return undefined;
   return { operands, terminology, validity, availableValuesOnly, location: body.location };

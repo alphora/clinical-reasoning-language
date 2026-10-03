@@ -76,6 +76,43 @@ function questionProfiles(resources: ReturnType<typeof emitFhirDefFromPath>["res
 }
 
 describe("aggregate selected-answer membership", () => {
+  // @kit selected-answer-aggregate:singleton-available
+  it.each([
+    ["known", false], ["flagged", true], [undefined, false],
+  ])("reads a singleton available answer %s as %s without requesting it", (code, expected) => {
+    const text = source.replace('any of "A" and "B"', 'any available value of "A"');
+    const p = program(text); expect(p.diagnostics).toEqual([]);
+    const d = p.descriptors.find(d => d.title === "Flagged")!;
+    const result = produceAnyMembershipCandidate(d, [code === undefined ? undefined : candidate(code)], "Patient/p");
+    expect(result).toMatchObject({ kind: "candidate", candidate: { resource: { valueBoolean: expected } } });
+    const path = fixture(text);
+    expect(validateCRLImports(path).success).toBe(true);
+    const cql = emitCQLImports(path); expect(cql.success, JSON.stringify(cql.errors)).toBe(true);
+    const fhir = emitFhirDefFromPath(path); expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+    expect(fhir.resources.some(r => r.resourceType === "StructureDefinition" && r.sourceName === "A")).toBe(true);
+    expect(questionProfiles(fhir.resources)).toEqual([]);
+  });
+  it("preserves singleton clear metadata and rejects invalid or contradictory available answers", () => {
+    const p = program(source.replace('any of "A" and "B"', 'any available value of "A"'));
+    expect(p.diagnostics).toEqual([]);
+    const d = p.descriptors.find(d => d.title === "Flagged")!;
+    const cleared = { ...candidate(undefined), validity: "2026-01", resource: { ...candidate(undefined).resource, effectiveDateTime: "2026-01" } };
+    expect(produceAnyMembershipCandidate(d, [cleared], "Patient/p")).toMatchObject({ kind: "candidate", candidate: { validity: "2026-01", resource: { valueBoolean: false, effectiveDateTime: "2026-01" } } });
+    expect(produceAnyMembershipCandidate(d, [candidate("invalid")], "Patient/p")).toMatchObject({ kind: "error", code: "publication-uninterpretable-value" });
+    const mixed = candidate("flagged"); mixed.resource.valueCodeableConcept!.coding.push({ system: "urn:answers", code: "known" });
+    expect(produceAnyMembershipCandidate(d, [mixed], "Patient/p")).toMatchObject({ kind: "error", code: "publication-ambiguous-coded-value" });
+  });
+  it.each(['any of "A"', 'any available value of', 'any available value of "A" and', 'any available value of "A" and "A"'])
+    ("continues refusing unsupported operand syntax: %s", replacement => {
+      expect(validateCRLImports(fixture(source.replace('any of "A" and "B"', replacement))).success).toBe(false);
+    });
+  it("requires the singleton itself as anchor and a predicate inside its domain", () => {
+    const text = source.replace('any of "A" and "B"', 'any available value of "A"');
+    expect(program(text.replace('using validity of "A"', 'using validity of "B"')).diagnostics.some(d => d.kind === "publication-validity-operand-unsupported")).toBe(true);
+    const outside = text.replace('- code is `flagged`.','- code is `outside`.');
+    expect(program(outside).diagnostics.some(d => d.kind === "publication-membership-domain-coverage")).toBe(true);
+    expect(emitCQLImports(fixture(outside)).success).toBe(false);
+  });
   // @kit selected-answer-aggregate:question-inputs
   it.each(["any of", "any available value of"])("retains operand profiles but requests them only when needed by %s", operation => {
     const fhir = emitFhirDefFromPath(fixture(source.replace("any of", operation)));
