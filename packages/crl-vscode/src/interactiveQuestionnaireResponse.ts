@@ -1,4 +1,4 @@
-/** Keep authoritative Q metadata and order. Accept hierarchical subsets; the caller chooses the prefix.
+/** Keep authoritative Q metadata and order. Accept hierarchical subsets chosen by the caller.
  * Host submission and browser edit preparation both reject invalid trees; the browser blocks Continue on failure. */
 export function retainInteractiveQuestionnaire(questionnaire: any, retained: any): any {
   const q = JSON.parse(JSON.stringify(questionnaire));
@@ -32,44 +32,60 @@ export function pruneInteractiveResponse(questionnaire: any, previous: any, inco
   const value = (item: any) => JSON.stringify((item?.answer ?? []).map((a: any) =>
     Object.fromEntries(Object.keys(a).filter(k => k.startsWith("value")).sort().map(k => [k, a[k]]))));
   let changed: string | undefined, pruned = false;
-  const hasAnswers = (v: any): boolean => !!v && typeof v === "object" &&
-    (Array.isArray(v.answer) && v.answer.length > 0 || Object.values(v).some(x => typeof x === "object" && hasAnswers(x)));
-  const walk = (questions: any[], before: any[], after: any[], prefix: string): any[] => {
-    const result: any[] = [];
+  const walk = (questions: any[], before: any[], after: any[], prefix: string): { items: any[]; definitions: any[] } => {
+    const result: any[] = [], definitions: any[] = [];
     for (const q of questions ?? []) {
       const old = (before ?? []).filter(x => x.linkId === q.linkId);
       const now = (after ?? []).filter(x => x.linkId === q.linkId);
-      const count = q.type === "group" && q.repeats ? Math.max(old.length, now.length, 1) : 1;
-      for (let i = 0; i < count; ++i) {
-        const p = old[i], n = now[i], path = `${prefix}/${q.linkId}[${i}]`;
-        if (changed) { if (hasAnswers(n) || hasAnswers(p)) pruned = true; continue; }
-        const item = copy(n ?? { linkId: q.linkId });
-        if (q.definition) item.definition = q.definition;
-        delete item.item;
-        if (item.answer) for (const a of item.answer) delete a.item;
-        // An empty response item is intentional: preserve a clear even when LForms omits it.
-        if (q.type !== "group" && q.type !== "display" && value(p) !== value(n)) {
-          changed = path;
-          if (hasAnswers(n?.item) || hasAnswers(p?.item) || [...(n?.answer ?? []), ...(p?.answer ?? [])].some((a: any) => hasAnswers(a.item))) pruned = true;
-        } else if (q.item?.length) {
-          if (item.answer?.length) {
-            for (let a = 0; a < item.answer.length; ++a) {
-              const children = walk(q.item, p?.answer?.[a]?.item, n?.answer?.[a]?.item, `${path}/answer[${a}]`);
-              if (children.length) item.answer[a].item = children;
-            }
-          } else {
-            const children = walk(q.item, p?.item, n?.item, path);
-            if (children.length) item.item = children;
-          }
+      // Array positions do not identify repeated occurrences after an add/remove/reorder.
+      // Preserve the supplied occurrences and the full template; Continue resolves applicability.
+      if (q.type === "group" && q.repeats) {
+        if (JSON.stringify(old) !== JSON.stringify(now)) changed ??= `${prefix}/${q.linkId}`;
+        for (const occurrence of now) {
+          const item = copy(occurrence);
+          if (q.definition) item.definition = q.definition;
+          const children = walk(q.item, occurrence.item, occurrence.item, `${prefix}/${q.linkId}`);
+          if (children.items.length) item.item = children.items; else delete item.item;
+          result.push(item);
         }
-        result.push(item);
+        definitions.push(copy(q));
+        continue;
       }
+      const p = old[0], n = now[0], path = `${prefix}/${q.linkId}[0]`;
+      const definition = copy(q);
+      const item = copy(n ?? { linkId: q.linkId });
+      if (q.definition) item.definition = q.definition;
+      delete item.item;
+      if (item.answer) for (const a of item.answer) delete a.item;
+      // An empty response item is intentional: preserve a clear even when LForms omits it.
+      if (q.type !== "group" && q.type !== "display" && value(p) !== value(n)) {
+        changed ??= path;
+        if (q.item?.length) pruned = true;
+        delete definition.item;
+      } else if (q.item?.length) {
+        if (item.answer?.length) {
+          const retained: any[] = [];
+          for (let a = 0; a < item.answer.length; ++a) {
+            const children = walk(q.item, p?.answer?.[a]?.item, n?.answer?.[a]?.item, `${path}/answer[${a}]`);
+            if (children.items.length) item.answer[a].item = children.items;
+            retained.push(...children.definitions);
+          }
+          // One template is shared by all answer occurrences.
+          definition.item = retained;
+        } else {
+          const children = walk(q.item, p?.item, n?.item, path);
+          if (children.items.length) item.item = children.items;
+          definition.item = children.definitions;
+        }
+      }
+      result.push(item);
+      definitions.push(definition);
     }
-    return result;
+    return { items: result, definitions };
   };
-  const response = { ...copy(previous ?? {}), ...copy(incoming), item: walk(questionnaire.item, previous?.item, incoming.item, "") };
-  const kept = changed ? retain(questionnaire, response) : copy(questionnaire);
-  pruned ||= JSON.stringify(kept.item) !== JSON.stringify(questionnaire.item);
+  const tree = walk(questionnaire.item, previous?.item, incoming.item, "");
+  const response = { ...copy(previous ?? {}), ...copy(incoming), item: tree.items };
+  const kept = changed ? retain(questionnaire, { item: tree.definitions }) : copy(questionnaire);
   return { questionnaire: kept, response, changed, pruned };
 }
 

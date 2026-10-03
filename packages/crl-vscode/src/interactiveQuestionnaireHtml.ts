@@ -83,7 +83,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
       results.hidden = true; evaluationWarnings = []; showWarnings();
       status.textContent = "Answers changed. Continue to re-evaluate.";
       if (delta.pruned) {
-        status.textContent = "Later questions and answers removed. Continue to re-evaluate.";
+        status.textContent = "Nested follow-up questions and answers removed. Continue to re-evaluate.";
         const active = doc.activeElement;
         const focus = active?.id && mount.contains(active) ? { id: active.id, start: active.selectionStart, end: active.selectionEnd, direction: active.selectionDirection } : undefined;
         void mountForm(true, focus);

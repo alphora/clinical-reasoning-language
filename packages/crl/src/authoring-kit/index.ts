@@ -372,7 +372,8 @@ export type {
 //   separate `<ruleId>:<claim>` namespace. The gate is now bidirectional: an invariant clause must
 //   carry a resolving anchor, and a non-invariant clause must carry none.
 // REFACTOR:grounded: schemaVersion → "2.20": security-patched engine acquisition identity; language semantics unchanged.
-const SCHEMA_VERSION = "2.20";
+// REFACTOR:grounded: schemaVersion → "2.21": interactive edits preserve siblings; parent follow-ups and repeated-group limits are explicit.
+const SCHEMA_VERSION = "2.21";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -539,7 +540,7 @@ const RULES: KitRule[] = [
     "rule": "Open the interactive questionnaire from the Medical Validation tree. Supply policy-local tests/interactive-questionnaire/request-1/request-bundle.json and additional numbered request directories as needed. Each collection Bundle has one Patient and at least one supported ServiceRequest, NutritionOrder, MedicationRequest, CommunicationRequest or Task associated through relative Patient/id references. The loader checks structure and association, not FHIR profile conformance or every source-adapter state restriction. Initial request resources are preserved.",
     "clauses": [
       {
-        "text": "Start and Continue submit the current Questionnaire and QuestionnaireResponse to native apply; extraction belongs to the engine. Editing or clearing an earlier answer prunes downstream response items and resets their defaults. There is no answer history or automatic restoration. The current form and result remain visible after an error so the user can correct or reset. Verify actual native results and returned questions, not only a preview or initial population.",
+        "text": "Start and Continue submit the current Questionnaire and QuestionnaireResponse to native apply; extraction belongs to the engine. Editing or clearing an answer preserves sibling questions and answers. Editing an ordinary parent removes its nested follow-up questions and answers without restoring their defaults. Repeated-group occurrences are preserved as exported with empty answer slots normalized within surviving occurrences; LForms omits wholly unanswered occurrences. Array position does not establish occurrence identity, so applicability inside repeats waits for Continue. There is no answer history or automatic restoration. A changed answer hides the previous result; a failed evaluation leaves the edited form available for correction or retry. Verify actual native results and returned questions, not only a preview or initial population.",
         "force": "default"
       },
       {

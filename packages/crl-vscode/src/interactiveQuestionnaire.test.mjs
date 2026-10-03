@@ -96,15 +96,82 @@ describe("interactive initial states", () => {
   });
 });
 describe("interactive response pruning", () => {
-  it("keeps the changed false answer and ancestors while dropping downstream answers", () => {
-    const result = pruneInteractiveResponse(q, qr(), qr(false));
+  it("retains all five flat siblings when only the second question is answered", () => {
+    const form = { item: ["one", "two", "three", "four", "five"].map(linkId => ({ linkId, type: "boolean" })) };
+    const incoming = { item: [{ linkId: "two", answer: [{ valueBoolean: true }] }] };
+    const result = pruneInteractiveResponse(form, { item: [] }, incoming);
+    expect(result.questionnaire).toEqual(form);
+    expect(result.response.item.map(i => i.linkId)).toEqual(form.item.map(i => i.linkId));
+    expect(result.response.item[1]).toEqual(incoming.item[0]);
+    expect(result.changed).toBe("/two[0]");
+    expect(result.pruned).toBe(false);
+  });
+  // @kit interactive-questionnaire:parent-followups
+  it.each(["item", "answer"])("prunes only descendants of every changed parent through %s", placement => {
+    const parent = id => ({ linkId: id, type: "string", item: [{ linkId: id + "child", type: "string" }] });
+    const form = { item: [parent("a"), parent("b"), parent("c")] };
+    const response = { item: form.item.map(q => {
+      const item = { linkId: q.linkId, answer: [{ valueString: "old" }] };
+      const children = [{ linkId: q.linkId + "child", answer: [{ valueString: "child value" }] }];
+      if (placement === "answer") item.answer[0].item = children;
+      else { delete item.answer; item.item = children; }
+      return item;
+    }) };
+    const incoming = structuredClone(response);
+    incoming.item[0].answer = [{ valueString: "changed" }];
+    incoming.item[1].answer = [{ valueString: "changed too" }];
+    const result = pruneInteractiveResponse(form, response, incoming);
     expect(result.pruned).toBe(true);
-    expect(result.response.item).toEqual([{ linkId: "g", item: [{ linkId: "a", answer: [{ valueBoolean: false }] }] }]);
+    expect(result.response.item.slice(0, 2)).toEqual(incoming.item.slice(0, 2).map(i => ({ linkId: i.linkId, answer: i.answer })));
+    expect(result.response.item[2]).toEqual(response.item[2]);
+    expect(result.questionnaire.item).toEqual([{ linkId: "a", type: "string" }, { linkId: "b", type: "string" }, form.item[2]]);
+    const back = structuredClone(result.response); back.item[0].answer = [{ valueString: "old" }];
+    expect(pruneInteractiveResponse(result.questionnaire, result.response, back).response.item[0]).toEqual(back.item[0]);
+  });
+  // @kit interactive-questionnaire:repeat-preservation
+  it("preserves repeat removals, reorder, empty additions and explicit clears without positional matching", () => {
+    const form = { item: [{ linkId: "g", type: "group", repeats: true, item: [
+      { linkId: "parent", type: "string", definition: "urn:parent", item: [{ linkId: "child", type: "string" }] },
+      { linkId: "sibling", type: "boolean" },
+    ] }] };
+    const occurrence = value => ({ linkId: "g", item: [
+      { linkId: "parent", definition: "urn:parent", answer: [{ valueString: value, item: [{ linkId: "child", answer: [{ valueString: value + " child" }] }] }] },
+      { linkId: "sibling", answer: [{ valueBoolean: false }] },
+    ] });
+    const before = { item: [occurrence("A"), occurrence("B"), occurrence("C")] };
+    for (const item of [before.item.slice(1), [before.item[0], before.item[2]], [...before.item].reverse(), []]) {
+      const result = pruneInteractiveResponse(form, before, { item });
+      expect(result.response.item).toEqual(item);
+      expect(result.changed).toBeDefined();
+      expect(result.pruned).toBe(false);
+      expect(result.questionnaire).toEqual(form);
+    }
+    const empty = pruneInteractiveResponse(form, { item: [] }, { item: [{ linkId: "g" }] });
+    expect(empty.changed).toBeDefined();
+    expect(empty.response.item).toHaveLength(1);
+    expect(empty.response.item[0].item[0]).toMatchObject({ linkId: "parent", definition: "urn:parent" });
+    const cleared = { item: [occurrence("A")] }; cleared.item[0].item.shift();
+    const result = pruneInteractiveResponse(form, before, cleared);
+    expect(result.response.item[0].item[0]).toMatchObject({ linkId: "parent", definition: "urn:parent" });
+    expect(result.response.item[0].item[0].answer).toBeUndefined();
+    expect(result.response.item[0].item[1]).toEqual(cleared.item[0].item[0]);
+    expect(before.item).toHaveLength(3);
+  });
+  it("keeps a forward enableWhen reference to a later sibling", () => {
+    const form = structuredClone(q);
+    form.item[0].item[0].enableWhen = [{ question: "c", operator: "exists", answerBoolean: true }];
+    expect(pruneInteractiveResponse(form, qr(), qr(false)).questionnaire).toEqual(form);
+  });
+  // @kit interactive-questionnaire:sibling-retention
+  it("keeps the changed false answer, siblings and unrelated branches", () => {
+    const result = pruneInteractiveResponse(q, qr(), qr(false));
+    expect(result.pruned).toBe(false);
+    expect(result.response).toEqual(qr(false));
     expect(qr().item).toHaveLength(2);
-    expect(result.questionnaire.item).toEqual([{ ...q.item[0], item: [q.item[0].item[0]] }]);
+    expect(result.questionnaire).toEqual(q);
     expect(q.item).toHaveLength(2);
   });
-  it("trims later empty questions while preserving preceding unanswered and display items", () => {
+  it("retains later empty questions, preceding unanswered and display items", () => {
     const form = { ...q, item: [
       { linkId: "empty", type: "string" }, { linkId: "note", type: "display", text: "Instructions" },
       { linkId: "second", type: "boolean", definition: "urn:def" }, { linkId: "later", type: "string" },
@@ -112,9 +179,9 @@ describe("interactive response pruning", () => {
     const before = { item: [{ linkId: "second", answer: [{ valueBoolean: false }] }] };
     const after = { item: [{ linkId: "second", answer: [{ valueBoolean: true }] }] };
     const result = pruneInteractiveResponse(form, before, after);
-    expect(result.pruned).toBe(true);
-    expect(result.questionnaire).toEqual({ ...form, item: form.item.slice(0, 3) });
-    expect(result.response.item.map(i => i.linkId)).toEqual(["empty", "note", "second"]);
+    expect(result.pruned).toBe(false);
+    expect(result.questionnaire).toEqual(form);
+    expect(result.response.item.map(i => i.linkId)).toEqual(["empty", "note", "second", "later"]);
     expect(pruneInteractiveResponse(form, before, before).questionnaire).toEqual(form);
   });
   it("retains the shared repeated template needed by earlier occurrences", () => {
@@ -126,21 +193,22 @@ describe("interactive response pruning", () => {
     after.item[1].item[0].answer[0].valueString = "edit";
     const result = pruneInteractiveResponse(form, before, after);
     expect(result.response.item[0]).toEqual(before.item[0]);
-    expect(result.response.item[1].item.map(i => i.linkId)).toEqual(["a"]);
-    expect(result.questionnaire.item).toEqual([form.item[0]]);
+    expect(result.response.item[1]).toEqual(after.item[1]);
+    expect(result.questionnaire).toEqual(form);
   });
-  it("change-back does not restore discarded answers", () => {
+  it("change-back preserves sibling answers", () => {
     const first = pruneInteractiveResponse(q, qr(), qr(false)).response;
     const back = structuredClone(first); back.item[0].item[0].answer[0].valueBoolean = true;
     const result = pruneInteractiveResponse(q, first, back).response;
-    expect(result.item).toEqual([{ linkId: "g", item: [{ linkId: "a", answer: [{ valueBoolean: true }] }] }]);
+    expect(result).toEqual(qr());
   });
   it("preserves an explicit clear when the renderer omits the item, and treats empty string as a value", () => {
     const cleared = qr(); cleared.item[0].item.shift();
-    expect(pruneInteractiveResponse(q, qr(), cleared).response.item).toEqual([{ linkId: "g", item: [{ linkId: "a" }] }]);
+    const expected = qr(); delete expected.item[0].item[0].answer;
+    expect(pruneInteractiveResponse(q, qr(), cleared).response).toEqual(expected);
     const changed = pruneInteractiveResponse(q, qr(), qr(true, "")).response;
     expect(changed.item[0].item[1].answer).toEqual([{ valueString: "" }]);
-    expect(changed.item).toHaveLength(1);
+    expect(changed.item).toHaveLength(2);
   });
   it("retains earlier nested answers when a later item changes", () => {
     const result = pruneInteractiveResponse(q, qr(), qr(true, "yes", 3));
@@ -148,14 +216,14 @@ describe("interactive response pruning", () => {
   });
   it("uses Questionnaire order, not reordered QR entries", () => {
     const changed = qr(false); changed.item.reverse();
-    expect(pruneInteractiveResponse(q, qr(), changed).response.item).toHaveLength(1);
+    expect(pruneInteractiveResponse(q, qr(), changed).response).toEqual(qr(false));
   });
-  it("prunes within a repeated group occurrence and through answer.item", () => {
+  it("preserves repeated occurrences and prunes through answer.item outside repeats", () => {
     const repeated = { item: [{ linkId: "g", type: "group", repeats: true, item: [{ linkId: "x", type: "string" }] }, { linkId: "z", type: "boolean" }] };
     const before = { item: [{ linkId: "g", item: [{ linkId: "x", answer: [{ valueString: "first" }] }] }, { linkId: "g", item: [{ linkId: "x", answer: [{ valueString: "second" }] }] }, { linkId: "z", answer: [{ valueBoolean: true }] }] };
     const after = structuredClone(before); after.item[1].item[0].answer[0].valueString = "changed";
     const result = pruneInteractiveResponse(repeated, before, after).response;
-    expect(result.item).toHaveLength(2); expect(result.item[0]).toEqual(before.item[0]);
+    expect(result).toEqual(after);
     const nested = { item: [{ linkId: "parent", type: "boolean", item: [{ linkId: "child", type: "string" }] }] };
     const old = { item: [{ linkId: "parent", answer: [{ valueBoolean: true, item: [{ linkId: "child", answer: [{ valueString: "old" }] }] }] }] };
     const fresh = structuredClone(old); fresh.item[0].answer[0].valueBoolean = false;
@@ -182,7 +250,7 @@ describe("interactive native request lifecycle", () => {
     await expect(session.evaluate(retained.response, retained.questionnaire)).rejects.toThrow("evaluation failed");
     await expect(session.evaluate(retained.response, retained.questionnaire)).rejects.toThrow("evaluation failed");
     const submitted = requests.slice(1).map(r => JSON.parse(r.repositoryJson).entry.at(-1).resource);
-    expect(submitted[0]).toEqual({ ...q, item: [{ ...q.item[0], item: [q.item[0].item[0]] }] });
+    expect(submitted[0]).toEqual(q);
     expect(submitted[1]).toEqual(submitted[0]);
     expect(session.result.questionnaire).toEqual(q);
     fail = false;
@@ -206,7 +274,8 @@ describe("interactive native request lifecycle", () => {
   });
   it("refuses a trim that removes a retained enableWhen dependency, without changing either input", () => {
     const forward = structuredClone(q);
-    forward.item[0].item[0].enableWhen = [{ question: "c", operator: "exists", answerBoolean: true }];
+    forward.item[0].item[0].item = [{ linkId: "child", type: "string" }];
+    forward.item[1].enableWhen = [{ question: "child", operator: "exists", answerBoolean: true }];
     const before = JSON.stringify(forward), previous = qr(), incoming = qr(false);
     expect(() => pruneInteractiveResponse(forward, previous, incoming)).toThrow("depends on a removed question through enableWhen");
     expect(JSON.stringify(forward)).toBe(before);
