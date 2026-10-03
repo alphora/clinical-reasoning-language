@@ -2,6 +2,6 @@
   "auditedRevision": "d9abb61871bf4f3d999cd601b52e4d24fe86aca4",
   "auditedSchemaVersion": "2.22",
   "auditedContentHash": "6e7ee65ddc9d048258f392a9d35e2d95929cf6283655e5f6f123b486eaf31baa",
-  "scope": "Bounded delta from861e7d3aec35e7e5e5bebc8553096f2db8d450b6: available-value aggregates preserve full definitions without requesting absent operands; current submitted Q/QR retains omitted answered items and extraction bindings for correction. Native compiler13 checks, client9ordinary/7collision/noform5 and actual production renderer change/clear pass; source plan/code reviews905/906/908/909 converged. Coverage ledger records owning assertions, identity delivery checks and limits. No installed/customer-policy or generalized repeated native-extraction claim.",
+  "scope": "Kit schema 2.22 bounded delta from861e7d3aec35e7e5e5bebc8553096f2db8d450b6: available-value aggregates preserve full definitions without requesting absent operands; current submitted Q/QR retains omitted answered items and extraction bindings for correction. Native compiler13 checks, client9ordinary/7collision/noform5 and actual production renderer change/clear pass; source plan/code reviews905/906/908/909 converged. Coverage ledger records owning assertions, identity delivery checks and limits. No installed/customer-policy or generalized repeated native-extraction claim.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
