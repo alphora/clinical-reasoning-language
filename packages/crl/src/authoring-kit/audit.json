@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "b4f3066699d3450a30c85d33e33ed20f69df2553",
-  "auditedSchemaVersion": "2.20",
-  "auditedContentHash": "3188854fd41afdaf6a30ba42ba1b82abd453f0ebaecbd1b607955c6cfb815de5",
-  "scope": "Kit schema 2.20 bounded delta audit from 560cb6ff4e654c392c7393fc69714c3c01fb02f1: security-patched engine acquisition identity and default execution evidence. Complete changed-path dispositions and limits in coverage.md; source review898 converged. No language or clinical semantics changed. Owning source checks and native six-step/four-step controls passed; HTTP/XSLT paths and customer deployment remain outside this evidence. This stamp certifies teaching/source alignment, not installed release or customer-policy acceptance.",
+  "auditedRevision": "861e7d3aec35e7e5e5bebc8553096f2db8d450b6",
+  "auditedSchemaVersion": "2.21",
+  "auditedContentHash": "887a421914af2937e39d1471fb9181a4dc3b8d31a3174ed817647e19545b4193",
+  "scope": "Kit schema 2.21 bounded delta audit from b4f3066699d3450a30c85d33e33ed20f69df2553: interactive questionnaire sibling retention and ordinary-parent follow-up pruning, conservative repeated-group normalization with explicit LForms export limits. Complete changed-path dispositions and evidence in coverage.md. Native plan/source review899/900 converged; external review incomplete after timeout/failed retry. 271 focused tests, core MCP smoke, real renderer and native browser-exported session checks passed. No language, engine or Java requirement change, no native repeated extraction or deployed-customer claim.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
