@@ -72,6 +72,7 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
   await delay(100);
   await rpc('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   await rpc('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await delay(400); // Observe the vendor's debounced selection update before any Continue.
   assert.equal(await evaluate(`document.querySelectorAll('#form input[role=combobox]').length`),5,'selecting a coded value retains all five siblings');
   assert.equal(await evaluate(`window.sent.filter(m=>m.type==='continue').length`),beforeEditMessages);
   fs.writeFileSync(path.join(root,'five-choice-siblings.png'),Buffer.from((await rpc('Page.captureScreenshot',{format:'png'})).data,'base64'));
