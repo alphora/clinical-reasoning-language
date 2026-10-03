@@ -3,6 +3,7 @@ import { join, relative, isAbsolute, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
+import { retainSubmittedAnswers } from "./interactiveQuestionnaireRetention";
 import { emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
 import type { ApplySessionRequestV1, ApplySessionResult, ApplySessionOptions } from "@smile-digital-health/crl/session";
 
@@ -212,8 +213,14 @@ export class InteractiveSession {
       await previous.catch(() => {});
       if (epoch !== this.epoch) return;
       try {
-        const result = await this.run(request, abort.signal);
+        const native = await this.run(request, abort.signal);
         if (epoch !== this.epoch) return;
+        // Parse the exact per-call snapshot; callers may have edited their objects while awaiting apply.
+        const submittedQ = JSON.parse(request.repositoryJson).entry.map((e: any) => e.resource)
+          .find((r: Fhir) => r.resourceType === "Questionnaire");
+        const submittedR = JSON.parse(request.requestDataJson).entry.map((e: any) => e.resource)
+          .find((r: Fhir) => r.resourceType === "QuestionnaireResponse");
+        const result = retainSubmittedAnswers(submittedQ, submittedR, native);
         this.result = result;
         return result;
       } catch (error) { if (epoch === this.epoch) throw error; }

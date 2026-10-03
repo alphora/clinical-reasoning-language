@@ -430,9 +430,9 @@ export interface CaseFeatureCollection {
   unionConcepts: CollectedCodeIsConcept[];
 }
 
-/** Gather admitted answer slots by raw declaration identity, including qualified producer operands.
- * Computed uncoded publications have no answer slot; their dependencies still participate. */
-function publicationCaseFeatures(program: PublicationProgram, source: string, ref: ReferenceName): PublicationDescriptor[] {
+/** Gather admitted answer slots by declaration identity. Definitions retain the complete
+ * dependency closure; question inputs follow only dependencies the producer can request. */
+function publicationCaseFeatures(program: PublicationProgram, source: string, ref: ReferenceName, purpose: "definitions" | "questions"): PublicationDescriptor[] {
   const seen = new Set<string>();
   const result: PublicationDescriptor[] = [];
   const visit = (owner: string, reference: ReferenceName): void => {
@@ -442,6 +442,9 @@ function publicationCaseFeatures(program: PublicationProgram, source: string, re
     const descriptor = program.get(declaration.identity.key);
     if (descriptor !== undefined) {
       if (hasLocalPublicationContribution(descriptor)) result.push(descriptor);
+      // Available-value membership reads the supplied set without requesting absent answers.
+      // Keep its own coded answer above and its full definition/CQL closure in the other walk.
+      if (purpose === "questions" && descriptor.producer?.kind === "anyMembership" && descriptor.producer.availableValuesOnly) return;
       // REFACTOR:grounded (#320, plan589): both BMI inputs remain answerable dependencies.
       for (const operand of publicationProducerOperands(descriptor.producer)) visit(operand.sourceIdentity, operand.conceptName);
       return;
@@ -1918,8 +1921,10 @@ export function emitFhirDefClosure(
     // input; an unsupported/not-a-record concept contributes no input either (step 6 raises the loud diagnostic).
     // There is NO Observation fallback — an input never carries a resource type the case-feature lane can't stand behind.
     const caseFeatureInputResolver: CaseFeatureInputResolver = (ref) => {
-      const publicationInputs = publicationCaseFeatures(prepared.publications, lib.filePath, ref).flatMap((descriptor) => {
+      for (const descriptor of publicationCaseFeatures(prepared.publications, lib.filePath, ref, "definitions")) {
         gatheredPublications.set(descriptor.identity.key, descriptor);
+      }
+      const publicationInputs = publicationCaseFeatures(prepared.publications, lib.filePath, ref, "questions").flatMap((descriptor) => {
         return descriptor.profileUrl === undefined ? [] : [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType, presentationOwner: presentationCatalogs.get(descriptor.identity.sourceIdentity) }];
       });
       const normalized = normalizeLocalRef(ref, lib.libraryName);

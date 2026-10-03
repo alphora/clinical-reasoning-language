@@ -61,7 +61,46 @@ const candidate = (code: string | undefined, key = "input") => ({ key, contribut
   resourceType: "Observation", id: key, status: "final", ...(code === undefined ? {} : { valueCodeableConcept: { coding: [{ system: "urn:answers", code }] } }),
 } });
 
+function questionProfiles(resources: ReturnType<typeof emitFhirDefFromPath>["resources"]): string[] {
+  const profiles: string[] = [];
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== "object") return;
+    const node = value as Record<string, unknown>;
+    if (Array.isArray(node.input)) for (const input of node.input) profiles.push(...(input.profile ?? []));
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) child.forEach(visit); else visit(child);
+    }
+  };
+  for (const resource of resources) if (resource.resourceType === "PlanDefinition") visit(resource.resource);
+  return [...new Set(profiles)].sort();
+}
+
 describe("aggregate selected-answer membership", () => {
+  // @kit selected-answer-aggregate:question-inputs
+  it.each(["any of", "any available value of"])("retains operand profiles but requests them only when needed by %s", operation => {
+    const fhir = emitFhirDefFromPath(fixture(source.replace("any of", operation)));
+    expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+    const profiles = fhir.resources.filter(r => r.resourceType === "StructureDefinition").map(r => r.resource.url).sort();
+    expect(profiles).toHaveLength(2);
+    expect(questionProfiles(fhir.resources)).toEqual(operation === "any of" ? profiles : []);
+  });
+  it("keeps a coded available aggregate's own answer without asking for its operands", () => {
+    const text = source.replace("any of", "any available value of").replace('concept "Flagged":', 'concept "Flagged":\n- code is `flagged-answer`.');
+    const fhir = emitFhirDefFromPath(fixture(text));
+    expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+    expect(fhir.resources.filter(r => r.resourceType === "StructureDefinition")).toHaveLength(3);
+    const own = fhir.resources.find(r => r.resourceType === "StructureDefinition" && r.sourceName === "Flagged")!;
+    expect(own).toBeDefined();
+    expect(questionProfiles(fhir.resources)).toEqual([own.resource.url]);
+  });
+  it("still requests an operand reached independently of an available-value check", () => {
+    const text = source.replace("any of", "any available value of")
+      .replace('- otherwise then recommend activity "Passed".', '- when "A" then recommend activity "Passed".\n- otherwise then recommend activity "Passed".');
+    const fhir = emitFhirDefFromPath(fixture(text));
+    expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+    const a = fhir.resources.find(r => r.resourceType === "StructureDefinition" && r.sourceName === "A")!;
+    expect(questionProfiles(fhir.resources)).toEqual([a.resource.url]);
+  });
   it("validates and emits terminology-only refs through the full public path without a question profile", () => {
     const path = fixture();
     const validation = validateCRLImports(path); expect(validation.success, JSON.stringify(validation.validationErrors)).toBe(true);
@@ -145,6 +184,11 @@ describe("aggregate selected-answer membership", () => {
     writeFileSync(join(dirname(path), "foreign.crl"), 'library "Foreign".\n'+source.slice(source.indexOf('terminology "Answers":'), source.indexOf('terminology "Flagged Answers":'))+term+answer("A")+answer("B"));
     expect(validateCRLImports(path).success).toBe(true);
     const emitted = emitCQLImports(path); expect(emitted.success, JSON.stringify(emitted.errors)).toBe(true);
+    const fhir = emitFhirDefFromPath(path);
+    expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
+    const profiles = fhir.resources.filter(r => r.resourceType === "StructureDefinition").map(r => r.resource.url).sort();
+    expect(profiles).toHaveLength(2);
+    expect(questionProfiles(fhir.resources)).toEqual(operation === "any of" ? profiles : []);
     const cases = join(dirname(path), "cases.cel");
     writeFileSync(cases, `library "Cases". covers "Aggregate".
 fact "Patient": - name is "Synthetic". - birth date is "1970-01-01". - defined by "Patient".

@@ -263,8 +263,11 @@ completeness remain design work, not a capability claimed for 4.121.0.
 
 An unknown matters when needed on the applicable decision path. It does not require every missing
 concept to become a question or prevent a result that the authored logic can already determine.
-For a calculation with no answer representation, gather its answerable dependencies or obtain the
-missing source input. If neither route exists, the workflow has unresolved input that must be exposed;
+For a calculation with no answer representation, gather the dependencies its operation requires or obtain the
+missing source input. An available-value membership check reads its enumerated current answers without
+requesting them: its operand dependencies remain in the computational and definition closure, but do not
+contribute questionnaire inputs through that check. A separately reached question still gathers normally.
+If a required input has neither route, the workflow has unresolved input that must be exposed;
 the emitter cannot fabricate a question or force false to finish. A pause is an intermediate state
 before a leaf activity, not a requirement for a new pended disposition in the policy.
 
@@ -330,8 +333,10 @@ an empty available set yields false. It does not classify missing clinical answe
 All present inputs must be interpreted before reducing the result: a positive member cannot mask
 an invalid, conflicting, or failed input. Ordinary `any of` membership retains three-state logic.
 Both operations carry only the authored anchor's actual optional validity, without substituting
-evaluation time. Terminal uncertainty checks use the available-value operation over the reached
-group/path; prerequisite eligibility conditions still determine whether that terminal is reached.
+evaluation time. Terminal uncertainty checks enumerate the answers whose currently present uncertainty
+must prevent Met, including other alternatives when the policy requires any present uncertainty to do so.
+The check itself asks no operand questions. Prerequisite eligibility conditions still determine whether
+that terminal is reached.
 Resource/datum type and the type of a computed result are distinct: existence over Condition records
 can produce a boolean without making the records boolean-valued. No particular current spelling is
 mandated by these examples.
