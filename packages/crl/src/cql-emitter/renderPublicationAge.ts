@@ -17,7 +17,8 @@ define function ${q(AGE_CQL.method)}(O FHIR.Observation):
   else null as System.String
 
 define function ${q(AGE_CQL.day)}(raw System.String, offsetHours System.Decimal):
-  if raw is null or Length(raw) < 10 then null as System.Date
+  if raw is null then null as System.Date
+  else if Length(raw) < 10 then null as System.Date
   else if Length(raw) = 10 then ToDate(raw)
   else date from (ToDateTime(raw) + System.Quantity { value: (offsetHours - (timezoneoffset from ToDateTime(raw))) * 60.0, unit: 'minutes' })
 
@@ -60,8 +61,8 @@ define function ${q(AGE_CQL.produce)}(P FHIR.Patient, contributorId System.Strin
   }
 
 define function ${q(AGE_CQL.choose)}(assertions ${list}, calculations ${list}, evaluationDay System.Date, offsetHours System.Decimal, conceptId System.String):
-  if not exists(calculations) then assertions
-  else if exists(assertions C where ${q(AGE_CQL.relation)}(C.validity, evaluationDay, offsetHours) = 'unknown') then
+  if not exists(calculations C where C.validity is not null) then Flatten({ assertions, calculations })
+  else if exists(assertions C where C.validity is not null and ${q(AGE_CQL.relation)}(C.validity, evaluationDay, offsetHours) = 'unknown') then
     ${error(list, "publication-age-day-unknown", "Cannot determine same-day assertion eligibility")}
   else if exists(assertions C where ${q(AGE_CQL.day)}(C.validity, offsetHours) = evaluationDay) then
     (assertions C where ${q(AGE_CQL.day)}(C.validity, offsetHours) = evaluationDay)
@@ -81,11 +82,11 @@ define function ${q(AGE_CQL.eligible)}(candidates ${list}, evaluationDay System.
     ${error(list, "publication-age-method-required", "Age inputs require exactly one asserted or calculated determination method")}
   else if exists(candidates C where ${q(AGE_CQL.relation)}(C.validity, evaluationDay, offsetHours) = 'future') then
     ${error(list, "publication-age-future-input", "Age input is dated after the evaluation day")}
-  else if exists(candidates C where ${q(AGE_CQL.method)}(C.resource) = 'calculated' and ${q(AGE_CQL.relation)}(C.validity, evaluationDay, offsetHours) = 'unknown') then
+  else if exists(candidates C where ${q(AGE_CQL.method)}(C.resource) = 'calculated' and C.validity is not null and ${q(AGE_CQL.relation)}(C.validity, evaluationDay, offsetHours) = 'unknown') then
     ${error(list, "publication-age-day-unknown", "Cannot determine whether a cached calculation is current")}
   else ${q(AGE_CQL.choose)}(
     (candidates C where ${q(AGE_CQL.method)}(C.resource) = 'asserted'),
     if exists(candidates C where C.arm = 'source') then (candidates C where C.arm = 'source')
-      else (candidates C where ${q(AGE_CQL.method)}(C.resource) = 'calculated' and ${q(AGE_CQL.day)}(C.validity, offsetHours) = evaluationDay),
+      else (candidates C where ${q(AGE_CQL.method)}(C.resource) = 'calculated' and (C.validity is null or ${q(AGE_CQL.day)}(C.validity, offsetHours) = evaluationDay)),
     evaluationDay, offsetHours, conceptId)`;
 }

@@ -1,3 +1,4 @@
+import { produceGenderCandidate } from "../emit/publicationGender";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { produceBMICandidate } from "../emit/publicationBMI";
 import { publicationHasValueFormError, publicationProducerOperands } from "../emit/publicationProgram";
@@ -830,16 +831,17 @@ function evaluateMembership(stage: ResolvedStage, entry: ConceptEntry, ctx: Ctx)
   if (members === undefined) return "not-evaluated"; // unresolved comparand — the validator already says so
 
   const subjectId = idOf(entry.lib, subjectArg.value);
-  const cands = ctx.candidates.get(subjectId) ?? [];
+  let cands = ctx.candidates.get(subjectId) ?? [];
   if (cands.length === 0) return null; // nothing asserted, nothing retrieved → unknown → PAUSE
 
-  // Newest wins. ⚠ An undated candidate cannot be ordered against a dated one, so a mix refuses rather than
-  // treating "no date" as oldest — a silent assumption that would decide real cases.
-  if (cands.some((c) => c.date === undefined) && cands.length > 1) {
+  // Dated candidates take precedence over undated fallback in newest-wins selection.
+  const dated = cands.filter(c => c.date !== undefined);
+  if (dated.length) cands = dated;
+  if (cands.every((c) => c.date === undefined) && cands.length > 1) {
     return refusePipeline(
       entry,
       ctx,
-      `subject "${subjectArg.value}" has candidates with and without dates, so newest-wins cannot be ordered`,
+      `subject "${subjectArg.value}" has multiple undated candidates, so newest-wins cannot be ordered`,
     );
   }
   // REFACTOR:grounded (#320, review 556): compare instants by their actual time, preserving authored
@@ -966,8 +968,10 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
     const resource = emitted.body;
     if (!matchesPublicationSource(source, resource)) continue;
     // Match the CEL/pinned repository compartment before projection, including unresolved subjects.
-    if (source.kind === "ageToday" ? `Patient/${resource.id}` !== ctx.publicationSubjectReference : !matchesCelPublicationPatient(resource, ctx.publicationSubjectReference)) continue;
-    const adapted = source.kind === "ageToday"
+    if (source.kind === "ageToday" || source.kind === "patientGender" ? `Patient/${resource.id}` !== ctx.publicationSubjectReference : !matchesCelPublicationPatient(resource, ctx.publicationSubjectReference)) continue;
+    const adapted = source.kind === "patientGender"
+      ? produceGenderCandidate(descriptor, source, resource, ctx.publicationSubjectReference)
+      : source.kind === "ageToday"
       ? produceAgeCandidate(descriptor, source, resource, ctx.publicationSubjectReference, ageClock(ctx.publicationNow))
       : source.kind === "observationValue" ? adaptObservationPublicationCandidate(descriptor, source, resource, ctx.publicationSubjectReference)
       // REFACTOR:grounded (859): validate/project request data before finite-code membership.

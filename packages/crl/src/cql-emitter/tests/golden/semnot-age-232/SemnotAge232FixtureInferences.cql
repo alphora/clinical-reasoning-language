@@ -101,7 +101,8 @@ define function "__CRL_PublicationSelection_v1_Choose"(latest List<Tuple { key S
   else "__CRL_PublicationSelection_v1_Fail"('publication-ambiguous-selection', conceptId, latest)
 
 define function "__CRL_PublicationSelection_v1_Latest"(candidates List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, conceptId System.String, equalTime System.String):
-  if not exists (candidates C
+  if Count(candidates) = 1 then "__CRL_PublicationSelection_v1_Choose"(candidates, conceptId, equalTime)
+  else if not exists (candidates C
     where not exists (candidates D where not ("__CRL_PublicationSelection_v1_Compare"(C.validity, D.validity) in { 'after', 'equal' }) return all D)
     return all C) then "__CRL_PublicationSelection_v1_Fail"('publication-incomparable-validity', conceptId, candidates)
   else "__CRL_PublicationSelection_v1_Choose"(
@@ -124,9 +125,9 @@ define function "__CRL_PublicationSelection_v1_Select"(candidates List<Tuple { k
         or (C.retrievedInputIdentity is not null and Count(candidates D where D.contributorId = C.contributorId and D.retrievedInputIdentity = C.retrievedInputIdentity return all D) > 1) return all C))
   else if Count(candidates) = 0 then "__CRL_PublicationSelection_v1_Result"('missing', null, conceptId, null as Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }, {} as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>)
   else if Count(candidates) = 1 then "__CRL_PublicationSelection_v1_Result"('selected', null, conceptId, singleton from candidates, {} as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>)
-  else if exists (candidates C where C.validity is null return all C) then
-    "__CRL_PublicationSelection_v1_Fail"('publication-undated-input', conceptId, (candidates C where C.validity is null return all C))
-  else "__CRL_PublicationSelection_v1_Latest"(candidates, conceptId, equalTime)
+  else if exists (candidates C where C.validity is not null return all C) then
+    "__CRL_PublicationSelection_v1_Latest"((candidates C where C.validity is not null return all C), conceptId, equalTime)
+  else "__CRL_PublicationSelection_v1_Fail"('publication-undated-input', conceptId, candidates)
 
 define function "__CRL_PublicationSelection_v1_Record"(result Tuple { state System.String, failureCode System.String, failureMessage System.String, conceptId System.String, selected Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }, affected List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }> }):
   if result.state = 'failed' then
@@ -220,7 +221,8 @@ define function "__CRL_AgeToday_v1_Method"(O FHIR.Observation):
   else null as System.String
 
 define function "__CRL_AgeToday_v1_Day"(raw System.String, offsetHours System.Decimal):
-  if raw is null or Length(raw) < 10 then null as System.Date
+  if raw is null then null as System.Date
+  else if Length(raw) < 10 then null as System.Date
   else if Length(raw) = 10 then ToDate(raw)
   else date from (ToDateTime(raw) + System.Quantity { value: (offsetHours - (timezoneoffset from ToDateTime(raw))) * 60.0, unit: 'minutes' })
 
@@ -263,8 +265,8 @@ define function "__CRL_AgeToday_v1_Produce"(P FHIR.Patient, contributorId System
   }
 
 define function "__CRL_AgeToday_v1_Choose"(assertions List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, calculations List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, evaluationDay System.Date, offsetHours System.Decimal, conceptId System.String):
-  if not exists(calculations) then assertions
-  else if exists(assertions C where "__CRL_AgeToday_v1_DayRelation"(C.validity, evaluationDay, offsetHours) = 'unknown') then
+  if not exists(calculations C where C.validity is not null) then Flatten({ assertions, calculations })
+  else if exists(assertions C where C.validity is not null and "__CRL_AgeToday_v1_DayRelation"(C.validity, evaluationDay, offsetHours) = 'unknown') then
     Message(null as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, true, 'publication-age-day-unknown', 'Error', conceptId + ': Cannot determine same-day assertion eligibility')
   else if exists(assertions C where "__CRL_AgeToday_v1_Day"(C.validity, offsetHours) = evaluationDay) then
     (assertions C where "__CRL_AgeToday_v1_Day"(C.validity, offsetHours) = evaluationDay)
@@ -284,12 +286,12 @@ define function "__CRL_AgeToday_v1_Eligible"(candidates List<Tuple { key System.
     Message(null as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, true, 'publication-age-method-required', 'Error', conceptId + ': Age inputs require exactly one asserted or calculated determination method')
   else if exists(candidates C where "__CRL_AgeToday_v1_DayRelation"(C.validity, evaluationDay, offsetHours) = 'future') then
     Message(null as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, true, 'publication-age-future-input', 'Error', conceptId + ': Age input is dated after the evaluation day')
-  else if exists(candidates C where "__CRL_AgeToday_v1_Method"(C.resource) = 'calculated' and "__CRL_AgeToday_v1_DayRelation"(C.validity, evaluationDay, offsetHours) = 'unknown') then
+  else if exists(candidates C where "__CRL_AgeToday_v1_Method"(C.resource) = 'calculated' and C.validity is not null and "__CRL_AgeToday_v1_DayRelation"(C.validity, evaluationDay, offsetHours) = 'unknown') then
     Message(null as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, true, 'publication-age-day-unknown', 'Error', conceptId + ': Cannot determine whether a cached calculation is current')
   else "__CRL_AgeToday_v1_Choose"(
     (candidates C where "__CRL_AgeToday_v1_Method"(C.resource) = 'asserted'),
     if exists(candidates C where C.arm = 'source') then (candidates C where C.arm = 'source')
-      else (candidates C where "__CRL_AgeToday_v1_Method"(C.resource) = 'calculated' and "__CRL_AgeToday_v1_Day"(C.validity, offsetHours) = evaluationDay),
+      else (candidates C where "__CRL_AgeToday_v1_Method"(C.resource) = 'calculated' and (C.validity is null or "__CRL_AgeToday_v1_Day"(C.validity, offsetHours) = evaluationDay)),
     evaluationDay, offsetHours, conceptId)
 
 define "__CRL_PublicationEnvelope_v1_Age 21 Or Older":

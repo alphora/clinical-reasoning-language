@@ -144,7 +144,7 @@ describe("CRE selected Boolean publication", () => {
 
   it.each([
     ["2026-01-01", "2026-01-01", "publication-ambiguous-selection"],
-    [undefined, "2026-01-01", "publication-undated-input"],
+    [undefined, undefined, "publication-undated-input"],
     ["2026", "2026-02", "publication-incomparable-validity"],
     ["2026-01-01T00:00:00.0001Z", "2026-01-01T00:00:00.0002Z", "publication-incomparable-validity"],
   ])("rejects unordered candidates %s / %s", (first, second, code) => {
@@ -741,13 +741,12 @@ describe("CRE selected-datum membership production", () => {
     expect(run.trace[0].facts).toEqual(["Own"]);
   });
 
-  it("refuses an undated operand plus an own answer instead of inventing a recency winner", () => {
+  it("selects a dated own answer over an undated inferred operand", () => {
     const policy = membershipPolicy.replace('- definition is "Procedure" in qualifying.', '- code is `answer`.\n- definition is "Procedure" in qualifying.');
     const { run } = evaluate(procedureFact("Operand", "`yes`") + fact("Own", "false", "2026-02-01"), ["Operand", "Own"], DECISION, "", "Deny", "", { policy });
-    expect(run.status).toBe("error");
-    expect(run.produced).toEqual([]);
+    expect(run.status).toBe("pass");
+    expect(run.trace[0].facts).toEqual(["Own"]);
     expect(run.trace[0].blockedUnknown).not.toBe(true);
-    expect(run.trace[0].publicationErrors?.map((error) => error.code)).toEqual(["publication-undated-input"]);
   });
 
   it("does not demote operand selection failure to a false or unknown producer", () => {

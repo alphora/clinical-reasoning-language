@@ -1,3 +1,4 @@
+import { readGenderProjection } from "../emit/publicationGender";
 import {
   normalizeLocalRef,
   type CRL,
@@ -474,7 +475,7 @@ export class RepresentationShapeValidator {
       // directly, which is where the stages actually are; checking it in both places would double-report.
     }
 
-    if (rep.valueProjection && narrativeHasConceptRef(rep.valueProjection.body.elements)) {
+    if (rep.valueProjection && !readGenderProjection(rep) && narrativeHasConceptRef(rep.valueProjection.body.elements)) {
       errors.push(
         this.err(
           "value-projection-references-concept",

@@ -1,3 +1,4 @@
+import { GENDER_CQL_PREFIX, GENDER_CQL_PRODUCE, renderPublicationGenderHelpers } from "./renderPublicationGender";
 /**
  * CRL → CQL emitter (v0.2).
  *
@@ -1245,7 +1246,7 @@ class Emitter {
     if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication !== undefined && s.__publication.role !== "retrieve")) {
       for (const statement of this.ast.statements) {
         const name = (statement as { name?: string }).name;
-        if (name !== undefined && [PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, AGE_CQL_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
+        if (name !== undefined && [PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, AGE_CQL_PREFIX, GENDER_CQL_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
           type: "Validation", kind: "publication-name-collision",
           line: statement.location?.start.line, column: statement.location?.start.column,
           message: `Declaration "${name}" uses the reserved publication helper namespace.`,
@@ -1266,6 +1267,8 @@ class Emitter {
         sections.push(renderPublicationBMIHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.role === "public" && hasAgeSource(s.__publication.descriptor)))
         sections.push(renderPublicationAgeHelpers());
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.sources?.some(source => source.kind === "patientGender")))
+        sections.push(renderPublicationGenderHelpers());
       if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication?.role === "public" &&
         (s.__publication.descriptor.producer !== undefined || s.__publication.descriptor.valueDomain !== undefined)))
         sections.push(renderPublicationProducerHelpers(this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.producer?.kind === "hasValue")));
@@ -2271,7 +2274,7 @@ class Emitter {
     // built itself as unbuilt work.
     const questionRead = c.__publication?.role === "public"
       ? `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.record)}(${cqlIdent(publicationEnvelopeName(c.name))})`
-      : c.__publication?.source?.kind === "ageToday"
+      : c.__publication?.source?.kind === "ageToday" || c.__publication?.source?.kind === "patientGender"
       ? "([Patient] P where P.id.value = Patient.id.value)"
       : c.__pureQuestionRead === true ? this.emitPureQuestionRead(c) : undefined;
     // ⚠ A concept with no definition after lowering is REPRESENTATIONS-ONLY, and its lowering is unbuilt.
@@ -2475,10 +2478,10 @@ class Emitter {
       const source = descriptor.sources![index];
       const target = this.renderPublicationReference(binding.sourceReferences![index]);
       const code = descriptor.localCode === undefined ? `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} } }` : `FHIR.CodeableConcept { text: FHIR.string { value: ${cqlStringLiteral(descriptor.title)} }, coding: { FHIR.Coding { system: FHIR.uri { value: ${cqlStringLiteral(descriptor.localCode!.system)} }, code: FHIR.code { value: ${cqlStringLiteral(descriptor.localCode!.code)} } } } }`;
-      const helper = source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationValue" ? PUBLICATION_OBSERVATION_CANDIDATE[source.valueType] : source.kind === "requestCode" ? requestCodeHelper(source.resourceType) : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
-      const args = source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : source.kind === "requestCode" ? `, ${renderPublicationCodeTable(source.codes)}` : "";
+      const helper = source.kind === "patientGender" ? GENDER_CQL_PRODUCE : source.kind === "ageToday" ? AGE_CQL.produce : source.kind === "observationValue" ? PUBLICATION_OBSERVATION_CANDIDATE[source.valueType] : source.kind === "requestCode" ? requestCodeHelper(source.resourceType) : PUBLICATION_SERVICE_REQUEST_CANDIDATE;
+      const args = source.kind === "patientGender" ? `, { ${source.mappings.map(m => `Tuple { gender: ${cqlStringLiteral(m.gender)}, system: ${cqlStringLiteral(m.answer.system)}, code: ${cqlStringLiteral(m.answer.code)} }`).join(", ")} }` : source.kind === "ageToday" ? `, ${cqlStringLiteral(source.op)}, ${cqlStringLiteral(source.unit)}, ${source.threshold}${Number.isInteger(source.threshold) ? ".0" : ""}, Today()` : source.kind === "requestCode" ? `, ${renderPublicationCodeTable(source.codes)}` : "";
       const projection = `((${target}) S return all ${cqlIdent(helper)}(S, ${cqlStringLiteral(source.contributorId)}, ${cqlStringLiteral(descriptor.conceptId)}, ${code}, ${descriptor.profileUrl === undefined ? "null as System.String" : cqlStringLiteral(descriptor.profileUrl)}, 'Patient/' + Patient.id.value${args}))`;
-      const projected = source.kind === "ageToday" || source.kind === "requestCode" ? `(${projection} C where C is not null)` : projection;
+      const projected = source.kind === "patientGender" || source.kind === "ageToday" || source.kind === "requestCode" ? `(${projection} C where C is not null)` : projection;
       candidates = `Flatten({ ${candidates}, ${projected} })`;
     }
     const producer = descriptor.producer;
@@ -3368,7 +3371,7 @@ class Emitter {
     if (c.__publication?.source !== undefined) {
       // REFACTOR:grounded (859): code/state validation precedes membership filtering.
       if (c.__publication.source.kind === "requestCode") return `[${c.__publication.source.resourceType}]`;
-      if (c.__publication.source.kind === "ageToday") {
+      if (c.__publication.source.kind === "ageToday" || c.__publication.source.kind === "patientGender") {
         this.emitErrors.push({ type: "Validation", kind: "publication-source-unsupported",
           message: `Unsupported publication source kind for "${c.name}".`,
           line: c.location.start.line, column: c.location.start.column });

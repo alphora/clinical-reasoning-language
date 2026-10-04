@@ -149,8 +149,8 @@ describe("BMI publication", () => {
       selectPublicationCandidate([old, undated.candidate], {
         conceptId: d.conceptId,
         equalTime: "error",
-      }).state,
-    ).toBe("failed");
+      }),
+    ).toMatchObject({ state: "selected", candidate: old });
     const anchored = prepare(
       text.replace('using validity of "Weight"', 'using validity of "Height"'),
     ).d;

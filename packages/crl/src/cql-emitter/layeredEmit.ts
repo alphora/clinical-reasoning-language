@@ -282,7 +282,7 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
     // definition checks (it carries a synthetic `defined as` bare-ref).
     if (stmt.__interfaceReexport) return "Interface";
     // REFACTOR:grounded (#320, plan583): uncoded Patient retrieval has a prepared source binding.
-    if (stmt.__publication?.source?.kind === "ageToday") return "ExternalElements";
+    if (stmt.__publication?.source?.kind === "ageToday" || stmt.__publication?.source?.kind === "patientGender") return "ExternalElements";
     // REFACTOR:grounded (#320, plan585): uncoded publications need no synthetic definition.
     if (stmt.__publication?.role === "public") return "Inferences";
     // Concept-level `code is`-ONLY concepts are LOWERED upstream

@@ -9,6 +9,7 @@ import { matchNarrative } from "../template-match/matcher";
 import { publicationCodeKey, normalizePublicationCodes, readFinitePublicationTerminology } from "./publicationDomain";
 import type { PublicationCandidate } from "./publicationSelection";
 import { publicationSourceAdmissionReason, type PublicationSource } from "./publicationSource";
+import { readGenderProjection } from "./publicationGender";
 import { readAgeProjection } from "./publicationAge";
 import { readPublicationBMI } from "./publicationBMI";
 import { readPublicationAnyMembership } from "../template-match/anyMembership";
@@ -323,6 +324,18 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         fail("A source-produced Case Feature requires an owning policy identity.", concept.location, "publication-source-profile-required");
       const sources = concept.representations.map((rep, index): PublicationSource => {
         const contributorId = `crl:source:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["source", index]]))}`;
+        const gender = readGenderProjection(rep);
+        if (gender) {
+          const mappings = gender.map(m => {
+            const codes = finiteTerminology(library.sourceIdentity, m.terminology, rep.location).codes;
+            if (codes.length !== 1) fail("Each administrative gender mapping requires a singleton terminology.", rep.location, "publication-gender-mapping");
+            const answer = codes[0];
+            if (!answer || !valueDomain?.some(c => publicationCodeKey(c) === publicationCodeKey(answer)))
+              fail("Administrative gender mapping outputs must belong to the concept value domain.", rep.location, "publication-gender-mapping");
+            return Object.freeze({ gender: m.gender, answer });
+          });
+          return Object.freeze({ kind: "patientGender", contributorId, mappings: Object.freeze(mappings) });
+        }
         const age = readAgeProjection(rep);
         if (age) return Object.freeze({ ...age, contributorId });
         const common = { contributorId, terminology: rep.terminologyName!,

@@ -218,7 +218,8 @@ define function ${name("choose")}(latest ${candidates}, conceptId System.String,
   else ${name("fail")}('publication-ambiguous-selection', conceptId, latest)
 
 define function ${name("latest")}(candidates ${candidates}, conceptId System.String, equalTime System.String):
-  if not exists (candidates C
+  if Count(candidates) = 1 then ${name("choose")}(candidates, conceptId, equalTime)
+  else if not exists (candidates C
     where not exists (candidates D where not (${name("compare")}(C.validity, D.validity) in { 'after', 'equal' }) return all D)
     return all C) then ${name("fail")}('publication-incomparable-validity', conceptId, candidates)
   else ${name("choose")}(
@@ -241,9 +242,9 @@ define function ${name("select")}(candidates ${candidates}, conceptId System.Str
         or (C.retrievedInputIdentity is not null and Count(candidates D where D.contributorId = C.contributorId and D.retrievedInputIdentity = C.retrievedInputIdentity return all D) > 1) return all C))
   else if Count(candidates) = 0 then ${name("result")}('missing', null, conceptId, ${noCandidate}, ${empty})
   else if Count(candidates) = 1 then ${name("result")}('selected', null, conceptId, singleton from candidates, ${empty})
-  else if exists (candidates C where C.validity is null return all C) then
-    ${name("fail")}('publication-undated-input', conceptId, (candidates C where C.validity is null return all C))
-  else ${name("latest")}(candidates, conceptId, equalTime)
+  else if exists (candidates C where C.validity is not null return all C) then
+    ${name("latest")}((candidates C where C.validity is not null return all C), conceptId, equalTime)
+  else ${name("fail")}('publication-undated-input', conceptId, candidates)
 
 define function ${name("record")}(result ${PUBLICATION_SELECTION_RESULT_CQL_TYPE}):
   if result.state = 'failed' then

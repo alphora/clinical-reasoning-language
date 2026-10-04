@@ -60,11 +60,15 @@ describe("ServiceRequest publication", () => {
   });
   it.each([
     [{ id: "r2" }, "publication-ambiguous-selection"],
-    [{ id: "r2", authoredOn: undefined }, "publication-undated-input"],
     [{}, "publication-duplicate-input"],
   ])("never silently collapses conflicting record identities %j", (extra, code) => {
     expect(selectPublicationCandidate([candidate(), candidate(extra)], { conceptId: "c", equalTime: "error" }))
       .toMatchObject({ state: "failed", diagnostic: { code } });
+  });
+  it("selects a dated request over an undated request", () => {
+    const dated = candidate();
+    expect(selectPublicationCandidate([candidate({ id: "r2", authoredOn: undefined }), dated], { conceptId: "c", equalTime: "error" }))
+      .toMatchObject({ state: "selected", candidate: dated });
   });
   it("preserves a sole undated witness", () => {
     expect(selectPublicationCandidate([candidate({ authoredOn: undefined })], { conceptId: "c", equalTime: "error" })).toMatchObject({ state: "selected" });

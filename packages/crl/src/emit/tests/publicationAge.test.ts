@@ -37,6 +37,19 @@ function resolve(birth: string | undefined, inputs: Candidate[]) {
   return eligible.kind === "error" ? eligible : selectPublicationCandidate(eligible.candidates, { conceptId: d.conceptId, equalTime: "error" });
 }
 describe("pattern-owned age publication", () => {
+  it("lets today's calculation outrank an undated assertion while preserving its fallback", () => {
+    const original = local(false); const undated = { ...original, validity: undefined };
+    expect(resolve("2008-09-07", [undated])).toMatchObject({ state: "selected", candidate: { arm: "source", resource: { valueBoolean: true } } });
+    expect(resolve(undefined, [undated])).toMatchObject({ state: "selected", candidate: undated });
+    expect(resolve("2008-09-07", [undated, local(false, clock.day, "asserted", "dated")])).toMatchObject({ state: "selected", candidate: { arm: "local", resource: { valueBoolean: false } } });
+  });
+  it("uses undated cached calculations only as fallback behind dated inputs", () => {
+    const cached = { ...local(false, clock.day, "calculated", "cached"), validity: undefined };
+    expect(resolve("2008-09-07", [cached])).toMatchObject({ state: "selected", candidate: { arm: "source", resource: { valueBoolean: true } } });
+    const dated = local(true);
+    expect(resolve(undefined, [cached, dated])).toMatchObject({ state: "selected", candidate: dated });
+    expect(resolve(undefined, [cached])).toMatchObject({ state: "selected", candidate: cached });
+  });
   // @kit patient-age-projection:source-only-layer-binding
   it("keeps source-only age bound through a criterion and shared decision in both lanes", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "crl-age-nested-"));

@@ -6,7 +6,8 @@ import type { PublicationValueError } from "./publicationDomain";
 import { readAgeProjection, type PublicationAgeSource } from "./publicationAge";
 import { isValidFhirTemporal, compareFhirTemporal } from "../cel/temporal";
 import { resourceCodingPlacement } from "./resourceEmitRegistry";
-export type PublicationSource = PublicationServiceRequestSource | PublicationAgeSource | PublicationObservationSource | PublicationRequestCodeSource;
+import { readGenderProjection, type PublicationGenderSource } from "./publicationGender";
+export type PublicationSource = PublicationGenderSource | PublicationServiceRequestSource | PublicationAgeSource | PublicationObservationSource | PublicationRequestCodeSource;
 
 // REFACTOR:grounded (859): request code projection is independent of a local answer slot.
 export interface PublicationRequestCodeSource {
@@ -19,6 +20,7 @@ export interface PublicationRequestCodeSource {
 
 export function publicationSourceResourceType(source: PublicationSource) {
   switch (source.kind) {
+    case "patientGender":
     case "ageToday": return "Patient" as const;
     case "requestCode": return source.resourceType;
     case "observationValue": return "Observation" as const;
@@ -48,10 +50,10 @@ export interface PublicationServiceRequestSource {
 export function publicationSourceAdmissionReason(concept: Readonly<Concept>): string | undefined {
   if (concept.representations.length === 0) return undefined;
   if (concept.valueTypes[0] === "Quantity" || concept.valueTypes[0] === "CodeableConcept") {
-    return concept.representations.every(rep => (rep.conceptType === "Observation" ||
+    return concept.representations.every(rep => (concept.valueTypes[0] === "CodeableConcept" && readGenderProjection(rep) !== undefined) || ((rep.conceptType === "Observation" ||
       (concept.valueTypes[0] === "CodeableConcept" && (rep.conceptType === "ServiceRequest" || rep.conceptType === "MedicationRequest"))) && rep.terminologyName !== undefined &&
-      rep.valueProjection === undefined && rep.valueElement === undefined && rep.valueTypes.length === 0)
-      ? undefined : `${concept.valueTypes[0]} sources require Observation native values, or CodeableConcept request codes from ServiceRequest/MedicationRequest; other projections are not implemented.`;
+      rep.valueProjection === undefined && rep.valueElement === undefined && rep.valueTypes.length === 0))
+      ? undefined : `${concept.valueTypes[0]} sources require Observation native values, CodeableConcept request codes from ServiceRequest/MedicationRequest, or an explicit Patient administrative gender mapping; other projections are not implemented.`;
   }
   if (concept.valueTypes[0] !== "boolean") return "Source publication requires an Observation<boolean> result.";
   if (concept.representations.some(rep => readAgeProjection(rep) !== undefined))
@@ -85,7 +87,7 @@ export function matchesCelPublicationPatient(resource: Record<string, unknown>, 
 }
 
 export function matchesPublicationSource(source: PublicationSource, resource: Record<string, unknown>): boolean {
-  if (source.kind === "ageToday") return resource.resourceType === "Patient";
+  if (source.kind === "ageToday" || source.kind === "patientGender") return resource.resourceType === "Patient";
   // Validate the request before membership filtering: a Reference or malformed code is not a negative.
   if (source.kind === "requestCode") return resource.resourceType === source.resourceType;
   if (resource.resourceType !== (source.kind === "observationValue" ? "Observation" : "ServiceRequest")) return false;

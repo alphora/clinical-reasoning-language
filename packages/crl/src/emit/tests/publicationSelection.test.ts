@@ -276,16 +276,15 @@ describe("selectPublicationCandidate: unavailable order and malformed data", () 
 
 describe("selectPublicationCandidate: undated multi-candidate input", () => {
   // @kit publication-selection:undated-competition
-  it("names the undated identity when a dated and undated candidate compete", () => {
-    const undated = candidate("undated", undefined, "local");
-    const dated = candidate("dated", newTime);
-    failsInEveryOrder([undated, dated], "publication-undated-input", preferLocal);
-    const result = selectPublicationCandidate([dated, undated], preferLocal);
-    if (result.state !== "failed") throw new Error("Expected undated failure");
-    expect(result.diagnostic.candidates).toMatchObject([
-      { key: undated.key, retrievedInputIdentity: undated.retrievedInputIdentity },
-    ]);
-    expect(result.diagnostic.candidates).toHaveLength(1);
+  it.each(["local", "source", "inferred"] as const)("dated %s outranks undated candidates from every arm", arm => {
+    const dated = candidate("dated", newTime, arm);
+    const undated = (["local", "source", "inferred"] as const).map(a => candidate("undated-" + a, undefined, a));
+    selectsInEveryOrder([...undated, dated], dated, preferLocal);
+  });
+  it("undated fallback does not resolve dated ambiguity or overlap", () => {
+    const u = candidate("undated", undefined);
+    failsInEveryOrder([u, candidate("a", newTime), candidate("b", newTime)], "publication-ambiguous-selection");
+    failsInEveryOrder([u, candidate("year", "2026"), candidate("month", "2026-02")], "publication-incomparable-validity");
   });
 
   // @kit publication-selection:undated-competition
@@ -299,12 +298,12 @@ describe("selectPublicationCandidate: undated multi-candidate input", () => {
   });
 
   // @kit publication-selection:undated-competition
-  it("a new dated answer cannot repair an undated input, but correcting that validity can", () => {
+  it("a dated answer overrides undated input and repaired timestamps rejoin recency", () => {
     const undated = candidate("undated", undefined);
     const existing = candidate("existing", oldTime, "local");
     const answer = candidate("new-answer", newTime, "local", { valueBoolean: false });
-    failsInEveryOrder([undated, existing], "publication-undated-input", preferLocal);
-    failsInEveryOrder([undated, existing, answer], "publication-undated-input", preferLocal);
+    selectsInEveryOrder([undated, existing], existing, preferLocal);
+    selectsInEveryOrder([undated, existing, answer], answer, preferLocal);
     const corrected = { ...undated, validity: oldTime };
     selectsInEveryOrder([corrected, existing, answer], answer, preferLocal);
     expect(corrected.resource).toBe(undated.resource);

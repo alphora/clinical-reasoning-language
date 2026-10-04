@@ -78,6 +78,14 @@ record entry. A record's human or external origin alone does not imply precedenc
 expresses how competing contributions are resolved. For the proposed recency example, newer evidence
 and newer assertions compete symmetrically; ties, absent timestamps, and derived validity need a contract.
 
+For most-recent publication selection, dated candidates take precedence over undated
+candidates across local, source and inferred arms. Select among the dated values;
+with no dated candidates a sole undated value remains fallback, while multiple
+undated candidates cannot be ordered. This is a missing-validity rule, not an
+assumption that a user answer always wins. Once source validity is supplied, normal
+recency applies again. Explicit valueless clears participate like other answers.
+Invalid validity and duplicate identities still produce errors.
+
 For the implemented final publication selector, calendar-only validity and a zoned instant can be
 ordered when every possible instant represented by the calendar precision is earlier or later.
 Comparison bounds cover the full day/month/year and the allowed timezone range; they never become

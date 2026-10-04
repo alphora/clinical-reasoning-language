@@ -89,12 +89,12 @@ export function eligibleAgeCandidates(d: PublicationDescriptor, candidates: read
     if (relation === "future") return fail("publication-age-future-input", "Age input is dated after the evaluation day.");
     if (markers[0].code === "asserted") asserted.push(c);
     else if (c.arm === "source") live.push(c);
-    else if (relation === "unknown") return fail("publication-age-day-unknown", "Cannot determine whether a cached age calculation is current.");
-    else if (relation === "same") cached.push(c);
+    else if (relation === "unknown" && c.validity !== undefined) return fail("publication-age-day-unknown", "Cannot determine whether a cached age calculation is current.");
+    else if (relation === "same" || c.validity === undefined) cached.push(c);
   }
   const calculated = live.length ? live : cached;
-  if (!calculated.length) return { kind: "eligible", candidates: asserted };
-  if (asserted.some(c => candidateDayRelation(c.validity, clock) === "unknown")) return fail("publication-age-day-unknown", "Cannot determine whether an assertion overrides today's calculation.");
+  if (!calculated.some(c => c.validity !== undefined)) return { kind: "eligible", candidates: [...asserted, ...calculated] };
+  if (asserted.some(c => c.validity !== undefined && candidateDayRelation(c.validity, clock) === "unknown")) return fail("publication-age-day-unknown", "Cannot determine whether an assertion overrides today's calculation.");
   const sameDay = asserted.filter(c => candidateDayRelation(c.validity, clock) === "same");
   return { kind: "eligible", candidates: sameDay.length ? sameDay : calculated };
 }

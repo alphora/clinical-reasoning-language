@@ -174,14 +174,16 @@ export function selectPublicationCandidate<T>(
     );
   }
 
+  // Dated evidence takes precedence; undated records remain fallback without an invented date.
+  const dated = candidates.filter(hasValidity);
+  if (dated.length > 0) candidates = dated;
   if (candidates.length === 0) return { state: "missing" };
   if (candidates.length === 1) return { state: "selected", candidate: candidates[0] };
-  // REFACTOR:grounded (557 round 3): another dated answer cannot order an undated row. Name the
-  // offending inputs so the application can correct their validity; do not silently rank them below.
+  // With no dated candidates, multiple undated records cannot be ordered.
   if (!candidates.every(hasValidity)) {
     return failed(
       "publication-undated-input",
-      "Multiple publication candidates include undated input; correct its validity before selecting.",
+      "Multiple undated publication candidates cannot be ordered; supply validity before selecting.",
       candidates.filter((candidate) => !hasValidity(candidate)),
     );
   }

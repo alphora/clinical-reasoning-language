@@ -100,7 +100,8 @@ define function "__CRL_PublicationSelection_v1_Choose"(latest List<Tuple { key S
   else "__CRL_PublicationSelection_v1_Fail"('publication-ambiguous-selection', conceptId, latest)
 
 define function "__CRL_PublicationSelection_v1_Latest"(candidates List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>, conceptId System.String, equalTime System.String):
-  if not exists (candidates C
+  if Count(candidates) = 1 then "__CRL_PublicationSelection_v1_Choose"(candidates, conceptId, equalTime)
+  else if not exists (candidates C
     where not exists (candidates D where not ("__CRL_PublicationSelection_v1_Compare"(C.validity, D.validity) in { 'after', 'equal' }) return all D)
     return all C) then "__CRL_PublicationSelection_v1_Fail"('publication-incomparable-validity', conceptId, candidates)
   else "__CRL_PublicationSelection_v1_Choose"(
@@ -123,9 +124,9 @@ define function "__CRL_PublicationSelection_v1_Select"(candidates List<Tuple { k
         or (C.retrievedInputIdentity is not null and Count(candidates D where D.contributorId = C.contributorId and D.retrievedInputIdentity = C.retrievedInputIdentity return all D) > 1) return all C))
   else if Count(candidates) = 0 then "__CRL_PublicationSelection_v1_Result"('missing', null, conceptId, null as Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }, {} as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>)
   else if Count(candidates) = 1 then "__CRL_PublicationSelection_v1_Result"('selected', null, conceptId, singleton from candidates, {} as List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }>)
-  else if exists (candidates C where C.validity is null return all C) then
-    "__CRL_PublicationSelection_v1_Fail"('publication-undated-input', conceptId, (candidates C where C.validity is null return all C))
-  else "__CRL_PublicationSelection_v1_Latest"(candidates, conceptId, equalTime)
+  else if exists (candidates C where C.validity is not null return all C) then
+    "__CRL_PublicationSelection_v1_Latest"((candidates C where C.validity is not null return all C), conceptId, equalTime)
+  else "__CRL_PublicationSelection_v1_Fail"('publication-undated-input', conceptId, candidates)
 
 define function "__CRL_PublicationSelection_v1_Record"(result Tuple { state System.String, failureCode System.String, failureMessage System.String, conceptId System.String, selected Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }, affected List<Tuple { key System.String, contributorId System.String, arm System.String, retrievedInputIdentity System.String, resource FHIR.Observation, validity System.String }> }):
   if result.state = 'failed' then

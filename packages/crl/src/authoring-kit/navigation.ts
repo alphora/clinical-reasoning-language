@@ -5,6 +5,7 @@ export type KitContent = Omit<AuthoringKit, "contentHash" | "navigation" | "audi
 
 /** Authored discovery terms, hashed with the kit. Retired spellings lead to current guidance. */
 const ALIASES: Record<string, string[]> = {
+  "patient-gender-projection": ["Patient.gender", "administrative gender", "gender source", "female", "male", "Patient demographics"],
   "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
   "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers", "uncertainty check", "computed guard", "uncertain assume yes", "uncertain assume no"],
   "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
@@ -41,6 +42,7 @@ const ALIASES: Record<string, string[]> = {
 // rule's contract. Artifact-to-rule prerequisites supply each example's context.
 // REFACTOR:grounded (#322): typed intake teaching is discoverable with its prerequisites.
 const RELATED: Record<string, string[]> = {
+  "patient-gender-projection": ["rule:concept-form", "rule:named-answer-options", "rule:publication-selection"],
   "request-code-sources": ["rule:concept-form", "rule:publication-selection"],
   "selected-answer-aggregate": ["rule:named-answer-options", "rule:publication-selection", "rule:branch-guards", "artifact:uncertainty-reference.crl"],
   "interactive-questionnaire": ["rule:produce-results", "rule:verify-loop"],
@@ -89,6 +91,7 @@ const EXAMPLE_RULES: Record<string, string[]> = {
 };
 
 const ARTIFACT_RULES: Record<string, string[]> = {
+  "patient-gender-reference": ["patient-gender-projection"],
   "uncertainty-reference": ["selected-answer-aggregate", "named-answer-options", "branch-guards", "cel-cases", "native-apply-session"],
   "intake-reference": ["text-answers", "cel-cases", "verify-loop"],
   "shared-continuation-reference": ["chaining-necessity", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],

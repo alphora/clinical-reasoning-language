@@ -19,6 +19,7 @@ import { SOURCE_ORDER_EXAMPLE } from "./sourceOrderExample";
  * `contentHash` is derived so the kit's identity can't lie.
  */
 import audit from "./audit.json";
+import { PATIENT_GENDER_CRL } from "./genderExample";
 import { buildKitIndex } from "./navigation";
 import { artifactRequirements } from "./requirements";
 import { createHash } from "node:crypto";
@@ -378,7 +379,8 @@ export type {
 // REFACTOR:grounded: schemaVersion → "2.23": single available-answer membership preserves passive inputs and explicit negative witnesses.
 // REFACTOR:grounded: schemaVersion → "2.24": shared executable terminal-uncertainty teaching.
 // schemaVersion → "2.25": distinguish source precedence from explicitly selected interview order.
-const SCHEMA_VERSION = "2.25";
+// schemaVersion → "2.26": explicit Patient gender source mapping, supplied-data testing and dated-over-undated recency.
+const SCHEMA_VERSION = "2.26";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -456,7 +458,7 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
     form: '- source representation: - type is <Resource>. - [ coded from "Value Set" ] - [ value projection is <phrase> ].',
     meaning:
-      "Write every concept-level field before the first source representation; source representations come last, and indentation does not close them. A source representation declares its resource type, optional coded from membership and value projection. Model information supplies the datum carrier; do not author value element is or value type is on the representation. coded from retrieves matching source records; value from is binds offered answers. Supported publication forms include Patient age projection, matching ServiceRequest with value projection is exists this, finite-code Observation Quantity and CodeableConcept sources, and inline ServiceRequest/MedicationRequest code projections (see request-code-sources). CodeableConcept sources preserve the complete coded value and validity; a named value domain interprets the selected value. Missing records or values remain unknown, recognized nonmembers are false, and unrecognized or conflicting interpretations are errors. Final selection precedes domain interpretation, so an older unrecognized value does not defeat a newer valid one. Source and local contributions join before the final authored selector. Patient age has its own daily recalculation/same-day assertion policy; no universal local-wins rule follows. Opaque ValueSet retrieval and arbitrary projection/producer combinations remain unsupported in this publication path; parsing a phrase is not proof of emission.",
+      "Write every concept-level field before the first source representation; source representations come last, and indentation does not close them. A source representation declares its resource type, optional coded from membership and value projection. Model information supplies the datum carrier; do not author value element is or value type is on the representation. coded from retrieves matching source records; value from is binds offered answers. Supported publication forms include Patient age projection, explicit Patient administrative-gender-to-answer mapping (patient-gender-projection), matching ServiceRequest with value projection is exists this, finite-code Observation Quantity and CodeableConcept sources, and inline ServiceRequest/MedicationRequest code projections (see request-code-sources). CodeableConcept sources preserve the complete coded value and validity; a named value domain interprets the selected value. Missing records or values remain unknown, recognized nonmembers are false, and unrecognized or conflicting interpretations are errors. Final selection precedes domain interpretation, so an older unrecognized value does not defeat a newer valid one. Source and local contributions join before the final authored selector. Patient age has its own daily recalculation/same-day assertion policy; no universal local-wins rule follows. Opaque ValueSet retrieval and arbitrary projection/producer combinations remain unsupported in this publication path; parsing a phrase is not proof of emission.",
     scope: "in",
   },
   {
@@ -473,6 +475,27 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
 ];
 
 const RULES: KitRule[] = [
+  {
+  "id": "patient-gender-projection",
+  "applicability": "Supplying an answer from Patient administrative gender",
+  "category": "concept-model",
+  "rule": "Use an explicit Record/Observation/CodeableConcept publication with a finite answer domain and shape reduction is most recent. Its Patient source representation uses value projection is administrative gender female as \"Yes Answer\" male as \"No Answer\". Each output names a singleton terminology in the answer domain. Add code is for a local answer and its four-choice presentation. Choose mappings only when administrative gender faithfully supplies the authored datum; it does not establish menopause or other clinical qualifications.",
+  "ref": "artifact:patient-gender-reference.crl; docs/patient-gender-projection.md",
+  "clauses": [
+    {
+      "text": "Source keys are female, male, other and unknown. Every authored key is unique and maps to one system/code identity in the finite domain. Missing or valid unmapped gender contributes no answer; malformed gender remains an error. Do not map unknown to a clinical No implicitly.",
+      "force": "default"
+    },
+    {
+      "text": "Use actual Patient.meta.lastUpdated as source validity. Ordinary most-recent selection applies, preserving selected local uncertainty. Dated candidates take precedence over undated candidates, regardless of origin. An explicit dated answer, uncertainty or clear can therefore override an undated Patient. Once Patient validity exists, ordinary timestamp ordering applies. A lone undated source remains fallback; multiple all-undated candidates remain ambiguous. Do not invent a timestamp.",
+      "force": "default"
+    },
+    {
+      "text": "CEL currently has no Patient gender/lastUpdated fields. Test the source using an external Patient JSON Bundle with native apply/session; locally supplied CEL answers do not test it. Verify populate, edit to both uncertain choices, and clear, including missing/unmapped data and the undated competition boundary.",
+      "force": "default"
+    }
+  ]
+},
   {
     id: "text-answers", applicability: "Authoring typed intake questions", category: "concept-model",
     rule: "Use value type is text on an explicit Record/Observation with code is and shape reduction is most recent. text is the author-facing alias for FHIR string; existing string spelling remains accepted. Emission uses Observation.valueString and a string Questionnaire item whose response uses valueString. Preserve the answer text; has-value does not trim it or judge clinical sufficiency. For a Boolean decision guard, derive a separate uncoded Record/Observation/boolean concept with definition is \"Primary Diagnosis\" has a value and its own most-recent reduction. The uncoded guard contributes no question; its answerable operand is included in the form.",
@@ -580,7 +603,7 @@ const RULES: KitRule[] = [
     "rule": "shape reduction is most recent selects one record from the candidates admitted by the concept's producers. It preserves that record's value: a newer false or unknown answer replaces an older true answer. A selected unknown can pause a decision; selection failure is an error, not a negative answer. Each producer owns its candidate and validity rules first, including Patient age's daily calculation and same-day assertion rule. See selection-reference.crl and its CEL companion for a newer false answer.",
     "clauses": [
       { "text": "The final selector requires demonstrable recency. Equally recent competing records error by default, even if their values agree. Author shape reduction is most recent, on equal time prefer local only when that tie policy is intended. It selects a unique local candidate at the latest equal time; it does not override a newer source or resolve two equally recent local candidates.", "force": "default" },
-      { "text": "One undated candidate can be selected. With multiple candidates, missing or overlapping validity that prevents identifying a unique latest record is an error. Malformed validity and repeated retrieved identities within one contributor are errors even on losing candidates. Do not invent dates or discard unknown answers to force a result; correct the input or report the unsupported case.", "force": "default" }
+      { "text": "Dated candidates take precedence over undated candidates, regardless of local, source or inferred origin. Select most recent among the dated candidates. With none dated, one undated candidate is a usable fallback; multiple undated candidates remain an error. Overlapping dated validity that prevents identifying a unique latest record is an error. Malformed validity and repeated retrieved identities within one contributor are errors even on losing candidates. Do not invent dates or discard unknown answers to force a result; correct the input or report the unsupported case.", "force": "default" }
     ],
     "ref": "src/emit/tests/publicationSelection.test.ts; src/cre/tests/publication.test.ts; selection-reference.crl"
   },
@@ -675,7 +698,7 @@ const RULES: KitRule[] = [
         "force": "default"
       },
       {
-        "text": "Unmarked legacy age data needs migration from known provenance; retrieval through the local arm does not prove assertion. Same-day unknown answers remain unknown. Multiple eligible assertions use the authored selector, including its ambiguity errors. A missing validity day cannot establish a same-day override.",
+        "text": "Unmarked legacy age data needs migration from known provenance; retrieval through the local arm does not prove assertion. Same-day unknown answers remain unknown. Multiple eligible assertions use the authored selector, including its ambiguity errors. Undated assertions and cached calculations are fallback and do not block dated calculations or dated assertions. A partial date with genuinely uncertain same-day status still requires resolution.",
         "force": "invariant",
         "test": "verifyLoop:patient-age-projection"
       },
@@ -1781,6 +1804,7 @@ const VERIFICATION_LEGEND: VerificationLegendEntry[] = [
 ];
 
 const REFERENCE_ARTIFACTS: ReferenceArtifact[] = ([
+  { name: "patient-gender-reference.crl", language: "crl", applicability: "Supplying a coded answer from Patient administrative gender", verification: ["fhir-emit"], purpose: "Explicit gender-to-answer mapping with four-choice local answers and a passive uncertainty check. This exact fixture is used by projection and CRE tests with injected raw FHIR; external Patient JSON and native Q/QR checks are separate from CEL. See patient-gender-projection for timestamp and editing limits.", source: PATIENT_GENDER_CRL },
   { name: "uncertainty-reference.crl", language: "crl", applicability: "Teaching a terminal check over currently supplied four-choice answers", verification: ["cre-run", "fhir-emit"], purpose: "Complete synthetic eligibility slice after request/EIU assessment, not a customer-policy template. G is required; A then B are ordered alternatives. Each otherwise-Met tests the explicitly enumerated G/A/B values, including retained unused B. Missing B is not requested by the check. Four-choice qualification follows the assumed direction; either uncertainty code blocks otherwise-Met. A absent/B supplied still pauses at A under this chosen order. Read with uncertainty-reference.cel and its declared package configuration. Native question visibility, extraction and edit/clear behavior require native verification; the listed tiers prove only CRE predictions and emission.", source: UNCERTAINTY_REFERENCE_CRL },
   { name: "uncertainty-reference.cel", language: "cel", applicability: "Controls for the synthetic uncertainty teaching slice", verification: ["cre-run"], purpose: "Eighteen cases exercise missing prerequisites, both alternatives, both uncertainty directions, retained unused answers, and the ordered A-absent/B-supplied pause. A missing or cleared input has no fact; it is not a negative answer code. This companion predicts CRE activities/pauses, not native question sets or UI retention.", source: UNCERTAINTY_REFERENCE_CEL },
   // REFACTOR:grounded (#322): exact inputs shared with owning and native tests.

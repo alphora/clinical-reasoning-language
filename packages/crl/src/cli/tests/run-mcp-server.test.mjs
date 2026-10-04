@@ -365,21 +365,35 @@ try {
     }
   });
 
-  await check("authoring_kit full exports all 19 artifacts and determination guidance", async () => {
+  await check("authoring_kit full exports all 22 artifacts and determination guidance", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { view: "full" } });
     assert.ok(!r.isError);
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.25");
-    assert.equal(kit.contentHash, "88e055261b8244adeaf4dff9d24d1f0b79eb45e93c4e73608ac2823249123e37");
+    assert.equal(kit.schemaVersion, "2.26");
+    assert.equal(kit.contentHash, "8096ebe01f51942f8cbcedf012af2d937135b86fb0b4a4ace590934492963521");
     assert.equal(kit.fullContentHash, kit.contentHash);
-    assert.equal(kit.referenceArtifacts.length, 21);
+    assert.equal(kit.referenceArtifacts.length, 22);
     assert.equal(kit.dispositionModel.categories.length, 3);
     assert.equal(kit.useCase, undefined);
     const crl = kit.referenceArtifacts.find(a => a.name === "selection-reference.crl").source;
     const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
     assert.equal(v.success, true);
+  });
+
+  await check("Patient gender is discoverable with its complete prerequisites and executable example", async () => {
+    const query = async args => JSON.parse((await client.callTool({ name: "authoring_kit", arguments: args })).content[0].text);
+    const search = await query({ view: "search", query: "Patient.gender" });
+    assert.ok(JSON.stringify(search).includes("rule:patient-gender-projection"));
+    const entry = await query({ view: "entry", id: "rule:patient-gender-projection" });
+    assert.ok(JSON.stringify(entry).includes("Dated candidates take precedence over undated candidates"));
+    assert.ok(JSON.stringify(entry).includes("multiple all-undated candidates remain ambiguous"));
+    assert.ok(JSON.stringify(entry).includes("rule:named-answer-options"));
+    const kit = await query({ view: "full" });
+    const source = kit.referenceArtifacts.find(a => a.name === "patient-gender-reference.crl").source;
+    const validated = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: source } })).content[0].text);
+    assert.equal(validated.success, true, JSON.stringify(validated.errors));
   });
 
   await check("authoring_kit embedded patient-age-both-rep-reference.crl validates clean via validate_crl", async () => {

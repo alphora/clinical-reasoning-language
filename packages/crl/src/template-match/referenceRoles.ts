@@ -1,3 +1,4 @@
+import { readGenderMappings } from "../emit/publicationGender";
 import type { CanonicalArg, CanonicalPatternCall } from "./canonicalTypes";
 import type { Location, NarrativeClause } from "../ast/types";
 import { matchNarrative } from "./matcher";
@@ -74,6 +75,11 @@ function walkCall(call: CanonicalPatternCall, out: Map<string, RefRole>): void {
  */
 export function narrativeReferenceRoles(body: NarrativeClause): ReadonlyMap<string, RefRole> {
   const out = new Map<string, RefRole>();
+  const gender = readGenderMappings(body);
+  if (gender) {
+    for (const m of gender) out.set(spanKey(m.location), "terminology");
+    return out;
+  }
   const aggregate = readAnyMembership(body);
   if (aggregate) {
     for (const ref of [...aggregate.operands, aggregate.validity]) out.set(spanKey(ref.location), "concept");

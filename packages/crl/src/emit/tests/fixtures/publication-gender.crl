@@ -1,0 +1,47 @@
+library "Patient Gender".
+terminology "Answers":
+- system is `urn:synthetic:answers`.
+- code is `true` display is `Yes`.
+- code is `false` display is `No`.
+- code is `unknown-true` display is `Uncertain - assume Yes`.
+- code is `unknown-false` display is `Uncertain - assume No`.
+terminology "Yes Answer": - system is `urn:synthetic:answers`. - code is `true`.
+terminology "No Answer": - system is `urn:synthetic:answers`. - code is `false`.
+terminology "Uncertain":
+- system is `urn:synthetic:answers`.
+- code is `unknown-true`.
+- code is `unknown-false`.
+
+concept "Female Administrative Gender":
+- code is `gender`.
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- value domain is answer options.
+- value from is "Answers":
+  - not qualifying is `false`.
+  - not qualifying is `unknown-false`.
+- shape reduction is most recent.
+- source representation:
+  - type is Patient.
+  - value projection is administrative gender female as "Yes Answer" male as "No Answer".
+
+presentation for "Female Administrative Gender":
+- question text is `Female administrative gender?`.
+
+concept "Uncertainty":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is any available value of "Female Administrative Gender" in "Uncertain" using validity of "Female Administrative Gender".
+- shape reduction is most recent.
+
+activity "Met": - request CPGCommunicationRequest. - with `Met`.
+activity "Unmet": - request CPGCommunicationRequest. - with `Unmet`.
+decision "D": first:
+- when "Female Administrative Gender" then:
+  first:
+  - when "Uncertainty" then recommend activity "Unmet".
+  - otherwise then recommend activity "Met".
+  end.
+- otherwise then recommend activity "Unmet".

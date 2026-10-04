@@ -164,16 +164,16 @@ check("authoring_kit delivers raw audited Markdown through MCP", async () => {
     }
   });
 
-check("authoring_kit full exports all 19 artifacts and determination guidance", async () => {
+check("authoring_kit full exports all 22 artifacts and determination guidance", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { view: "full" } });
     assert.ok(!r.isError);
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-  assert.equal(kit.schemaVersion, "2.25");
-  assert.equal(kit.contentHash, "88e055261b8244adeaf4dff9d24d1f0b79eb45e93c4e73608ac2823249123e37");
+  assert.equal(kit.schemaVersion, "2.26");
+  assert.equal(kit.contentHash, "8096ebe01f51942f8cbcedf012af2d937135b86fb0b4a4ace590934492963521");
     assert.equal(kit.fullContentHash, kit.contentHash);
-    assert.equal(kit.referenceArtifacts.length, 21);
+    assert.equal(kit.referenceArtifacts.length, 22);
     assert.equal(kit.dispositionModel.categories.length, 3);
     assert.equal(kit.useCase, undefined);
     const crl = kit.referenceArtifacts.find(a => a.name === "selection-reference.crl").source;

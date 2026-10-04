@@ -509,7 +509,7 @@ export function lowerLocalCodes(
         const sourceTwin: Concept = {
           // REFACTOR:grounded (859): retrieve the descriptor's actual source resource kind.
           ...stmt, name: sourceName, shape: "RecordSet", conceptType: publicationSourceResourceType(source), valueTypes: [], representations: [],
-          definition: source.kind === "ageToday" ? undefined : { type: "CodedFromDefinition", terminologyName: source.terminology, location: stmt.location },
+          definition: source.kind === "ageToday" || source.kind === "patientGender" ? undefined : { type: "CodedFromDefinition", terminologyName: source.terminology, location: stmt.location },
           __loweringRole: "source-impl", __publication: Object.freeze({ descriptor, role: "retrieve", source: descriptor.sources![index] }),
         };
         delete sourceTwin.code;

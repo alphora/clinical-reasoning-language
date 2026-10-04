@@ -167,9 +167,15 @@ const vectors: Vector[] = [
   {
     id: "dated-undated",
     rows: [row("u"), row("d", newer)],
-    outcome: "publication-undated-input",
+    outcome: "d",
     equalTime: "preferLocal",
   },
+  { id: "undated-clear", rows: [row("u"), row("clear", newer, "local", null)], outcome: "clear" },
+  { id: "undated-local", rows: [row("u", undefined, "local"), row("d", newer, "source")], outcome: "d" },
+  { id: "undated-inferred", rows: [row("u"), row("d", newer, "inferred")], outcome: "d" },
+  { id: "undated-sole-unsupported", rows: [row("u"), row("leap", "2026-12-31T23:59:60Z")], outcome: "leap" },
+  { id: "undated-dated-tie", rows: [row("u"), row("a", newer), row("b", newer)], outcome: "publication-ambiguous-selection" },
+  { id: "undated-overlap", rows: [row("u"), row("year", "2026"), row("month", "2026-02")], outcome: "publication-incomparable-validity" },
   { id: "both-undated", rows: [row("u"), row("d")], outcome: "publication-undated-input" },
   {
     id: "corrected-date",
@@ -237,7 +243,7 @@ describe("publication selector CQL helper registration", () => {
 // repository and executes CURRENT rendered source; no ignored emit fixture, saved-result oracle, or dist emitter.
 // Set CRL_PUBLICATION_CQL_ENGINE_JAR, CRL_PUBLICATION_CQL_DRIVER_DIR and optionally CRL_PUBLICATION_CQL_JAVA.
 const engineJar = process.env.CRL_PUBLICATION_CQL_ENGINE_JAR;
-describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply", () => {
+describe.skipIf(!engineJar)("publication selector against pinned CRL engine $apply", () => {
   it("preserves exact selected resources and distinguishes all selection errors from missing data", () => {
     const loaderPath = process.env.CRL_PUBLICATION_CQL_DRIVER_DIR;
     if (!engineJar || !loaderPath)
@@ -245,10 +251,10 @@ describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply"
     const sha = (bytes: string | Buffer): string =>
       createHash("sha256").update(bytes).digest("hex");
     expect(sha(readFileSync(engineJar))).toBe(
-      "10e6ae4e0846671bdfb8005fd577e9c195c7e9896bbd21342002eecd055e6ae0",
+      "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
     );
     expect(sha(readFileSync(path.join(loaderPath, "ApplyDriver.class")))).toBe(
-      "d1725f7f05f9e9e02409d426ead81a001d54907a086b300f477bcbf27f9e1c9c",
+      "84392646979904f48fe2d4aa37e90f78efc81f62308e2a4d9e36c698216b76cf",
     );
     const workParent = process.env.CRL_PUBLICATION_CQL_WORK_DIR ?? tmpdir();
     mkdirSync(workParent, { recursive: true });
@@ -262,6 +268,7 @@ describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply"
     const resources: Resource[] = [{ resourceType: "Patient", id: "test" }];
     const actions: Resource[] = [];
     const expectedResources = new Map<string, Resource>();
+    const probes = new Map<string, string>();
     const expectedErrors = new Map<string, string>();
     const fn = (key: keyof typeof names): string => `"${names[key]}"`;
     let cql =
@@ -290,7 +297,7 @@ describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply"
       const tuple = (r: Candidate): string =>
         `Tuple { key: ${literal(r.key)}, contributorId: ${literal(r.contributorId)}, arm: ${literal(r.arm)}, retrievedInputIdentity: ${r.retrievedInputIdentity === undefined ? "null as System.String" : literal(r.retrievedInputIdentity)}, resource: "Resource"(${literal(String(r.resource.id))}), validity: ${r.validity === undefined ? "null as System.String" : literal(r.validity)} }`;
       const ref = `"${vector.id}-result"`;
-      cql += `\ndefine ${ref}: ${fn("select")}({ ${rows.map(tuple).join(", ")} } as List<${PUBLICATION_CANDIDATE_CQL_TYPE}>, ${literal(vector.id)}, ${literal(vector.equalTime ?? "error")})\n`;
+      cql += `\ndefine ${ref}: ${fn("select")}({ ${rows.map(tuple).join(", ")} }, ${literal(vector.id)}, ${literal(vector.equalTime ?? "error")})\n`;
       cql += `define "${vector.id}-record": ${fn("record")}(${ref})\n`;
       const check =
         result.state === "selected"
@@ -302,6 +309,11 @@ describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply"
                 : "")
             : `${ref}.state = 'missing' and "${vector.id}-record" is null and ${ref}.failureCode is null`;
       cql += `define "${vector.id}-check": ${check}\n`;
+      const probeId = `probe-${vectors.indexOf(vector)}`;
+      probes.set(vector.id, probeId);
+      cql += `define "${vector.id}-probe": FHIR.Observation { id: FHIR.id { value: ${literal(probeId)} }, status: FHIR.ObservationStatus { value: 'final' }, value: FHIR.string { value: if "${vector.id}-check" then 'pass' else 'FAIL' } }\n`;
+      cql += `define "${vector.id}-evidence": { "${vector.id}-probe"${result.state === "selected" ? `, "${vector.id}-record"` : ""} }\n`;
+
       const adUrl = `http://example.org/ActivityDefinition/${vector.id}`;
       resources.push({
         resourceType: "ActivityDefinition",
@@ -311,28 +323,10 @@ describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply"
         kind: "CommunicationRequest",
         intent: "proposal",
         library: [libraryUrl],
-        ...(result.state === "selected"
-          ? {
-              dynamicValue: [
-                {
-                  path: "contained",
-                  expression: {
-                    language: "text/cql-identifier",
-                    expression: `${vector.id}-record`,
-                  },
-                },
-              ],
-            }
-          : {}),
+        dynamicValue: [{ path: "contained", expression: { language: "text/cql-identifier", expression: `${vector.id}-evidence` } }],
       });
       actions.push({
         id: vector.id,
-        condition: [
-          {
-            kind: "applicability",
-            expression: { language: "text/cql-identifier", expression: `${vector.id}-check` },
-          },
-        ],
         definitionCanonical: adUrl,
       });
       if (result.state === "selected") expectedResources.set(vector.id, result.candidate.resource);
@@ -427,7 +421,8 @@ describe.skipIf(!engineJar)("publication selector against pinned CQF 4.7 $apply"
     }
     visit(parsed);
     save("summary.json", { actualActions, issues, observations, vectorCount: vectors.length });
-    expect(actualActions.sort(), work).toEqual(vectors.map((v) => v.id).sort());
+    expect(actualActions.filter(id => !id.startsWith("loud-")).sort(), work).toEqual(vectors.map((v) => v.id).sort());
+    for (const [id, probeId] of probes) expect(observations.find(r => r.id === probeId)?.valueString, `${work}: ${id}`).toBe("pass");
     for (const [id, expected] of expectedResources)
       expect(
         observations.find((r) => r.id === expected.id),
