@@ -101,14 +101,19 @@ export function parseJavaMajor(versionOutput: string): number | undefined {
  * KE to install a second copy.
  */
 function javaCandidates(env: NodeJS.ProcessEnv, isWindows: boolean) {
+  // A plain snapshot loses process.env's case-insensitive Windows property access.
+  // Prefer the exact spelling, including an empty value, if a synthetic env has duplicates.
+  const value = (name: string): string | undefined => env[name] ?? (isWindows
+    ? env[Object.keys(env).find(key => key.toUpperCase() === name) ?? name]
+    : undefined);
   const exe = isWindows ? "java.exe" : "java";
   const candidates: { javaExe: string; source: "JAVA_HOME" | "PATH" }[] = [];
-  const home = env.JAVA_HOME?.trim();
+  const home = value("JAVA_HOME")?.trim();
   if (home) {
     const c = path.join(home, "bin", exe);
     if (existsSync(c)) candidates.push({ javaExe: c, source: "JAVA_HOME" });
   }
-  for (const dir of (env.PATH ?? "").split(path.delimiter)) {
+  for (const dir of (value("PATH") ?? "").split(path.delimiter)) {
     if (!dir) continue;
     const c = path.join(dir, exe);
     if (existsSync(c)) candidates.push({ javaExe: c, source: "PATH" });

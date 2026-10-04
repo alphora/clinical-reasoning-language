@@ -21,10 +21,37 @@ import {
   MIN_JAVA_MAJOR,
   parseJavaMajor,
   resolveJava,
+  resolveJavaAsync,
   verifyJar,
 } from "../spawn";
 
 describe("the JVM spawn contract is bounded by construction", () => {
+  it.each(["Path", "pAtH"])("Windows snapshots discover Java from %s in both APIs", async key => {
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-java-case-"));
+    writeFileSync(path.join(dir, "java.exe"), "");
+    const env = { [key]: dir }, expected = { ok: true, javaExe: path.join(dir, "java.exe"), source: "PATH", major: 23 };
+    expect(resolveJava(env, true, () => 'java version "23.0.1"')).toEqual(expected);
+    expect(await resolveJavaAsync(env, true, async () => 'java version "23.0.1"')).toEqual(expected);
+    expect(resolveJava({ PATH: "", [key]: dir }, true, () => 'java version "23.0.1"')).toEqual({ ok: false, reason: "not-found" });
+  });
+
+  it("Windows mixed-case JAVA_HOME retains usable-home priority and too-old fallback", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-java-home-case-")), home = path.join(dir, "home"), bin = path.join(dir, "path");
+    mkdirSync(path.join(home, "bin"), { recursive: true }); mkdirSync(bin);
+    writeFileSync(path.join(home, "bin", "java.exe"), ""); writeFileSync(path.join(bin, "java.exe"), "");
+    const env = { Java_Home: home, Path: bin }, homeExe = path.join(home, "bin", "java.exe");
+    expect(resolveJava(env, true, () => 'java version "23.0.1"')).toEqual({ ok: true, javaExe: homeExe, source: "JAVA_HOME", major: 23 });
+    const probe = (p: string) => p === homeExe ? 'java version "11.0.13"' : 'java version "23.0.1"';
+    expect(await resolveJavaAsync(env, true, async p => probe(p))).toEqual({ ok: true, javaExe: path.join(bin, "java.exe"), source: "PATH", major: 23 });
+    expect(resolveJava({ ...env, Java_Home: path.join(dir, "missing") }, true, probe)).toMatchObject({ ok: true, source: "PATH" });
+  });
+
+  it("POSIX environment lookup remains case-sensitive", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "crl-java-posix-case-")); writeFileSync(path.join(dir, "java"), "");
+    expect(resolveJava({ Path: dir }, false, () => 'java version "23.0.1"')).toEqual({ ok: false, reason: "not-found" });
+    expect(await resolveJavaAsync({ Path: dir }, false, async () => 'java version "23.0.1"')).toEqual({ ok: false, reason: "not-found" });
+    expect(resolveJava({ PATH: dir }, false, () => 'java version "23.0.1"')).toMatchObject({ ok: true, source: "PATH" });
+  });
   it("matches the delivered engine provenance manifest", () => {
     const manifest = JSON.parse(readFileSync(path.resolve(__dirname, "../../../../../patches/cqframework/cli-build.json"), "utf8"));
     expect(manifest).toMatchObject({ sha256: ENGINE_JAR_SOURCE.sha256, buildId: ENGINE_JAR_SOURCE.buildId, url: ENGINE_JAR_SOURCE.url });
