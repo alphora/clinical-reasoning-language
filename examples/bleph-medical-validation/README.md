@@ -25,7 +25,7 @@ The open KE flag under `src/medical-validation/flags/` is a labeled UI demonstra
 - `src/cel/regression/medical-validation.cel`: 30 additional controls; full regression evaluates all 46 cases.
 - `src/cql/` and `src/fhir/`: eight CQL files and 26 FHIR definitions, including seven Library resources.
 - `tests/data/fhir/`: emitted MV patient data and its manifest.
-- `tests/results/`: 16 native Questionnaire/QuestionnaireResponse pairs and their manifest, generated with CRL 5.4.2.
+- `tests/results/`: 16 native Questionnaire/QuestionnaireResponse pairs and their manifest, generated with CRL 6.4.33.
 
 The full source remains available for reading; provenance identifies the portions represented by the executable example. The frozen suite at `packages/crl/test/acceptance/bleph` separately exercises engine behavior, including ServiceRequest sourcing and local/source selection.
 

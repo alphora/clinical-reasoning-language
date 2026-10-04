@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "celLibrary": "mv",
   "useCase": "prior-auth",
-  "generatedAt": "2026-09-20T09:07:47.328Z",
+  "generatedAt": "2026-10-04T19:00:40.788Z",
   "provenance": {
-    "crlVersion": "6.4.1",
-    "producerJarSha256": "9870fc867547f65518c5cd6e698ace77b60a9e98797ed38330c25d06cbf5cb2e",
-    "inputClock": "2026-09-20T09:07:41.757Z",
-    "runtimeSha256": "a9539b2cc14e5b9b77a529b4ccec1ff67e150cbe3ecddc5e11a1147c3f671994",
-    "definitionClosureSha256": "06695d3a3a4447c2dbba2f8acc78944032da7a37e409ae49544ecb071aa589fb"
+    "crlVersion": "6.4.33",
+    "producerJarSha256": "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
+    "inputClock": "2026-10-04T19:00:38.400Z",
+    "runtimeSha256": "302e23821f4e8ae0f91905fccff1e64dd3be5e0aea8c4140b94cc5e7954a03a4",
+    "definitionClosureSha256": "f9273a1c17795493d89376c333e01079036ea16bf2fb52e31f2ead3db9ef7a54"
   },
   "cases": [
     {
@@ -19,20 +19,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-a61c921f6809",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-a61c921f6809.json",
-          "sha256": "187cb57abeee190e2a25523da1ef07ac665ac2ba6d828e1b32662b579b808310",
+          "sha256": "2d377e8f82d230c6bea07b9cd1583060b2ee2edad4a742aa19a912317eae8b85",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-a61c921f6809",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-fb2e0771ec55/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-a61c921f6809.json",
-          "sha256": "1afab1d68fc82c42373bd49dd4d397ad1c9dc6ed29d33f3d87d849036a177273",
+          "sha256": "8cea844fb173081414eeae4627344a74dda1bac7231204cd622a17cdadf8d3ef",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-pseudo-mrd-met",
       "inputSha256": "022fd280dd095e3880096d775e984218a0cce33816c4a516f6fc3e566e32f86c",
-      "producedAt": "2026-09-20T09:07:47.332Z"
+      "producedAt": "2026-10-04T19:00:40.791Z"
     },
     {
       "caseName": "Upper blepharoplasty — side-gaze obstruction",
@@ -42,20 +42,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-8260caeb85b4",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-8260caeb85b4.json",
-          "sha256": "193c99a753a07375827a01ee698a873217dc48526ccfc12ca824ff8584716984",
+          "sha256": "adf26f16fb3ba22a54c2f7da8069afcaa2ec5e98d326a2105a0555be8b2dc2c0",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-8260caeb85b4",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-5ee2778cace9/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-8260caeb85b4.json",
-          "sha256": "bbd952755be18eda460e6f7a688398e257f54ac04094c9b5848a15273ec68876",
+          "sha256": "0f8e506059f2a700417646beb0031de4c47275dd1efb2205f3a2aa9d7a5e3075",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-side-gaze-met",
       "inputSha256": "db71294c56a51f8ec143725c2ffde5839e9a51a454556ebd94d8560c11dd3816",
-      "producedAt": "2026-09-20T09:08:14.480Z"
+      "producedAt": "2026-10-04T19:00:52.644Z"
     },
     {
       "caseName": "Upper blepharoplasty — another affected daily activity",
@@ -65,20 +65,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-f13e04850cbf",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-f13e04850cbf.json",
-          "sha256": "337d5782b743d077c28a8bb1dc03009254a10f8dd91aa735bbea4aed7034f1e2",
+          "sha256": "2b45673c11eef00baed6c5fa3e742b2705e02f81c810c1f92fbf50e570ecd05c",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-f13e04850cbf",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-6ee5c421d80b/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-f13e04850cbf.json",
-          "sha256": "e734271ffa9b5a7a49be224bc5a3cbba946bd005b1185756f896939c79d84993",
+          "sha256": "34a4d2437767e3aad2b69c6ebd105a3db7c3a0793f2762d53d92b767f74d20a8",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-other-activity-met",
       "inputSha256": "2c9ce65aea086286abf38d5e7d830d08d8413b940808dc611d9b188172f55394",
-      "producedAt": "2026-09-20T09:08:50.148Z"
+      "producedAt": "2026-10-04T19:01:04.877Z"
     },
     {
       "caseName": "Ptosis repair — actual-margin MRD 2.0 mm or less",
@@ -88,20 +88,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-411a743428fe",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-411a743428fe.json",
-          "sha256": "ea626bb0debb4870eb25005e1e1de46e3ad3d559e304fcc06996bdf927a3ac40",
+          "sha256": "78332c8f35b1ca2e13d1fc2ddb510992b6d9a2584432f9a5020c99f208a318c0",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-411a743428fe",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d22e430a05da/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-411a743428fe.json",
-          "sha256": "e8d4603fe47ce84dafb7d0b178ab3d578531e97ed8b6e4e10b12beece513edb5",
+          "sha256": "f398fa0d8222126130d91169898b321f4295208ce2ff82a3cc9b43d02d4579d2",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-mrd-met",
       "inputSha256": "9e1c4ff6e88b56c1fcfcda485ed565a67723b19ed8f56ae2c497051b9871ee8b",
-      "producedAt": "2026-09-20T09:09:30.592Z"
+      "producedAt": "2026-10-04T19:01:18.567Z"
     },
     {
       "caseName": "Ptosis repair — visual interference with driving",
@@ -111,20 +111,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-47a7024e93f1",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-47a7024e93f1.json",
-          "sha256": "d52cd0b9b444e4f55660993e15a8baaeace99b225fe04cfcbd99994ba96b9200",
+          "sha256": "353bc7c576eba1a2c9b03b9011b69d09a15009cbca70f9225a9132c9f67df461",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-47a7024e93f1",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-b0dbe8d9c43c/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-47a7024e93f1.json",
-          "sha256": "cfe861a2e7bd221add5e760007787d84c54efd874390d746ed5eed0986c628a5",
+          "sha256": "3ef843f4b4a8b2c7ac6aee1d988fdbb4329c405572ab362bdcd8b96b167f1b6f",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-driving-met",
       "inputSha256": "a15649c7946baf0ce79cac1df944825e9b278549990713c23dbb671ff2a54067",
-      "producedAt": "2026-09-20T09:10:04.724Z"
+      "producedAt": "2026-10-04T19:01:33.619Z"
     },
     {
       "caseName": "Ptosis repair — another affected daily activity",
@@ -134,20 +134,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-7f95c589bd89",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-7f95c589bd89.json",
-          "sha256": "ec346a10d0c34c4ef6267a14d4e9421372e08f5ea2bc69385eefa1f45d3da9a0",
+          "sha256": "9523f0d9fe76fb30518ae7fd7032cb67d9494e595eefd29cf193b1229ad29d44",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-7f95c589bd89",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-3389c81f0be3/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-7f95c589bd89.json",
-          "sha256": "c74419cc4b23c0b7321d10514afdedfada670eb1b0c1144116b8db0e2444e6af",
+          "sha256": "9724fc923647b439ea528d4c5f84428b1948470c217cb283d1d08de393c0d8a6",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-other-activity-met",
       "inputSha256": "0111cae288e7cb272ef5f11b5ee8eeab1b99457bd137f8a35e1975fec4681b79",
-      "producedAt": "2026-09-20T09:10:33.698Z"
+      "producedAt": "2026-10-04T19:01:48.176Z"
     },
     {
       "caseName": "upper procedure — solely cosmetic",
@@ -157,20 +157,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-9ab7bd16eafe",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-9ab7bd16eafe.json",
-          "sha256": "75f163944f9a21e8d4c5321b6a375efb11ed8d9de07c4a731f2dfe109ef2bd3a",
+          "sha256": "491d707b045b49f4f015c8d6c7203161083a0f225f84b944970174314ca0654e",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-9ab7bd16eafe",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-f97ad71f6adf/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-9ab7bd16eafe.json",
-          "sha256": "d1706bae3ff8ad6414b66a5fc3ee8f08a521139435e737e99730b0dcc49ea98d",
+          "sha256": "af70104d212d975b35087779a3be62f521076417a39ef50cfd4b25a6bb721352",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-cosmetic-unmet",
       "inputSha256": "2ba96a255f25832b9c297e5bbffe64d436d88b9d9351394fa74312e0f245462d",
-      "producedAt": "2026-09-20T09:10:59.698Z"
+      "producedAt": "2026-10-04T19:02:03.782Z"
     },
     {
       "caseName": "upper procedure — no documented functional complaint",
@@ -180,20 +180,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-bd8bdb8320bf",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-bd8bdb8320bf.json",
-          "sha256": "979d35979197e6409a19d34299c52f4db88f98eaae5ec4d9c564ceaefa5501ef",
+          "sha256": "9f1e1b58ad244c7c39e5150f2641de6811de2d48ef148c10b54014d2fe194c70",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-bd8bdb8320bf",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-2266ed1ef5e0/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-bd8bdb8320bf.json",
-          "sha256": "2948ce3a59cb06c921b5212486ac89f8ef0a73f9c5ccbd475785fa38c82031aa",
+          "sha256": "9bf0c2e656143c7065d1570160df6423c12ecf5d20cb02ddedcb9003adb6e499",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-complaint-unmet",
       "inputSha256": "a5d0edf951cdf966c9873664d3a3698433bb97d496def0d231ed244b7c58ffba",
-      "producedAt": "2026-09-20T09:11:20.998Z"
+      "producedAt": "2026-10-04T19:02:25.808Z"
     },
     {
       "caseName": "upper procedure — individual necessity not established",
@@ -203,20 +203,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-7745814acee2",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-7745814acee2.json",
-          "sha256": "1d023c92083a98f9791e871efee80abed6215eb6a63d68425fc5a1cb5b5fcd95",
+          "sha256": "ba0e0dd85e62842994d88d7860b369c8c35ebdf3ea460ee28365dc3ed035647b",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-7745814acee2",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-67f526b536af/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-7745814acee2.json",
-          "sha256": "a7ca21fe3cac7127d12d8bdfa15bde749be6269eae2019451333274121f71675",
+          "sha256": "93a768ada4edc4633383162573ff91f240baf46704c6c407158f3f1aad846d48",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-necessity-unmet",
       "inputSha256": "b1e99a71a150c0679f11acb9eba433eae6fe40538c7e2e662e29ee8bebfd07d6",
-      "producedAt": "2026-09-20T09:11:43.757Z"
+      "producedAt": "2026-10-04T19:02:46.440Z"
     },
     {
       "caseName": "ptosis procedure — solely cosmetic",
@@ -226,20 +226,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-2b3616a37f2a",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-2b3616a37f2a.json",
-          "sha256": "2b5d9e2cf9d488d9ebd2004904548bef557635ef513f355550ccbfb09e845d80",
+          "sha256": "065c39da1b9c58d0354645ef1271e88e8852843068a3e0da16d07c28a06db940",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-2b3616a37f2a",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-7da4d80e6585/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-2b3616a37f2a.json",
-          "sha256": "9ac600438e0e71c733d0fc46f9ac547d843396b957b01168578eb3d2ee456617",
+          "sha256": "cb1aa231a04aeec383038e46f8cf94c1704ea65053f9d1454b74b07e9b704e98",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-cosmetic-unmet",
       "inputSha256": "192be69baf163d9eaeedddaf34b4a8cb211933b66871664aa0cb9500d9f5031f",
-      "producedAt": "2026-09-20T09:12:12.438Z"
+      "producedAt": "2026-10-04T19:03:09.167Z"
     },
     {
       "caseName": "ptosis procedure — no documented functional complaint",
@@ -249,20 +249,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-16afb40fbe09",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-16afb40fbe09.json",
-          "sha256": "cf1e2c9b298ae471903653be95559a0ef561896123dc958171e444a11d794055",
+          "sha256": "f2d7e39ef4e0af3b56d0e9c1b744f9a2bd49e0b6d71af1367c8762f113093bd7",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-16afb40fbe09",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d8142e648cca/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-16afb40fbe09.json",
-          "sha256": "a513f18f889da8c2d31e6b7bc00912f4800abacbd14eafd8f5c1a9cae76391c5",
+          "sha256": "f2b80285def80e3473d57af5f0425361f94baaba2d0c4cb9f926459290d4f6eb",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-complaint-unmet",
       "inputSha256": "5d5b140ab6777bbf6f507f108542dc708f2267972c4385cfe15f278378b6a301",
-      "producedAt": "2026-09-20T09:12:34.619Z"
+      "producedAt": "2026-10-04T19:03:32.183Z"
     },
     {
       "caseName": "ptosis procedure — individual necessity not established",
@@ -272,20 +272,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-e75fa0721634",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-e75fa0721634.json",
-          "sha256": "e6879298cf8b13b0456d23b0cd017f15d7d50256b63c5f16ac54a5b442ee25d3",
+          "sha256": "91ee6ad6140e3c421d992c9fcbddc994eb2a4cd64e483a2ea0f02089d1b5024f",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-e75fa0721634",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-9ba03476befd/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-e75fa0721634.json",
-          "sha256": "13be029b5f2f48f6f0526ccfea1da89dd18547e5ad7c9049f5a405c78740e362",
+          "sha256": "bda8b7a458850d28de7fe501d3375259acfa9c340feb42b790d1954501ea8c0c",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-necessity-unmet",
       "inputSha256": "eaa455c423f8ebc2a082b7fb46ce14fa237b64d020d2784014dd2ab45a48299d",
-      "producedAt": "2026-09-20T09:12:55.527Z"
+      "producedAt": "2026-10-04T19:03:55.252Z"
     },
     {
       "caseName": "Upper blepharoplasty — neither qualifying skin finding",
@@ -295,20 +295,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-bbe3ebbda231",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-bbe3ebbda231.json",
-          "sha256": "82de25d85c0689291a49e5daf172a98d7e45bab482c402432b1e4bcbb77bac46",
+          "sha256": "eaaab0db260ee37bf7e1973bbe8961eceacda8c02b8fb6697a7d456a16611744",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-bbe3ebbda231",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-72ed52521c38/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-bbe3ebbda231.json",
-          "sha256": "5ac8ce4f90f0e8b88b6b54121f45c0cf7772eb4c07fff8be5cdc56a81eee7a92",
+          "sha256": "5ca482ed51aa97e357d4e5a594ab181299d8ebe27f09d7e660f5355e86c5c627",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-skin-unmet",
       "inputSha256": "da0f43a48510d62a31eb7efbf532c002ef76326759069ce11021447326ecb36a",
-      "producedAt": "2026-09-20T09:13:21.361Z"
+      "producedAt": "2026-10-04T19:04:18.581Z"
     },
     {
       "caseName": "Upper blepharoplasty — required photographs not documented",
@@ -318,20 +318,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-2e4dc07e6677",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-2e4dc07e6677.json",
-          "sha256": "c412d2b479be448cc45b4e99b7e9ab9a5525986a2411438646707be0e27d1532",
+          "sha256": "308bba43197e5178b5172c42cbe2726844d146290e870a9a00d8841300b86598",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-2e4dc07e6677",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-7b6dae4bb980/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-2e4dc07e6677.json",
-          "sha256": "afe5de6180bf215ef8a35eae926055766965083edf9a30c5c404946881fd7a41",
+          "sha256": "633d8169848e24d68b71b436758588fbc8daa138a6712d28fb31a1756eccfc0b",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-photos-unmet",
       "inputSha256": "3a2c069e6beb45ff016818d7346fa9a5893d2fb38e89affe9863a85a26f4911d",
-      "producedAt": "2026-09-20T09:13:45.890Z"
+      "producedAt": "2026-10-04T19:04:40.680Z"
     },
     {
       "caseName": "Ptosis repair — actual-margin MRD exceeds 2.0 mm",
@@ -341,20 +341,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-3c382163d931",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-3c382163d931.json",
-          "sha256": "0e093506f87014444cfe71acb1a0bf4118e3be499e9d06386e8bf3e3ba79ac76",
+          "sha256": "7647b50ed7789c75ae6fc6d16f3ccf88493610d75adbf6fbae95a45343c61472",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-3c382163d931",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-d6054a11549d/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-3c382163d931.json",
-          "sha256": "c902255dbd2d58b052c634e5e093ddf427c95c4c4b32b8157fc6f376a3764af0",
+          "sha256": "8c381bba4d0f2c1353a8205deb9a59330cde279d28f4f1bf298cca3da247d9c6",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-mrd-unmet",
       "inputSha256": "8794729ece1cb6bc6876df4c24fd82215bd525ed0cebee0797f77adf247bab99",
-      "producedAt": "2026-09-20T09:14:11.245Z"
+      "producedAt": "2026-10-04T19:05:03.268Z"
     },
     {
       "caseName": "Ptosis repair — required photographs not documented",
@@ -364,20 +364,20 @@
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-b787334ba726",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/questionnaire/l34194-bleph-example-blepharoplasty-and-blepharopto-b787334ba726.json",
-          "sha256": "66671ae877a6927f0c5e16266916d920bea08f861ae8e6f605b9e21fc6cb0b35",
+          "sha256": "adc42c58a8df3e519042542f254bb12f8df68aa83e0b33a9e21881d457dcd4c3",
           "resourceType": "Questionnaire"
         },
         {
           "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-b787334ba726",
           "path": "tests/results/fhir/patient/blepharoplasty-and-blepharoptosis-repair-ca-487960a8d281/questionnaireresponse/l34194-bleph-example-blepharoplasty-and-blepharopto-b787334ba726.json",
-          "sha256": "98aa27b96852008959148fe6216a54479a8d6f500259a145cb994ae653b76148",
+          "sha256": "5eed8c96150c88bdf9cfbbb22f4bb4a94de959daf095added2d60347d50fdf7d",
           "resourceType": "QuestionnaireResponse"
         }
       ],
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-photos-unmet",
       "inputSha256": "2ce24d4029783bbf431d74791020a4a7317ff76b437925708ba3450b9f8685f3",
-      "producedAt": "2026-09-20T09:14:34.642Z"
+      "producedAt": "2026-10-04T19:05:25.115Z"
     }
   ]
 }

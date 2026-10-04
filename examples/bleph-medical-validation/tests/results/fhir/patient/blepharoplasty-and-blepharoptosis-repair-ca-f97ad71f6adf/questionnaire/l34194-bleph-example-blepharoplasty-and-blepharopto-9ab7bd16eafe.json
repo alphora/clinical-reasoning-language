@@ -67,40 +67,30 @@
           ]
         },
         {
-          "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-itemPopulationContext",
-          "valueExpression": {
-            "name": "CosmeticSurgicalPurpose",
-            "language": "text/cql-identifier",
-            "expression": "Cosmetic Surgical Purpose",
-            "reference": "http://example.org/crl/Library/L34194BlephExampleInferences"
-          }
+          "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+          "extension": [
+            {
+              "url": "definition",
+              "valueCanonical": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose|0.0.0"
+            },
+            {
+              "url": "expression",
+              "valueExpression": {
+                "name": "CosmeticSurgicalPurpose",
+                "language": "text/cql-identifier",
+                "expression": "Cosmetic Surgical Purpose",
+                "reference": "http://example.org/crl/Library/L34194BlephExampleInferences"
+              }
+            }
+          ]
         }
       ],
       "linkId": "1",
-      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.value[x]",
       "text": "Is this procedure solely cosmetic, with no functional benefit?",
-      "type": "group",
+      "type": "boolean",
       "required": false,
-      "repeats": false,
-      "item": [
-        {
-          "extension": [
-            {
-              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
-              "valueExpression": {
-                "language": "text/cql-expression",
-                "expression": "%CosmeticSurgicalPurpose.value"
-              }
-            }
-          ],
-          "linkId": "1.1",
-          "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.value[x]",
-          "text": "Cosmetic Surgical Purpose",
-          "type": "boolean",
-          "required": false,
-          "repeats": false
-        }
-      ]
+      "repeats": false
     }
   ]
 }
