@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.23");
+    expect(kit.schemaVersion).toBe("2.24");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -373,6 +373,8 @@ describe("authoring-kit — getAuthoringKit", () => {
       "shared-continuation-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
+      "uncertainty-reference.cel",
+      "uncertainty-reference.crl",
     ]);
     const src = (n: string) => kit.referenceArtifacts.find((a) => a.name === n)?.source;
     expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
@@ -459,7 +461,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
-    expect(crePairs.length).toBe(8); // includes the shared selection test input
+    expect(crePairs.length).toBe(9); // includes the shared uncertainty CRL/CEL pair
     for (const crl of crePairs) {
       const base = crl.name.replace(/\.crl$/, "");
       const cel = byName.get(`${base}.cel`);
@@ -490,6 +492,7 @@ describe("authoring-kit — getAuthoringKit", () => {
       const run = runCel(resolveCelImports(celPath));
       expect(run.success, `${base} run failed`).toBe(true);
       expect(run.runs.length, `${base} produced no cases`).toBeGreaterThan(0);
+      if (base === "uncertainty-reference") expect(run.runs.length).toBe(18);
       expect(
         run.runs.every((r) => r.status === "pass"),
         `${base} has a non-passing case`,
@@ -667,8 +670,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.23");
-    expect(kit.contentHash).toBe("441cb04b5ce32ed86895683070f2b9f8a14f59cd1621f62a89c38e88ee505a8d");
+    expect(kit.schemaVersion).toBe("2.24");
+    expect(kit.contentHash).toBe("1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {

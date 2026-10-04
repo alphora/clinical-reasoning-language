@@ -7,7 +7,7 @@ export function artifactRequirements(name: string): ArtifactRequirements {
   const base = name.replace(/\.(crl|cel)$/, "");
   const paired = ["intake-reference", "selection-reference", "named-answer-reference", "pa-determination-reference",
     "source-delegated-decision-reference", "disposition-arbitration-reference",
-    "reused-condition-reference", "shared-continuation-reference"].includes(base);
+    "reused-condition-reference", "shared-continuation-reference", "uncertainty-reference"].includes(base);
   const artifacts = paired ? [`artifact:${base}.${name.endsWith(".crl") ? "cel" : "crl"}`] : [];
   if (base === "named-answer-reference") artifacts.push("artifact:named-answer-terms.crl");
   const crl: Record<string, unknown> = {
@@ -21,6 +21,11 @@ export function artifactRequirements(name: string): ArtifactRequirements {
         "not-certify": { Deny: { label: "Not certified" }, EIU: { label: "Experimental/investigational/unproven" } },
       },
     };
+  }
+  if (base === "uncertainty-reference") {
+    crl.dispositions = { version: 1, mode: "embedded", options: {
+      certify: { Met: { label: "Met" } }, "not-certify": { Unmet: { label: "Unmet" } },
+    } };
   }
   return { artifacts, crl };
 }

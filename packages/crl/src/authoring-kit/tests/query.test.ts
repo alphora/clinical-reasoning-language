@@ -84,6 +84,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
 
   // @kit verify-loop:kit-discovery
   it.each([
+    ["uncertainty check", "rule:selected-answer-aggregate"],
+    ["computed guard", "rule:selected-answer-aggregate"],
     ["dropdown with a none answer", "rule:named-answer-options"],
     ["internal helper", "rule:chaining-necessity"],
     ["shared continuation", "rule:chaining-necessity"],
@@ -166,6 +168,16 @@ describe("one authoring kit: discovery and complete guidance", () => {
     const artifact: any = byId.get("artifact:named-answer-reference.crl");
     expect(artifact.requires.crl).toMatchObject({ canonicalBase: "https://example.org/answers", date: "2026-01-01T00:00:00.000Z" });
     expect(artifact.source).toBe(kit.referenceArtifacts.find(a => a.name === "named-answer-reference.crl")!.source);
+  });
+
+  // @kit selected-answer-aggregate:worked-example-discovery
+  it("terminal uncertainty guidance retrieves the complete executable pair and its configuration", () => {
+    const result = query({ view: "entry", id: "rule:selected-answer-aggregate" });
+    for (const name of ["uncertainty-reference.crl", "uncertainty-reference.cel"]) {
+      const artifact = result.entries.find((e: any) => e.id === `artifact:${name}`)?.content;
+      expect(artifact).toEqual(kit.referenceArtifacts.find(a => a.name === name));
+      expect(artifact.requires.crl.dispositions).toMatchObject({ version: 1, mode: "embedded" });
+    }
   });
 
   it("determination guidance applies before configuration exists and carries all completion checks", () => {

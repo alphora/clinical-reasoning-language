@@ -19,6 +19,7 @@ export function retainSubmittedAnswers(submittedQ: Fhir | undefined, submittedR:
   const q = copy(result.questionnaire ?? { ...submittedQ, item: [] });
   const r = copy(result.response ?? { ...submittedR, item: [] });
   const used = new Set<string>(), mapping = new Map<string, string>(), restored: any[] = [];
+  const ancestorConditions: Array<{ before: any[]; after: any[] }> = [];
   let nextId = 1;
   const all = (qs: any[]): any[] => qs.flatMap(q => [q, ...all(items(q.item))]);
   for (const item of all(items(q.item))) {
@@ -100,6 +101,14 @@ export function retainSubmittedAnswers(submittedQ: Fhir | undefined, submittedR:
       const nativeResponses = responses.filter(r => r.linkId === found.linkId);
       if (item.type !== "group" || item.repeats || oldResponses.length !== 1 || nativeResponses.length > 1)
         fail("partial retention inside repeated or answer-bearing parents needs occurrence identity");
+      // REFACTOR:grounded: a stable group identity does not establish a stable extraction context.
+      // Only a merge of missing descendants needs this check; wholly native branches stay native.
+      // Defensive support for supplied group conditions, not a claim that CRL emits them.
+      // Conservative equality refuses reordered metadata; literal gate IDs are mapped below.
+      for (const key of ["extension", "modifierExtension", "code", "enableBehavior"])
+        if (JSON.stringify(item[key] ?? []) !== JSON.stringify(found[key] ?? []))
+          fail("ancestor evaluation or extraction context changed");
+      ancestorConditions.push({ before: items(item.enableWhen), after: items(found.enableWhen) });
       let target = nativeResponses[0];
       if (!target) { target = { linkId: found.linkId }; responses.push(target); }
       target.item ??= []; found.item ??= [];
@@ -108,6 +117,17 @@ export function retainSubmittedAnswers(submittedQ: Fhir | undefined, submittedR:
   };
   q.item ??= []; r.item ??= [];
   merge(items(submittedQ.item), items(submittedR.item), q.item, r.item);
+  // A later omitted gate can retain its original ID, repairing a native condition's target.
+  // Defer for that case. If collision forces a new gate ID, refuse rather than rewrite native conditions.
+  for (const { before, after } of ancestorConditions) {
+    const mapped = before.map(condition => {
+      const question = mapping.get(condition.question);
+      if (!question) fail("ancestor enableWhen references an unavailable question");
+      return { ...condition, question };
+    });
+    if (JSON.stringify(mapped) !== JSON.stringify(after))
+      fail("ancestor evaluation or extraction context changed");
+  }
   if (!restored.length) return result;
   if (hasQ && JSON.stringify(submittedQ.extension ?? []) !== JSON.stringify(q.extension ?? []))
     fail("questionnaire-level evaluation or extraction context changed");

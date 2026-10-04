@@ -1,5 +1,43 @@
 # Authoring-kit coverage ledger
 
+## Terminal uncertainty worked example and safe answer retention - schema 2.24
+
+Baseline audited content: `f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11`, schema2.23. Parent `f97d56f63b2868278a4f9eecff4a29f53d9a6ad9` contains the prior metadata-only audit commits. Target: pending reviewed content commit; current content hash `1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796`. The stamp remains2.23 until review and qualification complete.
+
+Operator intent: an explicitly enumerated uncoded available-value check before every otherwise-Met reads current covered answers, including retained unused alternatives. Missing operands add no questions through this operation; ordinary required guards pause. Assumed direction controls routing; either uncertainty code prevents otherwise-Met. Errors propagate. Current submitted answered items remain editable after native omission; cleared/pruned history is not restored.
+
+Kit updated: selected-answer-aggregate rule, discovery aliases, prerequisites and the shared uncertaintyExample.ts CRL/CEL pair with embedded Met/Unmet configuration. The18 literal CEL expectations cover required pauses, ordered alternatives, both uncertainty directions, unused supplied answers and direct negative-route Unmet. Artifact comments distinguish coding from qualification, unknown otherwise behavior, explicit validity-anchor/no-competitor scope, vocabulary maintenance and separate native error/clear controls. Retrieval includes native-apply-session. This is an eligibility slice after request/EIU, not a customer-policy template. Outcome/question-set equality alone cannot identify which Unmet path executed; path explanations follow the authored decision.
+
+Owning evidence: authoring-kit.test.ts STEP-4 executes all18 delivered CEL cases; referenceArtifactsEmit.test.ts validates/emits the delivered CRL and declared configuration. query.test.ts adds two search rows and selected-answer-aggregate:worked-example-discovery, asserting exact retrieved pair/configuration. No prior owning assertion/tag was removed. The unchanged publicationAnyMembership.test.ts cases cover actual validity, finite domains, selected-clear and invalid/conflicting-value behavior, with separate emitter and reducer limits. Delivery pins measure packaging, not native execution.
+
+Client updated: interactiveQuestionnaireRetention.ts refuses unsafe matched-ancestor extraction/enablement changes only while restoring omitted answered descendants. Native-only branches stay native. The owning submitted-answer-retention suite covers extension, modifierExtension, code, enableWhen and enableBehavior changes with state/input preservation, plus unchanged matched ancestors with stable or renumbered question IDs. Literal gate references must use the existing identity mapping; arbitrary expressions are not normalized. A later omitted gate can retain its original ID; collision-renaming that would require changing native conditions refuses. Ancestor condition equality is not current enablement equality. This is conservative support for supplied Questionnaire structure, not evidence that CRL emits enabled native groups. The documentation states ordering, current-only retention, refusal and close/reopen to load changed definitions; Reset keeps the loaded definitions.
+
+Current verification status:242 final kit/emitter checks and60 targeted extension checks pass, including26 retention cases. MV warning verification binds the current18-case fixture's kit hash and both artifact hashes and reports0warnings. The full earlier gate passed5411core/32skipped and1359extension/3expectedfail plus build/types/MCP; it preceded final retention refinements and is not a final test of them. The final22-row source-example-release/verification.json matrix passed:18 actual MCP-emitted CEL cases plus4 controls that mutate emitted resources, including an older uncertain B and newer valueless B. Its expectations include exact outcomes and question sets. Earlier21-row results are historical and do not prove the added competing-clear control. Installed/UI qualification remains separate. Plan920 and source921 record actual reviewers, responses, dispositions and convergence status.
+
+Boundaries: caller owns retained data, editing external supplied answers and persistent replacement/clear. The compiler does not infer which concepts or Met endpoints an author's uncertainty policy covers. CRE and emission are separate from native and rendered interaction; no customer-policy or generalized repeated-extraction acceptance is claimed.
+
+Complete changed-path dispositions for this interval:
+
+- `docs/interactive-questionnaire.md` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `docs/release-integration.md` - Release scope/evidence record; no new semantics.
+- `docs/selected-answer-aggregate.md` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `package-lock.json` - Not author-facing semantics: release version/lock metadata only.
+- `package.json` - Not author-facing semantics: release version/lock metadata only.
+- `packages/crl-vscode/package.json` - Not author-facing semantics: release version/lock metadata only.
+- `packages/crl-vscode/src/interactiveQuestionnaireRetention.test.mjs` - Client behavior correction and owning refusal test described above.
+- `packages/crl-vscode/src/interactiveQuestionnaireRetention.ts` - Client behavior correction and owning refusal test described above.
+- `packages/crl-vscode/src/mcp-server.test.mjs` - Kit updated: schema/hash/artifact delivery identity.
+- `packages/crl/package.json` - Not author-facing semantics: release version/lock metadata only.
+- `packages/crl/src/authoring-kit/audit.json` - Not author-facing: inspected prior2.23 metadata-only stamp; next stamp is separate.
+- `packages/crl/src/authoring-kit/index.ts` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/authoring-kit/navigation.ts` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/authoring-kit/requirements.ts` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/authoring-kit/tests/coverage.md` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/authoring-kit/tests/query.test.ts` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/authoring-kit/uncertaintyExample.ts` - Kit updated: shared example, retrieval, owning gates or reconciled guidance described above.
+- `packages/crl/src/cli/tests/run-mcp-server.test.mjs` - Kit updated: schema/hash/artifact delivery identity.
+
 ## Singleton available-answer membership — candidate content delta, schema 2.23
 
 Baseline audited content: d9abb61871bf4f3d999cd601b52e4d24fe86aca4, kit2.22. Candidate parent: 7f6043e68b225140be9adaa2472c3074496444f9. All intervening committed changes are the2.22 audit stamp and its scope wording; no additional implementation changes. Target reviewed content: f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11; kit2.23 hash441cb04b5ce32ed86895683070f2b9f8a14f59cd1621f62a89c38e88ee505a8d. This metadata-only commit binds that existing revision in audit.json. The complete incremental file list is the recognizer, owning membership tests, aggregate documentation, kit index, kit/core-MCP/extension-MCP identity tests and this ledger. The unchanged runtime, driver and engine retain their existing evidence; installed candidate qualification remains separate. The immutable6.4.29 artifacts and existing2.22 ledger are preserved.

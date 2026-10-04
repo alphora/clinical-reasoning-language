@@ -2,6 +2,20 @@
 
 Open **Interactive FHIR Questionnaire** from the MV tree toolbar. This opens a live session for the policy currently open in MV. The existing FHIR Questionnaire button continues to show saved case results.
 
+Submitted answered items omitted by native evaluation are retained at the end of
+their matched parent, rather than restored to a historical display position.
+Cleared or pruned answers are not restored. A cleared question appears again only
+if the current decision independently needs it; the client offers no answer-history
+undo. Partial retention beneath a matched group refuses changed extraction or
+evaluation metadata, preserving the submitted form for correction. If definitions
+were legitimately re-emitted with a new context, close and reopen the panel to
+load them. Reset restarts a session against the definitions already loaded.
+This check preserves the ancestor's condition, not its current enablement outcome.
+If an omitted gate must be renamed to avoid an ID collision, retention refuses
+rather than rewriting a native group's condition. A removed ancestor condition
+also causes refusal. Metadata comparison is
+conservative: reordered properties or an explicit default can also cause refusal.
+
 Put each initial state in the policy's own project, alongside its `src` folder:
 
 ```text

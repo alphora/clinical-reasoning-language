@@ -6,7 +6,7 @@ export type KitContent = Omit<AuthoringKit, "contentHash" | "navigation" | "audi
 /** Authored discovery terms, hashed with the kit. Retired spellings lead to current guidance. */
 const ALIASES: Record<string, string[]> = {
   "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
-  "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers"],
+  "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers", "uncertainty check", "computed guard", "uncertain assume yes", "uncertain assume no"],
   "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
   "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API"],
   "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
@@ -42,7 +42,7 @@ const ALIASES: Record<string, string[]> = {
 // REFACTOR:grounded (#322): typed intake teaching is discoverable with its prerequisites.
 const RELATED: Record<string, string[]> = {
   "request-code-sources": ["rule:concept-form", "rule:publication-selection"],
-  "selected-answer-aggregate": ["rule:named-answer-options", "rule:publication-selection", "rule:branch-guards"],
+  "selected-answer-aggregate": ["rule:named-answer-options", "rule:publication-selection", "rule:branch-guards", "artifact:uncertainty-reference.crl"],
   "interactive-questionnaire": ["rule:produce-results", "rule:verify-loop"],
   "native-apply-session": ["rule:produce-results", "rule:text-answers", "rule:verify-loop"],
   "fhir-packaging": ["rule:verify-loop", "rule:emitted-trees-are-ours"],
@@ -89,6 +89,7 @@ const EXAMPLE_RULES: Record<string, string[]> = {
 };
 
 const ARTIFACT_RULES: Record<string, string[]> = {
+  "uncertainty-reference": ["selected-answer-aggregate", "named-answer-options", "branch-guards", "cel-cases", "native-apply-session"],
   "intake-reference": ["text-answers", "cel-cases", "verify-loop"],
   "shared-continuation-reference": ["chaining-necessity", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],
   "reused-condition-reference": ["criterion", "decision-composition", "branch-guards", "guard-or-vs-sibling-or", "cel-cases", "mv-case-authoring"],

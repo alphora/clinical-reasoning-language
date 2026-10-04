@@ -371,10 +371,10 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.23");
-    assert.equal(kit.contentHash, "441cb04b5ce32ed86895683070f2b9f8a14f59cd1621f62a89c38e88ee505a8d");
+    assert.equal(kit.schemaVersion, "2.24");
+    assert.equal(kit.contentHash, "1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796");
     assert.equal(kit.fullContentHash, kit.contentHash);
-    assert.equal(kit.referenceArtifacts.length, 19);
+    assert.equal(kit.referenceArtifacts.length, 21);
     assert.equal(kit.dispositionModel.categories.length, 3);
     assert.equal(kit.useCase, undefined);
     const crl = kit.referenceArtifacts.find(a => a.name === "selection-reference.crl").source;

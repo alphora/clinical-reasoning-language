@@ -1,4 +1,5 @@
 // REFACTOR:grounded (review642): one kit; applicability never filters teaching.
+import { UNCERTAINTY_REFERENCE_CRL, UNCERTAINTY_REFERENCE_CEL } from "./uncertaintyExample";
 import { ANSWER_EXAMPLE_BASE, ANSWER_EXAMPLE_TERMS, ANSWER_EXAMPLE_CEL, answerExampleSource } from "./answerExample";
 import { INTAKE_CRL, INTAKE_CEL, DATETIME_ANSWER } from "./intakeExample";
 import { SELECTION_REFERENCE_CRL, SELECTION_REFERENCE_CEL } from "./selectionExample";
@@ -375,7 +376,8 @@ export type {
 // REFACTOR:grounded: schemaVersion → "2.21": interactive edits preserve siblings; parent follow-ups and repeated-group limits are explicit.
 // REFACTOR:grounded: schemaVersion → "2.22": available-value reads do not request operand questions; submitted answers remain editable.
 // REFACTOR:grounded: schemaVersion → "2.23": single available-answer membership preserves passive inputs and explicit negative witnesses.
-const SCHEMA_VERSION = "2.23";
+// REFACTOR:grounded: schemaVersion → "2.24": shared executable terminal-uncertainty teaching.
+const SCHEMA_VERSION = "2.24";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -529,11 +531,11 @@ const RULES: KitRule[] = [
         "force": "default"
       },
       {
-        "text": "Omit code is when the calculation must not become a question. For a terminal quality check, enumerate the answers the rule must inspect, including other alternatives when any currently present uncertainty must prevent Met. Preserve required-question prerequisites separately. A coded available-value aggregate retains its own answer slot. Explicit unknown answer codes are authored terminology members, not compiler-reserved spellings. Route pruning and resubmission belong to the client; this producer supplies neither interview history nor client state.",
+        "text": "Omit code is when the calculation must not become a question. For a terminal quality check, enumerate the answers the rule must inspect, including other alternatives when any currently present uncertainty must prevent Met. Preserve required-question prerequisites separately. A coded available-value aggregate retains its own answer slot. Explicit unknown answer codes are authored terminology members, not compiler-reserved spellings. Route pruning and resubmission belong to the client; this producer supplies neither interview history nor client state. A terminal uncertainty policy must check every otherwise-Met endpoint and explicitly enumerate its covered answers; the compiler does not infer that policy requirement. The assumed direction controls clinical routing, not the final Met result. A supplied unused uncertainty may yield Unmet without a question for that operand; the calling client owns inspection, editing and which current answers it resubmits. In a persisted dataset, clear/replacement must supersede old records under the normal selection rules, or old uncertainty or selection errors can remain. The worked uncertainty-reference CRL/CEL pair shows both routing directions and the explicit terminal check.",
         "force": "default"
       }
     ],
-    "ref": "src/emit/tests/publicationAnyMembership.test.ts; docs/selected-answer-aggregate.md"
+    "ref": "artifact:uncertainty-reference.crl; artifact:uncertainty-reference.cel; src/emit/tests/publicationAnyMembership.test.ts; docs/selected-answer-aggregate.md"
   },
   {
     "id": "interactive-questionnaire",
@@ -1778,6 +1780,8 @@ const VERIFICATION_LEGEND: VerificationLegendEntry[] = [
 ];
 
 const REFERENCE_ARTIFACTS: ReferenceArtifact[] = ([
+  { name: "uncertainty-reference.crl", language: "crl", applicability: "Teaching a terminal check over currently supplied four-choice answers", verification: ["cre-run", "fhir-emit"], purpose: "Complete synthetic eligibility slice after request/EIU assessment, not a customer-policy template. G is required; A then B are ordered alternatives. Each otherwise-Met tests the explicitly enumerated G/A/B values, including retained unused B. Missing B is not requested by the check. Four-choice qualification follows the assumed direction; either uncertainty code blocks otherwise-Met. A absent/B supplied still pauses at A under this chosen order. Read with uncertainty-reference.cel and its declared package configuration. Native question visibility, extraction and edit/clear behavior require native verification; the listed tiers prove only CRE predictions and emission.", source: UNCERTAINTY_REFERENCE_CRL },
+  { name: "uncertainty-reference.cel", language: "cel", applicability: "Controls for the synthetic uncertainty teaching slice", verification: ["cre-run"], purpose: "Eighteen cases exercise missing prerequisites, both alternatives, both uncertainty directions, retained unused answers, and the ordered A-absent/B-supplied pause. A missing or cleared input has no fact; it is not a negative answer code. This companion predicts CRE activities/pauses, not native question sets or UI retention.", source: UNCERTAINTY_REFERENCE_CEL },
   // REFACTOR:grounded (#322): exact inputs shared with owning and native tests.
   { name: "intake-reference.crl", language: "crl", applicability: "Authoring typed intake questions", verification: ["cre-run", "fhir-emit"], purpose: "Synthetic text, Boolean false and explicit has-value guards. Both branches recommend Human Review, including with incomplete answers; no clinical eligibility or submission-timing rule. Use the paired CEL and supplied project requirements. Question reachability is tested independently of outcome equality.", source: INTAKE_CRL },
   { name: "intake-reference.cel", language: "cel", applicability: "Authoring typed intake questions", verification: ["cre-run"], purpose: "Empty and answered engineering examples. Place beside the paired CRL in the served project context, under src/cel/regression for full regression. Exactly one review recommendation is checked; Boolean false remains an answered field. Separate native Q/QR session checks cover change and clear.", source: INTAKE_CEL },

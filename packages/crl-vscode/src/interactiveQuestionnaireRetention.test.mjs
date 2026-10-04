@@ -14,6 +14,51 @@ const retain = (submitted, native) => retainSubmittedAnswers(submitted.questionn
 
 // @kit interactive-questionnaire:submitted-answer-retention
 describe("current submitted answers remain editable after native apply", () => {
+  it.each([false,true])("retains under unchanged matched ancestor metadata with renumbering=%s", renumber => {
+    const gate=item("gate","Gate");
+    const group={linkId:"g",definition:"urn:group",type:"group",
+      extension:[{url:"context",valueString:"same"}],modifierExtension:[{url:"modifier",valueBoolean:true}],
+      code:[{system:"urn:groups",code:"same"}],enableBehavior:"all",
+      enableWhen:[{question:"gate",operator:"=",answerBoolean:true}],item:[item("a","A"),item("b","B")]};
+    const old=pair([gate,group],[answer("gate",true),{linkId:"g",item:[answer("a",true),answer("b",false)]}]);
+    const gateId=renumber?"new-gate":"gate",groupId=renumber?"new-group":"g",bId=renumber?"new-b":"b";
+    const native=pair([{...gate,linkId:gateId},{...group,linkId:groupId,
+      enableWhen:[{question:gateId,operator:"=",answerBoolean:true}],item:[{...group.item[1],linkId:bId}]}],
+      [answer(gateId,true),{linkId:groupId,item:[answer(bId,false)]}],"2");
+    const before=structuredClone({old,native});
+    const result=retain(old,native),parent=result.questionnaire.item[1],response=result.response.item[1];
+    expect(parent.item.map(q=>q.definition)).toEqual(["urn:answer:B","urn:answer:A"]);
+    expect(parent.enableWhen).toEqual([{question:gateId,operator:"=",answerBoolean:true}]);
+    expect(response.item.find(i=>i.linkId===parent.item[1].linkId).answer).toEqual([{valueBoolean:true}]);
+    expect(response.item.find(i=>i.linkId===bId).answer).toEqual([{valueBoolean:false}]);
+    expect({old,native}).toEqual(before);
+  });
+  it.each([
+    ["extension", [{url:"extract-context",valueString:"original"}], [{url:"extract-context",valueString:"changed"}]],
+    ["modifierExtension", [{url:"modifier",valueBoolean:false}], [{url:"modifier",valueBoolean:true}]],
+    ["code", [{system:"urn:group-code",code:"original"}], [{system:"urn:group-code",code:"changed"}]],
+    ["enableWhen", undefined, [{question:"gate",operator:"=",answerBoolean:false}]],
+    ["enableBehavior", "any", "all"],
+  ])("refuses a retained child under changed ancestor %s and preserves the submitted form", async (key, oldValue, newValue) => {
+    const gates = [item("gate","Gate"),item("otherGate","Other Gate")];
+    const gateAnswers = [answer("gate",true),answer("otherGate",false)];
+    const group = {linkId:"g",definition:"urn:group",type:"group",
+      ...(key === "enableBehavior" ? {enableWhen:[
+        {question:"gate",operator:"=",answerBoolean:true},
+        {question:"otherGate",operator:"=",answerBoolean:true},
+      ]} : {}),[key]:oldValue,item:[item("a","A"),item("b","B")]};
+    const initial = pair([...gates,group],[...gateAnswers,{linkId:"g",item:[{linkId:"a"},{linkId:"b"}]}]);
+    const native = pair([...gates,{...group,[key]:newValue,item:[group.item[1]]}],[...gateAnswers,{linkId:"g",item:[{linkId:"b"}]}]);
+    let calls=0;
+    const session=new InteractiveSession({resourceType:"Bundle",entry:[]},"plan",async()=>++calls===1?initial:native);
+    session.reset({id:"one",subject:"Patient/p",bundle:{resourceType:"Bundle",entry:[]},label:"one"});
+    await session.evaluate();
+    const edited=structuredClone(initial.response);edited.item[2].item[0]=answer("a",true);
+    const before=structuredClone({initial,native,edited});
+    await expect(session.evaluate(edited,initial.questionnaire)).rejects.toThrow(/ancestor.*context changed/);
+    expect(session.result).toBe(initial);
+    expect({initial,native,edited}).toEqual(before);
+  });
   it("retains A with its binding and answer, without introducing unanswered B or mutating inputs", () => {
     const old = pair([item("1","G"),item("2","A"),item("3","B")],[answer("1",true),answer("2",true),{linkId:"3"}]);
     old.questionnaire.item[1].extension = [{url:"extract",valueCanonical:"urn:profile:a"}];
@@ -66,6 +111,21 @@ describe("current submitted answers remain editable after native apply", () => {
     expect(result.questionnaire.item[0].item).toEqual([group.item[0]]);
     expect(result.questionnaire.item[0].extension).toEqual(group.extension);
     expect(result.response.item[0].item).toEqual([answer("a",true)]);
+  });
+  it.each([false,true])("retains a later omitted ancestor gate only without an ID collision: %s", collision => {
+    const group={linkId:"g",definition:"urn:group",type:"group",enableWhen:[{question:"gate",operator:"=",answerBoolean:true}],item:[item("a","A"),item("b","B")]};
+    const old=pair([group,item("gate","G")],[{linkId:"g",item:[answer("a",true)]},answer("gate",true)]);
+    const native=pair([{...group,item:[group.item[1]]},...(collision?[item("gate","X")]:[])],[{linkId:"g",item:[{linkId:"b"}]}]);
+    const before=JSON.stringify([old,native]);
+    if(collision) expect(()=>retain(old,native)).toThrow(/context changed/);
+    else {
+      const result=retain(old,native);
+      expect(result.questionnaire.item[0].enableWhen[0].question).toBe("gate");
+      expect(result.questionnaire.item[1].linkId).toBe("gate");
+      expect(result.response.item[1]).toEqual(answer("gate",true));
+      expect(result.response.item[0].item).toContainEqual(answer("a",true));
+    }
+    expect(JSON.stringify([old,native])).toBe(before);
   });
   it("retains a wholly missing repeated subtree without matching occurrences by position", () => {
     const group = {linkId:"g",type:"group",repeats:true,item:[item("a","A")]};

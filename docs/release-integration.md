@@ -1,3 +1,15 @@
+# CRL 6.4.31 release integration
+
+Public baseline:6.4.28 (`0f1fa4f2d9b3bd5f212604b1cb6b8be025663fc8`). Local6.4.29 and6.4.30 were qualification candidates, not public releases. This release integrates their passive available-value operand inputs, current submitted-answer retention and singleton available-value membership. It adds kit2.24's executable uncertainty example and refuses retention across a changed ancestor extraction context.
+
+An available-value computation retains operand definitions and CQL but no longer requests operand questions through that check. Separately reached ordinary guards still request needed answers. Authors who need an answer must express that requirement independently. This intentional input change applies to available-value membership generally; it does not change ordinary aggregate missing-input semantics or infer uncertainty vocabulary.
+
+The guide identifies the actual computation, explicitly enumerated operands, validity anchor, finite domains and caller state boundary. Missing/cleared answers are distinct from both uncertainty choices. Supplied unused uncertainty counts, without forcing its question. The caller owns editing supplied data and replacing persisted selected records. Existing answered questions omitted by native completion remain editable from the current submitted Q/QR; unsafe reconciliation refuses without replacing the current form.
+
+Fresh source, archive, installed npm/VSIX MCP, native and rendered-session qualification is required before publication. Receipts and exact artifact identities are recorded in release6.4.31 verification assets. Engine and driver are unchanged; historical Linux engine evidence is retained only for those byte-identical components, not as a fresh test of this compiler or guide. No customer-policy run or generalized repeated-extraction qualification is claimed.
+
+---
+
 # Local build integration
 
 Audited September 21, 2026. Public baseline: `v6.3.0` at
