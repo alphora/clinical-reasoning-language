@@ -2,7 +2,7 @@
 
 ## Interview order, meaningful grouping and questionnaire boundaries — schema 2.25
 
-Baseline audited revision `934119386cd4399ef7e161efd22acb736a47f255`, schema2.24/hash `1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796`. Working base is released `9a968025c74c4f1433f665d19701eeaa36fd1f59`. Target is pending reviewed content commit; schema2.25/hash `88e055261b8244adeaf4dff9d24d1f0b79eb45e93c4e73608ac2823249123e37`. Prior audit stamp remains until review completes; development contentMatchesAudit is false.
+Baseline audited revision `934119386cd4399ef7e161efd22acb736a47f255`, schema2.24/hash `1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796`. Working base is released `9a968025c74c4f1433f665d19701eeaa36fd1f59`. Target reviewed content is `0c4a0339384f5b01a61869b6e763bbca6408210d`; schema2.25/hash `88e055261b8244adeaf4dff9d24d1f0b79eb45e93c4e73608ac2823249123e37`. The subsequent metadata-only stamp binds that reviewed content; installed delivery remains separately qualified.
 
 Intent: source-required order and explicitly selected interview order are distinct valid reasons for nested/ordered Decisions. Preserve source eligibility, required precedence, declared partial-input behavior, errors and output identity/multiplicity. A meaningful source- or workflow-selected single-use Criterion can override the one-use-inline default; it needs no manufactured second caller. Grouping and reuse are distinct rationales. Boolean settlement does not establish questionnaire completion or permission to skip presented questions. The language supplies no universal preference for maximum depth, minimum questions or a customer's particular flow.
 

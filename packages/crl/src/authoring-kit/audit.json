@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "934119386cd4399ef7e161efd22acb736a47f255",
-  "auditedSchemaVersion": "2.24",
-  "auditedContentHash": "1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796",
-  "scope": "Kit schema 2.24 bounded delta from f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11: executable18-case terminal-uncertainty example, discovery/configuration and changed-ancestor retention refusal. Complete path dispositions and evidence in coverage.md. The full suite preceded final retention refinements; final242 kit/emitter,60 client and22 native controls pass. Installed release qualification remains separate. Review920/921 actual arms and limits recorded. No customer-policy certification.",
+  "auditedRevision": "0c4a0339384f5b01a61869b6e763bbca6408210d",
+  "auditedSchemaVersion": "2.25",
+  "auditedContentHash": "88e055261b8244adeaf4dff9d24d1f0b79eb45e93c4e73608ac2823249123e37",
+  "scope": "Kit schema 2.25 bounded guide-only delta from934119386cd4399ef7e161efd22acb736a47f255: selected interview ordering, meaningful single-use Criteria and Boolean-versus-questionnaire boundaries. Complete changed-file dispositions in coverage.md. No runtime or reference-artifact changes. Native reviews926-929 converged; Anthropic unavailable after failed retry.318 focused tests,9 MCP retrievals and full6.4.32 suite passed before metadata stamp. Installed artifact qualification remains separate.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
