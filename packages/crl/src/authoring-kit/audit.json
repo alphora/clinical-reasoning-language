@@ -2,6 +2,6 @@
   "auditedRevision": "934119386cd4399ef7e161efd22acb736a47f255",
   "auditedSchemaVersion": "2.24",
   "auditedContentHash": "1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796",
-  "scope": "Kit2.24 bounded delta from f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11: executable18-case terminal-uncertainty example, discovery/configuration and changed-ancestor retention refusal. Complete path dispositions and evidence in coverage.md. The full suite preceded final retention refinements; final242 kit/emitter,60 client and22 native controls pass. Installed release qualification remains separate. Review920/921 actual arms and limits recorded. No customer-policy certification.",
+  "scope": "Kit schema 2.24 bounded delta from f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11: executable18-case terminal-uncertainty example, discovery/configuration and changed-ancestor retention refusal. Complete path dispositions and evidence in coverage.md. The full suite preceded final retention refinements; final242 kit/emitter,60 client and22 native controls pass. Installed release qualification remains separate. Review920/921 actual arms and limits recorded. No customer-policy certification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
