@@ -18,19 +18,29 @@ should be read alongside it.
 ## Choose the responsibility before the structure
 
 A Concept supplies a datum through supported answers, sources or computation.
-A Criterion defines the same Boolean condition once for reuse in multiple guards.
+A Criterion names a transparent Boolean condition assessed as a unit and may reuse it in multiple guards.
 A Decision expresses applicability, precedence, alternatives and actions. Keep a
 one-use condition inline by default; single-use criteria remain legal and the kit
-force model permits faithful overrides. Naming a criterion adds neither an answer
+force model permits faithful overrides for meaningful source- or workflow-selected groups. Such a group needs no manufactured second caller. Naming a criterion adds neither an answer
 slot nor a questionnaire boundary: its answerable dependencies still belong to
 the use-site input set.
 
-Use nested branches where the source requires sequencing. With ordinary Boolean
+Use nested branches where the source requires sequencing or the workflow explicitly
+selects an ordered interview. Distinguish the two justifications. With ordinary Boolean
 or unknown operands, `unknown and false` is false in either operand order. An
 outer unknown guard pauses before its descendants, even if a later condition
 would be false. Similarly `unknown or true` is true, but ordered first-match
 siblings stop at the earlier unknown. These are different meanings, not two
 interchangeable drawing layouts. Evaluated errors are separate from unknown.
+
+An authorized interview may ask independent eligibility alternatives in sequence.
+For A followed by B: A true can finish, A false continues to B, and A unanswered
+pauses even when B true was supplied. A need not be true for B to qualify. Declare
+that partial-input contract before execution; preserve complete-answer eligibility,
+source-required precedence, errors, output identity/multiplicity and any explicit
+requirement to settle from supplied evidence. A group remains appropriate when
+known true in an OR (or known false in an AND) must settle the condition despite
+other missing operands. This is Boolean settlement, not a promise of questionnaire completion or permission to skip a presented question. Criteria and compound Decision guards may present their operand questions together; verify actual forms and client behavior separately. CRL does not select an interview preference for the author.
 
 A repeated action-bearing continuation can use same-library `use decision`
 without becoming a separate clinical determination. Preserve its callers, source
@@ -234,10 +244,10 @@ traversal also depends on the engine and configuration; verify the pinned engine
 alone does not establish Questionnaire reachability: verify both with the pinned
 CRL engine using `$apply`, including clear-answer and change-answer session cases.
 
-## `criterion` — naming a reusable guard
+## `criterion` — naming a Boolean condition
 
-When the same branch-guard sub-expression recurs across branches or decisions
-*within one library*, name it with a `criterion` and reference the name:
+A meaningful source- or workflow-selected condition can be named even at one use site. When the same branch-guard sub-expression recurs across branches or decisions
+*within one library*, a `criterion` also provides reuse:
 
 ```
 criterion "Meets Coverage Preconditions":
@@ -328,8 +338,8 @@ fires. The boundary:
 
 | You have… | Use | Lowers to | A reviewer sees… |
 |---|---|---|---|
-| **Conjuncts, or an `or` nested under an `and`, gating one rule** | a **branch guard**, or a named **`criterion`** for a reused condition | authored applicability expression and dependencies | source operands; named reuse retains its dependency inputs |
-| **Independent alternatives sharing one consequence** | Boolean OR; use separate branches for source-required precedence or different actions | the authored expression and dependencies | alternatives without invented order |
+| **Conjuncts, or an `or` nested under an `and`, gating one rule** | a **branch guard**, or a named **`criterion`** for a meaningful group or reused condition | authored applicability expression and dependencies | source operands; named reuse retains its dependency inputs |
+| **Independent alternatives sharing one consequence** | Boolean OR for settlement from either known alternative; ordered branches for source precedence, different actions or an explicitly selected interview | the authored expression and dependencies | alternatives with their declared partial-input behavior |
 | **Alternative representations of one datum** | supported Concept source representations or `definition is` producers | the supported publication contract | the selected datum and its dependencies |
 | **Reusable action-bearing logic** — a shared determination or internal continuation | **`use decision`** | a referenced sub-`PlanDefinition`, itself independently applicable | linked action-bearing structure, kept out of the DNF |
 
@@ -577,7 +587,8 @@ first:
 fused by inference — the decision has **zero** criterion nodes, so a reviewer/cockpit
 can't see which one failed. **Do this instead:** compose them in *structure* — a
 branch guard `when ( "Has Qualifying Diagnosis" and "Failed Conservative Therapy" )`,
-or source-required ordered `when` nodes (see "Four ways to combine conditions").
+or ordered `when` nodes under a source requirement or an explicitly selected interview
+contract (see "Four ways to combine conditions").
 Concept data uses supported source representations or `definition is` producers;
 missing composition support is a capability gap, not a reason to use legacy inference.
 

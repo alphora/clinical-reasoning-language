@@ -1,4 +1,22 @@
-# Authoring-kit coverage ledger
+# Authoring-kit coverage and audit ledger
+
+## Interview order, meaningful grouping and questionnaire boundaries — schema 2.25
+
+Baseline audited revision `934119386cd4399ef7e161efd22acb736a47f255`, schema2.24/hash `1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796`. Working base is released `9a968025c74c4f1433f665d19701eeaa36fd1f59`. Target is pending reviewed content commit; schema2.25/hash `88e055261b8244adeaf4dff9d24d1f0b79eb45e93c4e73608ac2823249123e37`. Prior audit stamp remains until review completes; development contentMatchesAudit is false.
+
+Intent: source-required order and explicitly selected interview order are distinct valid reasons for nested/ordered Decisions. Preserve source eligibility, required precedence, declared partial-input behavior, errors and output identity/multiplicity. A meaningful source- or workflow-selected single-use Criterion can override the one-use-inline default; it needs no manufactured second caller. Grouping and reuse are distinct rationales. Boolean settlement does not establish questionnaire completion or permission to skip presented questions. The language supplies no universal preference for maximum depth, minimum questions or a customer's particular flow.
+
+Complete baseline-to-working-base delta: root/package versions and lockfile are release metadata; audit.json and ledger record the prior audit. No runtime/tests changed in that interval. Current source changes and dispositions:
+
+- authoring-kit/index.ts: Kit updated — decision-composition, chaining-necessity, criterion, guard-or-vs-sibling-or; example:any-when note and hollowed-criteria judge checkpoint align. Schema/hash identifies changed teaching. No runtime or reference-artifact change.
+- docs/decision-shapes.md: Kit updated — corresponding responsibilities, single-use override, ordered interview and Boolean-versus-questionnaire boundaries.
+- authoring-kit/tests/authoring-kit.test.ts: metadata schema/content pins only. The chaining-necessity reuse assertion briefly exposed loss of the literal term; prose now explicitly preserves action-bearing reuse. No behavioral oracle weakened.
+- cli/tests/run-mcp-server.test.mjs and crl-vscode/src/mcp-server.test.mjs: schema/hash pins updated to the reviewed2.25 content after the full run exposed stale2.24 expectations; all behavior assertions retained. Corrected MCP and extension runs are recorded separately from the initial failure and passed core suite.
+- authoring-kit/tests/coverage.md: audit evidence only.
+
+Existing evidence: cre/tests/publication.test.ts guard-or-vs-sibling-or:unknown-order observes absent A/present true B: combined OR approves while ordered siblings have blockedUnknown and no activity. Criterion declarations/references and named dependency preservation are exercised by criterion and publication suites; authoring-kit.test.ts runs reused-condition/shared-continuation examples; referenceArtifactsEmit.test.ts emits them. Single-use grouping is a faithful authoring-default override, not a new runtime capability. No behavior, fixture or @kit assertion changed.
+
+Verification: core build;318 tests across kit/query/export/reference emission and CRE publication;9 real MCP retrievals matching JSON kit. All reference artifacts byte-equivalent to released2.24. Copied pipeline preparation4/reviewer packet7 pass. Syntax/AST of renamed responsibilities skeleton and validation/CQL/FHIR emission of shortened uncertainty excerpt pass under6.4.31, with only answer concepts generating profiles. These are not native/client or fresh-author reproduction evidence. Prior926/927 reviewed interview order; reconciliation928/929 records current scoped review and coverage. Installed release acceptance remains separate.
 
 ## Terminal uncertainty worked example and safe answer retention - schema 2.24
 
