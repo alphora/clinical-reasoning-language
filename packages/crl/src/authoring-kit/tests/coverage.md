@@ -2,7 +2,7 @@
 
 ## Terminal uncertainty worked example and safe answer retention - schema 2.24
 
-Baseline audited content: `f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11`, schema2.23. Parent `f97d56f63b2868278a4f9eecff4a29f53d9a6ad9` contains the prior metadata-only audit commits. Target: pending reviewed content commit; current content hash `1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796`. The stamp remains2.23 until review and qualification complete.
+Baseline audited content: `f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11`, schema2.23. Parent `f97d56f63b2868278a4f9eecff4a29f53d9a6ad9` contains the prior metadata-only audit commits. Target reviewed content: `934119386cd4399ef7e161efd22acb736a47f255`; schema2.24, content hash `1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796`. This separate metadata-only commit binds the existing reviewed content revision; installed qualification is separate.
 
 Operator intent: an explicitly enumerated uncoded available-value check before every otherwise-Met reads current covered answers, including retained unused alternatives. Missing operands add no questions through this operation; ordinary required guards pause. Assumed direction controls routing; either uncertainty code prevents otherwise-Met. Errors propagate. Current submitted answered items remain editable after native omission; cleared/pruned history is not restored.
 

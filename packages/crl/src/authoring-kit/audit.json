@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11",
-  "auditedSchemaVersion": "2.23",
-  "auditedContentHash": "441cb04b5ce32ed86895683070f2b9f8a14f59cd1621f62a89c38e88ee505a8d",
-  "scope": "Kit schema 2.23 bounded delta from d9abb61871bf4f3d999cd601b52e4d24fe86aca4: singleton available-value membership preserves finite domains, validity, errors, passive question inputs and explicit negative witnesses. Existing ordinary aggregate cardinality remains unchanged. Complete changed-path dispositions and evidence in coverage.md. Native plan/code reviews914/915 converged, external unavailable. 203focused tests,19native nestedcases,8direct producer controls,13fullQR client exchanges and both rebuiltMCP suites pass. Source qualification only; no newly installed/customer-policy or generalized rendering claim.",
+  "auditedRevision": "934119386cd4399ef7e161efd22acb736a47f255",
+  "auditedSchemaVersion": "2.24",
+  "auditedContentHash": "1ca2457a49c4a177c4bc9467f60eff73f7d11ca4398051cebc41723364096796",
+  "scope": "Kit2.24 bounded delta from f1fbb52f20bfe09bc70fcd2d8a2779a59c0fcc11: executable18-case terminal-uncertainty example, discovery/configuration and changed-ancestor retention refusal. Complete path dispositions and evidence in coverage.md. The full suite preceded final retention refinements; final242 kit/emitter,60 client and22 native controls pass. Installed release qualification remains separate. Review920/921 actual arms and limits recorded. No customer-policy certification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
