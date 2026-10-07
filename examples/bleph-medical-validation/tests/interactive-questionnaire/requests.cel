@@ -1,0 +1,18 @@
+library "Bleph Interactive Request".
+covers "Blepharoplasty And Blepharoptosis Repair".
+
+fact "Demo Patient":
+- name is "Synthetic Bleph Questionnaire Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Demo Bleph Request":
+- code is "http://www.ama-assn.org/go/cpt|15822".
+- date is "2026-01-01".
+- defined by "ServiceRequest".
+
+case "Initial request without clinical answers":
+- id is "bleph-interactive-initial".
+- subject is "Demo Patient".
+- fact is "Demo Bleph Request".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.

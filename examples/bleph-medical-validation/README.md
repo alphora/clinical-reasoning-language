@@ -14,6 +14,23 @@ Select a case and pin its result to inspect the questions on that route. Use **N
 
 The open KE flag under `src/medical-validation/flags/` is a labeled UI demonstration. It lets you test inspecting and resolving an authoring flag in MV. Saved example verdicts in `review-samples/` are separate from active review state.
 
+## Interactive questionnaire
+
+In the Medical Validation tree toolbar, choose **Interactive FHIR Questionnaire**, then **Start**. The included synthetic Patient and request have no clinical answers: the first unanswered question is Cosmetic Surgical Purpose. Answer the form and use **Continue / Re-evaluate** to see the next questions or determination. **Reset** starts again without your answers.
+
+The request supplies demo context only. Its CPT code does not answer Procedure Under Review; choose that procedure in the questionnaire when asked. Either procedure branch can be exercised from this starter.
+
+`tests/interactive-questionnaire/requests.cel` authors the initial Patient and ServiceRequest. The pane reads the matching `request-1/request-bundle.json`, not CEL directly. This starter is deliberately separate from the 16 MV cases and 30 regression controls; open the existing MV entry, not the starter CEL, in Medical Validation. Normal suite-based CEL emission does not select this seed.
+
+With the repository dependencies installed and core built, run from the repository root:
+
+```sh
+node examples/bleph-medical-validation/tests/interactive-questionnaire/generate-request.cjs --check
+node examples/bleph-medical-validation/tests/interactive-questionnaire/generate-request.cjs --write
+```
+
+The first command checks CEL/bundle agreement; the second regenerates only the initial request bundle. Neither replaces MV patient data, native results, or saved review state.
+
 ## Included artifacts
 
 - `src/source/`: versioned L34194 HTML, readable policy text, and retrieval metadata.
@@ -25,6 +42,7 @@ The open KE flag under `src/medical-validation/flags/` is a labeled UI demonstra
 - `src/cel/regression/medical-validation.cel`: 30 additional controls; full regression evaluates all 46 cases.
 - `src/cql/` and `src/fhir/`: eight CQL files and 26 FHIR definitions, including seven Library resources.
 - `tests/data/fhir/`: emitted MV patient data and its manifest.
+- `tests/interactive-questionnaire/`: answer-free interactive starter CEL, its generator, and request bundle.
 - `tests/results/`: 16 native Questionnaire/QuestionnaireResponse pairs and their manifest, generated with the private CRL 6.4.34 candidate. This is source-fixture evidence, not released or installed-artifact qualification.
 
 The full source remains available for reading; provenance identifies the portions represented by the executable example. The frozen suite at `packages/crl/test/acceptance/bleph` separately exercises engine behavior, including ServiceRequest sourcing and local/source selection.

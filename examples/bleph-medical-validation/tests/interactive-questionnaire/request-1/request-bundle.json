@@ -1,0 +1,54 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "bleph-interactive-request-initial-request-w-c811e4c4de31",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient"
+          ]
+        },
+        "identifier": [
+          {
+            "system": "http://example.org/crl/identifier/cel-test-patient",
+            "value": "bleph-interactive-request-initial-request-w-c811e4c4de31"
+          }
+        ],
+        "name": [
+          {
+            "text": "Synthetic Bleph Questionnaire Patient"
+          }
+        ],
+        "birthDate": "1970-01-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "id": "bleph-interactive-request-initial-request-w-efba3d50a3be",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-servicerequest"
+          ]
+        },
+        "subject": {
+          "reference": "Patient/bleph-interactive-request-initial-request-w-c811e4c4de31"
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://www.ama-assn.org/go/cpt",
+              "code": "15822"
+            }
+          ]
+        },
+        "authoredOn": "2026-01-01",
+        "status": "active",
+        "intent": "order"
+      }
+    }
+  ]
+}
