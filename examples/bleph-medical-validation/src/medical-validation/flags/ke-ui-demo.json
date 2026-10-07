@@ -3,8 +3,8 @@
   "id": "ke-ui-demo",
   "category": "extraction",
   "tag": "customer-confirmable",
-  "gist": "UI test: inspect the read-only KE flag",
-  "description": "Demonstration flag added at the operator's request to test Medical Validation controls. This is not a clinical finding. Only the KE marker should be yellow while open. Medical Validation may inspect and resolve this authoring flag, but cannot edit its content or delete it.",
+  "gist": "Demo: confirm the cosmetic-purpose interpretation",
+  "description": "Demo flag — confirm whether 'Cosmetic Surgical Purpose' should be true only when the requested procedure is performed solely to improve appearance, without a qualifying functional or reconstructive purpose. This models a customer-confirmable policy interpretation that should be resolved before the rule is finalized; it is not a patient-specific clinical finding.",
   "status": "open",
   "fields": {},
   "anchor": {

@@ -1,5 +1,10 @@
 import type { PersistedReviewState, ReviewState } from './medicalValidationStore';
 
+/** The exit-pin action is ready only when every current policy case is approved. */
+export function allRouteVerdictsApproved(verdicts: readonly ReviewState[]): boolean {
+  return verdicts.length > 0 && verdicts.every(state => state === 'pass');
+}
+
 /** Worst group judgment: Fail, then unreviewed, then Pending; Pass requires every case to pass. */
 export function summarizeBranchVerdict(caseIds: readonly string[], verdicts: Record<string, PersistedReviewState>) {
   const states = new Set<ReviewState>(caseIds.map(id => verdicts[id] ?? 'unreviewed'));

@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.26");
+    expect(kit.schemaVersion).toBe("2.27");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -671,8 +671,19 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.26");
-    expect(kit.contentHash).toBe("8096ebe01f51942f8cbcedf012af2d937135b86fb0b4a4ace590934492963521");
+    expect(kit.schemaVersion).toBe("2.27");
+    expect(kit.contentHash).toBe("4a2bb92987826bdb3654046b4922fbacec50fb9d9072ddcb5ba8142ef28b0cf8");
+  });
+
+  // @kit criterion:description-navigation
+  it("criterion guidance describes the parent-owned hidden information toggle", () => {
+    const rule = getAuthoringKit().rules.find(r => r.id === "criterion")!.rule;
+    expect(rule).toContain("entire Criterion descriptions section is hidden at rest");
+    expect(rule).toContain("activated occurrence a white glow");
+    expect(rule).toContain("same control again closes the disclosure and removes the glow");
+    expect(rule).toContain("another occurrence transfers the selection");
+    expect(rule).toContain("accessible relationship to the description text");
+    expect(rule).toContain("Ordinary focus alone does not glow");
   });
 
   it("the changelog names the current schemaVersion, so a bump cannot ship unexplained", () => {

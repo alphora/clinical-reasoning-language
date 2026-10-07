@@ -1,4 +1,4 @@
-// REFACTOR:grounded: production renderer in a real browser, including native keyboard disclosure.
+// REFACTOR:grounded: production renderer and info controller in a real browser, including keyboard activation.
 // This tests a source-built renderer, not an installed extension host or native Questionnaire.
 const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert/strict'),{spawn}=require('child_process'),esbuild=require('esbuild');
 const work=path.resolve(__dirname,'../../..');
@@ -22,7 +22,17 @@ const rich=renderFlowPane(structure,{...opts,expandedGuardWhens:expanded});
 const collapsed=renderFlowPane(structure,opts);
 assert.deepEqual(rich.criterionOccurrences,baseline.criterionOccurrences);
 assert.equal(rich.html.match(/viewBox="[^"]+"/)[0],baseline.html.match(/viewBox="[^"]+"/)[0]);
-const html=`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-probe'; script-src 'nonce-probe'"><style nonce="probe">:root{--vscode-foreground:#ddd;--vscode-editor-background:#202020;--vscode-panel-border:#777}body{color:#ddd;background:#202020;font:14px sans-serif;margin:20px}${FLOW_STYLE}</style></head><body>${rich.html}<script nonce="probe">window.ready=true;window.violations=[];document.addEventListener('securitypolicyviolation',e=>violations.push(e.violatedDirective));</script></body></html>`;
+const browserCode=esbuild.buildSync({stdin:{contents:`
+ import {installCriterionDescriptionNavigation,sanitizeCriterionDescriptionSnapshot} from ${JSON.stringify(path.join(work,'packages/crl-vscode/src/criterionDescriptionNavigation.ts'))};
+ import {installFlowKeyboardActions} from ${JSON.stringify(path.join(work,'packages/crl-vscode/src/flowKeyboardActions.ts'))};
+ window.violations=[];document.addEventListener('securitypolicyviolation',e=>violations.push(e.violatedDirective));
+ const root=document.getElementById('root'),markup=root.innerHTML;
+ window.ui=installCriterionDescriptionNavigation(root);installFlowKeyboardActions(root);
+ window.rerender=()=>{ui.beforeRender();root.innerHTML=markup;ui.restore();};
+ window.sanitizeSnapshot=sanitizeCriterionDescriptionSnapshot;
+ window.ready=true;
+ `,resolveDir:work,loader:'ts'},bundle:true,platform:'browser',format:'iife',write:false}).outputFiles[0].text;
+const html=`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-probe'; script-src 'nonce-probe'"><style nonce="probe">:root{--vscode-foreground:#ddd;--vscode-editor-background:#202020;--vscode-panel-border:#777}body{color:#ddd;background:#202020;font:14px sans-serif;margin:20px}${FLOW_STYLE}</style></head><body><div id="root">${rich.html}</div><script nonce="probe">${browserCode}</script></body></html>`;
 fs.writeFileSync(path.join(out,'rendered.html'),html);
 async function rpc(target,method,params={}){
  const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
@@ -51,18 +61,34 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   }
   assert(ready,'Browser fixture did not load');
   await rpc(target,'Page.bringToFront');
-  const checks=await evaluate(`(()=>{const d=document.querySelector('.flow-criterion-descriptions');const texts=[...d.querySelectorAll('dd')].map(x=>x.textContent);d.querySelector('summary').focus();return {closedInitially:!d.open,keyboardFocus:document.activeElement===d.querySelector('summary'),entries:d.querySelectorAll('dt').length,literalMarkup:!d.querySelector('img')&&texts.some(t=>t.includes('<img src=x onerror=alert(1)>')),multiline:texts.some(t=>t.includes('\\n')),noInlineStyle:!document.querySelector('[style]'),textWhiteSpace:getComputedStyle(d.querySelector('dd')).whiteSpace};})()`);
-  assert.equal(checks.closedInitially,true);assert.equal(checks.keyboardFocus,true);assert.equal(checks.entries,2);assert.equal(checks.literalMarkup,true);assert.equal(checks.multiline,true);assert.equal(checks.noInlineStyle,true);assert.equal(checks.textWhiteSpace,'pre-wrap');
+  const checks=await evaluate(`(()=>{const d=document.querySelector('.flow-criterion-descriptions');const texts=[...d.querySelectorAll('dd')].map(x=>x.textContent);const i=document.querySelector('[data-criterion-info]');i.focus();return {closedInitially:!d.open&&d.hidden&&d.getClientRects().length===0,keyboardFocus:document.activeElement===i,noInitialGlow:!document.querySelector('.is-description-active'),entries:d.querySelectorAll('dt').length,literalMarkup:!d.querySelector('img')&&texts.some(t=>t.includes('<img src=x onerror=alert(1)>')),multiline:texts.some(t=>t.includes('\\n')),noInlineStyle:!document.querySelector('[style]'),textWhiteSpace:getComputedStyle(d.querySelector('dd')).whiteSpace};})()`);
+  assert.equal(checks.closedInitially,true);assert.equal(checks.keyboardFocus,true);assert.equal(checks.noInitialGlow,true);assert.equal(checks.entries,2);assert.equal(checks.literalMarkup,true);assert.equal(checks.multiline,true);assert.equal(checks.noInlineStyle,true);assert.equal(checks.textWhiteSpace,'pre-wrap');
+  const initialScreenshot=await rpc(target,'Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'initial-hidden.png'),Buffer.from(initialScreenshot.data,'base64'));
   await rpc(target,'Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r',unmodifiedText:'\r',windowsVirtualKeyCode:13});
   await rpc(target,'Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-  checks.enterOpens=await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(document.querySelector('details').open))))`);
+  checks.enterOpens=await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const d=document.querySelector('details'),i=document.querySelector('[data-criterion-info]');r(d.open&&!d.hidden&&d.getClientRects().length>0&&i.classList.contains('is-description-active')&&i.getAttribute('aria-expanded')==='true'&&document.activeElement===i)})))`);
   fs.writeFileSync(path.join(out,'partial-checks.json'),JSON.stringify(checks,null,2));assert.equal(checks.enterOpens,true);
   checks.selectable=await evaluate(`(()=>{const text=document.querySelector('dd'),r=document.createRange();r.selectNodeContents(text);const s=getSelection();s.removeAllRanges();s.addRange(r);return s.toString()===text.textContent&&text.getBoundingClientRect().height>0})()`);assert.equal(checks.selectable,true);
   const screenshot=await rpc(target,'Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'descriptions.png'),Buffer.from(screenshot.data,'base64'));
-  await evaluate(`document.querySelector('summary').focus()`);
+  await evaluate(`document.querySelector('[data-criterion-info]').focus()`);
   await rpc(target,'Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',text:' ',unmodifiedText:' ',windowsVirtualKeyCode:32});
   await rpc(target,'Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
-  checks.spaceCloses=await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(!document.querySelector('details').open))))`);assert.equal(checks.spaceCloses,true);
+  checks.spaceCloses=await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const d=document.querySelector('details'),i=document.querySelector('[data-criterion-info]');r(!d.open&&d.hidden&&d.getClientRects().length===0&&!i.classList.contains('is-description-active')&&i.getAttribute('aria-expanded')==='false'&&document.activeElement===i)})))`);assert.equal(checks.spaceCloses,true);
+  const closedScreenshot=await rpc(target,'Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,'closed-hidden.png'),Buffer.from(closedScreenshot.data,'base64'));
+  const clickInfo=`document.querySelector('[data-criterion-info]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`;
+  checks.pointerToggle=await evaluate(`(()=>{${clickInfo};const d=document.querySelector('details'),opened=d.open&&!d.hidden;${clickInfo};return opened&&!d.open&&d.hidden&&!document.querySelector('.is-description-active')})()`);assert.equal(checks.pointerToggle,true);
+  checks.openRerender=await evaluate(`(()=>{${clickInfo};const key=document.querySelector('.is-description-active').dataset.criterionInfo;rerender();const d=document.querySelector('details');return d.open&&!d.hidden&&document.querySelector('.is-description-active')?.dataset.criterionInfo===key})()`);assert.equal(checks.openRerender,true);
+  checks.transfer=await evaluate(`(()=>{const controls=[...document.querySelectorAll('[data-criterion-info]')];controls[1].dispatchEvent(new MouseEvent('click',{bubbles:true}));return document.querySelectorAll('.is-description-active').length===1&&controls[1].classList.contains('is-description-active')&&document.querySelector('details').open&&!document.querySelector('details').hidden})()`);assert.equal(checks.transfer,true);
+  await evaluate(`window.returnControl=document.querySelector('.is-description-active');document.querySelector('summary').focus()`);
+  await rpc(target,'Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r',unmodifiedText:'\r',windowsVirtualKeyCode:13});
+  await rpc(target,'Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  checks.summaryCloseFocus=await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const d=document.querySelector('details');r(!d.open&&d.hidden&&document.activeElement===returnControl&&!document.querySelector('.is-description-active'))})))`);assert.equal(checks.summaryCloseFocus,true);
+  checks.closedRerender=await evaluate(`(()=>{rerender();const d=document.querySelector('details');return !d.open&&d.hidden&&!document.querySelector('.is-description-active')})()`);assert.equal(checks.closedRerender,true);
+  checks.hiddenOwnerCloses=await evaluate(`(()=>{${clickInfo};const owner=document.querySelector('.is-description-active').closest('[data-flow-criterion]');owner.classList.add('flow-focus-hidden');ui.refresh();const d=document.querySelector('details'),closed=!d.open&&d.hidden&&!document.querySelector('.is-description-active');owner.classList.remove('flow-focus-hidden');return closed})()`);assert.equal(checks.hiddenOwnerCloses,true);
+  checks.unrelatedFocusPreserved=await evaluate(`new Promise(r=>{${clickInfo};const button=document.createElement('button');document.body.appendChild(button);button.focus();document.querySelector('details').open=false;requestAnimationFrame(()=>requestAnimationFrame(()=>{const result=document.activeElement===button&&document.querySelector('details').hidden;button.remove();r(result)}))})`);assert.equal(checks.unrelatedFocusPreserved,true);
+  checks.resetCloses=await evaluate(`(()=>{${clickInfo};ui.reset();const d=document.querySelector('details');return !d.open&&d.hidden&&!document.querySelector('.is-description-active')})()`);assert.equal(checks.resetCloses,true);
+  checks.snapshotReadable=await evaluate(`(()=>{const clone=document.getElementById('root').cloneNode(true);sanitizeSnapshot(clone);document.body.appendChild(clone);const d=clone.querySelector('details');d.open=true;const result=!d.hidden&&d.getClientRects().length>0&&!clone.querySelector('[data-criterion-info]')&&d.querySelector('dd').getBoundingClientRect().height>0;clone.remove();return result})()`);assert.equal(checks.snapshotReadable,true);
+  checks.removedOwnerCloses=await evaluate(`(()=>{${clickInfo};document.querySelector('.is-description-active').remove();ui.refresh();const d=document.querySelector('details');return !d.open&&d.hidden&&!document.querySelector('.is-description-active')})()`);assert.equal(checks.removedOwnerCloses,true);
   checks.cspViolations=await evaluate('violations');assert.deepEqual(checks.cspViolations,[]);
   checks.collapsedOwnerPresent=collapsed.html.includes('<dd>'+outerText+'</dd>');assert.equal(checks.collapsedOwnerPresent,true);
   fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify({scope:'Production source renderer, disposable headless browser',core,checks},null,2));console.log(JSON.stringify(checks));

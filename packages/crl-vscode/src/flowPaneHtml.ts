@@ -46,6 +46,7 @@ export interface FlowAnchor {
 }
 export interface RenderedFlow {
   html: string;
+  focusNodes: Record<string, import('./unpinnedTreeFocus').FocusNode>;
   /** structure nodeKey (decision/when/otherwise/action) → its <g> (highlight target). CONTRACT: no CONCEPT nodeKey is
    *  EVER an anchor key. The cockpit highlights the tree by REUSING the CRL pane's anchor-key sets (crlAnchorsForUnits /
    *  conceptCrlAnchors), which mix structure-row keys with concept keys; the concept keys rely on no-op'ing here (no
@@ -79,7 +80,7 @@ export interface RenderedFlow {
    *  body flag up onto a COLLAPSED box. A criterion rendered at N sites → N entries sharing one identity. NOTE (#233 2a):
    *  a non-root row carries NO verdict-chip markup yet and the `.crit-*` classes are `.flow-row`-scoped, so a shared
    *  criterion's non-root occurrence receives a (visually inert) verdict class in 2a; the chip + gate land in Todo 2b. */
-  criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
+  criterionOccurrences: { gid: string; occurrenceKey: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
   /** #203 Todo 4b Slice A — the gids of nodes that CAN carry a flag badge (`when` / decision root / def-leaf), so the
    *  webview can bulk-clear `.has-flag` before re-applying (a flag resolve must un-paint its node without a full re-render). */
   flaggableGids: string[];
@@ -115,6 +116,11 @@ const critToggle = (cx: number, cy: number, collapsed: boolean, revealKey: strin
     `<path class="flow-crit-chevron" d="${d}"/></g>`
   );
 };
+
+const criterionDescriptionId = (identity: string): string => `criterion-description-${encodeURIComponent(identity)}`;
+const criterionInfo = (cx: number, cy: number, occurrenceKey: string, identity: string, name: string): string =>
+  `<g class="flow-criterion-info" data-criterion-info="${escapeHtml(occurrenceKey)}" role="button" tabindex="0" aria-label="Show description for criterion ${escapeHtml(name)}" aria-controls="${escapeHtml(criterionDescriptionId(identity))}" aria-describedby="${escapeHtml(criterionDescriptionId(identity))}" aria-expanded="false">` +
+  `<title>Show description for criterion ${escapeHtml(name)}</title><circle cx="${cx}" cy="${cy}" r="7"/><text x="${cx}" y="${cy + 3.5}" text-anchor="middle">i</text></g>`;
 
 /** Criterion verdict uses the shared review icon; its identity and persistence remain model-level. */
 const critVerdictChip = (cx: number, cy: number, revealKey: string): string =>
@@ -279,7 +285,7 @@ export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): S
   return leaves;
 }
 
-/** Expand the selected disclosure's available outline descendants; collapse only the selected key. */
+/** Open nested criteria, leaving INPUT/answers independent; collapse only the selected disclosure. */
 export function toggleCriterionExpansion(current: Set<string>, key: string, structure: CrlDecisionStructure[], opts: Parameters<typeof renderFlowPane>[1] = {}): Set<string> {
   const next = new Set(current);
   if (next.delete(key)) return next;
@@ -287,7 +293,6 @@ export function toggleCriterionExpansion(current: Set<string>, key: string, stru
   const open = (n: LaidNode) => {
     if (n.inputRow) return; // INPUT stays independently collapsed when opening a criterion.
     if (n.criterionCollapse || n.critRow) next.add(n.nodeKey);
-    if (n.optionsRow) next.add(n.optionsRow.posKey);
     n.children.filter(c=>c.outline).forEach(open);
   };
   const find = (n: LaidNode): void => {
@@ -295,6 +300,40 @@ export function toggleCriterionExpansion(current: Set<string>, key: string, stru
     n.children.forEach(find);
   };
   roots.forEach(find); return next;
+}
+
+/** Reveal the selected execution traversal's criteria without opening INPUT or answer disclosures. */
+export function expandTraversalCriteria(current: Set<string>, traversal: import('./unpinnedTreeFocus').TreeTraversal, structure: CrlDecisionStructure[], opts: Parameters<typeof renderFlowPane>[1] = {}): Set<string> {
+  const next = new Set(current), route = new Set(traversal.route.nodeKeys);
+  const {roots} = buildLaid(projectFlowStructure(structure), new Map((opts.concepts ?? []).map(c=>[c.nodeKey,c])), {...opts,expandAllCriteria:true});
+  const walk = (n: LaidNode, ancestors: string[]): void => {
+    const criteria = n.criterionCollapse || n.critRow ? [...ancestors,n.nodeKey] : ancestors;
+    if ((n.criterionCollapse || n.critRow) && route.has(n.topWhenKey ?? n.nodeKey)) {
+      criteria.forEach(key=>next.add(key));
+    }
+    n.children.forEach(child=>walk(child,criteria));
+  };
+  roots.forEach(root=>walk(root,[]));
+  return next;
+}
+
+/** Pinned questions reveal only the INPUT/criterion ancestors of their real source occurrences. */
+export function expandQuestionInputs(current: Set<string>, cards: import('./routeCards').RouteCard[], structure: CrlDecisionStructure[], opts: Parameters<typeof renderFlowPane>[1] = {}): Set<string> {
+  const next = new Set(current);
+  const {roots} = buildLaid(projectFlowStructure(structure), new Map((opts.concepts ?? []).map(c=>[c.nodeKey,c])), {...opts,expandAllCriteria:true});
+  const walk = (n: LaidNode, ancestors: string[], context: {lib:string;name:string}[]): void => {
+    const criterion=n.criterionCollapse ?? n.critRow;
+    const path=criterion?[...context,{lib:criterion.lib,name:criterion.name}]:context;
+    const disclosures=criterion||n.inputRow?[...ancestors,n.nodeKey]:ancestors;
+    if(n.isSource && n.conceptLib!==undefined && n.conceptName!==undefined && cards.some(card=>
+      card.library===n.conceptLib && card.concept===n.conceptName && card.occurrences.some(o=>
+        o.ownerKey===(n.topWhenKey ?? n.nodeKey) && o.criterionPaths.some(p=>JSON.stringify(p)===JSON.stringify(path))))) {
+      disclosures.forEach(key=>next.add(key));
+    }
+    n.children.forEach(child=>walk(child,child.outline?disclosures:[],child.outline?path:[]));
+  };
+  roots.forEach(root=>walk(root,[],[]));
+  return next;
 }
 
 /**
@@ -312,6 +351,7 @@ function buildLaid(
     guardOutlines?: Map<string, GuardOutline>;
     expandAllCriteria?: boolean;
     expandedGuardWhens?: Set<string>;
+    traversalNavigation?: boolean;
     answerOptionsByConcept?: Map<string, { system?: string; code: string; display: string }[]>;
     /** #189 — for a question whose answers live in a pure-REFERENCE terminology we cannot expand: the
      *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
@@ -536,6 +576,7 @@ function buildLaid(
     const full = (n.kind === "when" && cf.conceptName ? `${cf.conceptName} — concept "${cf.conceptLib}"` : `${display} — ${n.lib}`)
       + (sole?.description !== undefined ? `\n${sole.description}` : "");
     // A BODY-LESS node (no branch body) reserves its OWN slot NOW, so its `y` is fixed before any outline hangs below it.
+    if (opts.traversalNavigation && structureChildren.length === 0 && n.kind === 'action' && !useDecision) slot += (guard ? 40 : 30) / ROW;
     const selfSlot = structureChildren.length === 0 ? slot++ : undefined;
     // Center a `when` on its CONTROL-FLOW spine (its branch body); a body-less node sits at its own reserved slot.
     const nodeY = structureChildren.length ? (structureChildren[0].y + structureChildren[structureChildren.length - 1].y) / 2 : (selfSlot as number);
@@ -658,6 +699,8 @@ function buildLaid(
 export function renderFlowPane(
   structure: CrlDecisionStructure[],
   opts: {
+    /** Reserve count/arrow space above unpinned MV terminals, including their guard tabs. */
+    traversalNavigation?: boolean;
     revealPrefix?: string;
     concepts?: CrlConceptNode[];
     /** #187 Option-C: a composite `when`'s `defined as` OPERATOR tree — the SAME shared builder the Questionnaire uses. */
@@ -682,15 +725,16 @@ export function renderFlowPane(
   const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string } | { criterionToggle: string } | { criterionOccurrence: { lib: string; name: string; bodyHash: string; elided: boolean } }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
   const conceptOccurrences: { gid: string; lib: string; name: string; flagGid?: string }[] = []; // #203 Todo 4b Slice A
-  const criterionOccurrences: { gid: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[] = []; // #224 ii.3 Slice 2b
+  const criterionOccurrences: { gid: string; occurrenceKey: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[] = []; // #224 ii.3 Slice 2b
   const flaggableGids: string[] = [];
 
   if (structure.length === 0) {
-    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids };
+    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', focusNodes: {}, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids };
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
   const { roots, maxDepth } = buildLaid(projectFlowStructure(structure), conceptMap, {
+    traversalNavigation: opts.traversalNavigation,
     defExpr: opts.defExpr,
     guardOutlines: opts.guardOutlines,
     expandedGuardWhens: opts.expandedGuardWhens,
@@ -789,13 +833,15 @@ export function renderFlowPane(
       const togKey = `${prefix}t${gid}`; // the chevron's OWN key (distinct from the box's data-reveal key)
       reveals[key] = { criterionOccurrence: { lib: cr.lib, name: cr.name, bodyHash: cr.bodyHash, elided: cr.elided } };
       reveals[togKey] = { criterionToggle: cr.posKey };
-      criterionOccurrences.push({ gid, lib: cr.lib, name: cr.name, collapsed: cr.collapsed, bodyConcepts: cr.bodyConcepts });
+      criterionOccurrences.push({ gid, occurrenceKey: n.nodeKey, lib: cr.lib, name: cr.name, collapsed: cr.collapsed, bodyConcepts: cr.bodyConcepts });
       flaggableGids.push(gid); // the rollup ⚑ participates in the host's bulk-clear (the flagBadge idiom)
       body +=
         `<g id="${escapeHtml(gid)}" class="flow-outline flow-crit-row" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        labelMarkup("Criterion", x, y, OUTLINE_H, OUTLINE_LABEL_MAX - 5, 20) +
+        flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 2, 6) +
+        labelMarkup("Criterion", x, y, OUTLINE_H, OUTLINE_LABEL_MAX - (n.criterionDescription === undefined ? 5 : 13), 20) +
         critToggle(x + 9, y + OUTLINE_H / 2, cr.collapsed, togKey) +
+        (n.criterionDescription === undefined ? "" : criterionInfo(x + OUTLINE_NODE_W - 58, y + OUTLINE_H / 2, n.nodeKey, JSON.stringify([cr.lib, cr.name]), cr.name)) +
         critVerdictChip(x + OUTLINE_NODE_W - 13, y + 9, key) +
         flagBadge(x + OUTLINE_NODE_W - 13, y + OUTLINE_H - 10, gid, false) +
         `</g>`;
@@ -825,6 +871,7 @@ export function renderFlowPane(
       body += `<g id="${escapeHtml(gid)}" class="flow-outline flow-input-row" data-reveal="${escapeHtml(togKey)}">` +
         `<title>${row.count} direct inputs${row.collapsed ? "; expand to inspect nested dependencies" : ""}</title>` +
         `<rect x="${x}" y="${y}" width="${nodeW(n)}" height="${OUTLINE_H}"/>` +
+        flowRing(x, y, nodeW(n), OUTLINE_H, 2, 4) +
         critToggle(x+8,y+OUTLINE_H/2,row.collapsed,togKey,`inputs (${row.count})`).replace('<g ', '<g data-flow-input-toggle="1" ').replace('</g>',`<text x="${x+20}" y="${y+OUTLINE_H/2+4}">INPUT (${row.count})</text></g>`) +
         (row.collapsed ? flagBadge(x+INPUT_NODE_W-13,y+OUTLINE_H/2,gid,false) : "") + `</g>`;
       continue;
@@ -963,12 +1010,12 @@ export function renderFlowPane(
     const critToggleMarkup = critC ? critToggle(x + 10, y + NODE_H / 2, critC.collapsed, key) : "";
     const labelDx = critC ? 24 : 10;
     const canOpenDecision = !!n.delegatedDecisionKey && roots.some(r => r.nodeKey === n.delegatedDecisionKey);
-    const labelMax = critC || canOpenDecision ? LABEL_MAX - 4 : LABEL_MAX;
+    const labelMax = critC || canOpenDecision ? LABEL_MAX - (n.criterionDescription === undefined ? 4 : 12) : LABEL_MAX;
     // #224 ii.3 Slice 2b: a single-criterion `when` records an OCCURRENCE (identity `{lib,name}` — the model-level verdict
     // is keyed on it, reviewed once across all occurrences + cases) + carries a verdict control at the top-right (a
     // criterion `when` has its concept suppressed → no flag badge there, so the slot is free). The host reveals the chip
     // per-occurrence via `.flow-row.crit-{pass,fail,pending,stale}` without re-render (the flagBadge/allPass idiom).
-    if (critC) criterionOccurrences.push({ gid, lib: critC.lib, name: critC.name, collapsed: critC.collapsed, bodyConcepts: critC.bodyConcepts });
+    if (critC) criterionOccurrences.push({ gid, occurrenceKey: n.nodeKey, lib: critC.lib, name: critC.name, collapsed: critC.collapsed, bodyConcepts: critC.bodyConcepts });
     const critVerdictMarkup = critC ? critVerdictChip(x + NODE_W - 13, y + 13, key) : "";
     // Bottom-right flag: grey creates an occurrence flag; yellow includes open flags rolled up from a collapsed body.
     // `flaggableGids` includes the gid so the host's bulk-clear covers it.
@@ -986,6 +1033,7 @@ export function renderFlowPane(
       guardTab +
       choicesControl(NODE_H) +
       critToggleMarkup +
+      (critC && n.criterionDescription !== undefined ? criterionInfo(x + NODE_W - 58, y + NODE_H / 2, n.nodeKey, JSON.stringify([critC.lib, critC.name]), critC.name) : "") +
       critVerdictMarkup +
       critFlagMarkup +
       allPassBadge +
@@ -1000,6 +1048,15 @@ export function renderFlowPane(
   const parents = new Map<string, string>();
   for (const n of all) for (const child of n.children) parents.set(child.nodeKey, n.nodeKey);
   const byNodeKey = new Map(all.map(n=>[n.nodeKey,n]));
+  const focusNodes = Object.fromEntries(all.map(n => [n.nodeKey, {
+    parent: parents.get(n.nodeKey) ?? '', owner: n.topWhenKey ?? n.nodeKey,
+    outline: !!n.outline, terminal: n.kind === 'action' && !n.useDecision,
+    choice: n.outlineRow === 'option',
+    criterion: !!(n.criterionCollapse || n.critRow),
+    logic: n.outlineRow === 'topor' || (n.outlineRow === 'op' && ['all of','any of','not'].includes(n.label)),
+    path: n.outline ? JSON.parse(n.nodeKey.slice(LEAF_KEY.length))[1] as string : '0',
+    ...(n.conceptName !== undefined && n.conceptLib !== undefined ? { concept: [n.conceptLib,n.conceptName] as [string,string] } : {}),
+  }]));
   const isLogic = (n: LaidNode) => n.outlineRow === "op" && (n.label === "all of" || n.label === "any of");
   const logicParent = (n: LaidNode): LaidNode | undefined => {
     let parent = byNodeKey.get(parents.get(n.nodeKey) ?? "");
@@ -1017,6 +1074,7 @@ export function renderFlowPane(
       (n.choice ? ` data-flow-choice="${escapeHtml(JSON.stringify(n.choice))}" data-flow-choice-for="${escapeHtml(n.choiceFor!)}"` : '') +
       (isLogic(n) ? ` data-flow-logic="${escapeHtml(n.nodeKey)}" data-flow-logic-parent="${escapeHtml(logicParent(n)?.nodeKey ?? "")}" data-flow-logic-depth="${groupDepth}" data-flow-logic-kind="${n.label === "any of" ? "any" : "all"}" role="button" tabindex="0" aria-pressed="false"` : '') +
       ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
+      (n.kind === 'action' && !n.useDecision ? ' data-flow-terminal="1"' : '') +
       (n.outlineRow === "option" ? ' data-flow-decoration="choices"' : n.outlineRow === "op" && n.label === "input" ? ' data-flow-decoration="input"' : '') +
       (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit" || n.inputRow) ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.inputRow ? `Inputs (${n.inputRow.count})` : n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
@@ -1054,18 +1112,56 @@ export function renderFlowPane(
   // REFACTOR:grounded: selectable, keyboard-accessible owner text outside SVG geometry.
   // Only rendered criterion identities participate; repeated occurrences share one entry.
   const renderedCriteria = new Set(criterionOccurrences.map((c) => JSON.stringify([c.lib, c.name])));
-  const descriptions = new Map<string, { name: string; lib: string; text: string }>();
+  const descriptions = new Map<string, { name: string; lib: string; text: string; occurrences: { key: string; context: string }[] }>();
+  const decisionFor = (n: LaidNode): LaidNode | undefined => {
+    let cursor: LaidNode | undefined = n;
+    const seen = new Set<string>();
+    while (cursor && !seen.has(cursor.nodeKey)) {
+      if (cursor.kind === "decision") return cursor;
+      seen.add(cursor.nodeKey);
+      cursor = byNodeKey.get(parents.get(cursor.nodeKey) ?? "");
+    }
+    return undefined;
+  };
+  const contextFor = (n: LaidNode): string => {
+    const guardKey = n.topWhenKey ?? (n.kind === "when" ? n.nodeKey : undefined);
+    const topWhen = byNodeKey.get(guardKey ?? "");
+    let cursor = byNodeKey.get(parents.get(n.nodeKey) ?? "");
+    let enclosing: LaidNode | undefined;
+    while (cursor && guardKey && (cursor.nodeKey === guardKey || cursor.topWhenKey === guardKey)) {
+      if (cursor.outlineRow === "crit" || cursor.criterionCollapse) { enclosing = cursor; break; }
+      cursor = byNodeKey.get(parents.get(cursor.nodeKey) ?? "");
+    }
+    const decision = decisionFor(topWhen ?? n);
+    const branchLabel = topWhen ? (topWhen.full || topWhen.label).split("\n", 1)[0] : undefined;
+    const decisionLabel = decision?.label.replace(/^decision\s+/i, "").replace(/^"(.*)"$/, "$1");
+    const parts = [
+      enclosing ? `Inside criterion ${enclosing.critRow?.name ?? enclosing.criterionCollapse?.name} — ${enclosing.critRow?.lib ?? enclosing.criterionCollapse?.lib}` : undefined,
+      branchLabel ? `Branch ${branchLabel}` : undefined,
+      decisionLabel ? `Decision ${decisionLabel}` : undefined,
+    ].filter((part): part is string => !!part);
+    return parts.join(" · ") || `Occurrence ${n.nodeKey}`;
+  };
   for (const n of all) {
     const owner = n.critRow ?? n.criterionCollapse;
     if (!owner || n.criterionDescription === undefined) continue;
     const key = JSON.stringify([owner.lib, owner.name]);
-    if (renderedCriteria.has(key)) descriptions.set(key, { name: owner.name, lib: owner.lib, text: n.criterionDescription });
+    if (!renderedCriteria.has(key)) continue;
+    const existing = descriptions.get(key) ?? { name: owner.name, lib: owner.lib, text: n.criterionDescription, occurrences: [] };
+    if (!existing.occurrences.some((occurrence) => occurrence.key === n.nodeKey)) existing.occurrences.push({ key: n.nodeKey, context: contextFor(n) });
+    descriptions.set(key, existing);
   }
   const descriptionHtml = descriptions.size === 0 ? "" :
-    `<details class="flow-criterion-descriptions"><summary>Criterion descriptions</summary><dl>` +
-    [...descriptions.values()].map((d) => `<dt>${escapeHtml(d.name)} — ${escapeHtml(d.lib)}</dt><dd>${escapeHtml(d.text)}</dd>`).join("") +
+    `<details class="flow-criterion-descriptions" hidden><summary>Criterion descriptions</summary><dl>` +
+    [...descriptions.entries()].map(([identity, d]) => `<div id="${escapeHtml(criterionDescriptionId(identity))}" class="flow-criterion-description" data-criterion-description="${escapeHtml(identity)}" tabindex="-1"><dt>${escapeHtml(d.name)} — ${escapeHtml(d.lib)}</dt><dd>${escapeHtml(d.text)}</dd><dd class="flow-criterion-contexts">` +
+      d.occurrences.map((occurrence) => {
+        const sameContext = d.occurrences.filter((candidate) => candidate.context === occurrence.context);
+        const ordinal = sameContext.length > 1 ? ` · Occurrence ${sameContext.indexOf(occurrence) + 1}` : "";
+        return `<span>${escapeHtml(occurrence.context + ordinal)}</span>`;
+      }).join("") +
+      `</dd></div>`).join("") +
     `</dl></details>`;
-  return { html: `<div class="flow-wrap">${svg}</div>${descriptionHtml}${zoom}`, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
+  return { html: `<div class="flow-wrap">${svg}</div>${descriptionHtml}${zoom}`, focusNodes, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
 }
 
 // Bottom-right flag: grey adds, yellow opens unresolved MV flags, green opens resolved MV flags. Rollup-only badges remain hidden until
@@ -1117,16 +1213,22 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
   `body[data-mode="medical-validation"] #root:not(.flow-has-pin) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-show-all-pins:not(.flow-has-pin) .flow-activity>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
+  // Operator-directed start/finish cue; independent of node focus, verdict color and pin selection.
+  `body[data-mode="medical-validation"] #root:not(.flow-has-pin):not(.flow-policy-routes-approved):not(.flow-route-review-loading) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-has-pin.flow-policy-routes-approved .flow-pinned>.flow-pin{filter:drop-shadow(0 0 3px #ffd54f) drop-shadow(0 0 6px #ffd54f)}` +
   `.fc-legend .fc-sw.fc-sw-true,.fc-legend .fc-sw.fc-sw-false{width:16px;height:2px;background:#fff;border:0;box-shadow:0 0 3px 1px #00e676}.fc-legend .fc-sw.fc-sw-false{box-shadow:0 0 3px 1px #f14c4c}` +
   `.flow-fallback{display:none}.flow-truth-unknown,.flow-false-stop{display:none;pointer-events:none}` +
-  `.flow-edge.flow-condition-true{stroke:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}` +
-  `.flow-edge.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
+  `.flow-edge.flow-condition-true,.flow-group-halo.flow-condition-true{stroke:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}` +
+  `.flow-edge.flow-condition-false,.flow-group-halo.flow-condition-false,.flow-condition-false>.flow-false-stop{stroke:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `.flow-condition-false>.flow-false-stop{display:inline;fill:none;stroke-width:1.75;vector-effect:non-scaling-stroke}` +
   `.flow-condition-unknown>.flow-truth-unknown{display:inline;fill:var(--vscode-foreground,#ddd);font-weight:bold}` +
   `.flow-wrap{display:inline-block;min-width:100%}` +
   `.flow-criterion-descriptions{margin:12px;padding:8px;border:1px solid var(--vscode-panel-border);border-radius:4px}` +
   `.flow-criterion-descriptions summary{cursor:pointer}.flow-criterion-descriptions dt{font-weight:600;margin-top:8px}` +
   `.flow-criterion-descriptions dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 12px}` +
+  `.flow-criterion-description{border-radius:4px;padding:1px 6px}.flow-criterion-description.is-target{background:var(--vscode-list-hoverBackground,rgba(255,255,255,.08));outline:1px solid var(--vscode-focusBorder,#3794ff)}` +
+  `.flow-criterion-contexts{display:flex;flex-direction:column;gap:6px;color:var(--vscode-descriptionForeground,#aaa)}.flow-criterion-contexts button{margin-left:6px}` +
+  `.flow-criterion-info{cursor:pointer}.flow-criterion-info circle{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#aaa)}.flow-criterion-info text{font-size:10px;font-weight:700;fill:var(--vscode-foreground,#ddd);pointer-events:none}.flow-criterion-info.is-description-active circle{stroke:#fff;stroke-width:2;filter:drop-shadow(0 0 4px #fff)}` +
+  `.criterion-navigation-target>rect{filter:drop-shadow(0 0 5px var(--vscode-focusBorder,#3794ff))}` +
   // `cursor:grab` = the grab-drag pan affordance on the tree background (a `.flow-row` overrides it with `pointer`, so nodes
   // still read as clickable); `user-select:none` so a pan-drag over node text doesn't select it.
   `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif);cursor:grab;user-select:none}` +

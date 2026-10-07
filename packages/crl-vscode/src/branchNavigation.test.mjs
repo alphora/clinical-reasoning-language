@@ -1,45 +1,55 @@
 import assert from 'node:assert/strict';
-import { leafRouteNeighbors } from './branchNavigation.ts';
-test('leaf navigation uses first representative, including from a later route to the same leaf',()=>{
- const a={caseId:'a',routeId:'r1',leafKey:'leaf-one'},alternate={caseId:'a',routeId:'r2',leafKey:'leaf-one'},
- b={caseId:'b',routeId:'r1',leafKey:'leaf-two'},later={caseId:'c',routeId:'r3',leafKey:'leaf-one'},
- c={caseId:'d',routeId:'r4',leafKey:'leaf-three'},routes=[a,alternate,b,later,c];
- assert.deepEqual(leafRouteNeighbors(routes,a),{previous:undefined,next:b,index:0,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,later),leafRouteNeighbors(routes,a));
- assert.deepEqual(leafRouteNeighbors(routes,alternate),leafRouteNeighbors(routes,a));
- assert.deepEqual(leafRouteNeighbors(routes,b),{previous:a,next:c,index:1,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,c),{previous:b,next:undefined,index:2,total:3});
+import { traversalRouteNeighbors } from './branchNavigation.ts';
+const route=(caseId,leafKey,traversalKey=leafKey,routeId=caseId)=>({caseId,routeId,leafKey,traversalKey});
+
+test('different traversals of one terminal are separate stops; duplicate cases share their traversal stop',()=>{
+ const a=route('a','one','a'),alternate=route('alternate','one','alternate'),duplicate=route('duplicate','one','a'),b=route('b','two');
+ const routes=[a,alternate,b,duplicate];
+ assert.deepEqual(traversalRouteNeighbors(routes,a),{previous:undefined,next:alternate,index:0,total:3});
+ assert.deepEqual(traversalRouteNeighbors(routes,duplicate),traversalRouteNeighbors(routes,a));
+ assert.deepEqual(traversalRouteNeighbors(routes,alternate),{previous:a,next:b,index:1,total:3});
+ assert.deepEqual(traversalRouteNeighbors(routes,b),{previous:alternate,next:undefined,index:2,total:3});
 });
-test('distinct structural leaves remain separate even when runtime terminal labels/ids match',()=>{
- const a={caseId:'a',routeId:'Met',leafKey:'decision-a/outcome'},b={caseId:'b',routeId:'Met',leafKey:'decision-b/outcome'};
- assert.equal(leafRouteNeighbors([a,b],a).next,b);
+
+test('distinct structural leaves remain separate even when terminal ids and traversal keys match',()=>{
+ const a=route('a','decision-a/outcome','same','Met'),b=route('b','decision-b/outcome','same','Met');
+ assert.equal(traversalRouteNeighbors([a,b],a).next,b);
 });
-test('tree order controls numbering and both arrows regardless of CEL case order',()=>{
- const first={caseId:'last-case',routeId:'r1',leafKey:'top'},
- alternate={caseId:'later-case',routeId:'alternate',leafKey:'top'},
- middle={caseId:'second-case',routeId:'r2',leafKey:'middle'},
- last={caseId:'first-case',routeId:'r3',leafKey:'bottom'};
- const routes=[last,middle,first,alternate],visual=['top','uncovered','middle','bottom'];
- assert.deepEqual(leafRouteNeighbors(routes,alternate,visual),{previous:undefined,next:middle,index:0,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,middle,visual),{previous:first,next:last,index:1,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,last,visual),{previous:middle,next:undefined,index:2,total:3});
- assert.deepEqual(routes,[last,middle,first,alternate], 'navigation must not reorder authored cases');
+
+test('tree order groups every terminal variant regardless of CEL case order',()=>{
+ const first=route('last-case','top','first'),alternate=route('alternate','top','second'),duplicate=route('duplicate','top','first'),
+ middle=route('middle','middle'),last=route('first-case','bottom');
+ const routes=[last,middle,first,alternate,duplicate],visual=['top','uncovered','middle','bottom'];
+ assert.deepEqual(traversalRouteNeighbors(routes,first,visual),{previous:undefined,next:alternate,index:0,total:4});
+ assert.deepEqual(traversalRouteNeighbors(routes,alternate,visual),{previous:first,next:middle,index:1,total:4});
+ assert.deepEqual(traversalRouteNeighbors(routes,middle,visual),{previous:alternate,next:last,index:2,total:4});
+ assert.deepEqual(traversalRouteNeighbors(routes,last,visual),{previous:middle,next:undefined,index:3,total:4});
+ assert.deepEqual(traversalRouteNeighbors(routes,duplicate,visual),traversalRouteNeighbors(routes,first,visual));
+ assert.deepEqual(routes,[last,middle,first,alternate,duplicate]);
 });
-test('non-disposition endpoints keep encounter order after mapped leaves without duplicate entries',()=>{
- const unknown={caseId:'paused',routeId:'paused-when',leafKey:'when-key'},
- known={caseId:'known',routeId:'r2',leafKey:'known'},
- other={caseId:'other',routeId:'r3',leafKey:'other'};
+
+test('unmapped visual order retains encounter order after mapped terminals without duplicate entries',()=>{
+ const unknown=route('unknown','not-in-order'),known=route('known','known'),other=route('other','other');
  const routes=[unknown,known,other],visual=['known','known','uncovered'];
- assert.deepEqual(leafRouteNeighbors(routes,known,visual),{previous:undefined,next:unknown,index:0,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,unknown,visual),{previous:known,next:other,index:1,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,other,visual),{previous:unknown,next:undefined,index:2,total:3});
- assert.deepEqual(leafRouteNeighbors(routes,unknown,[]),leafRouteNeighbors(routes,unknown));
- assert.deepEqual(leafRouteNeighbors([{caseId:'missing',routeId:'r',leafKey:''},...routes],unknown,visual),leafRouteNeighbors(routes,unknown,visual));
+ assert.deepEqual(traversalRouteNeighbors(routes,known,visual),{previous:undefined,next:unknown,index:0,total:3});
+ assert.deepEqual(traversalRouteNeighbors(routes,unknown,visual),{previous:known,next:other,index:1,total:3});
+ assert.deepEqual(traversalRouteNeighbors(routes,other,visual),{previous:unknown,next:undefined,index:2,total:3});
+ assert.deepEqual(traversalRouteNeighbors(routes,unknown,[]),{previous:undefined,next:known,index:0,total:3});
+ assert.deepEqual(traversalRouteNeighbors([route('missing','',''),...routes],unknown,visual),traversalRouteNeighbors(routes,unknown,visual));
 });
-test('unknown and unmapped routes cannot navigate; endpoints do not wrap',()=>{
- const a={caseId:'a',routeId:'r',leafKey:'leaf'},missing={caseId:'missing',routeId:'r'},unmapped={caseId:'x',routeId:'r',leafKey:''};
- assert.deepEqual(leafRouteNeighbors([unmapped,a],missing),{previous:undefined,next:undefined,index:-1,total:1});
- assert.deepEqual(leafRouteNeighbors([unmapped,a],unmapped),{previous:undefined,next:undefined,index:-1,total:1});
- assert.deepEqual(leafRouteNeighbors([],a),{previous:undefined,next:undefined,index:-1,total:0});
- assert.deepEqual(leafRouteNeighbors([a],a),{previous:undefined,next:undefined,index:0,total:1});
+
+test('unknown and unmapped identities cannot navigate; endpoints do not wrap',()=>{
+ const a=route('a','leaf'),missing={caseId:'missing',routeId:'missing'},unmapped=route('x','');
+ assert.deepEqual(traversalRouteNeighbors([unmapped,a],missing),{previous:undefined,next:undefined,index:-1,total:1});
+ assert.deepEqual(traversalRouteNeighbors([unmapped,a],unmapped),{previous:undefined,next:undefined,index:-1,total:1});
+ assert.deepEqual(traversalRouteNeighbors([],a),{previous:undefined,next:undefined,index:-1,total:0});
+ assert.deepEqual(traversalRouteNeighbors([a],a),{previous:undefined,next:undefined,index:0,total:1});
+});
+
+test('several ANY witnesses in one case/route retain their selected navigation identity',()=>{
+ const a=route('case','leaf','witness-a','route'),b=route('case','leaf','witness-b','route');
+ assert.equal(traversalRouteNeighbors([a,b],a).next,b);
+ assert.equal(traversalRouteNeighbors([a,b],b).previous,a);
+ assert.equal(traversalRouteNeighbors([a,b],b).index,1);
+ assert.equal(traversalRouteNeighbors([a,b],{...b,traversalKey:'stale'}).index,-1);
 });

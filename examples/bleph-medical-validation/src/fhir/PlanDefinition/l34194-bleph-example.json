@@ -89,7 +89,7 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "CRL branch Ref L128C7"
+                "expression": "CRL branch Ref L129C7"
               }
             }
           ],
@@ -131,14 +131,15 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Not CRL branch Ref L128C7"
+                "expression": "Not CRL branch Ref L129C7"
               }
             },
             {
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "CRL branch CriterionRef L129C7"
+                "expression": "CRL branch CriterionRef L130C7",
+                "description": "Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint."
               }
             }
           ],
@@ -195,7 +196,7 @@
                   "kind": "applicability",
                   "expression": {
                     "language": "text/cql-identifier",
-                    "expression": "CRL branch Ref L131C11"
+                    "expression": "CRL branch Ref L132C11"
                   }
                 }
               ],
@@ -236,7 +237,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "CRL branch CriterionRef L133C15"
+                        "expression": "CRL branch CriterionRef L134C15"
                       }
                     }
                   ],
@@ -295,7 +296,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "Not CRL branch CriterionRef L133C15"
+                        "expression": "Not CRL branch CriterionRef L134C15"
                       }
                     }
                   ]
@@ -340,7 +341,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "CRL branch CriterionRef L138C15"
+                        "expression": "CRL branch CriterionRef L139C15"
                       }
                     }
                   ],
@@ -399,7 +400,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "Not CRL branch CriterionRef L138C15"
+                        "expression": "Not CRL branch CriterionRef L139C15"
                       }
                     }
                   ]
@@ -416,7 +417,7 @@
                   "kind": "applicability",
                   "expression": {
                     "language": "text/cql-identifier",
-                    "expression": "Not CRL branch Ref L131C11"
+                    "expression": "Not CRL branch Ref L132C11"
                   }
                 }
               ]
@@ -448,14 +449,14 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Not CRL branch Ref L128C7"
+                "expression": "Not CRL branch Ref L129C7"
               }
             },
             {
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Not CRL branch CriterionRef L129C7"
+                "expression": "Not CRL branch CriterionRef L130C7"
               }
             }
           ]

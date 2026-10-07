@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
-import { summarizeBranchVerdict } from './branchVerdict.ts';
+import { allRouteVerdictsApproved, summarizeBranchVerdict } from './branchVerdict.ts';
 import { setAllReviewState } from './medicalValidationStore.ts';
+test('the exit pin requires approval of every policy route, not merely settled verdicts',()=>{
+ assert.equal(allRouteVerdictsApproved([]),false);
+ for(const states of [['unreviewed'],['pending'],['fail'],['pass','fail'],['fail','unreviewed'],['pass','pending'],['pass','fail','unreviewed']])assert.equal(allRouteVerdictsApproved(states),false);
+ for(const states of [['pass'],['pass','pass']])assert.equal(allRouteVerdictsApproved(states),true);
+});
 test('result verdict represents uniform states and the worst judgment in a group',()=>{
  for(const state of ['unreviewed','pending','pass','fail']) {
   const map=state==='unreviewed'?{}:{a:state,b:state};

@@ -115,6 +115,7 @@ concept "Qualifying Skin Finding Documented":
 - definition is "Upper Eyelid Skin Finding" in qualifying.
 
 criterion "Functional Necessity Documented":
+- description is "Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint.".
 - when ( "Qualifying Patient Complaint Reported" and "Individual Procedure Necessity Documented" ).
 
 criterion "Upper Blepharoplasty Evidence":

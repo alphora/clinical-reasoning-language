@@ -3,8 +3,8 @@ import { paintFlagBadges } from './flagBadgesWebview';
 import { summarizeFlagBadges } from './flagPlacement';
 import { createBranchQuestionnairePanel, nextQuestionnaireColumn } from "./branchQuestionnairePanel";
 import { createInteractiveQuestionnairePanel } from "./interactiveQuestionnairePanel";
-import { leafRouteNeighbors, type BranchIdentity } from "./branchNavigation";
-import { summarizeBranchVerdict } from "./branchVerdict";
+import { traversalRouteNeighbors, type BranchIdentity } from "./branchNavigation";
+import { allRouteVerdictsApproved, summarizeBranchVerdict } from "./branchVerdict";
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
 // REFACTOR:grounded: pinned route cards and MV-scoped proposals (docs/medical-validation-plan.md).
 // Correspondence cockpit SHELL (thin vscode) — three-pane viewer C2a (#156).
@@ -144,7 +144,7 @@ import {
 } from "./medicalValidationStore";
 import { reviewGridHtml, REVIEW_GRID_DRAWER_STYLE, REVIEW_GRID_DRAWER_SCRIPT } from "./reviewGridHtml";
 import { renderCrlPane } from "./crlPaneHtml";
-import { collectDispositionLeafKeys, toggleCriterionExpansion, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
+import { collectDispositionLeafKeys, toggleCriterionExpansion, expandTraversalCriteria, expandQuestionInputs, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
 import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
 import { SnapshotCapture, screenCapturedDom, snapshotFileName } from "./snapshotCapture";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
@@ -154,6 +154,9 @@ import { installRouteCards, ROUTE_CARD_STYLE, ROUTE_POINTER_STYLE } from "./rout
 import { alignFlowConnectorBorders } from "./flowConnectorBorders";
 import { installFlowPinVisibility } from "./flowPinVisibility";
 import { installFlowKeyboardActions } from "./flowKeyboardActions";
+import { installCriterionDescriptionNavigation, sanitizeCriterionDescriptionSnapshot } from "./criterionDescriptionNavigation";
+import { treeTraversal, treeTraversalSignature, terminalTraversals, treeFocusPaint, type FocusNode, type TreeTraversal } from './unpinnedTreeFocus';
+import { installUnpinnedTreeFocus, paintPinnedTraversal, sanitizeUnpinnedTreeFocusSnapshot, UNPINNED_TREE_FOCUS_STYLE } from './unpinnedTreeFocusWebview';
 import { installFlowDisclosureFocus } from "./flowDisclosureFocus";
 import { installFlowComponentContainers } from "./flowComponentContainers";
 import { graphWordingSources, resolveSourceWordingTarget, createPresentationProposal, savePresentationProposal, pendingPresentationProposals, type WordingTarget } from "./presentationProposal";
@@ -246,6 +249,7 @@ interface PaneView {
   indexVersion: number;
   acked: boolean;
   preserveTreeViewport?: boolean;
+  focusNodes?: Record<string, FocusNode>;
   /** Source: keyed by unitId. CRL: keyed by row nodeKey. CEL: case blocks by caseId, fact peeks by `fact:` key. */
   anchors: Record<string, { scrollTo: string; segmentIds: string[] }>;
   /** Per-pane click payload (a WebviewHit): source spans → {unitId,range}; CRL rows → {nodeKey}; CEL cases → {caseId};
@@ -679,7 +683,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     applyPaneOrder();
     // A pane opened mid-session holds no queued reveal (absent-pane effects were dropped in applyReveal) → re-drive the
     // current selection so the new pane highlights it on ack, instead of showing a blank/un-highlighted flowchart.
-    if (opened && state.selection) dispatch({ type: "select", selection: state.selection });
+    if (opened && state.selection) dispatch({ type: "select", selection: state.selection }, true);
   };
 
   // ── navigator TreeView (adapter over the headless navigatorItems model) ──
@@ -732,7 +736,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     s.selection && s.selection.primary === "cel" ? s.selection.caseId : undefined;
 
   // ── dispatch / effects ──
-  function dispatch(action: Action): void {
+  function dispatch(action: Action, replay = false): void {
+    if (!replay && !selectingTreeFocus && ['select','next','prev','setPrimary','setInputs'].includes(action.type)) clearTreeFocus();
     const previousRoute = state.selection?.primary === "cel" ? state.selection.routeId : undefined;
     const prevCaseId = focusedCaseId(state); // #177 slice 3: capture the focused case BEFORE reduce (real-change detection)
     const { state: next, effects } = reduce(state, action);
@@ -1662,6 +1667,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       pending: segmentsFor(tree, [...pending]).segmentIds,
       error: segmentsFor(tree, [...error]).segmentIds,
       allPassLeaves: segmentsFor(tree, [...allPassLeaves]).segmentIds,
+      policyRoutesApproved: allRouteVerdictsApproved(badgeEntries.map(entry => entry.verdict)),
     });
     drivePinnedVerdict();
   }
@@ -1977,8 +1983,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const conditions = sv && sv.status !== "error"
       ? conditionTruthKeys(sv.tree, id => selectedIds.has(id) ? whenKeyResolver(sv)(id) : undefined).map(m => ({ ids: segmentsFor(v, [m.key]).segmentIds, result: m.result })) : [];
     const pinLeafIds = selected ? segmentsFor(v, [selected.nodeKeys[selected.nodeKeys.length - 1]]).segmentIds : [];
+    const pinnedPaint = pinnedCards ? treeFocusPaint([pinnedCards.traversal], pinnedCards.payload.pinKey, v.focusNodes ?? {}) : undefined;
     void v.panel.webview.postMessage({ type: "markLeaves", gen: v.gen, yesIds, noIds, conditions, pinLeafIds,
       pinnedMarks: pinnedCards ? {
+        pathNodeKeys: pinnedPaint!.nodeKeys,
+        pathGroupKeys: pinnedPaint!.groupKeys,
+        pathGroupOutcomes: pinnedPaint!.groupOutcomes,
         yesIds: segmentsFor(v, pinnedCards.payload.marks.yesKeys).segmentIds,
         noIds: segmentsFor(v, pinnedCards.payload.marks.noKeys).segmentIds,
         conditions: pinnedCards.payload.marks.conditions.map((m: { key: string; result: string }) => ({ ids: segmentsFor(v,[m.key]).segmentIds, result: m.result }))
@@ -2073,7 +2083,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   // ── render a pane ──
-  function renderPane(pane: Pane, disclosureToken?: string): void {
+  function renderPane(pane: Pane, disclosureToken?: string, treeFocusToken?: string, pinFocusRequest?: string): void {
     const v = views.get(pane);
     if (!v) return;
     v.preserveTreeViewport = pane === 'tree' && v.gen > 0 && v.indexVersion === indexVersion;
@@ -2146,6 +2156,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // reveal shapes are IDENTICAL ({nodeKey} | {conceptNodeKey}), so clicks route through the existing onWebviewMessage
       // path with no new hit kinds, and it highlights in lockstep with the CRL pane (postReveal's crl|tree arms).
       const r = renderFlowPane(crlStructure, {
+        traversalNavigation: mode === 'medical-validation',
         revealPrefix: `g${gen}_`,
         concepts: conceptLayer,
         defExpr: buildDefExprResolver(), // #187 Option-C: composite → the ANY OF / ALL OF operator OUTLINE (shared builder)
@@ -2159,12 +2170,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
+      v.focusNodes = r.focusNodes;
       v.leafConcepts = r.leafConcepts; // #187 Todo 5: the def-leaf verdict-join map (captured atomically with the anchors)
       v.conceptOccurrences = r.conceptOccurrences; // #203 Todo 4b Slice A: the flag-badge substrate (captured atomically)
       v.criterionOccurrences = r.criterionOccurrences; // #224 ii.3 Slice 2b: the criterion-verdict substrate (captured atomically)
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode, disclosureToken, preserveViewport: v.preserveTreeViewport });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode, disclosureToken, treeFocusToken, pinFocusRequest, preserveViewport: v.preserveTreeViewport });
     } else if (pane === "fhirQuestionnaire") {
       // The $apply-driven pane (LForms). Per the integration design it receives DATA ONLY — never `html` — so
       // there is no innerHTML swap for the mounted form to survive and no dead-script trap (scripts inserted via
@@ -2281,6 +2293,70 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function inspectedRoutes(caseId: string): ExecutionRoute[] {
     const routes = routesForCase(caseId), sel = state.selection;
     return sel?.primary === "cel" && sel.caseId === caseId && sel.routeId ? routes.filter(r => r.terminalId === sel.routeId) : routes;
+  }
+  let selectingTreeFocus = false;
+  let unpinnedFocus: { epoch: number; key: string; token: string; options?: TreeTraversal[]; index: number; entries: TreeTraversal[] } | undefined;
+  let traversalCache: { epoch: number; entries: TreeTraversal[] } | undefined;
+  function treeTraversalEntries(): TreeTraversal[] {
+    if (traversalCache?.epoch !== indexVersion) {
+      traversalCache = {epoch:indexVersion,entries:[...scenarioByCaseId].flatMap(([caseId,sv]) =>
+        routesForCase(caseId).map(route=>treeTraversal(caseId,sv,route,whenKeyResolver(sv))))};
+    }
+    return traversalCache.entries;
+  }
+  function clearTreeFocus(): void {
+    if (!unpinnedFocus) return;
+    unpinnedFocus = undefined;
+    const tree = views.get('tree');
+    if (tree) void tree.panel.webview.postMessage({ type: 'clearTreeFocus', gen: tree.gen });
+  }
+  function postTreeFocus(): void {
+    const tree = views.get('tree'), focus = unpinnedFocus;
+    if (!tree || !focus || focus.epoch !== indexVersion || pinnedCards || mode !== 'medical-validation') return;
+    if (!tree.focusNodes?.[focus.key]) {
+      clearTreeFocus();
+      const selected = state.selection;
+      if (selected?.primary === 'cel') postReveal('tree',{kind:'celCase',id:selected.caseId});
+      driveLeafMarks();
+      return;
+    }
+    const entries = focus.options ? [focus.options[focus.index]] : focus.entries;
+    const paint = treeFocusPaint(entries, focus.key, tree.focusNodes ?? {});
+    void tree.panel.webview.postMessage({ type: 'unpinnedTreeFocus', gen: tree.gen, token: focus.token, ...paint,
+      navigation: focus.options ? { current: focus.index + 1, total: focus.options.length } : undefined });
+  }
+  function selectTreeTraversal(): void {
+    const focus = unpinnedFocus, choice = focus?.options?.[focus.index];
+    if (!focus || !choice) { postTreeFocus(); return; }
+    selectingTreeFocus = true;
+    const previousOrigin = scrollSuppressPane;
+    scrollSuppressPane = 'tree';
+    try {
+      const expanded = expandTraversalCriteria(expandedGuardWhens, choice, crlStructure, {
+        concepts: conceptLayer, defExpr: buildDefExprResolver(), guardOutlines,
+        answerOptionsByConcept: answerOptionsForDisplay(conceptLayer), answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer),
+      });
+      if (expanded.size !== expandedGuardWhens.size) { expandedGuardWhens = expanded; renderPane('tree',undefined,focus.token); }
+      dispatch({ type: 'select', selection: { primary: 'cel', caseId: choice.caseId, routeId: choice.route.terminalId } });
+    }
+    finally { selectingTreeFocus = false; scrollSuppressPane = previousOrigin; }
+    postTreeFocus();
+  }
+  function focusTreeNode(key: string): void {
+    const tree = views.get('tree'), node = tree?.focusNodes?.[key];
+    if (!node || node.choice || pinnedCards || mode !== 'medical-validation') return;
+    routeSelectionRequest++;
+    const entries = treeTraversalEntries();
+    const options = node.terminal ? terminalTraversals(entries, key) : undefined;
+    unpinnedFocus = { epoch: indexVersion, key, token: randomUUID(), options: options?.length ? options : undefined, index: 0, entries };
+    selectTreeTraversal();
+  }
+  function cycleTreeFocus(key: string, direction: string, token: unknown): void {
+    const focus = unpinnedFocus;
+    if (!focus?.options || focus.epoch !== indexVersion || pinnedCards || focus.key !== key || focus.token !== token) return;
+    const index = focus.index + (direction === 'previous' ? -1 : direction === 'next' ? 1 : 0);
+    if (index < 0 || index >= focus.options.length || index === focus.index) return;
+    focus.index = index; selectTreeTraversal();
   }
   let routeSelectionRequest = 0;
   async function selectRoutesThroughNode(nodeKey: string, pinRequest?: string, firstRoute = false): Promise<void> {
@@ -2404,7 +2480,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // REFACTOR:grounded: the host owns pin identity and proposal targets; webview never supplies paths.
   let wordingSources: ReturnType<typeof graphWordingSources> = new Map();
   let disclosureFocus: { gen: number; token: string } | undefined;
-  let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; verdictCaseIds: string[]; payload: any; targets: Map<string, WordingTarget> } | undefined;
+  let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; traversalKey: string; traversal: TreeTraversal; verdictCaseIds: string[]; payload: any; targets: Map<string, WordingTarget> } | undefined;
   const branchQuestionnaire = createBranchQuestionnairePanel(message => {
     if (!pinnedCards || pinnedCards.epoch!==indexVersion || mode!=="medical-validation" || message.token!==pinnedCards.token) return;
     if(message.type==='routeCardProposal')proposeCard(message);
@@ -2421,9 +2497,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(fromBranch && tree)void tree.panel.webview.postMessage({...msg,gen:tree.gen});
     else branchQuestionnaire.post(msg);
   }
-  function branchOrder() { return [...scenarioByCaseId.keys()].flatMap(caseId=>routesForCase(caseId).map(route=>({caseId,routeId:route.terminalId,leafKey:route.nodeKeys.at(-1)??''}))); }
+  function branchOrder() {
+    const nodes=views.get('tree')?.focusNodes ?? {};
+    return treeTraversalEntries()?.filter(e=>nodes[e.route.nodeKeys.at(-1)??'']?.terminal)
+      .map(e=>({caseId:e.caseId,routeId:e.route.terminalId,leafKey:e.route.nodeKeys.at(-1)!,traversalKey:treeTraversalSignature(e)}));
+  }
   function branchNeighbors(current: BranchIdentity) {
-    return leafRouteNeighbors(branchOrder(),current,[...collectDispositionLeafKeys(crlStructure)]);
+    const order=branchOrder();
+    return order ? traversalRouteNeighbors(order,current,[...collectDispositionLeafKeys(crlStructure)]) : undefined;
   }
   function caseIdsThroughReviewNode(semanticKey: string): string[] {
     const tree=views.get('tree'), maps=crlMaps;if(!tree || !maps)return [];
@@ -2457,16 +2538,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function navigatePinnedBranch(direction: string, token: unknown): void {
     const pin=pinnedCards;if(!pin || pin.epoch!==indexVersion || pin.token!==token || mode!=="medical-validation")return;
     const neighbors=branchNeighbors(pin);
-    const next=direction==='previous'?neighbors.previous:direction==='next'?neighbors.next:undefined;if(!next)return;
+    const next=direction==='previous'?neighbors?.previous:direction==='next'?neighbors?.next:undefined;if(!next)return;
     scrollSuppressPane='tree';
     try { dispatch({type:'select',selection:{primary:'cel',...next}}); }
     finally { scrollSuppressPane=undefined; }
-    pinCards(next.caseId,next.routeId,'branch-navigation');
+    pinCards(next.caseId,next.routeId,'branch-navigation',false,next.traversalKey);
   }
-  function pinCards(caseId: string, routeId: string, focusRequest?: string, showQuestions = false): void {
+  function pinCards(caseId: string, routeId: string, focusRequest?: string, showQuestions = false, traversalKey?: string): void {
     const view = views.get("tree"), sv = scenarioByCaseId.get(caseId);
     const route = routesForCase(caseId).find(r => r.terminalId === routeId);
     if (!view || !sv || !route || mode !== "medical-validation") return;
+    const options=treeTraversalEntries()?.filter(e=>e.caseId===caseId && e.route.terminalId===routeId);
+    const traversal=traversalKey===undefined ? options?.[0] : options?.find(e=>treeTraversalSignature(e)===traversalKey);
+    if (!traversal) return;
+    const selectedTraversalKey=treeTraversalSignature(traversal);
+    const neighbors=branchNeighbors({caseId,routeId,traversalKey:selectedTraversalKey});
+    if (!neighbors) return;
+    clearTreeFocus();
     const resolveKey = whenKeyResolver(sv);
     const q = buildRouteQuestionnaire(sv, route, buildResolveValueTypes(), sv.decision?.libraryName, { conceptShape: buildConceptShapeResolver(), defExpr: buildDefExprResolver() });
     const built = buildRouteCards(q, sv, resolveKey, (lib, name, nodeId, criteria) => {
@@ -2483,16 +2571,22 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const dirty = vscode.workspace.textDocuments.some(d => d.uri.fsPath === target.filePath && d.isDirty);
       return { ...target, editable: target.editable !== false && !foreign && !dirty, readOnlyReason: target.readOnlyReason ?? (foreign ? "Wording belongs to an imported library. Its CRL owner must propose the change." : dirty ? "Save or revert the unsaved CRL edits, then re-pin to propose wording." : undefined) };
     }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer), (lib,name) => !!crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.hasLocalCode, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answersFromTerminology);
+    const disclosureOptions = {
+      concepts: conceptLayer, defExpr: buildDefExprResolver(), guardOutlines,
+      answerOptionsByConcept: answerOptionsForDisplay(conceptLayer), answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer),
+    };
+    const expanded = expandQuestionInputs(expandTraversalCriteria(expandedGuardWhens,traversal,crlStructure,disclosureOptions), built.cards, crlStructure, disclosureOptions);
+    if (expanded.size !== expandedGuardWhens.size) { expandedGuardWhens = expanded; renderPane('tree',undefined,undefined,focusRequest); }
     const leafMarks = leafBucketsFromQuestionnaire(q.questions, resolveKey, sv.conceptTruth, view.leafConcepts);
     const selectedIds = new Set(route.nodeIds);
     const marks = { yesKeys: leafMarks.yesKeys, noKeys: leafMarks.noKeys,
       conditions: conditionTruthKeys(sv.tree, id => selectedIds.has(id) ? resolveKey(id) : undefined) };
     const token = randomUUID();
-    const neighbors=branchNeighbors({caseId,routeId});
     const verdictCaseIds=caseIdsThroughReviewNode(route.nodeKeys[route.nodeKeys.length-1]);
-    const payload = { token, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:neighbors.index+1,total:neighbors.total}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
+    const paint=treeFocusPaint([traversal],route.nodeKeys.at(-1)!,view.focusNodes ?? {});
+    const payload = { token, pathNodeKeys:paint.nodeKeys, pathGroupKeys:paint.groupKeys, pathGroupOutcomes:paint.groupOutcomes, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:neighbors.index+1,total:neighbors.total}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
       pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
-    pinnedCards = { token, epoch: indexVersion, caseId, routeId, verdictCaseIds, payload, targets: built.targets };
+    pinnedCards = { token, epoch: indexVersion, caseId, routeId, traversalKey:selectedTraversalKey, traversal, verdictCaseIds, payload, targets: built.targets };
     void view.panel.webview.postMessage({ type: "routeCards", gen: view.gen, ...payload, focusRequest });
     if(branchQuestionnaire.isOpen)branchQuestionnaire.update(payload);
     driveLeafMarks();
@@ -2527,6 +2621,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const v = views.get(pane);
     if (!v) return;
     if (pane === "tree" && msg.gen === v.gen) {
+      if (msg.type === 'treeFocus' && typeof msg.key === 'string') { focusTreeNode(msg.key); return; }
+      if (msg.type === 'cycleTreeFocus' && typeof msg.key === 'string' && typeof msg.dir === 'string') { cycleTreeFocus(msg.key, msg.dir, msg.token); return; }
       if (msg.type === 'pinFirstRoute' && typeof msg.key === 'string' && typeof msg.token === 'string' && mode === 'medical-validation') { void selectRoutesThroughNode(msg.key, msg.token, true); return; }
       if (msg.type === 'selectAndPinRoute' && typeof msg.key === 'string' && typeof msg.token === 'string' && mode === 'medical-validation') { void selectRoutesThroughNode(msg.key, msg.token); return; }
       if (msg.type === "unpinRoute") { routeSelectionRequest++; pinnedCards = undefined; branchQuestionnaire.close(); driveLeafMarks(); return; }
@@ -2583,6 +2679,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         driveLeafMarks();
         // #210 (disc 239): a fresh tree render dropped its `.node-focus` class — re-drive the agent's flag-anchor focus ring.
         driveNodeFocus();
+        postTreeFocus();
       }
       // #177 slice 4: a freshly-(re)rendered marker-bearing pane (tree/crl/source/questionnaire) loses its `.this-node`
       // class (innerHTML replaced) — re-drive the marker on its ack so the focused question's node re-paints. Like the
@@ -2887,6 +2984,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     views.set(pane, v);
     panel.onDidDispose(() => {
       if (pane === "tree") disclosureFocus = undefined;
+      if (pane === 'tree') clearTreeFocus();
       for (const d of disposables) d.dispose();
       if (views.get(pane) !== v) return;
       coord.disposePane(pane);
@@ -2930,6 +3028,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         catch (error) { console.warn("[crl.mv] Source correspondence unavailable", error); }
       }
       pinnedCards = undefined;
+      clearTreeFocus();
       branchQuestionnaire.close();
       crlStructure = cm.crlStructure;
       conceptLayer = cm.conceptLayer;
@@ -3041,6 +3140,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
   function resetToEmpty(message: string): void {
+    clearTreeFocus();
     pinnedCards = undefined;
     branchQuestionnaire.close();
     disclosureFocus = undefined;
@@ -3359,7 +3459,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const next = setReviewState(reviewByCaseId, caseId, value);
     if (!persistMv(next, notesByCaseId)) return false; // save (both maps) failed → memory + disk untouched
     renderPane("worklist"); // single-pane re-render (the dropdown selection); no-op when the worklist pane is closed
-    if (state.selection) dispatch({ type: "select", selection: state.selection });
+    if (state.selection) dispatch({ type: "select", selection: state.selection }, true);
     else renderTreeChrome(); // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout
     driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
     return true;
@@ -3529,7 +3629,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       reviewGridApplying = false;
     }
     renderPane("worklist"); // no-op when the worklist pane is closed
-    if (state.selection) dispatch({ type: "select", selection: state.selection }); // renders chrome (incl. the new gate/progress)…
+    if (state.selection) dispatch({ type: "select", selection: state.selection }, true); // renders chrome (incl. the new gate/progress)…
     else renderTreeChrome(); // …else render it directly — either way chrome is posted ONCE, post-commit (no double-post, cf. applyVerdict)
     driveDoneOverlay(); // re-drive AFTER the select's possible tree re-render: the reviewed case set changed
     driveCriterionVerdicts(); // …and the criterion verdict chips changed
@@ -4581,7 +4681,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (changed === 0) return; // nothing unreviewed/live → nothing to persist
       if (!persistMv(map, notesByCaseId)) return; // save failed → memory + disk untouched (persistMv surfaced the error)
       renderPane("worklist");
-      if (state.selection) dispatch({ type: "select", selection: state.selection });
+      if (state.selection) dispatch({ type: "select", selection: state.selection }, true);
       else renderTreeChrome();
       driveDoneOverlay(); // the reviewed set changed → repaint the tree done overlay
     };
@@ -4648,7 +4748,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       editingNoteId = undefined;
     }
     renderPane("worklist");
-    if (state.selection) dispatch({ type: "select", selection: state.selection }); // re-drive so a surviving selection re-highlights
+    if (state.selection) dispatch({ type: "select", selection: state.selection }, true); // re-drive so a surviving selection re-highlights
   }
 
   /** True iff the posted noteId is a live note in the OPEN drawer's case — the trusted-input gate for edit/save/delete. */
@@ -4872,7 +4972,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     showKeys = next;
     for (const pane of PANES) renderPane(pane);
     onNav.fire(undefined); // re-run getTreeItem → label prefixes appear/disappear
-    if (state.selection) dispatch({ type: "select", selection: state.selection }); // restore highlights post-re-render
+    if (state.selection) dispatch({ type: "select", selection: state.selection }, true); // restore highlights post-re-render
   }
 
   /** #224 ii.3 Slice 2 / #233 Todo 2a: flip a criterion's collapse state and re-render the TREE pane only — collapse
@@ -4890,7 +4990,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const view = views.get("tree");
     disclosureFocus = view && typeof focusToken === "string" ? { gen: view.gen, token: focusToken } : undefined;
     scrollSuppressPane='tree';
-    try { if (state.selection) dispatch({ type: "select", selection: state.selection }); }
+    try { if (state.selection) dispatch({ type: "select", selection: state.selection }, true); }
     finally { scrollSuppressPane=undefined; }
   }
 
@@ -5767,7 +5867,7 @@ body:has(.flag-drawer) .flow-zoom{display:none}
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
@@ -5831,16 +5931,19 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // the focused case. (The host re-drives per focused case: it clears in lockstep with the questionnaire when no case is
   // focused — the this-node/diverter lifecycle, driven by focusedScenario — NOT the case-independent done-overlay one.)
   `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
-  `let pinnedFlowKey='',pinnedRouteKeys=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
+  `let pinnedFlowKey='',pinnedRouteKeys=[],pinnedPathKeys=[],pinnedGroupKeys=[],pinnedGroupOutcomes=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
   // REFACTOR:grounded: component geometry follows live cards, collapse and zoom without changing route identities.
   `const componentUi=(${installFlowComponentContainers.toString()})(root);` +
   `const logicUi=(${installFlowLogicHighlight.toString()})(root);` +
   `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();logicUi.update();};` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
-  `(${installFlowKeyboardActions.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
+  `(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
+  `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
-  `const applyFlowPin=()=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(!pinnedFlowKey)return;const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}};` +
+  `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
+  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
   `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
+  `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
   `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
@@ -5852,14 +5955,14 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `pendingPinFocus='';pinFocusVersion++;gen=m.gen;disclosureUi.beforeRender();root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();logicUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin();routeCardUi.rebind();applyZoom();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
+  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion,routeToken:routeCardUi.token(),questionnaireOpen:routeCardUi.isExternal()});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
   // overlay classes are on the rows). Strip the EPHEMERAL rings (selection `.current`/`.this-node`, agent `.node-focus`) off a
   // CLONE via classList (exact — never rewrites label text) so a customer artifact doesn't carry them; keep verdict/flag/
   // review state. Echoes the token so the host coordinator matches it; the host still SCREENS the payload (trust boundary).
-  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
+  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}(${sanitizeCriterionDescriptionSnapshot.toString()})(_c);(${sanitizeUnpinnedTreeFocusSnapshot.toString()})(_c);v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
@@ -5886,8 +5989,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // mark replaces the prior overlay (clear-then-set, gen-guarded like the others). The host already resolved each node to
   // ONE verdict (pass/fail/pending are DISJOINT); error (⊆ pass, a pass-verdict node whose run errored) paints .error-node
   // INSTEAD of .review-pass (error-over-pass). No scroll (at-rest paint).
-  `else if(m.type==='clearReviewOverlay'){clrRO();pinVisibility.update();}` +
-  `else if(m.type==='markReviewOverlay'){if(m.gen!==gen)return;clrRO();` +
+  `else if(m.type==='clearReviewOverlay'){clrRO();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');pinVisibility.update();}` +
+  `else if(m.type==='markReviewOverlay'){if(m.gen!==gen)return;clrRO();root.classList.toggle('flow-policy-routes-approved',m.policyRoutesApproved===true);root.classList.remove('flow-route-review-loading');` +
   `const errSet=new Set(m.error||[]);` +
   `for(const id of errSet){const el=document.getElementById(id);if(el)el.classList.add('error-node');}` +
   `for(const id of (m.pass||[])){if(errSet.has(id))continue;const el=document.getElementById(id);if(el)el.classList.add('review-pass');}` +
@@ -5938,14 +6041,16 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='routeCards'){if(m.gen!==gen)return;pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}}` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}}` +
+  `else if(m.type==='unpinnedTreeFocus'){treeFocusUi.show(m);}` +
+  `else if(m.type==='clearTreeFocus'){if(m.gen===gen)treeFocusUi.reset();}` +
   `else if(m.type==='branchQuestionnaireState'){if(m.gen===gen)routeCardUi.questionnaireState(m.open,m.focusToken,m.requestId);}` +
   `else if(m.type==='routeCardDraft'){if(m.gen===gen)routeCardUi.draft(m);}` +
   `else if(m.type==='routeVerdict'){if(m.gen===gen)routeCardUi.verdict(m);}` +
   `else if(m.type==='routeVerdictFocus'){if(m.gen===gen)routeCardUi.verdictFocus(m);}` +
   `else if(m.type==='routeCardProposalResult'){if(m.gen===gen)routeCardUi.result(m);}` +
   `else if(m.type==='clearLeaves'){clrLeaf();for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');}` +
-  `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();currentRouteKeys=m.routeKeys||[];currentRouteLabel=m.routeLabel||'';currentRouteCase=m.routeCaseId||'';currentRouteId=m.routeId||'';applyFlowPin();if(pinnedFlowKey&&m.pinnedMarks)Object.assign(m,m.pinnedMarks);` +
+  `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();currentRouteKeys=m.routeKeys||[];currentRouteLabel=m.routeLabel||'';currentRouteCase=m.routeCaseId||'';currentRouteId=m.routeId||'';if(pinnedFlowKey&&m.pinnedMarks){Object.assign(m,m.pinnedMarks);pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];}applyFlowPin();` +
   `for(const el of root.querySelectorAll('.flow-pin-available'))el.classList.remove('flow-pin-available');for(const id of (m.pinLeafIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-pin-available');}` +
   `for(const c of (m.conditions||[])){if(!['true','false','unknown'].includes(c.result))continue;for(const id of c.ids){const el=document.getElementById(id);if(el){el.classList.add('flow-condition-'+c.result);for(const edge of root.querySelectorAll('.flow-edge[data-flow-condition]'))if(edge.dataset.flowCondition===el.dataset.flowKey&&edge.dataset.flowOutcome===(c.result==='true'?'Yes':c.result==='false'?'No':undefined))edge.classList.add('flow-condition-'+c.result);}}}` +
   `for(const id of (m.yesIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-yes');}` +
@@ -6018,7 +6123,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // Todo 5 (impl-review [important]): the drawer is last in DOM + revealed preserveFocus, so a keyboard user would tab through
   // all chrome + the flowchart before reaching it. On a GRID inject, move focus to its first enabled control (parity with the
   // create drawer's autofocus). Scoped to the grid so the create/edit/action forms keep their own focus behavior (aff()).
-  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html){aff();var rg=fld.querySelector('[data-review-grid]');if(rg){var f0=rg.querySelector('.rvg-all,input[type=radio]:not([disabled])');if(f0&&f0.focus)f0.focus();}}}alignBorders();});` +
+  `else if(m.type==='flagDrawer'){fld.innerHTML=m.html;if(m.html){aff();var rg=fld.querySelector('[data-review-grid]');if(rg){var f0=rg.querySelector('.rvg-all,input[type=radio]:not([disabled])');if(f0&&f0.focus)f0.focus();}}}treeFocusUi.refresh();alignBorders();});` +
   // #156 slice 4: a worklist review <select> sits INSIDE the .cel-case block (itself a data-reveal target). A CLICK on the
   // select must open the native dropdown WITHOUT selecting the case, so we stopPropagation (block the reveal) but do NOT
   // preventDefault (let the dropdown open). The state change rides the separate 'change' listener below. A DISABLED select
@@ -6062,6 +6167,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // Todo 2 (disc 356): a PER-NODE badge carries data-node-flag-gid (read off the MATCHED badge <g>, NOT a second closest — the
   // start pill is its SIBLING in the same row) → node-filtered; the start-count pill has none → the whole-policy list.
   `if(fb){e.preventDefault();e.stopPropagation();var nfg=fb.getAttribute('data-node-flag-gid');var owner=fb.closest('[data-reveal]');if(nfg&&owner)v.postMessage({type:'nodeFlagAction',gid:nfg,key:owner.getAttribute('data-reveal'),category:fb.getAttribute('data-flag-category'),gen});else v.postMessage({type:'mvFlags'});return;}` +
+  `if(e.target.closest&&e.target.closest('[data-criterion-info]')){e.preventDefault();e.stopPropagation();return;}` +
   // tree zoom control (− / reset / +) — a local view op, no host round-trip. Intercepted BEFORE [data-reveal].
   `const zb=e.target.closest&&e.target.closest('[data-zoom]');` +
   `if(zb){e.preventDefault();e.stopPropagation();const a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);return;}` +

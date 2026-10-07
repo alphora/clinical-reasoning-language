@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-import { renderFlowPane as renderUnchecked, FLOW_STYLE, flowLegendChrome as legendUnchecked, wrapLabel, collectDispositionLeafKeys, toggleCriterionExpansion } from "./flowPaneHtml.ts";
+import { renderFlowPane as renderUnchecked, FLOW_STYLE, flowLegendChrome as legendUnchecked, wrapLabel, collectDispositionLeafKeys, toggleCriterionExpansion, expandTraversalCriteria, expandQuestionInputs } from "./flowPaneHtml.ts";
 
 const renderFlowPane = (...args) => {
  const result=renderUnchecked(...args);
@@ -803,8 +803,50 @@ const gcrit = (name, operand, { elided = false } = {}) => ({ kind: "criterion", 
 const goutC = (critExpr) => ({ expr: critExpr });
 const gout = (expr, name) => (name ? goutC(gcrit(name, expr)) : { expr });
 
+check('terminal reveal opens all on-route criterion ancestors but not INPUT or answers',()=>{
+ const cs=[concept('h','Helper',{definitionKind:'definition-is',definitionRefs:['q','r']}),concept('q','Question',{hasLocalCode:true}),concept('r','OtherQuestion',{hasLocalCode:true})];
+ const tree=[{lib:'Pol',decision:'D',nodeKey:'root',children:[node('w','when','Criterion',[],[]),node('off','when','Off route',[],[])]}];
+ const expr=gcrit('Outer',gand(gcrit('Middle',gcrit('Inner',gleaf('Helper','h',{isSource:false,isInferred:true}))),gcrit('Inactive',gleaf('Question','q'))));
+ const opts={concepts:cs,guardOutlines:new Map([['w',goutC(expr)],['off',gout(gleaf('Question','q'),'Off')]]),answerOptionsByConcept:new Map([['q',[{code:'yes',display:'Yes'}]]])};
+ const all=toggleCriterionExpansion(new Set(),'w',tree,opts),full=renderFlowPane(tree,{...opts,expandedGuardWhens:all});
+ const boundaries=Object.entries(full.focusNodes).filter(([,n])=>n.criterion&&n.outline);
+ const inner=boundaries.find(([,n])=>n.path==='0.0.b');assert.ok(inner,'nested occurrence available for discovery');
+ const traversal={route:{nodeKeys:['root','w','end']}};
+ const expanded=expandTraversalCriteria(new Set(),traversal,tree,opts);
+ assert.ok(expanded.has('w'));assert.ok(expanded.has(inner[0]));assert.ok(expanded.has(boundaries.find(([,n])=>n.path==='0.0')[0]));
+ assert.ok(!expanded.has('off'));assert.ok(expanded.has(boundaries.find(([,n])=>n.path==='0.1')[0]));
+ const rendered=renderFlowPane(tree,{...opts,expandedGuardWhens:expanded});
+ assert.match(rendered.html,/data-flow-input="collapsed"/);assert.ok(!Object.values(rendered.focusNodes).some(n=>n.choice));
+ const manual=new Set(['manual-input','manual-answer']);const retained=expandTraversalCriteria(manual,traversal,tree,opts);
+ assert.ok(retained.has('manual-input')&&retained.has('manual-answer'),'user-opened disclosures retained');assert.deepEqual([...manual],['manual-input','manual-answer'],'does not mutate caller state');
+});
+
+check('pinned reveal follows actual question owner/library/criterion context through nested INPUT only',()=>{
+ const cs=[concept('h','Helper',{definitionKind:'definition-is',definitionRefs:['h2','nq']}),concept('h2','NestedHelper',{definitionKind:'definition-is',definitionRefs:['q','foreign']}),
+   concept('nq','NoQuestion',{definitionKind:'definition-is',definitionRefs:['plain']}),concept('plain','Plain'),concept('q','Question',{hasLocalCode:true}),concept('foreign','Question',{lib:'Other',hasLocalCode:true})];
+ const tree=[{lib:'Pol',decision:'D',nodeKey:'root',children:[node('w','when','Criterion',[],[]),node('other','when','Other',[],[])]}];
+ const opts={concepts:cs,guardOutlines:new Map([['w',goutC(gcrit('Outer',gcrit('Inner',gleaf('Helper','h',{isSource:false,isInferred:true}))))],
+   ['other',gout(gleaf('Helper','h',{isSource:false,isInferred:true}),'Other')]]),answerOptionsByConcept:new Map([['q',[{code:'yes',display:'Yes'}]]])};
+ const cards=[{library:'Pol',concept:'Question',occurrences:[{ownerKey:'w',criterionPaths:[[{lib:'Pol',name:'Outer'},{lib:'Pol',name:'Inner'}]]}]}];
+ const expanded=expandQuestionInputs(new Set(),cards,tree,opts),rendered=renderFlowPane(tree,{...opts,expandedGuardWhens:expanded});
+ assert.ok(expanded.has('w')&&!expanded.has('other'),'only question owner opens');
+ assert.equal(Object.entries(rendered.focusNodes).filter(([key,n])=>n.path?.endsWith('.inputs')&&expanded.has(key)).length,2,'both enclosing INPUT disclosures open');
+ assert.match(rendered.html,/data-flow-input="collapsed"/,'no-question INPUT remains folded');
+ assert.ok(Object.values(rendered.focusNodes).some(n=>n.concept?.[0]==='Pol'&&n.concept?.[1]==='Question'));
+ assert.ok(!Object.values(rendered.focusNodes).some(n=>n.choice),'answer choices remain folded');
+ const wrongOwner=cards.map(c=>({...c,occurrences:[{ownerKey:'missing',criterionPaths:c.occurrences[0].criterionPaths}]}));
+ assert.equal(expandQuestionInputs(new Set(),wrongOwner,tree,opts).size,0);
+ const wrongLibrary=cards.map(c=>({...c,library:'Missing'}));assert.equal(expandQuestionInputs(new Set(),wrongLibrary,tree,opts).size,0);
+ const wrongPath=cards.map(c=>({...c,occurrences:[{ownerKey:'w',criterionPaths:[[{lib:'Other',name:'Outer'},{lib:'Pol',name:'Inner'}]]}]}));
+ assert.equal(expandQuestionInputs(new Set(),wrongPath,tree,opts).size,0);
+ const manual=new Set(['manual-input','manual-answer']);const retained=expandQuestionInputs(manual,cards,tree,opts);
+ assert.ok(retained.has('manual-input')&&retained.has('manual-answer'));assert.equal(manual.size,2);
+ assert.deepEqual([...expandQuestionInputs(expanded,cards,tree,opts)],[...expanded],'idempotent');
+});
+
 // REFACTOR:grounded: descriptions have an accessible owner surface, stay escaped,
 // and do not alter the graph's geometry or create question/criterion occurrences.
+// @kit criterion:description-navigation
 check("criterion descriptions are selectable, deduplicated and geometry-neutral", () => {
   const tree = [{decision:"D",lib:"Pol",nodeKey:"d:D",location:{},children:[
     node("w:root","when","Group",[],[]), node("w:other","when","not Group",[],[]),
@@ -829,15 +871,39 @@ check("criterion descriptions are selectable, deduplicated and geometry-neutral"
     assert.equal(rich.html.match(/viewBox="[^"]+"/)[0],plain.html.match(/viewBox="[^"]+"/)[0]);
     const geometry = html => [...html.matchAll(/<(?:rect|path|line)\b[^>]*>/g)].map(m=>m[0]);
     assert.deepEqual(geometry(rich.html),geometry(plain.html));
-    const disclosure = rich.html.slice(rich.html.indexOf('<details class="flow-criterion-descriptions">'));
+    const disclosure = rich.html.slice(rich.html.indexOf('<details class="flow-criterion-descriptions"'));
+    assert.match(disclosure, /^<details class="flow-criterion-descriptions" hidden>/);
     assert.match(disclosure, /<summary>Criterion descriptions<\/summary>/);
     assert.equal((disclosure.match(/<dt>Group — Pol<\/dt>/g)||[]).length,1);
     assert.equal((disclosure.match(/<dt>Child — Pol<\/dt>/g)||[]).length,expandAllCriteria ? 1 : 0);
+    assert.equal((rich.html.match(/data-criterion-info=/g)||[]).length,rich.criterionOccurrences.length);
+    assert.equal((plain.html.match(/data-criterion-info=/g)||[]).length,0);
+    assert.equal((disclosure.match(/data-criterion-return=/g)||[]).length,0);
+    assert.equal((rich.html.match(/aria-expanded="false"/g)||[]).length >= rich.criterionOccurrences.length,true);
+    assert.equal((rich.html.match(/aria-describedby="criterion-description-/g)||[]).length,rich.criterionOccurrences.length);
+    assert.match(rich.html,/aria-controls="criterion-description-%5B%22/);
+    assert.match(disclosure,/Decision D/);
+    assert.match(disclosure,/Branch not Group — Pol · Decision/);
+    if (expandAllCriteria) assert.match(disclosure,/Inside criterion Group — Pol · Branch/);
     assert.ok(!rich.html.includes('<script>'));
     if (expandAllCriteria) assert.ok(disclosure.includes('&lt;script&gt;alert(1)&lt;/script&gt; &amp; text'));
     assert.ok(!plain.html.includes('flow-criterion-descriptions'));
     assert.match(rich.html, /<title>[^<]*Group explanation\nSecond line<\/title>/);
   }
+});
+
+check("criterion description context does not treat a preceding branch as the parent", () => {
+  const tree=[{decision:"D",lib:"Pol",nodeKey:"d:D",location:{},children:[
+    node("w:a","when","First",[],[]),node("w:b","when","Second",[],[]),
+  ]}];
+  const guardOutlines=new Map([
+    ["w:a",goutC({...gcrit("A",gleaf("X","c:X")),description:"A text"})],
+    ["w:b",goutC({...gcrit("B",gleaf("Y","c:Y")),description:"B text"})],
+  ]);
+  const html=renderFlowPane(tree,{concepts:[],guardOutlines}).html;
+  const b=html.match(/<div[^>]*class="flow-criterion-description"[^>]*><dt>B — Pol<\/dt>[\s\S]*?<\/div>/)?.[0]??"";
+  assert.match(b,/Branch Second — Pol · Decision D/);
+  assert.ok(!b.includes("Inside criterion A"));
 });
 
 // REFACTOR:grounded: actual renderer uses slot coordinates; component padding must remain pixel-sized.
@@ -1290,20 +1356,26 @@ check('ALL OF and ANY OF operator captions use prominent text',()=>{
  assert.match(FLOW_STYLE,/\.flow-logic-label>text\{fill:var\(--vscode-foreground,#ddd\);font-size:13px/);
 });
 
-check("expanding a criterion opens bounded descendants and choices, collapse preserves child state",()=>{
+check("expanding a criterion opens nested criteria but not answers, preserving manually opened choices",()=>{
  const tree=critStruct();const cs=[concept('c:A','A',{hasLocalCode:true}),concept('c:B','B',{hasLocalCode:true})];
  const guardOutlines=new Map([['w:crit',{expr:gcrit('Outer',gand(gcrit('Inner',gleaf('A','c:A')),gcrit('Sibling',gleaf('B','c:B'))))}]]);
  const opts={concepts:cs,guardOutlines,answerOptionsByConcept:new Map([['c:A',[{code:'x',display:'X'}]]])};
  const opened=toggleCriterionExpansion(new Set(),'w:crit',tree,opts);
  const render=()=>renderFlowPane(tree,{...opts,expandedGuardWhens:opened});
- const rr=render();assert.equal(rr.criterionOccurrences.length,3);assert.ok(rr.criterionOccurrences.every(o=>!o.collapsed));assert.ok(rr.html.includes('answer option'));
- const inner=Object.values(rr.reveals).filter(h=>'criterionToggle' in h).map(h=>h.criterionToggle);
+ const rr=render();assert.equal(rr.criterionOccurrences.length,3);assert.ok(rr.criterionOccurrences.every(o=>!o.collapsed));assert.equal(optRows(rr.html),0,'criterion expansion leaves answers folded');
+ const toggles=Object.values(rr.reveals).filter(h=>'criterionToggle' in h).map(h=>h.criterionToggle);
+ const inner=toggles.filter(k=>!k.endsWith('"opts"]'));
  assert.ok(inner.every(k=>opened.has(k)),'full-model keys match actual rendered toggle keys');
  const collapsed=toggleCriterionExpansion(opened,'w:crit',tree,opts);assert.equal(collapsed.has('w:crit'),false);assert.ok(inner.every(k=>collapsed.has(k)));
  const reopened=toggleCriterionExpansion(collapsed,'w:crit',tree,opts);assert.deepEqual(reopened,opened);
  const sibling=rr.criterionOccurrences.find(o=>o.name==='Sibling');assert.ok(sibling);
  const innerKey=inner.find(k=>k.endsWith('"crit"]')&&k.includes('0.0'));
  assert.ok(innerKey,'nested criterion toggle found');{const one=toggleCriterionExpansion(opened,innerKey,tree,opts);assert.equal(one.has('w:crit'),true);assert.equal(one.size,opened.size-1);}
+ const choicesKey=toggles.find(k=>k.endsWith('"opts"]'));assert.ok(choicesKey&&!opened.has(choicesKey));
+ const manual=toggleCriterionExpansion(opened,choicesKey,tree,opts);assert.equal(optRows(renderFlowPane(tree,{...opts,expandedGuardWhens:manual}).html),1,'explicit answer toggle still opens choices');
+ const foldedParent=toggleCriterionExpansion(manual,'w:crit',tree,opts);assert.ok(foldedParent.has(choicesKey));
+ const openParent=toggleCriterionExpansion(foldedParent,'w:crit',tree,opts);assert.equal(optRows(renderFlowPane(tree,{...opts,expandedGuardWhens:openParent}).html),1,'previously opened answers stay open');
+ const closeChoices=toggleCriterionExpansion(openParent,choicesKey,tree,opts);assert.ok(closeChoices.has('w:crit'));assert.equal(optRows(renderFlowPane(tree,{...opts,expandedGuardWhens:closeChoices}).html),0);
 });
 check("helper projection retains distinct truth anchors, actual input, original flag identity and one choice list",()=>{
  const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['c:Q']});

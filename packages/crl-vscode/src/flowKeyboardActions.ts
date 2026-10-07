@@ -8,7 +8,7 @@ export function installFlowKeyboardActions(root: HTMLElement) {
   root.addEventListener('pointerdown',()=>root.classList.add('flow-pointer-interaction'),{capture:true,signal:events.signal});
   root.addEventListener('keydown',()=>root.classList.remove('flow-pointer-interaction'),{capture:true,signal:events.signal});
   const nodeSelector = '[data-flow-key][tabindex="-1"]';
-  const buttonSelector = "[data-flow-pin],.route-layout-toggle,.route-branch-nav,.route-verdict-badge,[data-criterion-verdict],[data-node-flag-gid],[data-toggle-crit],[data-flow-logic]";
+  const buttonSelector = "[data-flow-pin],.route-layout-toggle,.route-branch-nav,.route-verdict-badge,[data-criterion-verdict],[data-node-flag-gid],[data-toggle-crit],[data-flow-logic],[data-criterion-info]";
   const visible = (n: Element) => win.getComputedStyle(n).display !== "none" && n.getClientRects().length > 0;
   const nodeOf = (n: Element) => n.closest<SVGGElement>(nodeSelector);
   const nativeControl = (n: Element) => !!n.closest('input,textarea,select,button,a,[contenteditable="true"]');
@@ -44,6 +44,8 @@ export function installFlowKeyboardActions(root: HTMLElement) {
     }
     if (e.key === "Enter" || (e.key === " " && button)) {
       if (e.shiftKey) return;
+      // Unpinned node activation belongs to the prefix/traversal navigation handler.
+      if (!button && !root.querySelector('.flow-pinned') && doc.body.dataset.mode === 'medical-validation') return;
       const owner = root.querySelector<SVGGElement>(".flow-pinned") ?? current;
       const pin = owner?.querySelector<SVGGElement>("[data-flow-pin]");
       const action = button ?? (pin && visible(pin) ? pin : undefined);

@@ -23,7 +23,7 @@ test('the Bleph MV example is discoverable and its native forms match its MV cas
   assert.equal(names.length, 16, 'L34194 clinical route examples');
   const manifest = JSON.parse(readFileSync(join(example, 'tests/results/questionnaire-manifest-mv.json'), 'utf8'));
   assert.ok(Number.isFinite(Date.parse(manifest.generatedAt)));
-  assert.equal(manifest.provenance.crlVersion, "6.4.33");
+  assert.equal(manifest.provenance.crlVersion, "6.4.34");
   assert.equal(manifest.provenance.producerJarSha256, "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b");
   assert.match(manifest.provenance.runtimeSha256, /^[a-f0-9]{64}$/);
   assert.match(manifest.provenance.definitionClosureSha256, /^[a-f0-9]{64}$/);
@@ -72,7 +72,7 @@ test('the L34194 native delivery stays bound to its source snapshot and emitted 
  const sources=['crl','cel','cql','anchor-source','provenance','source','refined-source'].flatMap(name=>files(join(base,name))).map(p=>[relative(base,p).replaceAll('\\','/'),p.endsWith('.docx')?readFileSync(p).toString('base64'):readFileSync(p,'utf8').replaceAll('\r\n','\n')]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
  const config=JSON.parse(readFileSync(join(example,'package.json'),'utf8')).crl;
  // Update this evidence binding only after source/result regeneration and native verification.
- assert.equal(createHash('sha256').update(JSON.stringify({sources,config})).digest('hex'),'7ef1dcaec1106cfe1be718800bf5efb904762108d201609ac39659f116edfca5');
+ assert.equal(createHash('sha256').update(JSON.stringify({sources,config})).digest('hex'),'2319d406f599ec8817116a6112d267df3e0a8b053423da5f62f84fa50e18ea38');
  const data=JSON.parse(readFileSync(join(example,'tests/data/fhir/cel-data-manifest.json'),'utf8'));
  const results=JSON.parse(readFileSync(join(example,'tests/results/questionnaire-manifest-mv.json'),'utf8'));
  assert.deepEqual(data.cases.map(c=>c.caseId).sort(),results.cases.map(c=>c.caseId).sort());

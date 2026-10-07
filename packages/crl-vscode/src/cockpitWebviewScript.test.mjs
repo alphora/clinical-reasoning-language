@@ -11,6 +11,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { COCKPIT_WEBVIEW_SCRIPT as SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForNodeThroughLit } from "./correspondenceCockpit.ts";
 import { FLOW_STYLE } from "./flowPaneHtml.ts";
+import { transformSync } from 'esbuild';
+import { reduce, initialState } from './correspondenceEngine.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The cockpit SHELL source text — for the HOST-side lifecycle wiring that lives outside the bundled webview SCRIPT string
@@ -50,20 +52,56 @@ function handlerBody(type) {
 
 check('pin focus follows the matching response and unpin retains the leaf; stale frames cannot steal focus',()=>{
   const section=SCRIPT.slice(SCRIPT.indexOf("let pendingPinFocus="),SCRIPT.indexOf("window.addEventListener('message'"));
-  const frames=[],messages=[],events=[];
+  const frames=[],messages=[],events=[],cancellations=[];
   const leaf={dataset:{flowKey:'leaf'},setAttribute(){},focus(){events.push('focus');},scrollIntoView(){events.push('scroll');}};
   const root={querySelectorAll:()=>[leaf]};
-  const ui=new Function('root','requestAnimationFrame','v',`
+  const ui=new Function('root','requestAnimationFrame','v','window',`
     let gen=1,pinnedFlowKey='',pinnedRouteKeys=[],pinnedRouteLabel='',currentRouteKeys=['leaf'],currentRouteCase='case',currentRouteId='route';
-    const routeCardUi={reset(){},show(){}},applyFlowPin=()=>{},applyZoom=()=>{};
+    const routeCardUi={reset(){},show(){}},treeFocusUi={reset(){}},applyFlowPin=()=>{},applyZoom=()=>{};
     ${section}
     return {toggle:toggleFlowPin,receive:m=>{${handlerBody('routeCards')}},invalidate:()=>{pendingPinFocus='';pinFocusVersion++;gen++;}};
-  `)(root,fn=>frames.push(fn),{postMessage:m=>messages.push(m)});
+  `)(root,fn=>frames.push(fn),{postMessage:m=>messages.push(m)},{addEventListener:(type,callback,capture)=>cancellations.push({type,callback,capture})});
+  assert.deepEqual(cancellations.map(c=>[c.type,c.capture]),[['pointerdown',true],['keydown',true],['focusin',true]],'cancellation is on the window capture path before document activation');
   ui.toggle('leaf');const request=messages.at(-1);
   ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:'old'});assert.equal(frames.length,0);
   ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:request.token});frames.shift()();assert.deepEqual(events,['focus','scroll']);
   ui.toggle('leaf');assert.equal(messages.at(-1).type,'unpinRoute');frames.shift()();assert.equal(events.length,4);
   ui.toggle('leaf');ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:messages.at(-1).token});ui.invalidate();frames.shift()();assert.equal(events.length,4);
+});
+
+check('internal disclosure and label refresh replays preserve tree focus; user navigation clears it',()=>{
+  const section=(start,end)=>{
+    const a=COCKPIT_SRC.indexOf(start),b=COCKPIT_SRC.indexOf(end,a);
+    assert.ok(a>=0&&b>a);return transformSync(COCKPIT_SRC.slice(a,b),{loader:'ts',target:'es2022'}).code;
+  };
+  const functions=section('  function dispatch(action: Action','  function applyReveal(')
+    +section('  function toggleCriterionExpand(','  const toggleKeysCmd')
+    +section('  function applyShowKeys(','  /** #224 ii.3 Slice 2 / #233 Todo 2a:');
+  const ui=new Function('reduce','initialState',`
+    let state={...initialState(),primary:'cel',selection:{primary:'cel',caseId:'a',routeId:'end'},index:{version:1,steps:[],sourceCycleIds:[],crlNav:[],celNav:[{caseId:'a',label:'A'},{caseId:'b',label:'B'}]}};
+    let focus=true,clears=0,renders=0,selectingTreeFocus=false,expandedGuardWhens=new Set(),showKeys=false,disclosureFocus,scrollSuppressPane,currentQuestionIndex;
+    const mode='medical-validation',PANES=['tree'],views=new Map([['tree',{gen:1}]]),crlStructure=[],conceptLayer=[],guardOutlines=new Map();
+    const focusedCaseId=s=>s.selection?.primary==='cel'?s.selection.caseId:undefined;
+    const clearTreeFocus=()=>{focus=false;clears++;},cockpitAgentBridge={notifyChanged(){}},onNav={fire(){}};
+    const applyReveal=()=>{},reflectSelectionToTree=()=>{},driveFailedCriteriaPeek=()=>{},driveDiverters=()=>{},driveLeafMarks=()=>{},driveThisNode=()=>{},shouldRerenderQuestionnaire=()=>false;
+    const buildDefExprResolver=()=>{},answerOptionsForDisplay=()=>{},answersFromTerminologyForDisplay=()=>{};
+    const toggleCriterionExpansion=(set,key)=>{const next=new Set(set);next.has(key)?next.delete(key):next.add(key);return next;};
+    const renderPane=()=>{renders++;views.get('tree').gen++;};
+    ${functions}
+    return {toggle:()=>toggleCriterionExpand('w','focus-token'),labels:()=>applyShowKeys(!showKeys),dispatch,
+      terminal:()=>{selectingTreeFocus=true;try{dispatch({type:'select',selection:{primary:'cel',caseId:'b',routeId:'end'}});}finally{selectingTreeFocus=false;}},
+      reading:()=>{focus=true;},current:()=>({focus,clears,renders,expanded:expandedGuardWhens.has('w'),selection:state.selection})};
+  `)(reduce,initialState);
+  ui.toggle();ui.toggle();ui.labels();
+  assert.equal(ui.current().clears,0);assert.equal(ui.current().focus,true);assert.equal(ui.current().renders,3);
+  assert.equal(ui.current().selection.routeId,'end');
+  ui.terminal();assert.equal(ui.current().focus,true);assert.equal(ui.current().clears,0);
+  ui.reading();ui.toggle();assert.equal(ui.current().focus,true); // Independent nonterminal focus survives the same replay.
+  ui.dispatch({type:'next'});assert.equal(ui.current().focus,false);assert.equal(ui.current().clears,1);
+  ui.reading();ui.dispatch({type:'select',selection:{primary:'cel',caseId:'a'}});assert.equal(ui.current().focus,false);
+  // Audit every same-selection re-drive, not just the disclosure path tested above.
+  const replays=[...COCKPIT_SRC.matchAll(/dispatch\(\{ type: "select", selection: state\.selection \}([^;]*);/g)];
+  assert.ok(replays.length>=7);for(const replay of replays)assert.equal(replay[1],', true)');
 });
 
 // Extract the root 'click' listener body (brace-matched) — the delegated handler where the note controls live.
@@ -154,6 +192,19 @@ check("#210 recolor: the worklist verdict dropdown (.cel-review-*) uses the SAME
 check("GEN-GUARD: markReviewOverlay drops a mark aimed at a superseded render (m.gen!==gen → return)", () => {
   const body = handlerBody("markReviewOverlay");
   assert.ok(/if\(m\.gen!==gen\)return;/.test(body), "mark is gen-guarded like the other channels");
+});
+
+check('policy-wide pin approval follows the current overlay, clears on teardown/render, and ignores stale generations',()=>{
+ const classes=new Set(),root={classList:{toggle:(key,on)=>on?classes.add(key):classes.delete(key),add:key=>classes.add(key),remove:key=>classes.delete(key)}};
+ const mark=new Function('m','gen','root','document','clrRO','pinVisibility',handlerBody('markReviewOverlay'));
+ const receive=m=>mark(m,3,root,{getElementById:()=>null},()=>{}, {update(){}});
+ classes.add('flow-route-review-loading');receive({gen:3,policyRoutesApproved:true});assert.ok(classes.has('flow-policy-routes-approved'));assert.ok(!classes.has('flow-route-review-loading'));
+ receive({gen:2,policyRoutesApproved:false});assert.ok(classes.has('flow-policy-routes-approved'));
+ for(const value of [false,undefined,'true']){receive({gen:3,policyRoutesApproved:value});assert.equal(classes.size,0);}
+ receive({gen:3,policyRoutesApproved:true});
+ new Function('root','clrRO','pinVisibility',handlerBody('clearReviewOverlay'))(root,()=>{},{update(){}});assert.ok(!classes.has('flow-policy-routes-approved'));assert.ok(classes.has('flow-route-review-loading'));
+ const render=handlerBody('render');
+ for(const reset of ["root.classList.remove('flow-policy-routes-approved')","root.classList.add('flow-route-review-loading')"]){assert.ok(render.indexOf(reset)>=0&&render.indexOf(reset)<render.indexOf('root.innerHTML=m.html'),'replacement tree holds cue until current approval acknowledgement');}
 });
 
 // ── #177 slice 4: the "this node" marker channel + its SURVIVES-REVEAL invariant ──
@@ -748,6 +799,20 @@ check("#224 ii.3 Slice 2 webview: a criterion chevron ([data-toggle-crit]) is in
   const revealAt = SCRIPT.indexOf("closest('[data-reveal]')");
   assert.ok(toggleAt > 0 && toggleAt < revealAt, "chevron intercept comes before the data-reveal click routing");
   assert.match(SCRIPT, /closest\('\[data-toggle-crit\]'\);.*postMessage\(\{type:'toggleCriterion',gen,key:[^}]*token:disclosureUi.capture\(ct\)\}\);return;/s);
+});
+
+check("criterion description navigation is a first-class control before generic reveal", () => {
+  assert.match(COCKPIT_SRC, /installCriterionDescriptionNavigation/);
+  const infoAt = SCRIPT.indexOf("[data-criterion-info]");
+  const revealAt = SCRIPT.indexOf("closest('[data-reveal]')", infoAt);
+  assert.ok(infoAt >= 0 && revealAt > infoAt, "description controls are intercepted before generic reveal");
+  assert.match(SCRIPT, /criterionDescriptionUi\.restore\(\)/);
+  assert.match(SCRIPT, /criterionDescriptionUi\.beforeRender\(\)/);
+  assert.match(SCRIPT, /criterionDescriptionUi\.refresh\(\)/);
+  assert.match(SCRIPT, /applyFlowPin\(true\)[\s\S]*?criterionDescriptionUi\.restore\(\)/);
+  assert.match(SCRIPT, /querySelectorAll\(["']\[data-criterion-info\]["']\)[\s\S]*?\.remove\(\)/);
+  assert.match(SCRIPT, /aria-expanded["'],\s*["']false["']/);
+  assert.match(SCRIPT, /flow-criterion-info\.is-description-active[\s\S]*?classList\.remove\(["']is-target["'],\s*["']is-description-active["']\)/);
 });
 
 // ── #224 ii.3 Slice 2b: model-level criterion verdict chips (webview + host) ──────────────────────

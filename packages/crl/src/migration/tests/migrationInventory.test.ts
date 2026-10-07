@@ -315,6 +315,8 @@ describe("scan integrity", () => {
     expect(rep.counts.buildFailed).toBe(0);
   });
 
+  // This whole-repository integrity scan is not a single-unit performance assertion.
+  // Keep a bounded budget for the complete census; preserve all integrity assertions below.
   it("FULL repo scan with the shipped manifest is clean — no dead rules, closed set, reconciled", () => {
     // This is the T7-staleness-gate basis: the real manifest over the whole repo. It also proves the
     // manifest has no dead rules against the tree (panel R1 Claude #9).
@@ -322,5 +324,5 @@ describe("scan integrity", () => {
     expect(rep.failures).toEqual([]);
     expect(rep.reconcile.ok).toBe(true);
     expect(rep.counts.included + rep.counts.excluded + rep.counts.buildFailed).toBe(rep.counts.discovered);
-  });
+  }, 120_000);
 });

@@ -11,7 +11,8 @@ review controls. Collapsed components retain the tab, hidden-question indicator,
 review status and applicable flag rollup. ALL OF, ANY OF and NOT retain their
 authored meaning inside the component; the boundary implies no Boolean operator.
 
-Root criteria retain their decision-route occurrence and selection behavior.
+Root criteria retain their decision-route occurrence identity. Their unpinned
+selection follows the prefix focus behavior described below.
 Nested criteria retain their criterion review identity. Neither flags nor review
 verdicts are reassigned to a child. Existing source mappings remain unchanged.
 
@@ -29,8 +30,10 @@ Differing determinations across uses remain visible, including Unknown. This is
 MV presentation behavior; it does not alter the generated FHIR Questionnaire or
 clinical evaluation.
 
-Operator-approved interactions (September 12, 2026): opening a tree disclosure
-opens its available nested disclosures; closing it preserves descendant state.
+Opening a Criterion in the tree opens its available nested criteria, but leaves
+INPUT and answer choices independently controlled. Manually opened choices are
+retained when closing and reopening their parent Criterion. Closing a disclosure
+preserves descendant state.
 Unknown or elided bodies remain bounded. Questions use Q numbers on the tree and
 attached cards, and bare numbers in the Result Questionnaire. Mouse interaction
 does not paint a selection/focus ring on disclosures or the questionnaire toggle;
@@ -50,16 +53,16 @@ Criterion; unresolved helpers retain available choices when no input is rendered
 
 With Questions off, answer choices use the dotted tree disclosure and mark the
 selected answer. Tree and card disclosures retain their own independent expansion
-state. Authored ALL OF/ANY OF groups have independent connector emphasis: ANY OF uses teal, ALL OF uses orange, independent of depth. Enabled connectors use a white line with a colored glow matching the condition connectors; inactive groups stay neutral. Turning a group off also clears
+state. Authored ALL OF/ANY OF groups have independent connector emphasis: ANY OF uses teal, ALL OF uses orange, independent of depth. Enabled connectors use a white line with their manual group-colored glow; inactive groups stay neutral. Turning a group off also clears
 its descendants; turning it on leaves them unchanged. This emphasis is a reading
-aid, not an evaluation result. Clicking a group changes connector emphasis. Synthetic wrappers do not create Boolean groups in the MV tree. The existing CRL Questionnaire and FHIR Questionnaire each have their own open/close toggle inside the tree pane. They remain separate views with their existing data and rendering behavior.
+aid, not an evaluation result. Clicking a group changes manual connector emphasis. On a selected terminal route, known Yes/left owners override that toggle color with the native green branch glow; No/right owners use the native red glow. Clearing the route restores the manual toggle's original state and color. Unknown owners get no automatic polarity color. Hidden off-route connectors have no visible halos. Synthetic wrappers do not create Boolean groups in the MV tree. The existing CRL Questionnaire and FHIR Questionnaire each have their own open/close toggle inside the tree pane. They remain separate views with their existing data and rendering behavior.
 
 Authority: operator-approved refinement, UX discussions 704, 710, 714/715, 718/719, and 720/721. Machine
 identifiers retain component terminology. CRL/CEL evaluation remains unchanged.
 
 To flag a visually suppressed helper, right-click its expanded Criterion and choose the specific concept target. Each target retains its original identity; sharing a Criterion never implicitly selects the first helper. Static snapshots preserve group emphasis, but their group labels are inert.
 
-Attached Questions use 320px condition nodes and cards; outcome leaves retain their original 168px width. Node labels fit the actual rendered width, using up to two lines and truncating only remaining overflow. Unpinning restores the original tree labels and geometry. The labeled Next control above the pinned leaf visits each distinct visual leaf once, selecting its first available case/route in authored enumeration order. Distinct leaves with the same outcome label remain separate stops. Navigation from an alternate route starts at its leaf; ends are disabled rather than wrapping. The existing route chooser still offers alternate routes. Traversal retains the pin and updates selection, questions and available source correspondence.
+Attached Questions use 320px condition nodes and cards; outcome leaves retain their original 168px width. Node labels fit the actual rendered width, using up to two lines and truncating only remaining overflow. Unpinning restores the original tree labels and geometry. The labeled Next control above the pinned leaf visits one route per terminal endpoint in tree order, retaining the first authored case reaching each endpoint. Its total equals the sum of the terminal traversal counts in the unpinned tree. Cases reaching the same endpoint share a stop regardless of their individual answers. Navigation from another case representing the same terminal uses that stop without replacing the currently pinned case. Ends are disabled rather than wrapping. The existing route chooser still offers individual cases/routes. Traversal retains the pin and updates selection, questions and available source correspondence.
 
 The navigation shows `n of c ← Next →`, using a one-based position and the total
 number of navigable results. While the Result Questionnaire is open, node badges
@@ -67,7 +70,69 @@ keep Boolean answers inline (`Q6 Yes`); other populated answers use `Q6 …`.
 The ellipsis indicates an abbreviated answer, not an action to open another pane.
 Its tooltip points to the questionnaire and includes the full answer.
 
+Operator-directed unpinned tree selection: clicking a nonterminal node highlights
+every executed prefix up to and including that node, with no case selector and no
+highlight continuing to a result. The clicked node gets both the blue path ring
+and fuzzy neutral focus; other included nodes get blue path highlighting only.
+Clicking a nonterminal Criterion also highlights all its visible nodes,
+including nested components and inputs, but not logical labels such as ALL OF,
+ANY OF or NOT, answer choices or downstream
+decision branches. Clicking a terminal highlights its first full
+traversal. Previous and next arrows above that terminal move through its distinct
+traversals; arrows and the `n of c` label appear only when there are multiple
+routes and stop at either end. A single route still gets path/focus highlighting,
+without navigator chrome. If a focused arrow disappears as the count becomes one,
+focus returns to that terminal. Pinned enumeration across terminal endpoints
+retains its separate navigation. ValueSet
+codes are answer details, not traversal choices: the question node represents the
+ValueSet. Cases differing only by such codes share a traversal choice. Display
+routes have one navigation stop per terminal endpoint. All visible nodes within
+an on-route ALL OF or ANY OF group get blue path highlighting, including nested
+criteria and inputs, regardless of their owning condition's truth. Blue means
+structural route membership, including No and unknown owners.
+Selected Yes/left branches use the existing green connector glow; selected
+No/right branches use the existing red glow. Unselected branches stay neutral.
+Each selected group's connector uses the same native green/red branch glow as
+its known owner outcome, overriding its manual toggle color. An unknown owner
+receives no automatic green/red; its manual toggle remains independent.
+Only the selected route gets automatic blue/group emphasis in either tree
+or pinned view; Boolean labels and answer choices never get blue highlighting.
+The selected case's actual operand answers, guard polarity and unknown results
+remain intact; blue and glow are structural reading aids, not truth claims.
+Collapsing a criterion preserves the count and selected traversal. Selecting a
+terminal or using its arrows opens the criteria on that traversal, including
+nested criterion ancestors, without opening INPUT or answer choices. Existing
+manual disclosure states are retained. Keyboard focus survives that redraw.
+Selecting a
+case elsewhere clears this tree focus. Explicit pinning and review controls retain
+their behavior; pinned navigation uses the same distinct traversal identities.
+
+On pinning or pinned traversal navigation, actual question-card occurrences open
+their enclosing INPUT and criterion disclosures. Matching is library-qualified
+and specific to the owning condition and criterion context. INPUTs without a
+question remain folded; answer choices remain independently controlled.
+
+The Bleph demo's 16 authored cases group into six display routes in both views.
+Different cases reaching the same terminal share a display navigation stop;
+they remain different actual answers and cases. Pinned view retains full
+explanatory questions and actual answers. Display grouping does not change evaluation, questionnaire membership,
+case verdicts or the all-current-frozen-cases approval gate. This is not a claim
+of coverage of every feasible policy execution.
+
 The unpinned MV tree shows one pin: the first leaf without a Pass checkmark, or the first leaf when all leaves have Pass. Holding Shift exposes every leaf pin; releasing Shift or leaving the window restores the single pin. This follows visible review status, including leaves without an authored CEL route; activating such a pin retains the existing no-route message. Clicking a result’s pin immediately opens the pinned Question–Result view using its first available route, even when another route was selected previously. Right-clicking a node in the main unpinned tree offers its route chooser and opens Question–Result after a route is chosen; cancellation leaves the view unchanged. Right-clicking a pin does nothing. Pinned-node and nested-criterion review menus retain their interactions. Fresh pinning turns Questions on. An async choice is ignored after another selection/pin intent, tree replacement, or policy change. Unpinning restores the single default pin.
+
+Operator-directed next-best-action cue: while policy route approval is unfinished,
+the offered default pin has a fuzzy yellow glow inviting entry into pinned view.
+Opening pinned view removes that start cue; the normal pin color invites traversal
+enumeration. Other Shift-revealed pins do not glow. When every route in the policy
+is approved, the current pinned pin glows yellow inviting exit. Returning to the
+approved tree removes the pin glow. Save and Unlock cues belong to KELP.
+Approval is derived from a nonempty set of current frozen case verdicts, all Pass;
+Fail, Pending, To do and ambiguous cases do not approve the policy routes. Removed
+cases do not count. The cue follows verdict changes and traversal navigation; a
+replacement tree waits for current verdict state before offering any cue. This
+route-approval signal does not change criterion verdicts or the validation gate.
+Pin styling and the keyboard-focus outline remain independent of the cue.
 
 The pinned result’s verdict icon shows the worst case verdict in its group: Fail,
 To do, Pending, then Pass. Missing judgments are To do. The group contains the

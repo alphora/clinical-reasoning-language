@@ -259,6 +259,9 @@ define "__CRL_PublicationEnvelope_v1_Ptosis Photographs Documented":
 define "Ptosis Photographs Documented":
   "__CRL_PublicationSelection_v1_Record"("__CRL_PublicationEnvelope_v1_Ptosis Photographs Documented")
 
+/*
+ * Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint.
+ */
 define "Functional Necessity Documented":
   FHIRHelpers.ToBoolean(("Qualifying Patient Complaint Reported").value as FHIR.boolean) and FHIRHelpers.ToBoolean(("Individual Procedure Necessity Documented").value as FHIR.boolean)
 
@@ -268,32 +271,32 @@ define "Upper Blepharoplasty Evidence":
 define "Blepharoptosis Repair Evidence":
   FHIRHelpers.ToBoolean(("Ptosis Margin Requirement Met").value as FHIR.boolean) and FHIRHelpers.ToBoolean(("Ptosis Photographs Documented").value as FHIR.boolean)
 
-define "CRL branch Ref L128C7":
+define "CRL branch Ref L129C7":
   FHIRHelpers.ToBoolean(("Cosmetic Surgical Purpose").value as FHIR.boolean)
 
-define "Not CRL branch Ref L128C7":
+define "Not CRL branch Ref L129C7":
   not (FHIRHelpers.ToBoolean(("Cosmetic Surgical Purpose").value as FHIR.boolean))
 
-define "CRL branch CriterionRef L129C7":
+define "CRL branch CriterionRef L130C7":
   "Functional Necessity Documented"
 
-define "Not CRL branch CriterionRef L129C7":
+define "Not CRL branch CriterionRef L130C7":
   not ("Functional Necessity Documented")
 
-define "CRL branch Ref L131C11":
+define "CRL branch Ref L132C11":
   FHIRHelpers.ToBoolean(("Upper Blepharoplasty Under Review").value as FHIR.boolean)
 
-define "Not CRL branch Ref L131C11":
+define "Not CRL branch Ref L132C11":
   not (FHIRHelpers.ToBoolean(("Upper Blepharoplasty Under Review").value as FHIR.boolean))
 
-define "CRL branch CriterionRef L133C15":
+define "CRL branch CriterionRef L134C15":
   "Upper Blepharoplasty Evidence"
 
-define "Not CRL branch CriterionRef L133C15":
+define "Not CRL branch CriterionRef L134C15":
   not ("Upper Blepharoplasty Evidence")
 
-define "CRL branch CriterionRef L138C15":
+define "CRL branch CriterionRef L139C15":
   "Blepharoptosis Repair Evidence"
 
-define "Not CRL branch CriterionRef L138C15":
+define "Not CRL branch CriterionRef L139C15":
   not ("Blepharoptosis Repair Evidence")

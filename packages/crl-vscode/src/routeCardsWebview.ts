@@ -62,7 +62,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     if (!label) return;
     const centered = label.getAttribute("text-anchor") === "middle";
     const x = Number(label.getAttribute("x"));
-    const available = centered ? width - 80 : width - (x - box.x) - 24;
+    const rightInset = node.querySelector(":scope > .flow-criterion-info") ? 76 : 24;
+    const available = centered ? width - 80 : width - (x - box.x) - rightInset;
     if (available <= 0) return;
     const original = Array.from(label.childNodes);
     const probe = svgEl("tspan", {}) as SVGTSpanElement;
@@ -308,7 +309,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         const rect=n.querySelector<SVGRectElement>(":scope > rect");if(rect)set(rect,"width",pos.width);
         for(const ring of Array.from(n.querySelectorAll<SVGRectElement>(":scope > .flow-ring > rect")))set(ring,"width",pos.width+(Number(ring.getAttribute("width"))-b.width));
         for(const text of Array.from(n.querySelectorAll<SVGTextElement>(":scope > text[text-anchor=middle]"))){set(text,"x",b.x+pos.width/2);for(const t of Array.from(text.querySelectorAll("tspan[x]")))set(t,"x",b.x+pos.width/2);}
-        for(const adornment of Array.from(n.querySelectorAll(":scope > .flow-pin,:scope > .flow-false-stop,:scope > .flow-allpass-badge,:scope > .flow-crit-verdict,:scope > .flow-startflag-badge")))set(adornment,"transform",`translate(${pos.width-b.width} 0)`);
+        for(const adornment of Array.from(n.querySelectorAll(":scope > .flow-pin,:scope > .flow-false-stop,:scope > .flow-allpass-badge,:scope > .flow-crit-verdict,:scope > .flow-startflag-badge,:scope > .flow-criterion-info")))set(adornment,"transform",`translate(${pos.width-b.width} 0)`);
         if(n.dataset.flowComponent!=="expanded")for(const badge of Array.from(n.querySelectorAll(":scope > .flow-flag-badge")))set(badge,"transform",`translate(${pos.width-b.width} 0)`);
         fitLabel(n, { x:b.x, y:b.y, height:b.height }, pos.width);
       }
@@ -355,13 +356,13 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const navigation=snapshot.navigation;
       const count=navigation?.current>0 && navigation.current<=navigation.total ? `${navigation.current} of ${navigation.total}` : '';
       const navCenter=pinBox.x+pinBox.width/2+(count?count.length*6+8:0)/2;
-      if(count){const progress=svgEl('text',{class:'route-leaf-nav-count',x:navCenter-64,y:pinBox.y-15,'text-anchor':'end','aria-label':`Result ${navigation.current} of ${navigation.total}`});progress.textContent=count;layer!.append(progress);}
+      if(count){const progress=svgEl('text',{class:'route-leaf-nav-count',x:navCenter-64,y:pinBox.y-15,'text-anchor':'end','aria-label':`Traversal ${navigation.current} of ${navigation.total}`});progress.textContent=count;layer!.append(progress);}
       const navLabel=svgEl('text',{class:'route-leaf-nav-label',x:navCenter,y:pinBox.y-15,'text-anchor':'middle'});navLabel.textContent='Next';layer!.append(navLabel);
       for (const [direction,enabled,offset] of [['previous',snapshot.navigation?.previous,-56],['next',snapshot.navigation?.next,32]] as const) {
         const x=navCenter+offset,y=pinBox.y-30;
-        const button=svgEl('g',{class:'route-branch-nav',role:'button',tabindex:enabled?0:-1,'aria-label':direction==='previous'?'Previous result':'Next result','aria-disabled':String(!enabled)});
+        const button=svgEl('g',{class:'route-branch-nav',role:'button',tabindex:enabled?0:-1,'aria-label':direction==='previous'?'Previous traversal':'Next traversal','aria-disabled':String(!enabled)});
         button.append(svgEl('rect',{x,y,width:24,height:22,rx:4}));
-        const title=svgEl('title',{});title.textContent=direction==='previous'?'Previous result — first route':'Next result — first route';button.append(title);
+        const title=svgEl('title',{});title.textContent=direction==='previous'?'Previous traversal':'Next traversal';button.append(title);
         button.append(svgEl('path',{d:direction==='previous'?`M${x+15} ${y+5} l-6 6 l6 6`:`M${x+9} ${y+5} l6 6 l-6 6`}));
         const go=()=>{if(enabled)api.postMessage({type:'navigatePinnedBranch',gen:generation(),token:snapshot.token,dir:direction});};
         button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();go();});
