@@ -1,0 +1,1 @@
+{"name": "synthetic-interview", "private": true, "version": "0.0.0", "crl": {"canonicalBase": "https://example.org/interview/", "libraries": ["src/crl/synthetic-interview.crl"], "status": "draft", "experimental": true, "date": "2026-01-01T00:00:00.000Z"}}

@@ -35,6 +35,8 @@
 
 /** Webview-safe URIs for the vendored LForms assets (media/lforms/). The host resolves these via
  *  `webview.asWebviewUri`; this module never constructs a path. */
+import { installBooleanAnswerClearControls } from "./lformsBooleanControls";
+
 export interface ApplyQuestionnaireAssets {
   /** `zone.min.js` — Zone.js. MUST load BEFORE `lhc-forms.js`. The concatenated bundle deliberately EXCLUDES
    *  it (see the vendor README), and without it Angular never bootstraps: `LForms.Util` still works, so
@@ -120,6 +122,7 @@ const BOOTSTRAP = `
   var ID = ${JSON.stringify(APPLY_Q_CONTAINER_ID)};
   var el = document.getElementById(ID);
   if (!el) return;
+  (${installBooleanAnswerClearControls.toString()})(el);
   // acquireVsCodeApi() may be called ONCE per webview and THROWS on a second call. The harness's reporter parks
   // its handle on this shared global; we reuse it if present.
   // ⚠ The cockpit shell does NOT follow this convention — it holds its handle in a closure local

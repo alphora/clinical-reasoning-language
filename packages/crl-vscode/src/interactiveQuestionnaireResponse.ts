@@ -27,11 +27,18 @@ export function retainInteractiveQuestionnaire(questionnaire: any, retained: any
 /** Runs unchanged in the webview and in unit tests. Only Q/QR structures are edited.
  * Serialized browser callers must pass retain explicitly; the default exists only in module scope. */
 export function pruneInteractiveResponse(questionnaire: any, previous: any, incoming: any,
-  retain = retainInteractiveQuestionnaire): { questionnaire: any; response: any; changed?: string; pruned: boolean } {
+  retain = retainInteractiveQuestionnaire, dependencies: Record<string, string[]> = {}): { questionnaire: any; response: any; changed?: string; pruned: boolean } {
   const copy = (x: any) => JSON.parse(JSON.stringify(x));
   const value = (item: any) => JSON.stringify((item?.answer ?? []).map((a: any) =>
     Object.fromEntries(Object.keys(a).filter(k => k.startsWith("value")).sort().map(k => [k, a[k]]))));
   let changed: string | undefined, pruned = false;
+  const changedProfiles = new Set<string>(), counts = new Map<string, number>();
+  const profile = (q: any): string | undefined => typeof q.definition === "string" ? q.definition.split("#")[0] : undefined;
+  const count = (items: any[], repeated = false) => { for (const q of items ?? []) {
+    const p = profile(q); if (p) counts.set(p, repeated || q.repeats ? Infinity : (counts.get(p) ?? 0) + 1);
+    count(q.item, repeated || !!q.repeats);
+  } };
+  count(questionnaire.item);
   const walk = (questions: any[], before: any[], after: any[], prefix: string): { items: any[]; definitions: any[] } => {
     const result: any[] = [], definitions: any[] = [];
     for (const q of questions ?? []) {
@@ -60,6 +67,8 @@ export function pruneInteractiveResponse(questionnaire: any, previous: any, inco
       // An empty response item is intentional: preserve a clear even when LForms omits it.
       if (q.type !== "group" && q.type !== "display" && value(p) !== value(n)) {
         changed ??= path;
+        const identity = profile(q);
+        if (identity && counts.get(identity) === 1) changedProfiles.add(identity);
         if (q.item?.length) pruned = true;
         delete definition.item;
       } else if (q.item?.length) {
@@ -85,7 +94,27 @@ export function pruneInteractiveResponse(questionnaire: any, previous: any, inco
   };
   const tree = walk(questionnaire.item, previous?.item, incoming.item, "");
   const response = { ...copy(previous ?? {}), ...copy(incoming), item: tree.items };
-  const kept = changed ? retain(questionnaire, { item: tree.definitions }) : copy(questionnaire);
+  let kept = changed ? retain(questionnaire, { item: tree.definitions }) : copy(questionnaire);
+  const removed = new Set<string>();
+  const removeTree = (q: any) => { removed.add(q.linkId); for (const child of q.item ?? []) removeTree(child); };
+  const collect = (items: any[]) => { for (const q of items ?? []) {
+    const p = profile(q);
+    if (p && counts.get(p) === 1 && (dependencies[p] ?? []).some(parent => changedProfiles.has(parent))) removeTree(q);
+    collect(q.item);
+  } };
+  collect(kept.item);
+  const references = (items: any[]): boolean => (items ?? []).some(q => !removed.has(q.linkId) &&
+    ((q.enableWhen ?? []).some((c: any) => removed.has(c.question)) || references(q.item) ||
+      (q.extension ?? []).some((e: any) => e.url === "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression")));
+  // Optional flat pruning must never break literal references or an opaque expression.
+  if (removed.size && !references(kept.item)) {
+    const trim = (items: any[]): any[] => (items ?? []).filter(i => !removed.has(i.linkId)).map(i => {
+      const x = copy(i); if (x.item) x.item = trim(x.item);
+      if (x.answer) for (const a of x.answer) if (a.item) a.item = trim(a.item);
+      return x;
+    });
+    kept = retain(kept, { item: trim(kept.item) }); response.item = trim(response.item); pruned = true;
+  }
   return { questionnaire: kept, response, changed, pruned };
 }
 

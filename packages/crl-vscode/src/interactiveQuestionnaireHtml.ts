@@ -1,8 +1,9 @@
 import { pruneInteractiveResponse, questionnaireWithoutDefaults, retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
+import { installBooleanAnswerClearControls } from "./lformsBooleanControls";
 
 // Self-contained browser function; passed explicit dependencies so the tested functions are the shipped ones.
 export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveResponse, withoutDefaults: typeof questionnaireWithoutDefaults,
-  retain: typeof retainInteractiveQuestionnaire, inspect: (q: unknown) => string[]) {
+  retain: typeof retainInteractiveQuestionnaire, inspect: (q: unknown) => string[], booleanControls: typeof installBooleanAnswerClearControls) {
   const w = globalThis as any, doc = w.document, api = w.acquireVsCodeApi();
   const select = doc.getElementById("codeset"), start = doc.getElementById("start"), next = doc.getElementById("continue");
   const reset = doc.getElementById("reset"), cancel = doc.getElementById("cancel"), status = doc.getElementById("status");
@@ -19,6 +20,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   let token = 0, render = 0, busy = false, ready = false, blocked = false, q: any, response: any, snapshot: any, subject: string;
   let transitioning = false, hasResult = false;
   let observing = false, editError = false;
+  let dependencies: Record<string, string[]> = {};
   const send = (type: string, extra = {}) => api.postMessage({ type, token, ...extra });
   const controls = () => {
     start.disabled = busy || !select.value || hasResult; next.disabled = busy || !ready || !q || blocked || editError;
@@ -53,7 +55,8 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
       response = { ...response, ...snapshot, item: response?.item ?? snapshot.item };
       ready = true; observing = true; controls();
       if (focus) {
-        const target = doc.getElementById(focus.id);
+        const element = doc.getElementById(focus.id);
+        const target = element?.matches('label') ? element.querySelector('input[type="radio"]') : element;
         if (target && mount.contains(target)) {
           target.focus({ preventScroll: true });
           if (focus.start !== null && typeof target.setSelectionRange === "function")
@@ -67,7 +70,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   function observe() {
     if (!observing || busy || !ready) return;
     try {
-      const current = exported(), delta = prune(q, snapshot, current, retain);
+      const current = exported(), delta = prune(q, snapshot, current, retain, dependencies);
       const unsupported = inspect(delta.questionnaire);
       if (editError) status.textContent = blocked
         ? "This form cannot be submitted because the renderer does not support: " + unsupported.join("; ")
@@ -83,18 +86,21 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
       results.hidden = true; evaluationWarnings = []; showWarnings();
       status.textContent = "Answers changed. Continue to re-evaluate.";
       if (delta.pruned) {
-        status.textContent = "Nested follow-up questions and answers removed. Continue to re-evaluate.";
+        status.textContent = "Dependent questions and answers removed. Continue to re-evaluate.";
         const active = doc.activeElement;
-        const focus = active?.id && mount.contains(active) ? { id: active.id, start: active.selectionStart, end: active.selectionEnd, direction: active.selectionDirection } : undefined;
+        const id = active?.id || active?.closest('label')?.id;
+        const focus = id && mount.contains(active) ? { id, start: active.selectionStart ?? null, end: active.selectionEnd ?? null, direction: active.selectionDirection } : undefined;
         void mountForm(true, focus);
       }
       if (blocked) status.textContent = "This form cannot be submitted because the renderer does not support: " + unsupported.join("; ");
       controls();
     } catch (e) { editError = true; error(e); controls(); }
   }
-  // Native events reach this listener after Angular's target listener. Do not rely on onFormChange's 360 ms debounce.
+  // Native input/change handle other widgets. ng-zorro Booleans cancel those events;
+  // the clear adapter explicitly observes clears, and onFormChange handles selections.
   mount.addEventListener("input", observe);
   mount.addEventListener("change", observe);
+  booleanControls(mount, observe);
   next.addEventListener("click", () => {
     observe();
     if (!ready || busy || blocked || editError) return;
@@ -113,6 +119,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   w.addEventListener("message", (event: any) => {
     const m = event.data;
     if (m.type === "initial") {
+      dependencies = m.dependencies ?? {};
       definitionWarnings = m.warnings ?? []; warnings.open = false;
       token = m.token; busy = false; transitioning = false; clear(); select.replaceChildren();
       for (const state of m.states) { const o = doc.createElement("option"); o.value = state.id; o.textContent = state.label; select.appendChild(o); }
@@ -132,7 +139,9 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
       outcomes.replaceChildren();
       for (const activity of m.activities) { const p = doc.createElement("p"); p.textContent = activity; outcomes.appendChild(p); }
       results.hidden = m.activities.length === 0;
-      status.textContent = m.activities.length ? "Evaluation complete. You can change answers and re-evaluate." : q ? "Answer the questions, then Continue." : "The engine returned no questionnaire or activities.";
+      status.textContent = m.activities.length
+        ? q ? "Evaluation complete. You can change answers and re-evaluate." : "Evaluation complete. Select Reset to start again."
+        : q ? "Answer the questions, then Continue." : "The engine returned no questionnaire or activities.";
       evaluationWarnings = m.warnings ?? []; showWarnings();
       blocked = !!m.unsupported?.length;
       if (blocked) status.textContent = "This form cannot be submitted because the renderer does not support: " + m.unsupported.join("; ");
@@ -156,5 +165,5 @@ nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}button,select{padding
 <button id="start">Start</button><button id="continue" disabled>Continue / Re-evaluate</button><button id="reset">Reset</button><button id="cancel" disabled>Cancel</button>
 </nav><p id="status" role="status">Loading initial states…</p><details id="warnings" hidden><summary id="warning-summary">Warnings</summary><ul id="warning-list"></ul></details><div id="form"></div><section id="results" aria-labelledby="result-heading" aria-live="polite" hidden><h2 id="result-heading">Result</h2><div id="outcomes"></div></section>
 <script nonce="${nonce}" src="${asset("zone.min.js")}"></script><script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script><script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>
-<script nonce="${nonce}">(${installInteractiveQuestionnaire.toString()})(${pruneInteractiveResponse.toString()},${questionnaireWithoutDefaults.toString()},${retainInteractiveQuestionnaire.toString()},${inspect.toString()});</script></body></html>`;
+<script nonce="${nonce}">(${installInteractiveQuestionnaire.toString()})(${pruneInteractiveResponse.toString()},${questionnaireWithoutDefaults.toString()},${retainInteractiveQuestionnaire.toString()},${inspect.toString()},${installBooleanAnswerClearControls.toString()});</script></body></html>`;
 }

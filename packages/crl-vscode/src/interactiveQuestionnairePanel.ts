@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { InteractiveSession, nativeInteractiveRunner, prepareInteractivePolicy, type NativeApply } from "./interactiveQuestionnaire";
 import { interactiveQuestionnaireHtml } from "./interactiveQuestionnaireHtml";
 import { nextQuestionnaireColumn } from "./branchQuestionnairePanel";
+import { interactiveQuestionnaireDependencies } from "./interactiveQuestionnaireDependencies";
 
 export function createInteractiveQuestionnairePanel(context: vscode.ExtensionContext, inspectQuestionnaire: (q: unknown) => string[] = () => []) {
   let current: vscode.WebviewPanel | undefined, owner: string | undefined, session: InteractiveSession | undefined;
@@ -37,7 +38,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
           session = new InteractiveSession(prepared.definitions, prepared.planId, nativeInteractiveRunner(adapter.applySession));
           if (selected) session.reset(selected);
           post({ type: "initial", states: states.map(({ id, label }) => ({ id, label })), subject: selected?.subject,
-            warnings: prepared.warnings });
+            warnings: prepared.warnings, dependencies: interactiveQuestionnaireDependencies(prepared.definitions, prepared.planId) });
         } catch (e) { post({ type: "initial", states: [], error: String(e) }); }
       };
       const listener = panel.webview.onDidReceiveMessage(async message => {

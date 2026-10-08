@@ -61,14 +61,17 @@ const candidate = (code: string | undefined, key = "input") => ({ key, contribut
   resourceType: "Observation", id: key, status: "final", ...(code === undefined ? {} : { valueCodeableConcept: { coding: [{ system: "urn:answers", code }] } }),
 } });
 
-function questionProfiles(resources: ReturnType<typeof emitFhirDefFromPath>["resources"]): string[] {
+// REFACTOR:grounded - ordinary gathering and conditional retention are different inputs.
+function questionProfiles(resources: ReturnType<typeof emitFhirDefFromPath>["resources"], purpose: "ordinary" | "retained" = "ordinary"): string[] {
   const profiles: string[] = [];
-  const visit = (value: unknown): void => {
+  const visit = (value: unknown, retained = false): void => {
     if (!value || typeof value !== "object") return;
     const node = value as Record<string, unknown>;
-    if (Array.isArray(node.input)) for (const input of node.input) profiles.push(...(input.profile ?? []));
+    const isRetained = retained || (typeof node.title === "string" && node.title.startsWith("Retain available "));
+    if (Array.isArray(node.input) && isRetained === (purpose === "retained"))
+      for (const input of node.input) profiles.push(...(input.profile ?? []));
     for (const child of Object.values(node)) {
-      if (Array.isArray(child)) child.forEach(visit); else visit(child);
+      if (Array.isArray(child)) child.forEach(item => visit(item, isRetained)); else visit(child, isRetained);
     }
   };
   for (const resource of resources) if (resource.resourceType === "PlanDefinition") visit(resource.resource);
@@ -91,6 +94,8 @@ describe("aggregate selected-answer membership", () => {
     const fhir = emitFhirDefFromPath(path); expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
     expect(fhir.resources.some(r => r.resourceType === "StructureDefinition" && r.sourceName === "A")).toBe(true);
     expect(questionProfiles(fhir.resources)).toEqual([]);
+    const aProfile = fhir.resources.find(r => r.resourceType === "StructureDefinition" && r.sourceName === "A")!;
+    expect(questionProfiles(fhir.resources, "retained")).toEqual([aProfile.resource.url]);
   });
   it("preserves singleton clear metadata and rejects invalid or contradictory available answers", () => {
     const p = program(source.replace('any of "A" and "B"', 'any available value of "A"'));
@@ -120,6 +125,7 @@ describe("aggregate selected-answer membership", () => {
     const profiles = fhir.resources.filter(r => r.resourceType === "StructureDefinition").map(r => r.resource.url).sort();
     expect(profiles).toHaveLength(2);
     expect(questionProfiles(fhir.resources)).toEqual(operation === "any of" ? profiles : []);
+    expect(questionProfiles(fhir.resources, "retained")).toEqual(operation === "any of" ? [] : profiles);
   });
   it("keeps a coded available aggregate's own answer without asking for its operands", () => {
     const text = source.replace("any of", "any available value of").replace('concept "Flagged":', 'concept "Flagged":\n- code is `flagged-answer`.');
@@ -129,6 +135,7 @@ describe("aggregate selected-answer membership", () => {
     const own = fhir.resources.find(r => r.resourceType === "StructureDefinition" && r.sourceName === "Flagged")!;
     expect(own).toBeDefined();
     expect(questionProfiles(fhir.resources)).toEqual([own.resource.url]);
+    expect(questionProfiles(fhir.resources, "retained")).toEqual(fhir.resources.filter(r => r.resourceType === "StructureDefinition" && r.sourceName !== "Flagged").map(r => r.resource.url).sort());
   });
   it("still requests an operand reached independently of an available-value check", () => {
     const text = source.replace("any of", "any available value of")
@@ -137,6 +144,7 @@ describe("aggregate selected-answer membership", () => {
     expect(fhir.success, JSON.stringify(fhir.errors)).toBe(true);
     const a = fhir.resources.find(r => r.resourceType === "StructureDefinition" && r.sourceName === "A")!;
     expect(questionProfiles(fhir.resources)).toEqual([a.resource.url]);
+    expect(questionProfiles(fhir.resources, "retained")).toEqual(fhir.resources.filter(r => r.resourceType === "StructureDefinition").map(r => r.resource.url).sort());
   });
   it("validates and emits terminology-only refs through the full public path without a question profile", () => {
     const path = fixture();
@@ -226,6 +234,7 @@ describe("aggregate selected-answer membership", () => {
     const profiles = fhir.resources.filter(r => r.resourceType === "StructureDefinition").map(r => r.resource.url).sort();
     expect(profiles).toHaveLength(2);
     expect(questionProfiles(fhir.resources)).toEqual(operation === "any of" ? profiles : []);
+    expect(questionProfiles(fhir.resources, "retained")).toEqual(operation === "any of" ? [] : profiles);
     const cases = join(dirname(path), "cases.cel");
     writeFileSync(cases, `library "Cases". covers "Aggregate".
 fact "Patient": - name is "Synthetic". - birth date is "1970-01-01". - defined by "Patient".

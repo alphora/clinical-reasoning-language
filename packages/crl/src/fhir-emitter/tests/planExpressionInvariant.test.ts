@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { applyPlanExpressionInvariant } from "../planExpressionInvariant";
 import type { EmittedResource } from "../types";
 import type { PerLibraryEmit } from "../../imports/emit";
+import { generatedRetentionExpression } from "../generatedRetentionExpression";
 
 const resource = (resourceType: string, body: Record<string, unknown>): EmittedResource =>
   ({ resourceType, relativePath: resourceType + "/test.json", resource: { resourceType, ...body } }) as EmittedResource;
@@ -15,6 +16,17 @@ const pd = (language: string, expression: string, reference?: string) => resourc
 });
 
 describe("PlanDefinition expression ownership", () => {
+  it("checks generated transport predicates against their registered text, owner and condition names", () => {
+    const expr = generatedRetentionExpression('if "Gate" then true else false', "Owner", ["Gate"]);
+    const helper = resource("PlanDefinition", { library: ["https://test/Library/Owner"], action: [{ condition: [{ expression: expr }] }] });
+    expect(applyPlanExpressionInvariant([lib("Owner"),helper],[manifest("Owner",["Gate"])])).toEqual([]);
+    expect(applyPlanExpressionInvariant([lib("Owner"),helper],[manifest("Owner",[])])[0].kind).toBe("dangling-plan-expression-define");
+    helper.resource.library = ["https://test/Library/Other"];
+    expect(applyPlanExpressionInvariant([lib("Other"),helper],[manifest("Other",["Gate"])])[0].kind).toBe("dangling-plan-expression-define");
+    expr.expression = "true";
+    expect(applyPlanExpressionInvariant([lib("Other"),helper],[])[0].kind).toBe("plan-expression-not-identifier");
+    expect(applyPlanExpressionInvariant([pd("text/cql", "true")],[])[0].kind).toBe("plan-expression-not-identifier");
+  });
   it("accepts named conditions in the bound owner", () => {
     expect(applyPlanExpressionInvariant([lib("Owner"), pd("text/cql-identifier", "Allowed")],
       [manifest("Owner", ["Allowed"])])).toEqual([]);

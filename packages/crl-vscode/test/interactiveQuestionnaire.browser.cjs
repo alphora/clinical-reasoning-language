@@ -15,7 +15,7 @@ const load = (entry) => {
       const m=new Module(file,module);m.filename=file;m.paths=Module._nodeModulePaths(path.dirname(file));
       const stub=new Proxy(function(){},{get:()=>stub,apply:()=>stub,construct:()=>stub}),req=m.require.bind(m);
       m.require=id=>id==='vscode'?Object.fromEntries([...source.matchAll(/vscode[0-9]*\.([A-Za-z0-9_]+)/g)].map(match=>[match[1],stub])):req(id);
-      m._compile(source+'\nmodule.exports.__iq={interactiveQuestionnaireHtml,InteractiveSession,nativeInteractiveRunner,prepareInteractivePolicy,unrenderableQuestionnaireFeatures};',file);
+      m._compile(source+'\nmodule.exports.__iq={interactiveQuestionnaireHtml,InteractiveSession,nativeInteractiveRunner,prepareInteractivePolicy,unrenderableQuestionnaireFeatures,interactiveQuestionnaireDependencies,interactiveRequest};',file);
       installedRuntime=m.exports.__iq;
       for(const [name,value] of Object.entries(installedRuntime)) assert.equal(typeof value,"function",`Installed binding ${name} must be callable`);
     }
@@ -236,10 +236,16 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
   assert.equal(await evaluate(`document.getElementById('continue').disabled`),true);
   assert.match(await evaluate(`document.getElementById('status').textContent`),/renderer does not support.*preferredTerminologyServer/);
   fs.writeFileSync(path.join(root,'panel.png'),Buffer.from((await rpc('Page.captureScreenshot',{format:'png'})).data,'base64'));
+  await post({type:'result',token:4,activities:['Complete'],subject:'Patient/p'});
+  await until(()=>evaluate(`document.getElementById('status').textContent==='Evaluation complete. Select Reset to start again.'`),'native no-form completion');
+  assert.equal(await evaluate(`document.getElementById('form').childElementCount`),0,'no prior form is reconstructed');
+  assert.equal(await evaluate(`document.getElementById('continue').disabled`),true,'no form to resubmit');
+  assert.equal(await evaluate(`document.getElementById('reset').disabled`),false,'Reset remains available');
   console.log(JSON.stringify({browser:'passed',fastChangeMs,pruned:true,clear:true,errorRetention:true,staleReplyIgnored:true,selectorAck:true,keyboardFocus:true}));
   if(process.env.CRL_IQ_NATIVE){
     const native=load('packages/crl-vscode/src/interactiveQuestionnaire.ts');
     const {applySession}=require(installed?path.join(installed,'dist/apply-session.js'):path.resolve('packages/crl-vscode/dist/apply-session.js'));
+    if(!process.env.CRL_IQ_BLEPH_ONLY){
     const prepared=native.prepareInteractivePolicy(path.resolve('packages/crl-vscode/src/testdata/interactive-questionnaire/src/cel/mv/cases.cel'));
     const initial=prepared.initialStates[0];
     const session=new native.InteractiveSession(prepared.definitions,prepared.planId,native.nativeInteractiveRunner(applySession,root));session.reset(initial);
@@ -275,5 +281,50 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
     assert.ok(!flatten(result.response?.item).some(i=>(i.answer||[]).some(a=>a.valueString==='first')),'cleared first answer stays empty');
     assert.equal(result.activities.length,0);
     console.log('Native browser-exported pair: completion, sibling-preserving change-back, and explicit clear: passed');
+    }
+    // The maintained Bleph model is unchanged. Verify flat downstream pruning from
+    // its real PlanDefinition ancestry, then send an unpruned pair independently.
+    const blephRoot=path.resolve('examples/bleph-medical-validation');
+    const bp=native.prepareInteractivePolicy(path.join(blephRoot,'src/cel/mv/medical-validation.cel'));
+    const {interactiveQuestionnaireDependencies}=load('packages/crl-vscode/src/interactiveQuestionnaireDependencies.ts');
+    const dependencies=interactiveQuestionnaireDependencies(bp.definitions,bp.planId);
+    const manifest=JSON.parse(fs.readFileSync(path.join(blephRoot,'tests/results/questionnaire-manifest-mv.json')));
+    const artifact=type=>JSON.parse(fs.readFileSync(path.join(blephRoot,manifest.cases[0].artifacts.find(a=>a.resourceType===type).path)));
+    let bq=artifact('Questionnaire'),bqr=artifact('QuestionnaireResponse');
+    bqr.authored=new Date().toISOString();
+    const bi={...bp.initialStates[0],subject:bqr.subject.reference};
+    bi.bundle=structuredClone(bi.bundle);
+    for(const e of bi.bundle.entry){if(e.resource.resourceType==='Patient')e.resource.id=bi.subject.split('/').pop();else if(e.resource.subject)e.resource.subject.reference=bi.subject;}
+    const rawBleph=native.nativeInteractiveRunner(applySession,root);
+    const fresh=await rawBleph(native.interactiveRequest(bp.definitions,bp.planId,bi,bq,bqr),new AbortController().signal);
+    assert.deepEqual(fresh.activities,['certify.Met']);
+    bq=fresh.questionnaire;bqr=fresh.response;
+    const bs=new native.InteractiveSession(bp.definitions,bp.planId,rawBleph);bs.reset(bi);bs.result=fresh;
+    await post({type:'initial',token:10,states:[{id:bi.id,label:'Bleph'}],subject:bi.subject,dependencies});
+    await post({type:'result',token:10,questionnaire:bq,response:bqr,activities:['Met'],subject:bi.subject});await mounted();
+    assert.ok(flatten(bq.item).length>3);
+    await evaluate(`document.querySelector('#form lhc-item-boolean label[id$="|true"]').click()`);
+    await until(()=>evaluate(`document.querySelectorAll('#form input[type=radio]').length===3`),'immediate Cosmetic pruning');await mounted();
+    assert.equal(await evaluate(`document.querySelectorAll('#form input[type=radio]').length`),3,'only Cosmetic Boolean control remains before Continue');
+    await evaluate(`document.getElementById('continue').click()`);
+    const pruned=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
+    assert.equal(flatten(pruned.questionnaire.item).length,1,'immediate current Q contains only Cosmetic');
+    assert.equal(flatten(pruned.response.item).length,1,'immediate current QR contains only Cosmetic');
+    const pr=await bs.evaluate(pruned.response,pruned.questionnaire);assert.deepEqual(pr.activities,['not-certify.Unmet']);
+    // Another conforming client can submit all old downstream answers: native apply
+    // still excludes them when Cosmetic changes, without client pruning or merging.
+    const unpruned=structuredClone(bqr);unpruned.authored=new Date().toISOString();
+    unpruned.item[0].answer=[{valueBoolean:true}];
+    const ur=await rawBleph(native.interactiveRequest(bp.definitions,bp.planId,bi,bq,unpruned),new AbortController().signal);assert.deepEqual(ur.activities,pr.activities);assert.equal(flatten(ur.questionnaire.item).length,1);
+    await post({type:'result',token:10,...pr,subject:bi.subject});await mounted();
+    await evaluate(`document.querySelector('#form lhc-item-boolean label[id$="|false"]').click()`);await mounted();
+    await evaluate(`document.getElementById('continue').click()`);
+    const reopen=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
+    const reopened=await bs.evaluate(reopen.response,reopen.questionnaire);
+    assert.deepEqual(reopened.activities,[]);assert.equal(flatten(reopened.questionnaire.item).length,3);
+    assert.ok(flatten(reopened.response.item).slice(1).every(i=>!i.answer?.length),'downstream answers restart blank');
+    fs.writeFileSync(path.join(root,'bleph-pruning.json'),JSON.stringify({pruned,pr,unprunedResult:ur,reopened,dependencies},null,2));
+    console.log('Maintained Bleph: immediate Q/QR pruning, unpruned native equivalence, blank reopening: passed');
+
   }
 })().catch(async e=>{console.error(e);if(ws)try{console.error(await evaluate(`({text:document.body.innerText,html:document.getElementById('form').innerHTML.slice(0,1200),sent:window.sent})`));}catch{}process.exitCode=1}).finally(async()=>{if(ws)try{await rpc('Browser.close')}catch{};ws?.close();child?.kill();server?.close();});

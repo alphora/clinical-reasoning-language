@@ -80,6 +80,7 @@ import {
   ambiguousPolicyEntrypoint,
   type ActivityResolver,
   type CaseFeatureInputResolver,
+  type CaseFeatureRetentionResolver,
   type ConceptResolver,
   type DecisionResolver,
 } from "./decision";
@@ -432,7 +433,7 @@ export interface CaseFeatureCollection {
 
 /** Gather admitted answer slots by declaration identity. Definitions retain the complete
  * dependency closure; question inputs follow only dependencies the producer can request. */
-function publicationCaseFeatures(program: PublicationProgram, source: string, ref: ReferenceName, purpose: "definitions" | "questions"): PublicationDescriptor[] {
+function publicationCaseFeatures(program: PublicationProgram, source: string, ref: ReferenceName, purpose: "definitions" | "questions" | "dependencies"): PublicationDescriptor[] {
   const seen = new Set<string>();
   const result: PublicationDescriptor[] = [];
   const visit = (owner: string, reference: ReferenceName): void => {
@@ -441,7 +442,7 @@ function publicationCaseFeatures(program: PublicationProgram, source: string, re
     seen.add(declaration.identity.key);
     const descriptor = program.get(declaration.identity.key);
     if (descriptor !== undefined) {
-      if (hasLocalPublicationContribution(descriptor)) result.push(descriptor);
+      if (purpose === "dependencies" || hasLocalPublicationContribution(descriptor)) result.push(descriptor);
       // Available-value membership reads the supplied set without requesting absent answers.
       // Keep its own coded answer above and its full definition/CQL closure in the other walk.
       if (purpose === "questions" && descriptor.producer?.kind === "anyMembership" && descriptor.producer.availableValuesOnly) return;
@@ -1943,6 +1944,28 @@ export function emitFhirDefClosure(
       return [...legacy, ...publicationInputs];
     };
 
+    const caseFeatureRetentionResolver: CaseFeatureRetentionResolver = (ref) => {
+      const answers = new Map<string, PublicationDescriptor>();
+      for (const consumer of publicationCaseFeatures(prepared.publications, lib.filePath, ref, "dependencies")) {
+        if (consumer.producer?.kind !== "anyMembership" || !consumer.producer.availableValuesOnly) continue;
+        for (const operand of publicationProducerOperands(consumer.producer)) {
+          for (const answer of publicationCaseFeatures(prepared.publications, operand.sourceIdentity, operand.conceptName, "definitions")) {
+            if (answer.profileUrl && answer.localCode) answers.set(answer.identity.key, answer);
+          }
+        }
+      }
+      const literal = (s: string) => `'${s.replace(/'/g, "\\'")}'`;
+      return [...answers.values()].map(answer => {
+        gatheredPublications.set(answer.identity.key, answer);
+        // Presence concerns an asserted answer record, including an explicit clear.
+        // Do not select or calculate unused data merely to preserve its wire slot.
+        const code = answer.localCode!;
+        return { name: answer.title, canonical: answer.profileUrl!, resourceType: answer.resourceType,
+          presentationOwner: presentationCatalogs.get(answer.identity.sourceIdentity),
+          presenceExpression: `exists ([Observation] O where exists (O.code.coding C where C.system.value = ${literal(code.system)} and C.code.value = ${literal(code.code)}))` };
+      });
+    };
+
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
     // loop suffices.
@@ -1988,6 +2011,7 @@ export function emitFhirDefClosure(
           return target && entry ? { ...target, canonical: libraryCanonicalUrl(metadata, identityForEntry(entry)) } : undefined;
         },
         presentations,
+        caseFeatureRetentionResolver,
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);

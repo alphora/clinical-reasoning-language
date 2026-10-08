@@ -5,10 +5,31 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { resolveCelSuite, findPolicySrc, emitCrlTwoLane, coerceFlag, isValidFlagId, runCel } from '@smile-digital-health/crl';
+import { resolveCelSuite, resolveCelImports, findPolicySrc, emitCrlTwoLane, coerceFlag, isValidFlagId, runCel } from '@smile-digital-health/crl';
+import { discoverInitialStates, prepareInteractivePolicy, validateInitialBundle } from './interactiveQuestionnaire.ts';
 
 const root = resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const example = join(root, 'examples/bleph-medical-validation');
+
+test('the Bleph interactive starter is CEL-backed, answer-free and selectable from the MV entry', () => {
+  const fixture = join(example, 'tests/interactive-questionnaire');
+  execFileSync(process.execPath, [join(fixture, 'generate-request.cjs'), '--check'], { cwd: root });
+  const states = discoverInitialStates(example);
+  assert.equal(states.length, 1);
+  assert.equal(states[0].id, 'request-1');
+  assert.match(states[0].label, /15822/);
+  assert.equal(validateInitialBundle(states[0].bundle), states[0].subject);
+  assert.deepEqual(states[0].bundle.entry.map(e => e.resource.resourceType).sort(), ['Patient', 'ServiceRequest']);
+  const prepared = prepareInteractivePolicy(join(example, 'src/cel/mv/medical-validation.cel'));
+  assert.deepEqual(prepared.initialStates, states);
+  assert.equal(prepared.planId, 'l34194-bleph-example');
+  const initial = runCel(resolveCelImports(join(fixture, 'requests.cel')));
+  assert.equal(initial.success, true, JSON.stringify(initial.errors));
+  assert.equal(initial.runs.length, 1);
+  assert.equal(initial.runs[0].status, 'pass');
+  assert.equal(initial.runs[0].expected.pause, true);
+  assert.deepEqual(initial.runs[0].produced, []);
+});
 
 test('the Bleph MV example is discoverable and its native forms match its MV cases', () => {
   const mv = resolveCelSuite(example, 'mv');

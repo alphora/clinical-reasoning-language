@@ -1,3 +1,73 @@
+## Native wire-state, passive answer retention and Boolean controls - schema 2.28
+
+Baseline completed audit: `58d2c714411540ce8149c8896012501da63eb2d5`, kit2.27/hash `4a2bb92987826bdb3654046b4922fbacec50fb9d9072ddcb5ba8142ef28b0cf8`. Working base `d6cb7dfedc5315e89af80d0c1bce8beb035354a7`. Target is pending reviewed content commit; uncommitted scope is not an audited revision. Schema2.28/hash `105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652`. Prior stamp remains until verification/review and an existing target SHA.
+
+Operator intent: assessment state travels in the native Q/QR; clients must not reconstruct omitted answers from history. Optional current-form pruning improves MV editing, while an unpruned submission remains valid. An earlier excluded or unanswered ancestor removes downstream state; reopening asks again with blank answers. Passive available-value computations preserve currently supplied answer/clear state after preceding route prerequisites are established, without gathering absent alternatives. Their own unresolved compound condition is not an earlier prerequisite. Retained unused supplied uncertainty continues to prevent otherwise-Met when enumerated by the authored check. Scoped question wording belongs to the ordinary gathered occurrence.
+
+Kit updated: `interactive-questionnaire` removes the rejected client restoration contract, teaches returned-pair-only qualification, standard conditional retention and conservative optional current-form pruning. `selected-answer-aggregate` teaches the same passive dependency distinction and wire state. No customer outcome/clinical policy guidance is introduced. Mechanical full-content comparison with released2.27 found only rules, schema/hash and audit metadata changed; all22 reference artifacts, examples, concept model, allowlist, navigation, disposition and other sections remain byte-equivalent. Whole-kit canonical identity pins are updated in core and both MCP delivery suites.
+
+Owning evidence and dispositions:
+
+- `closureOrchestrator.ts`, `decision.ts`, `generatedRetentionExpression.ts`, `planExpressionInvariant.ts`: Kit updated. Discover uncoded passive producers through full dependency closure; retain coded supplied operands via conditional standard PlanDefinition inputs. The raw asserted presence predicate includes valueless clears without selecting clinical data. Preceding established guards constrain scope; deduplicate profiles and preserve ordinary scoped input wording. Authored guards remain owned named public CQL expressions. Compiler transport expressions have private exact text/owner/referenced-public-name provenance; unregistered, mutated, wrong-owner and unknown-name inline expressions are rejected. No custom wire extension or history cache. Imported/computed traversal was inspected; native generalization beyond the recorded simple fixtures is not claimed.
+- `passiveRetention.test.ts`, `planExpressionInvariant.test.ts`: Kit updated. Three structural fixture tests (progressive/nested and scoped Criterion wording) plus seven ownership/invariant tests observe profile inventories, standard conditional presence, no question for passive consumers, ordinary named clinical guards and refusal boundaries. Scoped wording is emitter evidence only, not a rendered/native wording claim.
+- `publicationAnyMembership.test.ts`: Kit updated. Seven owning input-inventory rows previously counted every conditional PD input as a requested question. All old ordinary expected inventories are preserved; additional explicit conditional-retention inventories cover singleton, two operands, coded aggregate, independent ordinary use and imported operands. Clinical Boolean/missing/error expectations are unchanged. Revised48-test emitter/aggregate/invariant run passed. Imported unit evidence does not prove imported native execution.
+- `test/acceptance/passive-retention/{progressive,nested}` and `scripts/native-acceptance/passive-retention.cjs`: Kit updated. Actual reusable synthetic G/A/B four-choice fixtures with package canonical/request configuration. Twenty-one raw native returned-pair-only calls passed using engine8bf5d9e7/driver84392646, candidate6.4.35. They cover answer/change/clear, unchanged resubmit, unused retained uncertainty, prior exclusion/reopening blank, supplied-later shortcut without gathering missing A, excluded and unanswered parent with conflicting later records, and a clear overriding an older source record over resubmit. Evidence E:/crl-scratch/passive-retention-stable/summary.json and each raw request/result. Earlier runs interrupted by build-time driver removal remain failures, not semantic passes; stable copied runtime avoided that overlap. No client merge, client prune or extracted-answer cache used.
+- `interactiveQuestionnaire.ts`, deleted `interactiveQuestionnaireRetention.ts`/test: Kit updated. Adopt the exact successful native pair, including no-form completion; rejected historical reconstruction deleted. `interactiveQuestionnaireWireState.test.mjs` checks omitted state is absent on the next wire request, metadata/values/IDs, immutable snapshots and no-form handling. Prior failure/cancel behavior remains.
+- `interactiveQuestionnaireDependencies.ts`/test and `interactiveQuestionnaireResponse.ts`, panel/HTML callers: Kit updated. Derive ancestors and ordered preceding guards from the complete resolved PD graph; grouped peers remain peers, multiple occurrences intersect, repeats/ambiguous profiles are protected. Missing/ambiguous/duplicate/cyclic delegates disable inference. Optional pruning defers for retained literal or opaque SDC enablement references; removal includes every descendant before reference checking. Current Q and QR are trimmed together, with no client history. Structural tests cover these fallbacks, multiple edits and maintained Bleph Cosmetic ancestry.
+- `lformsBooleanControls.ts`/test, Boolean browser harness, pane/cockpit/interactive adapters: Existing language guidance sufficient. UI-only presentation replaces visible Not Answered radio with accessible Clear answer, calling LForms' native null handler; data/Questionnaire semantics are unchanged. Tests cover editable/read-only, selection and keyboard behavior, vendor-shape fallback, idempotent disposal/restoration and queued refresh after disposal. Source real bundled Edge qualification passed in the earlier slice; installed qualification is a separate release gate.
+- `interactiveQuestionnaire.browser.cjs`: Kit updated. Actual bundled LForms in Edge; generic peer/parent/clear/error/no-form controls and exact native-pair adoption. Maintained Bleph source-built r3 verifies immediate Cosmetic edit trims both Q/QR before Continue, raw unpruned submission returns equivalent Unmet, and returning No reopens blank clinical answers. E:/crl-scratch/bleph-current-pruning-r3/bleph-pruning.json. Prior harness failures were corrected, retained and not credited. Bleph authored CRL/CEL/clinical CQL/FHIR/results unchanged by this slice.
+- Bleph README, request CEL/bundle, generate-request.cjs and `mvWorkspaceFixture.test.mjs`: Existing guidance sufficient. Separate interactive starter request is generated from the existing request declaration and verified read-only by default. No new clinical branch, answer, outcome or validation case.
+- package manifests/lockfile: Not author-facing; lockstep6.4.35 release metadata. Previous audit.json/ledger stamp from the baseline interval inspected as metadata-only. Current audit metadata is not automatically advanced by builds.
+- `docs/interactive-questionnaire.md`: Kit updated; same current native/optional-prune contract and qualification limits. Historical restoration and known shortcut-loss guidance corrected in place after the native fix.
+
+Complete changed-path inventory (baseline to working source, including untracked source; grouped dispositions above cover every path):
+
+- `docs/interactive-questionnaire.md`
+- `examples/bleph-medical-validation/README.md`
+- `examples/bleph-medical-validation/tests/interactive-questionnaire/generate-request.cjs`
+- `examples/bleph-medical-validation/tests/interactive-questionnaire/request-1/request-bundle.json`
+- `examples/bleph-medical-validation/tests/interactive-questionnaire/requests.cel`
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/src/applyQuestionnairePaneHtml.ts`
+- `packages/crl-vscode/src/correspondenceCockpit.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaire.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaireDependencies.test.mjs`
+- `packages/crl-vscode/src/interactiveQuestionnaireDependencies.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaireHtml.ts`
+- `packages/crl-vscode/src/interactiveQuestionnairePanel.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaireResponse.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaireRetention.test.mjs`
+- `packages/crl-vscode/src/interactiveQuestionnaireRetention.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaireWireState.test.mjs`
+- `packages/crl-vscode/src/lformsBooleanControls.test.mjs`
+- `packages/crl-vscode/src/lformsBooleanControls.ts`
+- `packages/crl-vscode/src/mcp-server.test.mjs`
+- `packages/crl-vscode/src/mvWorkspaceFixture.test.mjs`
+- `packages/crl-vscode/test/interactiveQuestionnaire.browser.cjs`
+- `packages/crl-vscode/test/lformsBooleanControls.browser.cjs`
+- `packages/crl/package.json`
+- `packages/crl/scripts/native-acceptance/passive-retention.cjs`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/cli/tests/run-mcp-server.test.mjs`
+- `packages/crl/src/emit/tests/publicationAnyMembership.test.ts`
+- `packages/crl/src/fhir-emitter/closureOrchestrator.ts`
+- `packages/crl/src/fhir-emitter/decision.ts`
+- `packages/crl/src/fhir-emitter/generatedRetentionExpression.ts`
+- `packages/crl/src/fhir-emitter/planExpressionInvariant.ts`
+- `packages/crl/src/fhir-emitter/tests/passiveRetention.test.ts`
+- `packages/crl/src/fhir-emitter/tests/planExpressionInvariant.test.ts`
+- `packages/crl/test/acceptance/passive-retention/nested/package.json`
+- `packages/crl/test/acceptance/passive-retention/nested/src/crl/synthetic-interview.crl`
+- `packages/crl/test/acceptance/passive-retention/progressive/package.json`
+- `packages/crl/test/acceptance/passive-retention/progressive/src/crl/synthetic-interview.crl`
+
+Review: native CRL gpt-6-astra/high and native impl gpt-6-astra/high code consultations converged; latest rounds each0 critical/0 important/0 nit. Recorded findings/dispositions in discussions1003/1004, earlier Boolean/starter/wire consultations996-1002. Imported/scoped breadth limits remain explicit. Anthropic unavailable after prior failure; no full panel claimed. Source verification passed:5464core/32skip, real run-mcp-server.test,1397extension/3expectedfail; core build, extension compile and both typechecks. Revised48 owning tests and21 native calls passed. Installed-release qualification remains pending and separately recorded. No universal-client, clinical certification, full KE pipeline run or customer deployment is inferred from the source audit.
+
 ## Criterion information controls and terminal-route projection — schema 2.27
 
 Baseline completed audit: `e0e61e4e69370854caafa11255f278db611b45ff`, schema2.26/hash `8096ebe01f51942f8cbcedf012af2d937135b86fb0b4a4ace590934492963521`. Working base: released `3e1881fd1fc924452842bb690b4a0c4a0ad395be`. Target reviewed content: `58d2c714411540ce8149c8896012501da63eb2d5`. This separate metadata-only stamp binds that existing commit. Schema2.27/hash `4a2bb92987826bdb3654046b4922fbacec50fb9d9072ddcb5ba8142ef28b0cf8`. This completes the bounded source audit; rebuilt post-stamp delivery and installed-release qualification remain separate.

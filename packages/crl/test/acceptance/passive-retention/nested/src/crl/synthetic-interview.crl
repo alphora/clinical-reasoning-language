@@ -1,0 +1,111 @@
+library "Synthetic Interview".
+terminology "Answers":
+- system is `urn:synthetic:four-answers`.
+- code is `true` display is `Yes`.
+- code is `false` display is `No`.
+- code is `unknown-true` display is `Uncertain - assume Yes`.
+- code is `unknown-false` display is `Uncertain - assume No`.
+terminology "Uncertain":
+- system is `urn:synthetic:four-answers`.
+- code is `unknown-true`.
+- code is `unknown-false`.
+terminology "Affirmative":
+- system is `urn:synthetic:four-answers`.
+- code is `true`.
+- code is `unknown-true`.
+terminology "Request Codes":
+- system is `urn:synthetic:request`.
+- code is `included`.
+concept "Request":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- value domain is "Request Codes".
+- shape reduction is most recent.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Request Codes".
+concept "Request Supplied":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Request" has a value.
+- shape reduction is most recent.
+concept "G":
+- code is `g`.
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- value domain is answer options.
+- value from is "Answers":
+  - not qualifying is `false`.
+  - not qualifying is `unknown-false`.
+- shape reduction is most recent.
+presentation for "G":
+- question text is "Synthetic G?".
+concept "A":
+- code is `a`.
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- value domain is answer options.
+- value from is "Answers":
+  - not qualifying is `false`.
+  - not qualifying is `unknown-false`.
+- shape reduction is most recent.
+presentation for "A":
+- question text is "Synthetic A?".
+concept "B":
+- code is `b`.
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- value domain is answer options.
+- value from is "Answers":
+  - not qualifying is `false`.
+  - not qualifying is `unknown-false`.
+- shape reduction is most recent.
+presentation for "B":
+- question text is "Synthetic B?".
+concept "Current Uncertainty":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is any available value of "G" and "A" and "B" in "Uncertain" using validity of "G".
+- shape reduction is most recent.
+concept "Supplied Alternative Qualifies":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is any available value of "A" and "B" in "Affirmative" using validity of "A".
+- shape reduction is most recent.
+activity "Met":
+- request CPGCommunicationRequest.
+- with `Met`.
+activity "Unmet":
+- request CPGCommunicationRequest.
+- with `Unmet`.
+decision "Assess":
+first:
+- when "Request Supplied" then:
+    first:
+    - when not "G" then recommend activity "Unmet".
+    - otherwise then:
+        first:
+        - when "A" then:
+            first:
+            - when "Current Uncertainty" then recommend activity "Unmet".
+            - otherwise then recommend activity "Met".
+            end.
+        - otherwise then:
+            first:
+            - when "B" then:
+                first:
+                - when "Current Uncertainty" then recommend activity "Unmet".
+                - otherwise then recommend activity "Met".
+                end.
+            - otherwise then recommend activity "Unmet".
+            end.
+        end.
+    end.
+- otherwise then recommend activity "Unmet".

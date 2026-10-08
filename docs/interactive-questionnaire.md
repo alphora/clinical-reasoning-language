@@ -2,19 +2,15 @@
 
 Open **Interactive FHIR Questionnaire** from the MV tree toolbar. This opens a live session for the policy currently open in MV. The existing FHIR Questionnaire button continues to show saved case results.
 
-Submitted answered items omitted by native evaluation are retained at the end of
-their matched parent, rather than restored to a historical display position.
-Cleared or pruned answers are not restored. A cleared question appears again only
-if the current decision independently needs it; the client offers no answer-history
-undo. Partial retention beneath a matched group refuses changed extraction or
-evaluation metadata, preserving the submitted form for correction. If definitions
-were legitimately re-emitted with a new context, close and reopen the panel to
-load them. Reset restarts a session against the definitions already loaded.
-This check preserves the ancestor's condition, not its current enablement outcome.
-If an omitted gate must be renamed to avoid an ID collision, retention refuses
-rather than rewriting a native group's condition. A removed ancestor condition
-also causes refusal. Metadata comparison is
-conservative: reordered properties or an explicit default can also cause refusal.
+Each successful `$apply` response supplies the current Questionnaire and
+QuestionnaireResponse. The client displays that returned pair without adding
+questions or answers from an earlier form. Necessary answer retention, correction
+access and current-path applicability must be represented on the wire by the
+content and runtime; a client merge cannot establish portable content behavior.
+Verify progression by resubmitting only the returned pair with the initial data.
+A result that loses a still-needed answer is a runtime/content defect, even if its
+first disposition was correct. No-form completion stays no-form; Reset starts a
+new assessment. A failed evaluation keeps the current edited form available.
 
 Put each initial state in the policy's own project, alongside its `src` folder:
 
@@ -53,7 +49,7 @@ The patient-field and code-field mappings follow the FHIR R4 definitions for [Nu
 
 One state is selected automatically. Multiple states appear in a selector labelled with their request number and available request codes, references, or resource types. **Start** applies the policy to the selected state. Answer the form and select **Continue / Re-evaluate** to submit the current QuestionnaireResponse to `$apply`. Returned activities appear in the **Result** area below the refreshed form. Definition and evaluation warnings appear in a separate **Warnings** section, collapsed initially; errors remain visible in the status area. A form without activities is not automatically a final policy disposition.
 
-Editing or clearing an answer keeps its sibling questions and their answers, including later unanswered siblings. Question order alone does not establish a dependency. Editing a parent question removes its nested follow-up questions and answers from the current Q/QR pair; changing it back does not restore them. **Continue / Re-evaluate** submits the current pair and lets `$apply` determine the applicable questions again. **Reset** or selecting another initial state discards the current form. Nothing is saved as answer history or written into `tests/results`. A failed evaluation leaves the current form available for correction or retry; **Cancel** stops the pending evaluation.
+Editing or clearing an answer keeps its sibling questions and their answers, including later unanswered siblings. Question order alone does not establish a dependency. Editing a parent question removes its nested follow-up questions and answers from the current Q/QR pair. Flat downstream questions are also removed when the complete emitted PlanDefinition proves that every use depends on the edited input; grouped peers and independently used inputs remain. Incomplete delegation, ambiguous identities, repeats and unsafe enablement dependencies defer this optional pruning to native evaluation; changing it back does not restore them. **Continue / Re-evaluate** submits the current pair and lets `$apply` determine the applicable questions again. **Reset** or selecting another initial state discards the current form. Nothing is saved as answer history or written into `tests/results`. A failed evaluation leaves the current form available for correction or retry; **Cancel** stops the pending evaluation.
 
 If trimming would remove a question referenced by a retained question's `enableWhen`, the edit cannot be submitted. Undo that edit or Reset to recover. This check covers literal `enableWhen.question` references only; dependencies inside FHIRPath expressions (including enablement, calculated, or initial expressions) are not analyzed or validated after trimming.
 
@@ -61,9 +57,9 @@ Repeated groups share one question template. The pane preserves the occurrences 
 
 The native engine performs extraction internally as part of `$apply`. The extension submits the unchanged starting data and current QR, with the policy definitions and current retained Questionnaire. It does not extract clinical resources or retain extracted data between requests. LForms supplies the response's authored time on export; the extension does not assign timestamps to individual answers.
 
-After successful evaluation, an answered item from the submitted pair remains editable even if native evaluation no longer returns that question. The pane retains that current answer and its extraction definition; it does not introduce unanswered alternatives or restore answers already cleared or pruned before submission. A native returned question keeps its native value. If completion returns no form, the submitted answered subset remains available for correction under its existing canonical. Reset still discards the form.
+For available-value checks, the emitter includes conditional standard PlanDefinition inputs that retain currently supplied answer slots after its preceding route is established, including when the consumer itself remains unresolved. Missing slots are not gathered through the passive check. A definitively excluded parent route removes its downstream state. The synthetic native acceptance resubmits only returned Q/QR pairs, including supplied-later qualification, both uncertainty directions, an unused retained uncertain alternative, explicit clear and route exclusion. The maintained Bleph browser check verifies immediate client pruning and the same native outcome from an unpruned submission. These checks use the pinned engine; they do not certify every third-party client's rendering or every alternative engine.
 
-Across generated forms, stable item definitions identify answers; positional linkIds do not. Retained IDs are made unique and literal enableWhen references are remapped. Unknown expression-dependent renumbering, changed extraction context, or partial retention inside repeated/answer-bearing parents fails visibly instead of guessing. Whole omitted repeated subtrees preserve their supplied occurrences. This is reconciliation of the current submitted pair, not answer history or a merge of clinical resources.
+The native returned metadata, question identities, answers and canonical binding are preserved. The client does not renumber, restore or merge omitted items. Local edit preparation operates on the current pair only; it does not infer decision dependencies from flat item order.
 
 The loader accepts the five request types above as input data. The compiler currently supports natural CodeableConcept source projections from ServiceRequest and MedicationRequest for active orders with inline system/code codings. Loading another request type does not establish support for every CRL projection from it; unsupported projections still report compiler errors.
 
