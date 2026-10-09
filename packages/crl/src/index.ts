@@ -422,6 +422,11 @@ export type { FlagTagInfo, FlagLabel, FieldRule, FlagStatus, CreateFlagTarget, C
 // single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver. See discussions/248.
 export { coerceFlag, coerceFlagStatus, isOpen, isValidFlagId } from "./flags/mvFlag";
 export type { MvFlag, MvFlagAnchor, MvFlagStatus, MvFlagCategory, MvFlagScope } from "./flags/mvFlag";
+// REFACTOR:grounded (MV/KE workflow): desired-state flags and MV-owned lifecycle.
+export { coerceQaEditRequest, isQaSourcePath } from "./flags/qaEditRequest";
+export type { QaEditRequest, QaEditTarget, QuestionEditTarget, AnswerEditTarget, QuestionEditState, AnswerEditState } from "./flags/qaEditRequest";
+export { buildQaEditFlag, qaEditFlagId, isQaEditFlag, mvReviewStatus, transitionMvFlag, renewMvFlag, mvFlagRevision } from "./flags/mvFlagReview";
+export type { MvReviewStatus } from "./flags/mvFlagReview";
 export { flagStoreDir, legacyFlagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, removeFlag } from "./flags/mvFlagStore";
 export type { FlagStoreLoad } from "./flags/mvFlagStore";
 export { resolveAnchor } from "./flags/mvFlagAnchor";

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MV/KE workflow): generic types exclude reserved Q/A editors.
 // #212 step 4 — the CORE-owned flag vocabulary + the PURE field validator (flagVocab.ts). Covers the accessors (tags,
 // categories, the human MV Type `displayName`s + `mv:*` labels) + every validateFlagFields reason. The registry's flag
 // entries were stripped in v0.3.4, so flagVocab is the sole home (the former equivalence test is gone).
@@ -15,15 +16,17 @@ import {
 
 describe("flagVocab accessors", () => {
   // @kit review-flags:phase-vocabulary
-  test("flagTags() returns the eight flag tags with their categories", () => {
+  test("flagTags() returns the ten flag tags with their categories", () => {
     const byId = new Map(flagTags().map((t) => [t.id, t]));
     expect([...byId.keys()].sort()).toEqual([
+      "answer-crud",
       "customer-confirmable",
       "fidelity-defect",
       "internal-inconsistency",
       "narrative-defect",
       "open-fork",
       "other",
+      "question-edit",
       "tooling-bug",
       "validation-concern",
     ]);
@@ -35,7 +38,7 @@ describe("flagVocab accessors", () => {
 
   test("displayName marks EXACTLY the four human MV Types (extraction tags OMIT the property, not set it undefined)", () => {
     const byId = new Map(flagTags().map((t) => [t.id, t]));
-    const named = flagTags().filter((t) => t.displayName).map((t) => t.id).sort();
+    const named = flagTags().filter((t) => t.displayName && !t.editor).map((t) => t.id).sort();
     expect(named).toEqual(["narrative-defect", "other", "tooling-bug", "validation-concern"]);
     expect(byId.get("validation-concern")!.displayName).toBe("CRL vs customer intent");
     expect(byId.get("narrative-defect")!.displayName).toBe("CRL vs narrative");
@@ -69,7 +72,7 @@ describe("flagVocab accessors", () => {
 
   test("label INVARIANT: a tag has an mv:* label IFF it is an MV Type (displayName present) — no drawer Type emits label-less, no AI tag gets one", () => {
     for (const t of flagTags()) {
-      expect(flagLabelOf(t.id) !== undefined).toBe(t.displayName !== undefined);
+      expect(flagLabelOf(t.id) !== undefined).toBe(t.displayName !== undefined && !t.editor);
     }
   });
 
@@ -98,7 +101,7 @@ describe("flagVocab accessors", () => {
 
 describe("validateFlagFields", () => {
   // @kit review-flags:optional-issue-reference
-  test.each(flagTags().map(t => t.id))("%s accepts an optional issue reference", tag => {
+  test.each(flagTags().filter(t=>!t.editor).map(t => t.id))("%s accepts an optional issue reference", tag => {
     const fields: Record<string, string> = { ref: "#207" };
     if (tag === "fidelity-defect") fields.direction = "over-reach";
     const result = validateFlagFields({ tag, gist: "Review finding", fields });
@@ -200,7 +203,7 @@ describe("validateFlagFields", () => {
   });
 
   test("status resolved → ok; an out-of-enum status → invalid-value", () => {
-    expect(validateFlagFields({ tag: "validation-concern", gist: "x", status: "resolved" }).ok).toBe(true);
+    expect(validateFlagFields({ tag: "customer-confirmable", gist: "x", status: "resolved" }).ok).toBe(true);
     const bad = validateFlagFields({ tag: "validation-concern", gist: "x", status: "deferred" });
     expect(bad.ok).toBe(false);
     if (bad.ok) return;

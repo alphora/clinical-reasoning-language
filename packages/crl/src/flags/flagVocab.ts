@@ -32,6 +32,7 @@ export interface FieldRule {
  *  (the extraction tags) are AI-authoring-only and never appear in the human drawer. */
 export interface FlagTagInfo {
   id: string;
+  editor?: "question" | "answer";
   category: MvFlagCategory;
   /** the human "Type" label; present ⇒ the tag is an MV-drawer Type (absent ⇒ AI-authoring-only, hidden from the drawer). */
   displayName?: string;
@@ -82,16 +83,20 @@ const REF: FieldRule = { key: "ref", required: false };
 /** The internal tag record. `fields` is authoring order (`status` first, then the tag's discriminators, then `ref`). */
 interface FlagTagDef {
   id: string;
+  editor?: "question" | "answer";
   aliases: readonly string[];
   category: MvFlagCategory;
-  displayName?: string; // present ⇒ a human MV Type (shown in the drawer); absent ⇒ AI-authoring-only
-  /** the GitHub label for this MV Type (present iff `displayName` is). `blurb` is the one-line gloss; the label DESCRIPTION is
+  displayName?: string; // Human MV type; specialized editors are excluded from the generic drawer choices.
+  /** Optional GitHub label retained for older issue integrations. `blurb` is the one-line gloss; the label DESCRIPTION is
    *  DERIVED as `${displayName} — ${blurb}`, so the human "CRL vs …" string lives in exactly one place (no drift). */
   label?: { name: string; color: string; blurb: string };
   fields: readonly FieldRule[];
 }
 
 const FLAG_TAGS: readonly FlagTagDef[] = [
+  // REFACTOR:grounded: these types are controlled exclusively by the pinned Q/A editor.
+  { id: "question-edit", aliases: [], category: "validation", displayName: "Question Edit", editor: "question", fields: [STATUS] },
+  { id: "answer-crud", aliases: [], category: "validation", displayName: "Answer CRUD", editor: "answer", fields: [STATUS] },
   {
     id: "customer-confirmable",
     aliases: [],
@@ -212,13 +217,14 @@ export function flagFieldRulesOf(rawTag: string): FieldRule[] {
 }
 
 /** Every flag tag's authoring info (id + category + displayName + fields) — the cockpit drawer + `flagTags()` source. The
- *  drawer filters to the human MV Types via `displayName` presence (the extraction tags have none → never shown). */
+ *  generic drawer filters to displayName && !editor; Q/A types use their dedicated controls. */
 export function flagTags(): FlagTagInfo[] {
   // OMIT `displayName` when absent (don't emit `displayName: undefined`) so `"displayName" in tag` / `Object.hasOwn` is a true
   // "is this an MV Type?" test, not just truthiness.
   return FLAG_TAGS.map((t) => ({
     id: t.id,
     category: t.category,
+    ...(t.editor ? { editor: t.editor } : {}),
     ...(t.displayName !== undefined ? { displayName: t.displayName } : {}),
     fields: t.fields.map((f) => ({ ...f })),
   }));
@@ -256,6 +262,7 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   const def = defOf(input.tag);
   if (!def) return { ok: false, reason: "unknown-tag", message: `"${input.tag}" is not a registered flag tag` };
   const canon = def.id;
+  if (def.editor) return { ok: false, reason: "invalid-value", message: "Question Edit and Answer CRUD flags are edited through the Question and Answer UI." };
 
   for (const key of ["title", "gist"] as const) {
     if (input[key] !== undefined && typeof input[key] !== "string")
@@ -317,6 +324,7 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
 
   const status = (input.status ?? "open").trim() || "open";
   if (status !== "open" && status !== "resolved") return { ok: false, reason: "invalid-value", message: "status must be one of: open, resolved" };
+  if (def.category === "validation" && status === "resolved") return { ok: false, reason: "invalid-value", message: "New MV flags start Pending fix. Fixed changes are approved through Medical Review." };
 
   return { ok: true, canon, category: def.category, gist, ...(description ? { description } : {}), status, fields };
 }

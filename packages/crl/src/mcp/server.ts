@@ -40,7 +40,7 @@ import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
 // #212 step 2 — the MCP flag tools write the `medical-validation/flags/` STORE (not `.crl` meta-tags): validate+build via the shared seam,
 // then dedup-check + save. `createFlag`/`setFlagStatus` (the `.crl` splicers) are no longer used here.
-import { validateAndBuildMvFlagDraft, flagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, isOpen, canonicalFlagTag } from "../index";
+import { validateAndBuildMvFlagDraft, flagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, isOpen, canonicalFlagTag, transitionMvFlag } from "../index";
 import type { CreateFlagTarget, MvFlag, MvFlagScope, FlagStatus } from "../index";
 // canonicalize a selector's tag alias — `canonicalFlagTag` (the flag vocab), NOT the `.crl` registry's `canonicalTag`
 // (#212 step 4: flag tags left the registry, so the registry no longer knows them; the store holds the canonical tag).
@@ -1233,7 +1233,8 @@ export function createServer(): McpServer {
     {
       title: "Set a review flag's status (#205 crl-refactors)",
       description:
-        "Flip the status (open↔resolved) of ONE review flag store record (#212), located by a selector. The counterpart to " +
+        "Change ONE review flag store record located by a selector. MV flags use open (Pending fix), fixed, then approved; " +
+        "resolved is an alias for approval and requires Fixed first. KE flags retain open/resolved. Q/A edit flags require their dedicated UI. The counterpart to " +
         "create_flag. Pass `path` (the target `.crl` — locates the `medical-validation/flags/` store; inline `code` is NOT supported), the " +
         "selector, and `status` (the NEXT status). Selector: `scope` (concept|decision|library) + `name` + `tag` " +
         "(canonicalized) identify the flag when there is one such flag; pass `key` (a decision-occurrence key or the record's " +
@@ -1252,7 +1253,7 @@ export function createServer(): McpServer {
         tag: z.string().min(1).describe("The flag tag id (canonicalized)."),
         key: z.string().optional().describe("A decision-occurrence key or the record's dedup key, to disambiguate two same-tag flags on one node."),
         id: z.string().optional().describe("The flag record's `id` (from a create result or an `ambiguous` candidate) — uniquely selects it."),
-        status: z.enum(["open", "resolved"]).describe("The NEXT status to set."),
+        status: z.enum(["open", "fixed", "approved", "resolved"]).describe("MV: Pending (open), Fixed, then Approved. KE: open or resolved."),
       },
     },
     (args) => runSetFlagStatus(args as SetFlagStatusArgs),
@@ -1356,12 +1357,22 @@ function runSetFlagStatus(args: SetFlagStatusArgs): ToolResponse {
       });
     }
     const matched = matches[0];
-    if (matched.status === args.status) return writeResult({ ok: true, changed: false, flag: matched }); // already there — a sweeper skips
+    // REFACTOR:grounded (MV/KE workflow): specialized request state belongs to the Q/A UI.
+    if (matched.tag === "question-edit" || matched.tag === "answer-crud")
+      return writeResult({ ok: false, reason: "invalid-value", message: "Use the Question and Answer UI to change this edit flag." });
+    if (matched.status === args.status || matched.category === "validation" &&
+      (matched.status === "approved" || matched.status === "resolved") && (args.status === "approved" || args.status === "resolved"))
+      return writeResult({ ok: true, changed: false, flag: matched });
     // Re-read by id right before save: merge status+editedAt onto the CURRENT on-disk record (don't clobber a concurrent edit
     // to gist/fields/anchor, and don't resurrect a record deleted between the load and the save — return not-found).
     const current = loadFlags(storeDir).flags.find((f) => f.id === matched.id);
     if (!current) return writeResult({ ok: false, reason: "not-found", message: "the flag was removed before the update could be applied — reload and retry" });
-    const updated: MvFlag = { ...current, status: args.status, editedAt: new Date().toISOString() };
+    if (current.category === "extraction" && args.status !== "open" && args.status !== "resolved")
+      return writeResult({ ok: false, reason: "invalid-value", message: "KE flags use open or resolved." });
+    let updated: MvFlag;
+    try { updated = current.category === "validation" ? transitionMvFlag(current, args.status) : { ...current, status: args.status, editedAt: new Date().toISOString() }; }
+    catch (error) { return writeResult({ ok: false, reason: "invalid-value", message: error instanceof Error ? error.message : String(error) }); }
+    if (updated === current) return writeResult({ ok: true, changed: false, flag: current });
     saveFlag(storeDir, updated);
     return writeResult({ ok: true, changed: true, flag: updated });
   } catch (e) {

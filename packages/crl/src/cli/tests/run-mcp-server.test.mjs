@@ -300,6 +300,21 @@ try {
     assert.equal(out.changed, false);
   });
 
+  // REFACTOR:grounded (MV/KE workflow): manual approval aliases are retry-safe; illegal transitions are domain failures.
+  await check("set_flag_status → manual MV Fixed/Approved lifecycle and legacy aliases", async () => {
+    const { crlPath, storeDir } = mkPolicy();
+    await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "review" } });
+    const change = async status => JSON.parse((await client.callTool({ name: "set_flag_status", arguments: { path: crlPath, scope: "concept", name: "C", tag: "validation-concern", status } })).content[0].text);
+    const premature = await change("approved");
+    assert.equal(premature.success, false); assert.equal(premature.reason, "invalid-value");
+    assert.equal((await change("fixed")).success, true);
+    assert.equal((await change("resolved")).flag.status, "approved");
+    assert.equal((await change("resolved")).changed, false);
+    const flag = storeFlags(storeDir)[0];
+    writeFileSync(join(storeDir, flag.id + ".json"), JSON.stringify({ ...flag, status: "resolved" }));
+    assert.equal((await change("approved")).changed, false);
+  });
+
   await check("set_flag_status → resolves a flag by a tag ALIAS (over-reach-to-fix → fidelity-defect)", async () => {
     const { crlPath } = mkPolicy();
     await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "fidelity-defect", gist: "over", fields: { direction: "over-reach" } } });

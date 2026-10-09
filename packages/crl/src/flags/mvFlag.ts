@@ -4,11 +4,13 @@
 // NOT an MV-step content artifact. The record is SELF-DESCRIBING (it retains its original target + a human label) so it stays
 // meaningful even when its anchor no longer resolves; the live anchor is for NAVIGATION, not identity (see mvFlagAnchor.ts).
 //
-// Conservative coercion (the gate must NEVER silently pass): a status that isn't exactly "resolved" ⇒ "open" (a malformed
+// Conservative coercion (the gate must NEVER silently pass): an unknown status ⇒ "open" (a malformed
 // status must BLOCK, never clear); a structurally-invalid record ⇒ undefined so the STORE raises a load warning → gate error
 // (never silently dropped — dropping a flag would remove a blocker). `id`/`createdAt` are HOST-injected (keeps this pure).
 
-export type MvFlagStatus = "open" | "resolved";
+import { coerceQaEditRequest, type QaEditRequest } from "./qaEditRequest";
+import { isQaEditFlag, qaEditFlagId } from "./mvFlagReview";
+export type MvFlagStatus = "open" | "fixed" | "approved" | "resolved";
 /** The status lifecycle a flag SURFACE (cockpit / MCP tool) types against — an alias of `MvFlagStatus`, re-homed here from the
  *  deleted `rewriteMetaStatus` (#212 step 4) so both callers keep the `FlagStatus` name without depending on `.crl` refactors. */
 export type FlagStatus = MvFlagStatus;
@@ -33,8 +35,10 @@ export interface MvFlagAnchor {
 }
 
 export interface MvFlag {
-  schemaVersion: 1;
-  /** stable record identity, host-generated at creation (crypto.randomUUID); INDEPENDENT of the anchor, so an orphaned flag keeps its id. */
+  // REFACTOR:grounded (MV/KE workflow): v2 carries specialized Q/A requests; legacy flags remain readable.
+  schemaVersion: 1 | 2;
+  editRequest?: QaEditRequest;
+  /** Stable record identity: generic flags use UUIDs; Q/A requests hash their immutable source target. */
   id: string;
   category: MvFlagCategory;
   /** the concern TYPE (the flag tag). Human MV Types (a `displayName` in flagVocab): validation-concern / narrative-defect /
@@ -53,17 +57,17 @@ export interface MvFlag {
   editedAt?: string;
 }
 
-export const isOpen = (f: MvFlag): boolean => f.status !== "resolved";
+export const isOpen = (f: MvFlag): boolean => f.status !== "resolved" && f.status !== "approved";
 
 /** A flag `id` is used verbatim as a filename segment (`<id>.json`), so it MUST be a file-safe token — no path separators,
  *  no `.`/`..`, no whitespace. Host ids are `crypto.randomUUID()` (hex+dash), which pass. A record whose id fails this is
  *  structurally invalid (→ store warning → gate blocks), NEVER trusted into a `join()` (a `../x` id would escape the store). */
 export const isValidFlagId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]+$/.test(v);
 
-/** Coerce a stored status: EXACTLY "resolved" stays resolved; ANYTHING else (unknown/absent/malformed) ⇒ "open" — a bad
+/** Coerce a stored status: Known lifecycle values are retained; unknown values (unknown/absent/malformed) ⇒ "open" — a bad
  *  status must conservatively BLOCK the gate, never clear it (mirrors the old collectFlags "absent status ⇒ open" rule). */
 export function coerceFlagStatus(v: unknown): MvFlagStatus {
-  return v === "resolved" ? "resolved" : "open";
+  return v === "resolved" || v === "fixed" || v === "approved" ? v : "open";
 }
 
 const str = (v: unknown): string | undefined => (typeof v === "string" && v !== "" ? v : undefined);
@@ -74,7 +78,7 @@ const str = (v: unknown): string | undefined => (typeof v === "string" && v !== 
 export function coerceFlag(parsed: unknown): MvFlag | undefined {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
   const o = parsed as Record<string, unknown>;
-  if (o.schemaVersion !== 1) return undefined; // unknown/absent/forward version ⇒ invalid (→ warning → gate blocks; never mis-read as v1)
+  if (o.schemaVersion !== 1 && o.schemaVersion !== 2) return undefined;
   const id = isValidFlagId(o.id) ? o.id : undefined; // file-safe token only (a `../x` id must never reach a join())
   const tag = str(o.tag);
   const gist = typeof o.gist === "string" ? o.gist : undefined; // gist may be empty-ish? require present string
@@ -101,7 +105,7 @@ export function coerceFlag(parsed: unknown): MvFlag | undefined {
     for (const [k, v] of Object.entries(o.fields as Record<string, unknown>)) if (typeof v === "string") fields[k] = v;
   }
   const flag: MvFlag = {
-    schemaVersion: 1,
+    schemaVersion: o.schemaVersion as 1 | 2,
     id,
     category,
     tag,
@@ -114,5 +118,12 @@ export function coerceFlag(parsed: unknown): MvFlag | undefined {
   if (str(o.description)) flag.description = o.description as string;
   if (str(o.dedupKey)) flag.dedupKey = o.dedupKey as string;
   if (str(o.editedAt)) flag.editedAt = o.editedAt as string;
+  if (category === "extraction" && (flag.status === "fixed" || flag.status === "approved")) return undefined;
+  if (flag.schemaVersion === 2 && !isQaEditFlag(flag)) return undefined;
+  if (isQaEditFlag(flag)) {
+    const request = coerceQaEditRequest(o.editRequest);
+    if (o.schemaVersion !== 2 || !request || request.kind !== tag || category !== "validation" || qaEditFlagId(request.target) !== id) return undefined;
+    flag.editRequest = request;
+  } else if (o.editRequest !== undefined) return undefined;
   return flag;
 }
