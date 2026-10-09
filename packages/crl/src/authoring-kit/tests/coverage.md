@@ -2222,7 +2222,7 @@ All test/tag deltas dispositioned; existing tested inputs are sufficient for a p
 
 ## CRL Knowledge Engineer app — release6.4.40
 
-Baseline551d2dfb770e7cef5cf2998fcdd59f99a7a75d12, schema2.32/hashce4f381b5c3d07884093106821955958aaea4f1226c1cef30f60b5252b29330e. Reviewed interval includes16a0517c5 metadata and a2578d0587e12a07981457f2b62d675e39c8e787 Windows source identity correction above. Target is pending reviewed content commit; prior stamp remains until review and qualification. Current guidance schema2.33/hash2560908e70c401e8d963470a1a30df67b984ef8d9bdd6248c1faec12ee8cff1e. Operator explicitly directs CRL to save to disk without observing KELP locks; KELP owns lock, commit, push and unlock externally. No new persisted summary/receipt or MV status automation.
+Baseline551d2dfb770e7cef5cf2998fcdd59f99a7a75d12, schema2.32/hashce4f381b5c3d07884093106821955958aaea4f1226c1cef30f60b5252b29330e. Reviewed interval includes16a0517c5 metadata and a2578d0587e12a07981457f2b62d675e39c8e787 Windows source identity correction above. Reviewed target602bcfc8c6af0fe2e187d85bb00706fc658738e4, schema2.33/hash2560908e70c401e8d963470a1a30df67b984ef8d9bdd6248c1faec12ee8cff1e, finalized in separate metadata stamp. Explicit export and both freshly built actual core/extension MCP full JSON/Markdown identity are checked before committing this stamp (tmp/ke-app-audited-kit/audit-delivery-verification.json). Current guidance schema2.33/hash2560908e70c401e8d963470a1a30df67b984ef8d9bdd6248c1faec12ee8cff1e. Operator explicitly directs CRL to save to disk without observing KELP locks; KELP owns lock, commit, push and unlock externally. No new persisted summary/receipt or MV status automation.
 
 | Changed owner / assertion | Disposition and evidence |
 |---|---|
