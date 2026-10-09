@@ -1709,9 +1709,9 @@ Plan1024: native0C/1I/0N, accepted CEL gap; external internal error on first cal
 
 Final MR10 local evidence:17affected suites443PASS;5MV suites116PASS; fresh core/extension build/types and real core MCP PASS; final five native calls PASS; all46Bleph CRE cases PASS and policy CQL unchanged. Broader338suite run5483PASS/32skip identified only the nine old AD goldens and a shared-registry proof pin, all resolved/rechecked in443PASS. Task defaults remain bounded to CEL activity outputs; shared concept registry unchanged. Native1025final0C0I0N converged; external unavailable. Kit2.29/hash49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69 source remains pending, prior2.28stamp retained. No completed audit/release/install/commit.
 
-# Completed Medical Review release audit 6.4.36 (target stamp pending)
+# Completed Medical Review release audit 6.4.36
 
-Baseline349c245a5a6d7e9b8f5a0c3cefaa27cd88939518 (kit2.28) resolves and is an ancestor of the reviewed candidate. This section supersedes pending MR sections above as current audit status; those sections retain exact per-feature owning assertions, shared inputs, failure cases and bounded proof. Candidate kit2.29/hash49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69. The target full SHA will be recorded with the separate metadata stamp after checks/review. No historical audit identity is rewritten.
+Baseline349c245a5a6d7e9b8f5a0c3cefaa27cd88939518 (kit2.28) resolves and is an ancestor of the reviewed candidate. This section supersedes pending MR sections above as current audit status; those sections retain exact per-feature owning assertions, shared inputs, failure cases and bounded proof. Candidate kit2.29/hash49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69. Reviewed target da2a1fa4f8199f4dba66a07b4212974e17280748; audited schema 2.29, content hash 49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69. This literal identity is finalized by the separate metadata-only stamp commit. No historical audit identity is rewritten.
 
 Intent is the operator's MR1-MR10 request and subsequent UI/local-save corrections. MR11 Request promotion is explicitly deferred. Reviews1009-1025 cover feature plans/code and findings; release1026/1027 cover audit and qualification. External reviewer unavailable after two internal errors; native coverage is identified separately. This is tooling/emission evidence, not independent medical-policy approval.
 
@@ -2046,3 +2046,5 @@ Final maintained Bleph regeneration: all16 native MV cases generated Questionnai
 
 Generated native qualification delta paths (all read and hash-verified; existing guidance sufficient with generation/proof limits above):
 - `examples/bleph-medical-validation/tests/results/questionnaire-manifest-mv.json`
+
+Completed audit: full source5498core/32skipped plus actualMCP integration, final98extension suites1564pass/3expectedfail, builds/typechecks and whitespace PASS. Source review1026/1027 native final0C0I0N converged after3important findings accepted across plan/code rounds; external unavailable. Installed/release acceptance remains a separately recorded gate.
