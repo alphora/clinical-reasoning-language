@@ -84,6 +84,23 @@ test('KE recovery preserves conflicting external bytes and continues to block pu
  }finally{f.close();}
 });
 const native=process.env.CRL_KE_NATIVE_ACCEPTANCE==='1'?test:test.skip;
+
+// @kit chaining-necessity:ke-static-delegation
+native('KE Q/A edits regenerate static forms for a policy with linked decision libraries',async()=>{
+ const f=fixture();try{
+  writeFileSync(f.policy,readFileSync(f.policy,'utf8').replace('then recommend activity "Met".','then use decision "Child"."Sub".'));
+  writeFileSync(join(f.root,'src/crl/child.crl'),'library "Child".\ndecision "Sub":\n- when "L"."Q" then recommend activity "L"."Met".\n');
+  saveQuestionRequest(f.root,f.flags,f.wording(),'Multi decision question?','Multi decision detail');
+  saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Multi decision Yes',description:''});
+  const before=snapshot(f.root),mv=mvBytes(f),preview=await f.call('preview');assert.equal(preview.state,'preview');assert.deepEqual(snapshot(f.root),before);
+  const result=await f.call('apply');assert.equal(result.ok,true);assert.equal(result.state,'changed');assert.deepEqual(mvBytes(f),mv);
+  const plans=definitions(f).map(d=>d.resource).filter(r=>r.resourceType==='PlanDefinition'&&['D','Sub'].includes(r.title)&&r.type?.coding?.some(c=>['workflow-definition','eca-rule'].includes(c.code)));
+  assert.equal(plans.length,2);const root=plans.find(r=>r.type.coding.some(c=>c.code==='workflow-definition')),child=plans.find(r=>r.type.coding.some(c=>c.code==='eca-rule'));
+  assert.notEqual(root.url,child.url);assert.match(JSON.stringify(root),new RegExp(child.url));
+  const resources=forms(f);assert.match(JSON.stringify(resources),/Multi decision question/);assert.match(JSON.stringify(resources),/Multi decision detail/);assert.match(JSON.stringify(resources),/Multi decision Yes/);
+  const unchanged=snapshot(f.root),repeat=await f.call('apply',{produce:async()=>{throw Error('Linked current outputs must not regenerate');}});assert.equal(repeat.state,'no-op');assert.deepEqual(snapshot(f.root),unchanged);
+ }finally{f.close();}
+},180000);
 // @kit mv-wording-patches:ke-static-apply
 native('native KE application updates definitions and static Q/QR, leaves pending MV flags untouched, repeats without writes',async()=>{
  const f=fixture();try{saveQuestionRequest(f.root,f.flags,f.wording(),'Requested question?','Requested detail');saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Requested Yes',description:'Requested answer detail'});

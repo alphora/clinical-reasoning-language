@@ -241,7 +241,7 @@ first:
     expect(run.produced.map((p) => p.recommendation)).toEqual(["Deny"]);
   });
 
-  it.each(["direct", "criterion alias", "delegated criterion", "CEL alias"])("admits direct imported publication but retains unsupported %s contexts", (site) => {
+  it.each(["direct", "criterion alias", "CEL alias"])("admits direct imported publication but retains unsupported %s contexts", (site) => {
     const legacy = POLICY.replace("- shape is Record.", "- shape is Scalar.").replace("- shape reduction is most recent.\n", "")
       .replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
     const shared = POLICY.replace('library "Publication".', 'library "Shared".') + `
@@ -255,9 +255,7 @@ decision "Sub":
 first:
 - when "Outer" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".`;
-    const decision = site === "delegated criterion"
-      ? DECISION.replace('recommend activity "Approve"', 'use decision "Shared"."Sub"')
-      : site === "criterion alias"
+    const decision = site === "criterion alias"
         ? 'criterion "Via Alias":\n- when ("Shared"."Alias").\n' + DECISION.replace('when "Answer"', 'when "Via Alias"')
         : site === "direct" ? DECISION.replace('when "Answer"', 'when "Shared"."Answer"') : DECISION;
     const authoredFact = site === "CEL alias" ? fact("True", "true").replace('"Publication"."Answer"', '"Shared"."Alias"') : fact("True", "true");
@@ -340,10 +338,9 @@ first:
   });
 
   // @kit chaining-necessity:foreign-scope-refusal
-  it.each(["guard", "delegation"])("does not exempt a foreign %s alongside a valid sibling leaf", (site) => {
+  it("does not exempt a foreign legacy guard alongside a valid sibling leaf", () => {
     const shared = sharedActivities + '\nconcept "Foreign":\n- type is Observation.\ndecision "Sub":\nfirst:\n- when "Foreign" then recommend activity "Approve".';
-    const decision = site === "guard" ? sharedDecision.replace('when "Answer"', 'when "Shared"."Foreign"')
-      : sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Shared"."Sub"');
+    const decision = sharedDecision.replace('when "Answer"', 'when "Shared"."Foreign"');
     const { run } = evaluate(fact("A", "true"), ["A"], decision, "", "Approve", "", { policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [shared] });
     expect(run.status).toBe("error");
     expect(run.produced).toEqual([]);
@@ -432,6 +429,117 @@ first:
     expect(run.status).toBe("pass");
     expect(run.produced.map((p) => p.recommendation)).toEqual(["Approve"]);
     expect(run.trace[0].children?.[0].children?.[0].nodeId).toBe("when[0]/action[0]/when[0]");
+  });
+
+  // @kit chaining-necessity:cross-library-publication
+  it.each([true, false, undefined])("evaluates a cross-library delegated publication in its owner scope (%s)", (value) => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"'));
+    const shared = POLICY.replace('library "Publication".', 'library "Shared".').replace('`answer`', '`shared-answer`')
+      + 'criterion "Owned":\n- when ("Answer").\n'
+      + DECISION.replace('decision "D"', 'decision "Sub"').replace('when "Answer"', 'when "Owned"');
+    const decision = sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Shared"."Sub"');
+    const facts = fact("Root", "true") + (value === undefined ? "" : fact("Child", String(value)).replace('"Publication"."Answer"', '"Shared"."Answer"'));
+    const { run, view } = evaluate(facts, value === undefined ? ["Root"] : ["Root", "Child"], decision, "", value ? "Approve" : "Deny", "",
+      { policy, siblings: [shared], captureView: true });
+    expect(run.status).toBe(value === undefined ? "fail" : "pass");
+    expect(run.produced.map(p => p.recommendation)).toEqual(value === undefined ? [] : [value ? "Approve" : "Deny"]);
+    expect(run.diagnostics).toEqual([]);
+    const guard = run.trace[0].children?.[0].children?.[0];
+    expect(guard?.nodeId).toBe("when[0]/action[0]/when[0]");
+    expect(guard?.source?.filePath).toMatch(/sibling-0\.crl$/);
+    expect(guard?.blockedUnknown === true).toBe(value === undefined);
+    const nodes = (tree: NonNullable<typeof view>["tree"]): NonNullable<typeof view>["tree"] => tree.flatMap(n => [n, ...nodes(n.children ?? [])]);
+    const displayed = nodes(view!.tree);
+    expect(displayed.find(n => n.nodeId === "when[0]/action[0]")?.action?.target.libraryName).toBe("Shared");
+    expect(displayed.find(n => n.nodeId === guard?.nodeId)?.source.filePath).toMatch(/sibling-0\.crl$/);
+  });
+
+  // @kit chaining-necessity:transitive-publication
+  it("follows three source-owned decision frames without treating decision targets as concept refs", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"'));
+    const shared = policy.replace('library "Publication".', 'library "Shared".')
+      + sharedDecision.replace('decision "D"', 'decision "Sub"').replaceAll('"Shared"."Approve"', '"Leaf"."Approve"').replaceAll('"Shared"."Deny"', '"Leaf"."Deny"')
+        .replace('recommend activity "Leaf"."Approve"', 'use decision "Leaf"."End"');
+    const leaf = sharedActivities.replace('library "Shared".', 'library "Leaf".')
+      + DECISION.replace('decision "D"', 'decision "End"').replace('when "Answer"', 'when "Shared"."Answer"');
+    const decision = DECISION.replace('recommend activity "Approve"', 'use decision "Shared"."Sub"').replace('recommend activity "Deny"', 'recommend activity "Leaf"."Deny"');
+    const facts = fact("Root", "true") + fact("Child", "true").replace('"Publication"."Answer"', '"Shared"."Answer"');
+    const { run } = evaluate(facts, ["Root", "Child"], decision, "", "Approve", "", { policy, siblings: [shared, leaf] });
+    expect(run.status).toBe("pass");
+    expect(run.produced.map(p => p.recommendation)).toEqual(["Approve"]);
+    expect(run.diagnostics).toEqual([]);
+    expect(run.trace[0].children?.[0].children?.[0].children?.[0].children?.[0].source.filePath).toMatch(/sibling-1\.crl$/);
+  });
+
+  it("refuses a delegated decision whose explicit include owner disagrees with the runtime owner", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"')).replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
+    const shared = POLICY.replace('library "Publication".', 'library "Shared".').replace('`answer`', '`shared-answer`') + DECISION.replace('decision "D"', 'decision "Sub"');
+    const decision = DECISION.replace('recommend activity "Approve"', 'use decision "Shared"."Sub"').replace('- otherwise then recommend activity "Deny".', '');
+    const { run } = evaluate(fact("Root", "true"), ["Root"], decision, "", "Approve", "", { policy, siblings: [shared], installed: [shared] });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-ambiguous-scope: decision");
+  });
+
+  it("diagnoses a missing delegated decision rather than silently excluding the branch", () => {
+    const decision = sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Shared"."Missing"');
+    const { run } = evaluate(fact("Root", "true"), ["Root"], decision, "", "Approve", "", {
+      policy: POLICY.slice(0, POLICY.indexOf('activity "Approve"')), siblings: [sharedActivities],
+    });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-unresolved-decision");
+  });
+
+  it.each(["missing criterion", "different criterion", "legacy concept"])("refuses delegated index-owner mismatch even without a local namesake decision (%s)", (mode) => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"')).replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
+    const criteria = mode === "legacy concept" ? "" : 'criterion "Owned":\n- when ("Alias").\n';
+    const shared = POLICY.replace('library "Publication".', 'library "Shared".').replace('`answer`', '`shared-answer`')
+      + 'concept "Alias":\n- defined as "Answer".\n' + criteria
+      + DECISION.replace('decision "D"', 'decision "Sub"').replace('when "Answer"', mode === "legacy concept" ? 'when "Alias"' : 'when "Owned"');
+    const local = 'library "Shared".\nconcept "Other":\n- type is Observation.\n'
+      + (mode === "different criterion" ? 'criterion "Owned":\n- when ("Other").' : mode === "legacy concept" ? 'concept "Alias":\n- defined as "Other".' : "");
+    const decision = DECISION.replace('recommend activity "Approve"', 'use decision "Shared"."Sub"').replace('- otherwise then recommend activity "Deny".', '');
+    const facts = fact("Root", "true") + fact("Child", "false").replace('"Publication"."Answer"', '"Shared"."Answer"');
+    const { run } = evaluate(facts, ["Root", "Child"], decision, "", "Deny", "", { policy, siblings: [local], installed: [shared] });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain(`publication-ambiguous-scope: ${mode === "legacy concept" ? "legacy concept" : "criterion"}`);
+  });
+
+  it("admits an explicitly included package decision with its own publication and activities", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"')).replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
+    const shared = POLICY.replace('library "Publication".', 'library "Shared".').replace('`answer`', '`shared-answer`') + DECISION.replace('decision "D"', 'decision "Sub"');
+    const decision = DECISION.replace('recommend activity "Approve"', 'use decision "Shared"."Sub"').replace('- otherwise then recommend activity "Deny".', '');
+    const facts = fact("Root", "true") + fact("Child", "false").replace('"Publication"."Answer"', '"Shared"."Answer"');
+    const { run } = evaluate(facts, ["Root", "Child"], decision, "", "Deny", "", { policy, installed: [shared] });
+    expect(run.diagnostics).toEqual([]);
+    expect(run.status).toBe("pass");
+    expect(run.produced.map(p => p.recommendation)).toEqual(["Deny"]);
+  });
+
+  it("preserves the foreign legacy-expression boundary inside a delegated owner's criterion", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"'));
+    const shared = sharedActivities + '\ncriterion "Owned":\n- when ("Other"."Legacy").\n'
+      + DECISION.replace('decision "D"', 'decision "Sub"').replace('when "Answer"', 'when "Owned"');
+    const decision = sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Shared"."Sub"');
+    const { run } = evaluate(fact("Root", "true"), ["Root"], decision, "", "Approve", "", { policy, siblings: [shared, 'library "Other".\nconcept "Legacy":\n- type is Observation.'] });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("publication-unsupported-scope");
+  });
+
+  it("retains runtime cycle errors and invalidated traces across delegated library frames", () => {
+    const policy = POLICY.slice(0, POLICY.indexOf('activity "Approve"'));
+    const shared = sharedActivities + DECISION.replace('decision "D"', 'decision "Sub"').replace('when "Answer"', 'when "Publication"."Answer"')
+      .replace('recommend activity "Approve"', 'use decision "Publication"."D"');
+    const decision = sharedDecision.replace('recommend activity "Shared"."Approve"', 'use decision "Shared"."Sub"');
+    const { run, view } = evaluate(fact("Root", "true"), ["Root"], decision, "", "Approve", "", { policy, siblings: [shared], captureView: true });
+    expect(run.status).toBe("error");
+    expect(run.produced).toEqual([]);
+    expect(run.diagnostics.join("\n")).toContain("decision delegation cycle");
+    expect(view?.produced).toEqual([]);
+    expect(run.trace[0].children?.[0].invalidated).toBe(true);
   });
 
   it.each([true, false, undefined])("evaluates answered sibling menu guards and refuses unknown menu behavior (guard=%s)", (guard) => {

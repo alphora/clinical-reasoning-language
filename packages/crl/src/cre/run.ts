@@ -2729,8 +2729,8 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   // REFACTOR:grounded (#320, review 570): a leaf in a local sibling does not
   // evaluate a foreign publication. Resolve its actual declaration before allowing
   // that typed slot. Prepared publication operands/guards are admitted separately below.
-  // Foreign legacy expressions and delegated decisions retain their explicit boundary.
-  // Same-library delegation and menu leaves use this same activity admission;
+  // Delegation is admitted in its owning source scope; foreign legacy expressions
+  // retain their explicit boundary. Delegated decisions and menu leaves use this activity admission;
   // action guards retain their separate publication/foreign-expression checks.
   // This is a one-hop activity-label check, not full FHIR closure validation.
   // Transitive and other-resource identity collisions remain the emitter's checks;
@@ -2754,15 +2754,27 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
   if (coveredScope !== undefined) registerActivityLibrary(filePath, coveredScope.localNames.activities);
   const preparedConcepts = new Map<string, ConceptEntry>();
   const publicationScopeErrors = new Set<string>();
-  const qualifiedLibraries = (node: unknown, allowLeafActivities: boolean, names = new Set<string>()): Set<string> => {
+  const admittedDecisions = new Set<string>();
+  const qualifiedLibraries = (node: unknown, allowLeafActivities: boolean, names = new Set<string>(), from = filePath): Set<string> => {
+    const owner = entriesByPath.get(from);
+    const ownerLib = owner?.ast.library.name ?? coveredLib;
+    const ownerScope = scopes.get(from);
     if (node === null || typeof node !== "object") return names;
     if (Array.isArray(node)) {
-      for (const child of node) qualifiedLibraries(child, allowLeafActivities, names);
+      for (const child of node) qualifiedLibraries(child, allowLeafActivities, names, from);
     } else {
       const value = node as Record<string, unknown>;
       // REFACTOR:grounded (#320, plan593): the shared program validates every publication
       // body and its concept/terminology dependencies in the owning source scope.
       if (value.type === "Concept" && value.shapeReduction !== undefined) return names;
+      // Runtime and rendering indexes use library/name keys. An admitted package
+      // decision must not read a local namesake's criterion or legacy concept body.
+      if (value.type === "Criterion" && criterionTablesByLib.get(ownerLib)?.get(value.name as string) !== node) {
+        publicationScopeErrors.add(`publication-ambiguous-scope: criterion ${labelOf(ownerLib, value.name as string)} resolves to different source owners in CRE and the prepared emitted closure.`);
+      }
+      if (value.type === "Concept" && concepts.get(idOf(ownerLib, value.name as string))?.filePath !== from) {
+        publicationScopeErrors.add(`publication-ambiguous-scope: legacy concept ${labelOf(ownerLib, value.name as string)} resolves to different source owners in CRE and the prepared emitted closure.`);
+      }
       if (value.type === "CELDefinedByField") {
         const ref = value.ref as ReferenceName;
         const target = resolveDefinedByTarget(ref, graph);
@@ -2788,32 +2800,62 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
           return names;
         }
       }
+      // A decision reference is a typed action target, not a foreign concept expression.
+      // Keep registry-based runtime/view-model resolution, but prove that its source
+      // matches the caller's include scope and the prepared emitted closure first.
+      if (allowLeafActivities && value.type === "UseDecision") {
+        const ref = value.decisionName as ReferenceName;
+        const qualifier = getRefLibrary(ref);
+        const target = !qualifier || qualifier === ownerLib
+          ? ownerScope && { filePath: from, names: ownerScope.localNames }
+          : ownerScope && lookupKnownLibrary(ownerScope, qualifier);
+        const resolved = resolveDecision(ownerLib, ref);
+        if (!target?.names.decisions.has(getRefName(ref)) || !resolved) {
+          publicationScopeErrors.add(`publication-unresolved-decision: decision ${labelOf(qualifier ?? ownerLib, getRefName(ref))} does not resolve in its caller's scope.`);
+        } else if (resolved.filePath !== target.filePath) {
+          publicationScopeErrors.add(`publication-ambiguous-scope: decision ${labelOf(resolved.lib, resolved.decision.name)} resolves to different source owners in CRE and its caller's include scope.`);
+        } else if (!publicationProgram?.declarations.getLibrary(target.filePath)) {
+          publicationScopeErrors.add(`publication-unsupported-scope: delegated decision ${labelOf(resolved.lib, resolved.decision.name)} is outside the prepared emitted closure.`);
+        } else {
+          const key = JSON.stringify([resolved.filePath, resolved.decision.name]);
+          if (!admittedDecisions.has(key)) {
+            admittedDecisions.add(key);
+            const delegatedOwner = entriesByPath.get(resolved.filePath);
+            // The emitter consumes the participating library, not just the reached branch.
+            // Include its criterion definitions and activity identity checks in admission.
+            const delegatedScope = scopes.get(resolved.filePath);
+            if (delegatedScope) registerActivityLibrary(resolved.filePath, delegatedScope.localNames.activities);
+            if (delegatedOwner) qualifiedLibraries(delegatedOwner.ast, true, names, resolved.filePath);
+          }
+        }
+        return names;
+      }
       let resolvedActivity = false;
-      if (allowLeafActivities && value.type === "RecommendActivity" && coveredScope !== undefined) {
+      if (allowLeafActivities && value.type === "RecommendActivity" && ownerScope !== undefined) {
         const ref = value.activityName as ReferenceName;
         const name = getRefName(ref);
         const qualifier = getRefLibrary(ref);
-        const target = !qualifier || qualifier === coveredLib
-          ? { filePath, origin: coveredScope.origin, names: coveredScope.localNames }
-          : lookupKnownLibrary(coveredScope, qualifier);
-        if (target !== undefined && (!qualifier || qualifier === coveredLib || target.origin !== "package") && target.names.activities.has(name)) {
+        const target = !qualifier || qualifier === ownerLib
+          ? { filePath: from, origin: ownerScope.origin, names: ownerScope.localNames }
+          : lookupKnownLibrary(ownerScope, qualifier);
+        if (target !== undefined && (!qualifier || qualifier === ownerLib || target.origin !== "package") && target.names.activities.has(name)) {
           resolvedActivity = true;
           registerActivityLibrary(target.filePath, target.names.activities);
         } else {
-          activityErrors.add(qualifier && qualifier !== coveredLib && target?.origin === "package" && target.names.activities.has(name)
+          activityErrors.add(qualifier && qualifier !== ownerLib && target?.origin === "package" && target.names.activities.has(name)
             ? `publication-unsupported-activity: package activity "${qualifier}"."${name}" is outside the local sibling evaluation scope.`
-            : `publication-unresolved-activity: activity "${qualifier ?? coveredLib}"."${name}" does not resolve: ${target === undefined ? "target library is not available" : "target library does not declare this activity"}.`);
+            : `publication-unresolved-activity: activity "${qualifier ?? ownerLib}"."${name}" does not resolve: ${target === undefined ? "target library is not available" : "target library does not declare this activity"}.`);
         }
       }
       if (value.type === "QualifiedReference" && typeof value.libraryName === "string") {
-        const hit = publicationProgram?.declarations.lookupConcept(filePath, value as unknown as ReferenceName);
+        const hit = publicationProgram?.declarations.lookupConcept(from, value as unknown as ReferenceName);
         if (hit?.kind === "hit" && hit.node.shapeReduction !== undefined &&
           (preparedConcepts.get(idOf(hit.identity.libraryName, hit.identity.conceptName)) ?? concepts.get(idOf(hit.identity.libraryName, hit.identity.conceptName)))?.filePath === hit.identity.sourceIdentity) return names;
-        names.add(value.libraryName);
+        if (value.libraryName !== ownerLib) names.add(value.libraryName);
       }
       for (const [key, child] of Object.entries(value)) {
         if (resolvedActivity && key === "activityName") continue;
-        qualifiedLibraries(child, allowLeafActivities, names);
+        qualifiedLibraries(child, allowLeafActivities, names, from);
       }
     }
     return names;
@@ -2958,14 +3000,14 @@ function runCelInternal(graph: ResolvedCelGraph, opts?: { now?: Date }): Omit<Ce
         if (owner) preparedConcepts.set(id, { node, lib: library.libraryName, filePath: library.sourceIdentity, entryName: owner.name, fallbackLib: library.libraryName });
       }
       const hasForeignReference = (node: unknown, allowLeafActivities: boolean): boolean =>
-        [...qualifiedLibraries(node, allowLeafActivities)].some(name => name !== coveredLib);
+        qualifiedLibraries(node, allowLeafActivities).size > 0;
       // Run both walks before combining results so neither loses its diagnostics to short-circuiting.
       const foreignCrlReference = hasForeignReference(graph.coversTarget.ast, true);
       const foreignCelReference = hasForeignReference(graph.cel, false);
       const unsupportedScope = foreignCrlReference || foreignCelReference ||
         [...publicationPaths].some(source => publicationProgram!.declarations.getLibrary(source) === undefined);
       admissionErrors.push(...activityErrors, ...publicationScopeErrors);
-      if (unsupportedScope) admissionErrors.push("publication-unsupported-scope: CRE admits prepared publication dependencies and local sibling activities; foreign legacy expressions, delegated decisions, and publications outside the emitted closure remain unsupported.");
+      if (unsupportedScope) admissionErrors.push("publication-unsupported-scope: CRE admits prepared publication dependencies, scoped delegated decisions and local sibling activities; foreign legacy expressions and publications outside the emitted closure remain unsupported.");
       if (admissionErrors.length) publicationError = [...new Set(admissionErrors)].join("\n");
       else {
         // Commit prepared owners only after admission succeeds; failed contexts keep

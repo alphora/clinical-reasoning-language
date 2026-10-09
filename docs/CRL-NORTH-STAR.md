@@ -230,8 +230,10 @@ operands and direct publication guards. Prepared source identity owns each opera
 participating prepared source owners sharing a library/concept cache key are explicitly refused.
 During prepared-publication evaluation, CEL-backed assertions must resolve to the same
 concept and source owner CRE evaluates, including shadows outside the prepared closure.
-This admission guard does not certify the separate legacy-only evaluation path. Foreign legacy
-expressions, delegated decisions, and CEL-only publications outside that closure remain unsupported.
+This admission guard does not certify the separate legacy-only evaluation path. Delegated decisions
+inside the prepared emitted closure are evaluated in their own source scope, including imported
+publication guards; mismatched caller-scope/runtime owners are refused. Foreign legacy expressions
+and CEL-only publications outside that closure remain unsupported.
 Installed CRL source is prepared under the consumer project's canonical base and policy identity;
 this does not certify compatibility with separately compiled package artifacts. Native package
 identity parity remains unverified. CRE is not the full CQL/FHIR artifact preflight: includes and package resolution still require

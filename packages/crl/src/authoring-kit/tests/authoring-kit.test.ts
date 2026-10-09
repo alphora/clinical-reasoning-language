@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.33");
+    expect(kit.schemaVersion).toBe("2.34");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -643,6 +643,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     // the false-coupling guard survives: independent lookalikes still duplicate inline
     expect(rule!.rule).toContain("Never couple independently owned policies");
     expect(rule!.rule).toContain("regenerate/check provenance");
+    expect(rule!.rule).toContain("same-library and cross-library delegation inside the prepared emitted closure");
+    expect(rule!.rule).toContain("Missing targets, mismatched include/runtime owners");
+    expect(rule!.rule).not.toContain("refuses foreign delegated decisions");
     // the invented-boundary invariant clause still anchors to the composition lens
     const invented = (rule!.clauses ?? []).find(
       (c) =>
@@ -673,8 +676,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.33");
-    expect(kit.contentHash).toBe("2560908e70c401e8d963470a1a30df67b984ef8d9bdd6248c1faec12ee8cff1e");
+    expect(kit.schemaVersion).toBe("2.34");
+    expect(kit.contentHash).toBe("c702d3adde3a92bf23d6b978c7141cef89e24fab9cd9821b8458f65fe5f68cd3");
   });
 
   // @kit criterion:description-navigation

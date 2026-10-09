@@ -62,7 +62,10 @@ Decisions contain branches, not bare top-level action lists. A guarded action
 block can invoke several decisions when its common applicability is real.
 For unconditional independent determinations without such a gate, invoke the
 actual roots separately; do not invent an always-true question to fit syntax.
-Current CRE publication preparation refuses foreign decision delegation.
+CRE publication preparation supports linked decisions inside the prepared emitted
+closure in each decision's own source scope. Caller-scope/runtime owner mismatches
+are refused; foreign legacy expressions remain a separate limitation. Each decision
+emits a distinct PlanDefinition, and `use decision` addresses its canonical URL.
 
 Native forms and route-focused MV cards can differ. Do not assume a decisive
 Boolean value suppresses every other input in the native returned form. Verify
