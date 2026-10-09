@@ -27,7 +27,12 @@ export function produceHasValueCandidate(
       ? "valueBoolean"
       : producer.operandValueType === "string"
         ? "valueString"
-        : producer.operandValueType === "dateTime" ? "valueDateTime" : "valueCodeableConcept";
+        : producer.operandValueType === "dateTime" ? "valueDateTime"
+          : producer.operandValueType === "Quantity" ? "valueQuantity" : "valueCodeableConcept";
+  // REFACTOR:grounded (#324): a Quantity wrapper/unit alone is not a numeric answer; zero is.
+  const present = producer.operandValueType === "Quantity"
+    ? (operand?.resource.valueQuantity as Record<string, unknown> | undefined)?.value != null
+    : operand?.resource[choice] != null;
   const id = operand?.resource.id;
   const resource: Record<string, unknown> = {
     resourceType: "Observation",
@@ -38,7 +43,7 @@ export function produceHasValueCandidate(
       descriptor.localCode === undefined
         ? { text: descriptor.title }
         : { coding: [descriptor.localCode], text: descriptor.title },
-    valueBoolean: operand?.resource[choice] != null,
+    valueBoolean: present,
     ...(operand?.resource.effectiveDateTime === undefined
       ? {}
       : { effectiveDateTime: operand.resource.effectiveDateTime }),

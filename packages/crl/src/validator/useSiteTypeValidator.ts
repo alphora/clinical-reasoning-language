@@ -36,6 +36,7 @@ import {
 
 import { assumedShapePreMigration } from "../grammar/conceptShapes";
 import { publicationAdmissionReason, isPublicationAnswerGuard, readPublicationHasValue, readPublicationMembership, readPublicationThreshold } from "../emit/publicationProgram";
+import { publicationQuantityThresholdError } from "../emit/publicationQuantity";
 import { readPublicationBMI } from "../emit/publicationBMI";
 import { readPublicationAnyMembership } from "../template-match/anyMembership";
 import type {
@@ -227,6 +228,9 @@ export class UseSiteTypeValidator {
       const bmi = readPublicationBMI(concept), threshold = readPublicationThreshold(concept);
       const operands = bmi ? [bmi.weight, bmi.height] : threshold ? [threshold.operand] : [];
       if (operands.length) {
+        const thresholdError = threshold && publicationQuantityThresholdError(threshold.threshold);
+        if (thresholdError !== undefined)
+          errors.push(publicationContextMismatch(concept.name, getRefName(threshold!.operand), thresholdError, threshold!.location, attribution));
         const resolveOperand = (ref: ReferenceName) =>
           resolveLib(getRefName(ref), getRefLibrary(ref) ?? undefined, ctx)?.types.concepts.get(getRefName(ref));
         if (bmi !== undefined) {
@@ -254,8 +258,8 @@ export class UseSiteTypeValidator {
     if (presence !== undefined) {
       const name = getRefName(presence.operand);
       const resolved = resolveLib(name, getRefLibrary(presence.operand) ?? undefined, ctx)?.types.concepts.get(name);
-      if (resolved !== undefined && (resolved.publication === undefined || publicationAdmissionReason(resolved.publication) !== undefined || !["boolean", "string", "dateTime", "CodeableConcept"].includes(resolved.publication.valueTypes[0])))
-        errors.push(publicationContextMismatch(concept.name, name, "has-value requires a selected boolean, text, dateTime or CodeableConcept publication", presence.location, attribution));
+      if (resolved !== undefined && (resolved.publication === undefined || publicationAdmissionReason(resolved.publication) !== undefined || !["boolean", "string", "dateTime", "CodeableConcept", "Quantity"].includes(resolved.publication.valueTypes[0])))
+        errors.push(publicationContextMismatch(concept.name, name, "has-value requires a selected boolean, text, dateTime, CodeableConcept or Quantity publication", presence.location, attribution));
       return;
     }
     const membership = concept.shapeReduction !== undefined && publicationAdmissionReason(concept) === undefined

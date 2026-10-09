@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.30");
+    expect(kit.schemaVersion).toBe("2.31");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -361,6 +361,8 @@ describe("authoring-kit — getAuthoringKit", () => {
       "named-answer-reference.cel",
       "named-answer-reference.crl",
       "named-answer-terms.crl",
+      "numeric-intake-reference.cel",
+      "numeric-intake-reference.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
@@ -462,7 +464,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     const crePairs = kit.referenceArtifacts.filter(
       (a) => a.verification.includes("cre-run") && a.name.endsWith(".crl"),
     );
-    expect(crePairs.length).toBe(9); // includes the shared uncertainty CRL/CEL pair
+    expect(crePairs.length).toBe(10); // includes numeric intake and the shared uncertainty pair
     for (const crl of crePairs) {
       const base = crl.name.replace(/\.crl$/, "");
       const cel = byName.get(`${base}.cel`);
@@ -671,8 +673,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.30");
-    expect(kit.contentHash).toBe("4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea");
+    expect(kit.schemaVersion).toBe("2.31");
+    expect(kit.contentHash).toBe("713344a161486ea034ec04d45fe5a465a79d8ec35da6293a9a1cc030ea9f8495");
   });
 
   // @kit criterion:description-navigation

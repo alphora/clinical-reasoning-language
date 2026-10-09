@@ -37,6 +37,12 @@ export function publicationDecimal(value: number): { coefficient: bigint; scale:
 export function isPublicationComparisonDecimal(value: number): boolean {
   return Number.isFinite(value) && Math.abs(value) <= 1e6 && publicationDecimal(value).scale <= 100000000n;
 }
+/** The same authored threshold admission is used by validation and executable preparation. */
+export function publicationQuantityThresholdError(threshold: { value: number; unit: string }): string | undefined {
+  return !isPublicationComparisonDecimal(threshold.value) || !Object.prototype.hasOwnProperty.call(units, threshold.unit)
+    ? "Quantity threshold requires a finite value and a supported unit: m, cm, kg, g, kg/m2."
+    : undefined;
+}
 export function publicationQuantityAtLeast(value: unknown, threshold: { value: number; unit: string }):
   { kind: "unknown" } | { kind: "known"; value: boolean } | PublicationValueError {
   const q = readPublicationQuantity(value);

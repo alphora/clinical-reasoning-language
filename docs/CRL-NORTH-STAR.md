@@ -152,9 +152,9 @@ Text intake uses explicit selected Record/Observation publications; `text` is an
 The separate `"Answer" has a value` producer publishes a Boolean about the selected answer slot, not a
 clinical determination or dataset completeness. It preserves false and recognized coded Unknown/N/A as
 answered; absent records or absent primitive values yield false without inventing validity. This bounded
-producer admits selected Boolean, string, dateTime and domain-interpreted CodeableConcept operands; it is not a
+producer admits selected Boolean, string, dateTime, domain-interpreted CodeableConcept and Quantity operands; it is not a
 legacy pipeline or projection stage. Errors propagate. See [typed intake answers](typed-intake-answers.md)
-for the request/clear contract and native FHIR parser boundary.
+for the request/clear contract and native FHIR parser boundary. Quantity presence tests its numeric value: zero is answered, unit-only or extension-only numeric values are unanswered. It imposes no threshold or conversion. Existing populated exact-Quantity checks and selection errors remain in force; valueless unit metadata and UCUM lexical validity retain existing validation limits.
 
 Quantity measurements can use explicit Record/Observation publication with `shape reduction is most recent`.
 An Observation source preserves its Quantity and effectiveDateTime while projecting the analytical identity.

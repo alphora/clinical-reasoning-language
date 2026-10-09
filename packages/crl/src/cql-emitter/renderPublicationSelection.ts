@@ -2,6 +2,8 @@
 // The source adapter must supply faithful validity strings; FHIR dateTime conversion is a separate seam.
 import { cqlStringLiteral } from "./cqlStrings";
 import { PUBLICATION_OBSERVATION_STATUSES } from "../emit/publicationProgram";
+// Match ECMAScript trim's blank characters without changing the authored unit identity.
+const BLANK_QUANTITY_UNIT = cqlStringLiteral("^[\\x09-\\x0D\\x20\\xA0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]*$");
 
 // v1 is the compiler-internal Observation-candidate ABI. A future resource type needs a
 // distinct typed ABI/version; these reserved names never imply polymorphic FHIR resources.
@@ -51,8 +53,8 @@ export function renderPublicationCandidateHelpers(includeQuantity = false, inclu
 ${fhirValueType === "Quantity" ? `  else if (O.value as FHIR.Quantity).comparator.value is not null
     or ((O.value as FHIR.Quantity).value.value is not null and (
       ((O.value as FHIR.Quantity).system.value is not null and (O.value as FHIR.Quantity).system.value != 'http://unitsofmeasure.org')
-      or ((O.value as FHIR.Quantity).system.value = 'http://unitsofmeasure.org' and Coalesce((O.value as FHIR.Quantity).code.value, '') = '')
-      or Coalesce((O.value as FHIR.Quantity).code.value, (O.value as FHIR.Quantity).unit.value, '') = '')) then
+      or ((O.value as FHIR.Quantity).system.value = 'http://unitsofmeasure.org' and Matches(Coalesce((O.value as FHIR.Quantity).code.value, ''), ${BLANK_QUANTITY_UNIT}))
+      or Matches(Coalesce((O.value as FHIR.Quantity).code.value, (O.value as FHIR.Quantity).unit.value, ''), ${BLANK_QUANTITY_UNIT}))) then
     ${fail("publication-invalid-quantity", "An exact Quantity requires a supported unit identity and no comparator")}
 ` : ""}\
   else if O.effective is not null and not (O.effective is FHIR.dateTime) then

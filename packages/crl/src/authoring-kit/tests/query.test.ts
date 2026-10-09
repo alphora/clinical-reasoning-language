@@ -53,9 +53,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview).not.toHaveProperty("rules");
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
-    // Kit 2.26 adds Patient gender guidance and its complete reference artifact.
-    // Keep the untruncated index bounded (36,293 bytes with this audit metadata).
-    expect(JSON.stringify(overview).length).toBeLessThan(37000);
+    // Keep the complete index bounded; Quantity intake adds two paired artifacts and discovery terms.
+    expect(JSON.stringify(overview).length).toBeLessThan(38000);
     const fullSize = JSON.stringify(query({ view: "full" })).length;
     for (const id of ["rule:criterion", "rule:decision-composition"]) {
       expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);

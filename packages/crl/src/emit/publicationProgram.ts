@@ -13,7 +13,7 @@ import { readGenderProjection } from "./publicationGender";
 import { readAgeProjection } from "./publicationAge";
 import { readPublicationBMI } from "./publicationBMI";
 import { readPublicationAnyMembership } from "../template-match/anyMembership";
-import { readPublicationQuantity, isPublicationComparisonDecimal } from "./publicationQuantity";
+import { readPublicationQuantity, publicationQuantityThresholdError } from "./publicationQuantity";
 import {
   createPublicationContext,
   type PublicationContext,
@@ -61,7 +61,7 @@ export interface PublicationHasValueProducer {
   readonly kind: "hasValue";
   readonly producerId: string;
   readonly operand: QualifiedConceptIdentity;
-  readonly operandValueType: "boolean" | "string" | "dateTime" | "CodeableConcept";
+  readonly operandValueType: PublicationValueType;
 }
 export interface PublicationCode { readonly system: string; readonly code: string }
 export interface PublicationMembershipProducer {
@@ -444,8 +444,8 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         if (operand.node.shapeReduction === undefined) return fail("Has-value requires an explicitly selected Record operand.", presence.location, "publication-has-value-operand-unsupported");
         const prepared = prepare(operand.library, operand.node);
         if (prepared === undefined) return fail("Has-value operand preparation failed.", presence.location, "publication-dependency-failed");
-        if (prepared.valueType !== "boolean" && prepared.valueType !== "string" && prepared.valueType !== "dateTime" && prepared.valueType !== "CodeableConcept")
-          return fail("Has-value supports selected boolean, text, dateTime or CodeableConcept answers; complex-value presence is not defined for this type.", presence.location, "publication-has-value-operand-unsupported");
+        if (!["boolean", "string", "dateTime", "CodeableConcept", "Quantity"].includes(prepared.valueType))
+          return fail("Has-value supports selected boolean, text, dateTime, CodeableConcept or Quantity answers; presence is not defined for this type.", presence.location, "publication-has-value-operand-unsupported");
         producer = Object.freeze({ kind: "hasValue", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["hasValue", 0]]))}`,
           operand: prepared.identity, operandValueType: prepared.valueType });
       }
@@ -457,8 +457,9 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         if (hit.node.shapeReduction === undefined) return fail("Quantity comparison requires an explicitly selected Record operand.", comparison.location, "publication-quantity-operand-unsupported");
         const operand = prepare(hit.library, hit.node);
         if (operand?.valueType !== "Quantity") return fail("Quantity comparison requires a Quantity-valued publication.", comparison.location, "publication-quantity-operand-unsupported");
-        if (!isPublicationComparisonDecimal(comparison.threshold.value) || !["m", "cm", "kg", "g", "kg/m2"].includes(comparison.threshold.unit))
-          return fail("Quantity threshold requires a finite value and a supported unit: m, cm, kg, g, kg/m2.", comparison.location, "publication-quantity-unit-unsupported");
+        const thresholdError = publicationQuantityThresholdError(comparison.threshold);
+        if (thresholdError !== undefined)
+          return fail(thresholdError, comparison.location, "publication-quantity-unit-unsupported");
         producer = Object.freeze({ kind: "quantityThreshold", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["quantityThreshold", 0]]))}`,
           operand: operand.identity, threshold: Object.freeze(comparison.threshold) });
       }

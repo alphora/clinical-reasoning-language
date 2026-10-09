@@ -74,6 +74,7 @@ define function ${q(n.hasValue)}(operand ${result}, producerId System.String, co
       else if valueType = 'boolean' then (operand.selected.resource.value as FHIR.boolean).value is not null
       else if valueType = 'string' then (operand.selected.resource.value as FHIR.string).value is not null
       else if valueType = 'dateTime' then (operand.selected.resource.value as FHIR.dateTime).value is not null
+      else if valueType = 'Quantity' then (operand.selected.resource.value as FHIR.Quantity).value.value is not null
       else operand.selected.resource.value is not null,
       profile, operand.selected.resource, subjectReference),
     validity: operand.selected.validity

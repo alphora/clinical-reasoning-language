@@ -5,7 +5,7 @@ import type { ArtifactRequirements } from "./types";
 
 export function artifactRequirements(name: string): ArtifactRequirements {
   const base = name.replace(/\.(crl|cel)$/, "");
-  const paired = ["intake-reference", "selection-reference", "named-answer-reference", "pa-determination-reference",
+  const paired = ["numeric-intake-reference", "intake-reference", "selection-reference", "named-answer-reference", "pa-determination-reference",
     "source-delegated-decision-reference", "disposition-arbitration-reference",
     "reused-condition-reference", "shared-continuation-reference", "uncertainty-reference"].includes(base);
   const artifacts = paired ? [`artifact:${base}.${name.endsWith(".crl") ? "cel" : "crl"}`] : [];

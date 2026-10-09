@@ -221,10 +221,10 @@ describe("typed intake and selected-value presence", () => {
     expect(emitCQLImports(f.path).success).toBe(false);
     expect(runCel(f.graph).runs.every((r) => r.status !== "pass")).toBe(true);
   });
-  it("rejects complex presence rather than inferring object-not-null semantics", () => {
+  it("admits selected Quantity presence without a numeric threshold", () => {
     const p = program(INTAKE_CRL.replace("value type is text", "value type is Quantity"));
     expect(p.diagnostics.some((d) => d.kind === "publication-has-value-operand-unsupported")).toBe(
-      true,
+      false,
     );
   });
   it("resolves foreign text dependencies into the form without extra guard profiles", () => {
