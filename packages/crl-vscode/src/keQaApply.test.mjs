@@ -19,6 +19,7 @@ function fixture(){
  writeFileSync(cel,'library "Cases". covers "L".\nfact "Patient": - name is "Synthetic". - birth date is "1970-01-01". - defined by "Patient".\nfact "Answer": - value is "yes". - date is "2026-10-09". - defined by "L"."Q".\ncase "Selected": - subject is "Patient". - fact is "Answer". - result is "D" is "Met".\ncase "Unanswered": - subject is "Patient". - result is "D" is pause.\n');
  const emission=emitCrlTwoLane(f.policy,{date:'2026-10-09',capability:'publishable'});assert.equal(emission.success,true,JSON.stringify(emission));writeTwoLane(emission,join(f.root,'src'));
  const services={storageRoot:join(f.root,'..','ke-tests-'+f.root.split(/[\\/]/).at(-1)),crlVersion:'6.4.38'};
+ if(process.platform==='win32')services.storageRoot=services.storageRoot.replace(/^[A-Za-z]/,c=>c===c.toUpperCase()?c.toLowerCase():c.toUpperCase());
  const beforeClose=f.close;f.close=()=>{beforeClose();rmSync(services.storageRoot,{recursive:true,force:true});};
  const selection=()=>loadFlags(f.flags).flags.filter(f=>f.editRequest).map(f=>({id:f.id,revision:mvFlagRevision(f)}));
  const call=(operation,extra={})=>runKeUpdates({schemaVersion:1,operation,artifactRoot:f.root,requests:selection()}, {...services,...extra});

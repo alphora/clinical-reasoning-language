@@ -95,6 +95,7 @@ test('cross-library subdecision files are not counted as separate policy entries
   const policy=join(root,'root.crl'),otherDriveCase=policy.replace(/^[A-Za-z]/,c=>c===c.toUpperCase()?c.toLowerCase():c.toUpperCase());
   assert.notEqual(otherDriveCase,policy);
   assert.doesNotThrow(()=>assertSingleLocalPolicy(root,otherDriveCase,mvPublicationOptions(root)));
+  assert.doesNotThrow(()=>assertSingleLocalPolicy(root.toLowerCase(),policy,mvPublicationOptions(root)));
  }
 });
 test('live-only generated paths and publication-field drift refuse destructive regeneration',()=>{

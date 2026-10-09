@@ -68,7 +68,7 @@ function applySourceRequests(root:string,policy:string,selected:MvFlag[]){
       const next=planPresentationEdit(source,{library:r.target.library,concept:r.target.concept,context:r.target.context,questionText:r.desired.text,questionDescription:r.desired.description}).candidateSource;
       writeFileSync(file,next);changes.push({file:r.target.file,before:source,after:next});
     }else{
-      const target=answerTarget(policy,r);if(resolve(target.filePath)!==file)throw Error('The answer source owner changed.');
+      const target=answerTarget(policy,r);if(relative(resolve(target.filePath),file)!=='')throw Error('The answer source owner changed.');
       const authored=answerSourceState(target,r.target.system,r.target.code);if(equal(authored,r.desired)){if(r.desired===null)deleted.push({system:r.target.system,code:r.target.code,consumers:target.consumers});continue;}
       if(!equal(authored,r.before))throw Error('Answer content differs from both the baseline and requested state.');
       if(!target.editable || !target.systems.includes(r.target.system))throw Error(target.readOnlyReason??'This answer is not locally owned.');
@@ -100,7 +100,7 @@ function clearDeletedSelections(root:string,deleted:DeletedOption[]){
     for(const fact of graph.cel.statements)if(fact.type==='CELFact'){
       const db=fact.body.find(b=>b.type==='CELDefinedByField'),value=fact.body.find(b=>b.type==='CELValueField');if(!db || db.type!=='CELDefinedByField' || !value || value.type!=='CELValueField' || value.value.kind!=='string')continue;
       const target=resolveDefinedByTarget(db.ref,graph);if(!target || target.kind!=='concept')continue;
-      if(!deleted.some(d=>(value.value.value===d.code || value.value.value===d.system+'|'+d.code) && d.consumers.some(c=>c.library===target.lib && c.concept===target.name && resolve(c.filePath)===resolve(target.sourceIdentity))))continue;
+      if(!deleted.some(d=>(value.value.value===d.code || value.value.value===d.system+'|'+d.code) && d.consumers.some(c=>c.library===target.lib && c.concept===target.name && relative(resolve(c.filePath),resolve(target.sourceIdentity))==='')))continue;
       const index=tokens.findIndex(t=>t.line===value.location.start.line && t.column===value.location.start.column),dash=tokens[index-1];
       const dot=tokens.slice(index).find(t=>t.type==='DOT' && offset(t)>=offset(value.location.end));
       if(dash?.type!=='DASH' || !dot)throw Error('CEL answer field boundaries could not be resolved.');
@@ -120,7 +120,7 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
   const root=resolve(input.artifactRoot);if(input.schemaVersion!==1 || !['discover','preview','apply','recover'].includes(input.operation))throw Error('Unsupported KE Updates request.');
   assertOrdinaryEditPath(root);if(!existsSync(join(root,'package.json')))throw Error('Select the owning artifact package.');
   assertOrdinaryEditPath(services.storageRoot);
-  if(inside(root,resolve(services.storageRoot)) || resolve(services.storageRoot)===root)throw Error('KE temporary storage must be outside the artifact.');
+  if(inside(root,resolve(services.storageRoot)) || relative(root,resolve(services.storageRoot))==='')throw Error('KE temporary storage must be outside the artifact.');
   const recoveryRoot=join(services.storageRoot,'recovery',createHash('sha256').update(process.platform==='win32'?root.toLowerCase():root).digest('hex'));
   const recovery=inspectMvEdits(recoveryRoot,root,true),incomplete=recovery.transactions.filter(t=>['prepared','publishing','recovery-required'].includes(t.state.phase));
   if(input.operation==='discover')return {ok:true,...discoverKeUpdates(root),recoveryRequired:incomplete.length>0 || recovery.errors.length>0};

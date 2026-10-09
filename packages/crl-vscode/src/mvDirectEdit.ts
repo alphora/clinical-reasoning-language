@@ -68,6 +68,7 @@ export function authoredCrlFiles(root: string): string[] {
 
 /** Independent entries exclude files reached through another include closure. Cycles/diagnostic failures refuse. */
 export function assertSingleLocalPolicy(projectRoot: string, policyPath: string, options: DefinitionPublicationOptions): void {
+  const fileKey = (file: string): string => process.platform === 'win32' ? resolve(file).toLowerCase() : resolve(file);
   const inventory = authoredCrlFiles(projectRoot), candidates: string[] = [], included = new Set<string>();
   const libraries = new Map<string, string>(), called = new Set<string>();
   for (const file of inventory) {
@@ -88,12 +89,12 @@ export function assertSingleLocalPolicy(projectRoot: string, policyPath: string,
     if (graph.diagnostics.some(d => d.severity === 'error' || ['parse-failure', 'registry-duplicate', 'package-resolution-failure'].includes(d.kind))) {
       throw new Error(`Local CRL discovery is incomplete: ${file}: ${JSON.stringify(graph.diagnostics)}`);
     }
-    for (const library of graph.resolvedLibraries) if (resolve(library.filePath) !== resolve(file) && contains(projectRoot, library.filePath)) included.add(resolve(library.filePath));
+    for (const library of graph.resolvedLibraries) if (fileKey(library.filePath) !== fileKey(file) && contains(projectRoot, library.filePath)) included.add(fileKey(library.filePath));
     if (parsed.result.statements.some(s => s.type === 'Decision')) candidates.push(file);
   }
-  for (const name of called) { const file = libraries.get(name); if (file) included.add(resolve(file)); }
+  for (const name of called) { const file = libraries.get(name); if (file) included.add(fileKey(file)); }
   const roots: string[] = [];
-  for (const file of candidates.filter(f => !included.has(resolve(f)))) {
+  for (const file of candidates.filter(f => !included.has(fileKey(f)))) {
     const result = emitCrlTwoLane(file, options);
     if (!result.success) throw new Error(`Cannot classify independent policy entry: ${file}`);
     const workflows = result.fhir.resources.filter(r => r.resource.resourceType === 'PlanDefinition' &&
