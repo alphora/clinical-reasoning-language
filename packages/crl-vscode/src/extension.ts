@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { registerPresentationEditor } from "./presentationEditor";
+import { registerKeUpdates } from './keUpdatesCommand';
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { claudeCodeTarget, resolveAutoProvisionMode, decideProvisioning, isProvisionedByPath, refreshMcpEnv, type ProvisionContext, type ProvisionDecision } from "./provision";
@@ -281,6 +282,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
   registerScenarioRunner(context);
   registerPresentationEditor(context);
+  registerKeUpdates(context);
   registerProvenancePanel(context);
   registerCorrespondenceCockpit(context);
   // DEV-HOST ONLY. The CSP harness is an instrument, not a feature: it answered the LForms policy question and
