@@ -12,6 +12,7 @@ import {qaFixture} from './qaFlagEditingFixture.mjs';
 import {saveQuestionRequest,saveAnswerRequest} from './qaFlagEditing.ts';
 import {runKeUpdates,discoverKeUpdates} from './keQaApply.ts';
 import {MvEditTransaction,EditInterrupted,readEditTree} from './mvEditTransaction.ts';
+import {KeAppController} from './keAppController.ts';
 function fixture(){
  const f=qaFixture(),pkg=JSON.parse(readFileSync(join(f.root,'package.json'),'utf8'));pkg.crl.date='2026-10-09';writeFileSync(join(f.root,'package.json'),JSON.stringify(pkg));
  writeFileSync(f.policy,f.source.replace('library "L".','library "L".\ninclude "Terms".')+'\nactivity "Met":\n- request CPGCommunicationRequest.\ndecision "D":\n- when "Q" then recommend activity "Met".\n');
@@ -19,6 +20,7 @@ function fixture(){
  writeFileSync(cel,'library "Cases". covers "L".\nfact "Patient": - name is "Synthetic". - birth date is "1970-01-01". - defined by "Patient".\nfact "Answer": - value is "yes". - date is "2026-10-09". - defined by "L"."Q".\ncase "Selected": - subject is "Patient". - fact is "Answer". - result is "D" is "Met".\ncase "Unanswered": - subject is "Patient". - result is "D" is pause.\n');
  const emission=emitCrlTwoLane(f.policy,{date:'2026-10-09',capability:'publishable'});assert.equal(emission.success,true,JSON.stringify(emission));writeTwoLane(emission,join(f.root,'src'));
  const services={storageRoot:join(f.root,'..','ke-tests-'+f.root.split(/[\\/]/).at(-1)),crlVersion:'6.4.38'};
+ if(process.platform==='win32')services.storageRoot=services.storageRoot.replace(/^[A-Za-z]/,c=>c===c.toUpperCase()?c.toLowerCase():c.toUpperCase());
  const beforeClose=f.close;f.close=()=>{beforeClose();rmSync(services.storageRoot,{recursive:true,force:true});};
  const selection=()=>loadFlags(f.flags).flags.filter(f=>f.editRequest).map(f=>({id:f.id,revision:mvFlagRevision(f)}));
  const call=(operation,extra={})=>runKeUpdates({schemaVersion:1,operation,artifactRoot:f.root,requests:selection()}, {...services,...extra});
@@ -43,6 +45,17 @@ test('KE refuses a changed selection and authored divergence without any live wr
  const f=fixture();try{saveQuestionRequest(f.root,f.flags,f.wording(),'Requested?','');const selected=f.selection();
   await assert.rejects(()=>runKeUpdates({schemaVersion:1,operation:'preview',artifactRoot:f.root,requests:[{...selected[0],revision:'wrong'}]},f.services),/request changed/);
   writeFileSync(f.policy,readFileSync(f.policy,'utf8').replace('Authored question?','Different author?'));const before=snapshot(f.root);await assert.rejects(()=>f.call('apply'),/baseline and requested/);assert.deepEqual(snapshot(f.root),before);
+ }finally{f.close();}
+});
+// @kit mv-wording-patches:ke-app-preview
+test('KE app real preview combines final source edits, includes deleted CEL selections, and invalidates changed CEL inputs',async()=>{
+ const f=fixture();try{
+  saveQuestionRequest(f.root,f.flags,f.wording(),'Requested?','Detail');
+  saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'create',system:f.system,code:'replacement',display:'Replacement',description:'',qualifications:{'["L","Q"]':true}});
+  saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'delete',system:f.system,code:'yes'});
+  const before=snapshot(f.root),mv=mvBytes(f),preview=await f.call('preview');assert.equal(preview.changes.length,new Set(preview.changes.map(c=>c.file)).size);
+  const cel=preview.changes.find(c=>c.file==='src/cel/mv/cases.cel');assert.ok(cel);assert.match(cel.before,/- value is "yes"/);assert.doesNotMatch(cel.after,/- value is "yes"/);assert.deepEqual(preview.refreshedFolders,['tests/results','tests/data/fhir']);assert.deepEqual(snapshot(f.root),before);
+  let applied=false;const c=new KeAppController(f.root,async input=>{if(input.operation==='apply'){applied=true;throw Error('Must refuse before apply');}return await runKeUpdates(input,f.services);});await c.act('refresh');c.select(c.state.requests.map(r=>r.id));await c.act('preview');writeFileSync(f.cel,readFileSync(f.cel,'utf8')+'\n// changed case input\n');await c.act('run');assert.equal(applied,false);assert.match(c.state.error,/Preview again/);assert.deepEqual(mvBytes(f),mv);
  }finally{f.close();}
 });
 test('ok producer outcome with failed cases blocks all live publication',async()=>{
@@ -75,7 +88,7 @@ const native=process.env.CRL_KE_NATIVE_ACCEPTANCE==='1'?test:test.skip;
 native('native KE application updates definitions and static Q/QR, leaves pending MV flags untouched, repeats without writes',async()=>{
  const f=fixture();try{saveQuestionRequest(f.root,f.flags,f.wording(),'Requested question?','Requested detail');saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Requested Yes',description:'Requested answer detail'});
   const mv=mvBytes(f),activities=definitions(f).filter(r=>r.resource.resourceType==='ActivityDefinition');assert.ok(activities.length);
-  const result=await f.call('apply');assert.equal(result.state,'changed');assert.deepEqual(mvBytes(f),mv);assert.deepEqual(definitions(f).filter(r=>r.resource.resourceType==='ActivityDefinition'),activities);
+  const app=new KeAppController(f.root,input=>runKeUpdates(input,f.services));await app.act('refresh');app.select(app.state.requests.map(r=>r.id));await app.act('preview');assert.equal(app.state.error,undefined);await app.act('run');assert.equal(app.state.error,undefined);const result=app.state.result;assert.equal(result.state,'changed');assert.deepEqual(mvBytes(f),mv);assert.deepEqual(definitions(f).filter(r=>r.resource.resourceType==='ActivityDefinition'),activities);
   const resources=forms(f);assert.ok(resources.some(r=>r.resourceType==='Questionnaire'));const rendered=JSON.stringify(resources);assert.match(rendered,/Requested question/);assert.match(rendered,/Requested detail/);assert.match(rendered,/Requested Yes/);
   writeFileSync('tmp/mv-ke-workflow/native-request-forms.json',JSON.stringify(resources,null,2));
   for(const type of ['ValueSet','CodeSystem'])assert.match(JSON.stringify(definitions(f).filter(r=>r.resource.resourceType===type)),/Requested answer detail/);assert.ok(loadFlags(f.flags).flags.every(f=>f.status==='open'));

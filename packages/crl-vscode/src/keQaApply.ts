@@ -68,7 +68,7 @@ function applySourceRequests(root:string,policy:string,selected:MvFlag[]){
       const next=planPresentationEdit(source,{library:r.target.library,concept:r.target.concept,context:r.target.context,questionText:r.desired.text,questionDescription:r.desired.description}).candidateSource;
       writeFileSync(file,next);changes.push({file:r.target.file,before:source,after:next});
     }else{
-      const target=answerTarget(policy,r);if(resolve(target.filePath)!==file)throw Error('The answer source owner changed.');
+      const target=answerTarget(policy,r);if(relative(resolve(target.filePath),file)!=='')throw Error('The answer source owner changed.');
       const authored=answerSourceState(target,r.target.system,r.target.code);if(equal(authored,r.desired)){if(r.desired===null)deleted.push({system:r.target.system,code:r.target.code,consumers:target.consumers});continue;}
       if(!equal(authored,r.before))throw Error('Answer content differs from both the baseline and requested state.');
       if(!target.editable || !target.systems.includes(r.target.system))throw Error(target.readOnlyReason??'This answer is not locally owned.');
@@ -100,7 +100,7 @@ function clearDeletedSelections(root:string,deleted:DeletedOption[]){
     for(const fact of graph.cel.statements)if(fact.type==='CELFact'){
       const db=fact.body.find(b=>b.type==='CELDefinedByField'),value=fact.body.find(b=>b.type==='CELValueField');if(!db || db.type!=='CELDefinedByField' || !value || value.type!=='CELValueField' || value.value.kind!=='string')continue;
       const target=resolveDefinedByTarget(db.ref,graph);if(!target || target.kind!=='concept')continue;
-      if(!deleted.some(d=>(value.value.value===d.code || value.value.value===d.system+'|'+d.code) && d.consumers.some(c=>c.library===target.lib && c.concept===target.name && resolve(c.filePath)===resolve(target.sourceIdentity))))continue;
+      if(!deleted.some(d=>(value.value.value===d.code || value.value.value===d.system+'|'+d.code) && d.consumers.some(c=>c.library===target.lib && c.concept===target.name && relative(resolve(c.filePath),resolve(target.sourceIdentity))==='')))continue;
       const index=tokens.findIndex(t=>t.line===value.location.start.line && t.column===value.location.start.column),dash=tokens[index-1];
       const dot=tokens.slice(index).find(t=>t.type==='DOT' && offset(t)>=offset(value.location.end));
       if(dash?.type!=='DASH' || !dot)throw Error('CEL answer field boundaries could not be resolved.');
@@ -120,7 +120,7 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
   const root=resolve(input.artifactRoot);if(input.schemaVersion!==1 || !['discover','preview','apply','recover'].includes(input.operation))throw Error('Unsupported KE Updates request.');
   assertOrdinaryEditPath(root);if(!existsSync(join(root,'package.json')))throw Error('Select the owning artifact package.');
   assertOrdinaryEditPath(services.storageRoot);
-  if(inside(root,resolve(services.storageRoot)) || resolve(services.storageRoot)===root)throw Error('KE temporary storage must be outside the artifact.');
+  if(inside(root,resolve(services.storageRoot)) || relative(root,resolve(services.storageRoot))==='')throw Error('KE temporary storage must be outside the artifact.');
   const recoveryRoot=join(services.storageRoot,'recovery',createHash('sha256').update(process.platform==='win32'?root.toLowerCase():root).digest('hex'));
   const recovery=inspectMvEdits(recoveryRoot,root,true),incomplete=recovery.transactions.filter(t=>['prepared','publishing','recovery-required'].includes(t.state.phase));
   if(input.operation==='discover')return {ok:true,...discoverKeUpdates(root),recoveryRequired:incomplete.length>0 || recovery.errors.length>0};
@@ -130,7 +130,7 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
     for(const transaction of incomplete)transaction.recover();
     return {ok:true,schemaVersion:1,state:'recovered',requiredScopes:scopes,changedPaths};
   }
-  if(incomplete.length || recovery.errors.length)throw Error('An interrupted KE update needs recovery. Lock the KE scopes and invoke recover before applying another update.');
+  if(incomplete.length || recovery.errors.length)throw Error('An interrupted KE update needs recovery. Invoke recover before applying another update.');
   const selected=selectedRequests(root,input.requests),suite=resolveCelSuite(root);if(!suite.ok || !suite.suite.policyPath)throw Error('The artifact has no unique policy and MV case suite.');
   const policy=suite.suite.policyPath,publication=mvPublicationOptions(root);assertSingleLocalPolicy(root,policy,publication);
   mkdirSync(services.storageRoot,{recursive:true});
@@ -145,7 +145,19 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
     const units:EditUnit[]=sourceFiles.map(file=>({path:join(root,file),after:readEditTree(join(stage,file))}));
     for(const lane of ['cql','fhir'])units.push({path:join(root,'src',lane),after:preservePlaceholders(readEditTree(join(root,'src',lane)),readEditTree(join(stage,'src',lane)))});
     const changed=()=>units.filter(u=>!equal(editTreeIdentity(readEditTree(u.path)),editTreeIdentity(u.after)));
-    if(input.operation==='preview')return {ok:true,schemaVersion:1,state:'preview',requiredScopes:scopes,requests:input.requests,changes:sourcePlan.changes,clearedCases:cleared,changedPaths:changed().map(u=>relative(root,u.path).replace(/\\/g,'/'))};
+    if(input.operation==='preview'){
+      const changes=changed();
+      const sourceChanges=changes.filter(u=>/^(?:src[\\/]crl|src[\\/]cel)[\\/]/.test(relative(root,u.path))).map(u=>({
+        file:relative(root,u.path).replace(/\\/g,'/'),before:readFileSync(u.path,'utf8'),after:u.after.kind==='file'?Buffer.from(u.after.bytes).toString('utf8'):''
+      }));
+      const basis=createHash('sha256').update(canonicalMvValue({
+        inputs:['package.json','src/crl','src/cel'].map(file=>({file,identity:editTreeIdentity(readEditTree(join(root,file)))})),
+        units:units.map(u=>({file:relative(root,u.path).replace(/\\/g,'/'),before:editTreeIdentity(readEditTree(u.path)),after:editTreeIdentity(u.after)}))
+      })).digest('hex');
+      return {ok:true,schemaVersion:1,state:'preview',requiredScopes:scopes,requests:input.requests,changes:sourceChanges,clearedCases:cleared,
+        changedPaths:changes.map(u=>relative(root,u.path).replace(/\\/g,'/')),basis,
+        refreshedFolders:['tests/results',...(cleared.length?['tests/data/fhir']:[])]};
+    }
     if(!changed().length && nativeResultsCurrent(root,digest,pd,services.crlVersion)){
       readEditTree(join(root,'tests/results'));cpSync(join(root,'tests/results'),join(stage,'tests/results'),{recursive:true});
       const manifestPath=join(stage,'tests/results/questionnaire-manifest-mv.json'),manifest=JSON.parse(readFileSync(manifestPath,'utf8'));
