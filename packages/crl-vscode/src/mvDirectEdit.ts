@@ -100,7 +100,7 @@ export function assertSingleLocalPolicy(projectRoot: string, policyPath: string,
       (r.resource.type as {coding?: {code?: string}[]} | undefined)?.coding?.some(c => c.code === 'workflow-definition'));
     if (workflows.length) roots.push(file);
   }
-  if (roots.length !== 1 || resolve(roots[0]) !== resolve(policyPath)) {
+  if (roots.length !== 1 || relative(resolve(roots[0]), resolve(policyPath)) !== '') {
     throw new Error(`Direct Save requires one independent policy owner for src/cql and src/fhir. The KE must reconcile these entry owners: ${roots.join(', ') || 'none'}`);
   }
 }
