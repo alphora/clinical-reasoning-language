@@ -110,8 +110,11 @@ function treeFiles(tree: EditTree): ReadonlyMap<string, Uint8Array> {
   if (tree.kind === 'missing') return new Map();
   throw new Error('A generated lane is not an ordinary directory.');
 }
+// Repository scaffolding is preserved in publication, but is not a generated definition.
+const isScaffoldingPlaceholder = (name: string) => basename(name) === '.gitkeep';
 export function generatedDefinitionDrift(live: EditTree, baseline: EditTree, directory: string) {
-  const actual = treeFiles(live), expected = treeFiles(baseline), extra = [...actual.keys()].filter(p => !expected.has(p));
+  const definitions = (tree: EditTree) => new Map([...treeFiles(tree)].filter(([name]) => !isScaffoldingPlaceholder(name)));
+  const actual = definitions(live), expected = definitions(baseline), extra = [...actual.keys()].filter(p => !expected.has(p));
   if (extra.length) throw new Error(`Live generated files are outside this policy closure. Ask the KE to reconcile ownership; nothing will be deleted: ${extra.map(p => join(directory, p)).join(', ')}`);
   const missing = [...expected.keys()].filter(p => !actual.has(p));
   if (missing.length) throw new Error(`Generated definitions are missing. Explicitly regenerate these definitions before editing: ${missing.map(p=>join(directory,p)).join(", ")}`);
@@ -207,7 +210,11 @@ function planDirectSourceEdit(options:QuestionEditOptions & {sourceEdit?:()=>Ret
     writeTwoLane(baseline,join(scratch,'baseline/src'));writeTwoLane(candidate,join(scratch,'candidate/src'));
     for (const lane of ['cql','fhir']) {
       const path=join(projectRoot,'src',lane),before=readEditTree(path),expected=readEditTree(join(scratch,'baseline/src',lane)),after=readEditTree(join(scratch,'candidate/src',lane));
-      drift.push(...generatedDefinitionDrift(before,expected,path));capturedBefore.set(path,before);units.push({path,after});
+      drift.push(...generatedDefinitionDrift(before,expected,path));capturedBefore.set(path,before);
+      // The transaction replaces the whole lane; retain every live placeholder's exact path and bytes.
+      const files=new Map(treeFiles(after));
+      for(const [name,bytes] of treeFiles(before))if(isScaffoldingPlaceholder(name))files.set(name,bytes);
+      units.push({path,after:{...after,kind:'directory',files}});
     }
     units.push({path:options.sidecarPath,after:{kind:'file',bytes:json(sidecar)}});
     units.push({path:receiptPath,after:{kind:'file',bytes:json({schemaVersion:1,id:options.id,kind:'medical-review-direct-edit',editedAt:options.editedAt,

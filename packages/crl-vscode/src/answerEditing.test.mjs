@@ -96,3 +96,26 @@ test('Save refuses an installed question namesake introduced after pinning',()=>
   assert.throws(()=>previewAnswerChange(f.policyPath,target,{operation:'update',system:f.system,code:'yes',display:'Changed'}),/competing local and installed/);assert.equal(readFileSync(f.terms,'utf8'),before);
  }finally{f.close();}
 });
+
+test('answer CRUD preserves scaffolding in both generated lanes while publishing terminology and FHIR',()=>{
+ const f=answerFixture();try{
+  const placeholders=new Map();
+  for(const lane of ['cql','fhir'])for(const member of ['.gitkeep','scaffold/.gitkeep']){
+   const file=join(f.project,'src',lane,member);mkdirSync(join(file,'..'),{recursive:true});
+   const bytes=Buffer.from(member==='.gitkeep'?'':`keep ${lane}\n`);writeFileSync(file,bytes);placeholders.set(file,bytes);
+  }
+  for(const change of [
+   {operation:'update',system:f.system,code:'yes',display:'Documented',description:'Supporting evidence'},
+   {operation:'create',system:f.system,code:'other',display:'Other',qualifications:Object.fromEntries(f.target().consumers.map(c=>[c.key,false]))},
+   {operation:'delete',system:f.system,code:'other'}
+  ]){
+   const plan=publish(f,change);assert.ok([...placeholders.keys()].every(file=>!plan.changedPaths.includes(file)));
+   for(const [file,bytes] of placeholders)assert.deepEqual(readFileSync(file),bytes);
+  }
+  assert.match(readFileSync(f.terms,'utf8'),/display is `Documented`/);assert.doesNotMatch(readFileSync(f.terms,'utf8'),/code is `other`/);
+  const e=emitCrlTwoLane(f.policyPath,mvPublicationOptions(f.project));
+  const vs=e.fhir.resources.find(r=>r.resourceType==='ValueSet').resource,cs=e.fhir.resources.find(r=>r.resourceType==='CodeSystem'&&r.resource.url===f.system).resource;
+  assert.equal(vs.expansion.contains.find(c=>c.code==='yes').display,'Documented');
+  assert.equal(cs.concept.find(c=>c.code==='yes').definition,'Supporting evidence');
+ }finally{f.close();}
+});

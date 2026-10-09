@@ -162,3 +162,43 @@ test('freshness keeps known dependency watches when a later owner lookup fails',
   assert.deepEqual(service.inputFiles,inputs);assert.deepEqual(service.watchRoots,roots);
  }finally{f.close();}
 });
+
+test('scaffolding placeholders preserve load freshness, publication and rollback without entering definition drift',()=>{
+ const f=fixture();try{
+  const placeholders=new Map();
+  for(const lane of ['cql','fhir'])for(const member of ['.gitkeep','scaffold/nested/.gitkeep']){
+   const file=join(f.project,'src',lane,member);mkdirSync(join(file,'..'),{recursive:true});
+   const bytes=Buffer.from(member==='.gitkeep'?'':`scaffold ${lane} ${member}\n`);writeFileSync(file,bytes);placeholders.set(file,bytes);
+  }
+  const checker=new MvDefinitionFreshness(),scratch=join(f.root,'freshness');
+  const initial=checker.check(f.options.policyPath,scratch);assert.equal(initial.state,'current');
+  const first=[...placeholders.keys()][0];writeFileSync(first,'updated placeholder\n');placeholders.set(first,Buffer.from('updated placeholder\n'));
+  const updated=checker.check(f.options.policyPath,scratch);assert.equal(updated.state,'current');assert.equal(updated.digest,initial.digest);
+  const plan=planDirectQuestionEdit(f.options);
+  assert.ok([...placeholders.keys()].every(file=>!plan.changedPaths.includes(file)));assert.deepEqual(plan.contentDrift,[]);
+  const interrupted=MvEditTransaction.prepare({artifactRoot:f.project,storageRoot:join(f.root,'recovery'),units:plan.units,
+   boundary:(point,ordinal)=>{if(point==='after-publish'&&plan.units[ordinal].path===join(f.project,'src/fhir'))throw new Error('injected publication failure');}});
+  assert.throws(()=>interrupted.publish(),/injected publication failure/);
+  assert.equal(interrupted.state.phase,'rolled-back');
+  assert.equal(readFileSync(f.owner,'utf8'),f.source);
+  for(const [file,bytes] of placeholders)assert.deepEqual(readFileSync(file),bytes);
+  assert.equal(checker.check(f.options.policyPath,scratch).state,'current');
+  const tx=MvEditTransaction.prepare({artifactRoot:f.project,storageRoot:join(f.root,'recovery'),units:plan.units});tx.publish();
+  for(const [file,bytes] of placeholders)assert.deepEqual(readFileSync(file),bytes);
+  assert.match(readFileSync(f.owner,'utf8'),/Describe the complaint/);
+  assert.equal(checker.check(f.options.policyPath,scratch).state,'current');
+ }finally{f.close();}
+});
+
+test('ordinary and hidden foreign generated artifacts still block load and save even alongside placeholders',()=>{
+ const f=fixture();try{
+  writeFileSync(join(f.project,'src/cql/.gitkeep'),'');
+  for(const [lane,member] of [['cql','foreign.cql'],['cql','.foreign.cql'],['fhir','foreign.json'],['fhir','.foreign.json']]){
+   const file=join(f.project,'src',lane,member);writeFileSync(file,'foreign artifact');
+   const state=new MvDefinitionFreshness().check(f.options.policyPath,join(f.root,'freshness'));
+   assert.equal(state.state,'unknown');assert.ok(state.message.includes(file));assert.ok(!state.message.includes('.gitkeep'));
+   assert.throws(()=>planDirectQuestionEdit(f.options),error=>error.message.includes(file)&&!error.message.includes('.gitkeep'));
+   assert.equal(readFileSync(file,'utf8'),'foreign artifact');assert.equal(readFileSync(f.owner,'utf8'),f.source);rmSync(file);
+  }
+ }finally{f.close();}
+});
