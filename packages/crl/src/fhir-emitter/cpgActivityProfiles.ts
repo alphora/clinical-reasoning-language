@@ -87,6 +87,13 @@ const TABLE: ReadonlyArray<readonly [string, CpgActivityProfile]> = [
     activityTypeCode: "recommend-immunization",
     dynamicValuePath: "medicationCodeableConcept",
   }],
+  ["CPGCommunicationRequest", {
+    profileUrl: `${CPG_BASE}/cpg-communicationactivity`,
+    kind: "CommunicationRequest",
+    targetProfile: `${CPG_BASE}/cpg-communicationrequest`,
+    activityTypeCode: "send-message",
+    dynamicValuePath: null,
+  }],
   ["CPGTaskRequest", {
     // REFACTOR:grounded (MR10): generic Task alias, not a fabricated CPG Request profile.
     profileUrl: `${CPG_BASE}/cpg-computableactivity`,

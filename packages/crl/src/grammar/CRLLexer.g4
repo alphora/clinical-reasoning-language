@@ -230,6 +230,7 @@ ACTIVITY_TYPE
         const validTypes = [
             'CPGAdministerMedication',
             'CPGTaskRequest',
+            'CPGCommunicationRequest',
             'CPGDispenseMedication',
             'CPGDocumentMedication',
             'CPGEnrollment',

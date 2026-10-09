@@ -9,17 +9,34 @@ import { planDirectQuestionEdit, mvPublicationOptions, assertSingleLocalPolicy }
 import { MvDefinitionFreshness } from './mvDefinitionFreshness.ts';
 import { MvEditTransaction } from './mvEditTransaction.ts';
 
-function fixture(artifactName="policy"){
+function fixture(artifactName="policy", request="CPGServiceRequest", configured=false){
  const root=mkdtempSync(join(tmpdir(),'mv-candidate-')),project=join(root,artifactName);mkdirSync(join(project,'src/crl'),{recursive:true});
  const policyPath=join(project,'src/crl/policy.crl'),owner=join(project,'src/crl/intake.crl'),sidecarPath=join(project,'src/medical-validation',artifactName+'.json');
- writeFileSync(join(project,'package.json'),JSON.stringify({name:'candidate-policy',version:'1.0.0',crl:{canonicalBase:'http://example.org/candidate',date:'2026-10-08',status:'draft'}}));
- writeFileSync(policyPath,'library "Policy".\ninclude "Intake".\nactivity "Refer":\n- request CPGServiceRequest.\ndecision "Review":\n- when "Intake"."Complaint" then recommend activity "Refer".\n');
+ writeFileSync(join(project,'package.json'),JSON.stringify({name:'candidate-policy',version:'1.0.0',crl:{canonicalBase:'http://example.org/candidate',date:'2026-10-08',status:'draft',...(configured?{dispositions:{options:{certify:{Refer:{label:'Refer'}}}}}:{})}}));
+ const activity=configured?'certify.Refer':'Refer';
+ writeFileSync(policyPath,`library "Policy".\ninclude "Intake".\nactivity "${activity}":\n- request ${request}.\ndecision "Review":\n- when "Intake"."Complaint" then recommend activity "${activity}".\n`);
  const source='library "Intake".\nconcept "Complaint":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `complaint`.\n- shape reduction is most recent.\npresentation for "Complaint":\n- question text is "Complaint?".\n- question description is "Details".\n';writeFileSync(owner,source);
  const sidecar={schemaVersion:2,byCaseId:{a:'pass',b:'fail'},notesByCaseId:{a:[{id:'n',text:'Keep',created:1}]},criterionVerdictsByKey:{criterion:{state:'pass',bodyHash:'body'}}};
  mkdirSync(join(project,'src/medical-validation/flags'),{recursive:true});writeFileSync(sidecarPath,JSON.stringify(sidecar));writeFileSync(join(project,'src/medical-validation/flags/keep.json'),'operator flag');
  const emission=emitCrlTwoLane(policyPath,mvPublicationOptions(project));assert.equal(emission.success,true);writeTwoLane(emission,join(project,'src'));
  const options={policyPath,target:resolveWordingTarget(owner,source,'Complaint'),questionText:'Describe the complaint?',questionDescription:'More details',sidecarPath,sidecar,id:randomUUID(),editedAt:'2026-10-08T00:00:00.000Z',scratchRoot:join(root,'scratch')};
  return {root,project,owner,source,sidecarPath,options,close:()=>rmSync(root,{recursive:true,force:true})};
+}
+for(const request of ['CPGTaskRequest','CPGCommunicationRequest','CPGServiceRequest','CPGMedicationRequest'])for(const configured of [false,true]){
+ test(`MV load and direct question save preserve ${request}, configured=${configured}`,()=>{
+  const f=fixture('policy',request,configured);try{
+   const source=readFileSync(f.options.policyPath,'utf8');
+   const baseline=emitCrlTwoLane(f.options.policyPath,mvPublicationOptions(f.project));
+   const checker=new MvDefinitionFreshness();assert.equal(checker.check(f.options.policyPath,join(f.root,'freshness')).state,'current');
+   const plan=planDirectQuestionEdit(f.options);
+   MvEditTransaction.prepare({artifactRoot:f.project,storageRoot:join(f.root,'recovery'),units:plan.units}).publish();
+   assert.equal(readFileSync(f.options.policyPath,'utf8'),source);
+   const after=emitCrlTwoLane(f.options.policyPath,mvPublicationOptions(f.project));assert.equal(after.success,true);
+   assert.deepEqual(after.fhir.resources.filter(r=>r.resourceType==='ActivityDefinition'),baseline.fhir.resources.filter(r=>r.resourceType==='ActivityDefinition'));
+   assert.deepEqual(after.cql.cqlByLibrary.map(r=>({libraryName:r.libraryName,cql:r.cql})),baseline.cql.cqlByLibrary.map(r=>({libraryName:r.libraryName,cql:r.cql})));
+   assert.equal(checker.check(f.options.policyPath,join(f.root,'freshness')).state,'current');
+  }finally{f.close();}
+ });
 }
 test('candidate emits changed PD wording with preserved failures/history and zero live writes, then journal publishes it',()=>{
  const f=fixture();try{

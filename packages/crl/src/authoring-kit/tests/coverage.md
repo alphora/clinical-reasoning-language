@@ -2048,3 +2048,62 @@ Generated native qualification delta paths (all read and hash-verified; existing
 - `examples/bleph-medical-validation/tests/results/questionnaire-manifest-mv.json`
 
 Completed audit: full source5498core/32skipped plus actualMCP integration, final98extension suites1564pass/3expectedfail, builds/typechecks and whitespace PASS. Source review1026/1027 native final0C0I0N converged after3important findings accepted across plan/code rounds; external unavailable. Installed/release acceptance remains a separately recorded gate.
+
+
+## Kit 2.30 maintenance: generic MV activities
+
+MCP delivery owners: `packages/crl/src/cli/tests/run-mcp-server.test.mjs` and `packages/crl-vscode/src/mcp-server.test.mjs` retain full kit/artifact/prerequisite assertions and advance their schema/content identity pins from 2.29 to 2.30. Not new semantics; actual protocol retrieval is rerun after correcting the stale pins. The first standalone rerun overlapped the extension's required core rebuild and found its temporarily absent dist files; that harness ordering failure is preserved and corrected by sequential execution. Core compiler results remain 5508pass/32skip. No full-suite rerun is warranted by these mechanical pin corrections.
+
+Baseline: `da2a1fa4f8199f4dba66a07b4212974e17280748` (completed 2.29 audit). Target: pending reviewed content commit; this section is not an advanced audit stamp. Schema 2.30; content hash `4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea`.
+
+Operator intent: MV loading and direct question/answer editing work across supported activity types and preserve unrelated activities. Task is the new coverage-example type; existing CommunicationRequest remains a legitimate distinct resource. Configured disposition membership/finality/cardinality do not infer the resource kind. Clinical fidelity remains manual.
+
+Complete interval inventory follows. The 6.4.36 stamp and lockstep version commit were inspected: their changes are audit identity/evidence and package versions, with no additional runtime semantics. Current operator flag and human MV sidecar are excluded from this operation, preserved rather than counted as audited changes.
+
+- `docs/CRL-NORTH-STAR.md`
+- `docs/cel-spec.md`
+- `docs/cpg-ig-alignment.md`
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/src/answerEditing.test.mjs`
+- `packages/crl-vscode/src/mvDirectEdit.test.mjs`
+- `packages/crl/package.json`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/cel/emitter/emitFhir.ts`
+- `packages/crl/src/cel/emitter/tests/taskRequest.test.ts`
+- `packages/crl/src/fhir-emitter/activity.ts`
+- `packages/crl/src/fhir-emitter/cpgActivityProfiles.ts`
+- `packages/crl/src/fhir-emitter/tests/activity.test.ts`
+- `packages/crl/src/fhir-emitter/tests/cpgActivityProfiles.test.ts`
+- `packages/crl/src/fhir-emitter/types.ts`
+- `packages/crl/src/grammar/CRLLexer.g4`
+- `packages/crl/src/imports/tests/dispositionValidate.integration.test.ts`
+- `packages/crl/src/lexer/CRLLexerErrorListener.ts`
+- `packages/crl/src/transformer/fsh-to-crl/mapping/activityDefinition.test.ts`
+- `packages/crl/src/transformer/fsh-to-crl/mapping/activityDefinition.ts`
+- `packages/crl/src/validator/dispositionValidator.ts`
+- `packages/crl/src/validator/tests/dispositionValidation.test.ts`
+- `packages/crl/src/validator/validator.ts`
+
+
+| Changed assertion/input or behavior | Disposition and evidence |
+|---|---|
+| Lexer, listener and profile registry accept distinct CommunicationRequest and Task | Kit updated: `dispositions`, `pa-disposition-set`, `configure-dispositions` describe generic supported profiles and explicit metadata scope. `cel/emitter/tests/taskRequest.test.ts` accepts both tokens; `fhir-emitter/tests/cpgActivityProfiles.test.ts` checks all 15 fixed mappings including distinct kinds/profiles; unknown-token rejection remains. Syntax/profile emission proof, not native execution. |
+| Configured request-type guard removed; membership/finality retained | Kit updated. Tag `configure-dispositions:generic-activity-kind`, `validator/tests/dispositionValidation.test.ts`, four Task/CommunicationRequest/ServiceRequest/MedicationRequest rows with normalized explicit disposition options. Import integration validates the same non-Task kinds in actual configured projects with valid selected Boolean input. Existing membership, mutual exclusion, malformed config and mode/finality assertions remain. Clinical conclusion versus service-order fidelity remains manual, including `communicated-not-ordered` methodology anchor. |
+| Configured service/medication coding and Interface failure | Kit updated. Tag `dispositions:generic-authored-activity`, `fhir-emitter/tests/activity.test.ts`: ServiceRequest `code` and MedicationRequest `medicationCodeableConcept` terminology lowering exactly equals ordinary authored emission; Interface scoped terminology explicitly fails rather than dropping coding. Configuration alone adds no PAS/Task override. |
+| CommunicationRequest label/narrative restored; Task mapping retained | Kit updated, same emitter owner: configured and unconfigured CommunicationRequest use payload.contentString; configured note.text/reasonCode only for the explicit Task/CommunicationRequest mappings. Task positive rows remain. Resource emission proof separate from native execution. |
+| FSH import and CEL resource map | Existing guidance sufficient: preserve authored resource kind. Import parameter rows cover CommunicationRequest/Task string and Coding forms plus ServiceRequest; CEL mapping preserves distinct output types. No migration of untouched activities. |
+| MV load/question save and answer CRUD | Existing direct-edit guidance sufficient. `crl-vscode/src/mvDirectEdit.test.mjs` exercises actual freshness/compiler/publication with four activity types, configured and unconfigured (8 rows); question changes preserve authored activity source, emitted ActivityDefinition resource and actual CQL text. `answerEditing.test.mjs` same 8 rows perform update/create/delete through actual planner/journal; ActivityDefinition bytes stay unchanged, local vocabulary updates; answer membership can legitimately change vocabulary-dependent CQL. Source coordinates/AST presentation metadata are not runtime artifacts. Actual installed UI is a separate release gate. |
+| Documentation and kit pins | Kit updated; North Star, CEL and IG mapping docs reflect independent kinds. Schema/hash pin updated with full canonical payload; all reference-artifact dependencies and invariant anchors retained. No new clinical/source fidelity claim. |
+| Error type union removal and unmatched-reference kind restoration | Not additional teaching: remove obsolete request-type error contract; retain explicit unsupported CommunicationRequest-with-terminology diagnostic. Actual caller emission paths and owning negative controls cover these. |
+| Package versions, lock and audit-only historical changes | Not author-facing semantics: lockstep 6.4.37 and inspected prior metadata stamp. No dependency, engine, driver, MIN_JAVA_MAJOR or crl.* configuration change. Installed byte comparison remains release gate. |
+
+Tag delta: added `configure-dispositions:generic-activity-kind` and `dispositions:generic-authored-activity`; no removed owning tags. Existing tags were reviewed at assertion/input level, not merely counted. The historical bootstrap inventory records its original test titles; this maintenance section and reverse map supersede its obsolete request-type observations. No unreviewed relevant case is excluded. Retained limits: no arbitrary custom activity grammar, no added PAS metadata mappings for other profiles, no customer deployment/clinical approval or live KELP guarantee; MR11 Request promotion deferred.
+
+Validation/review: pending final source suites and code review; audit.json retains prior stamp until these complete. Installed/native/Linux/package qualification is separate.
+
+Completion delivery owner in this interval: `packages/crl-vscode/test/oracle/golden/completion.json`. The actual generator diff adds exactly two CPGCommunicationRequest completion entries in supported request contexts; pruning just those entries yields byte-structurally identical prior data, with no lost completion. Existing generic activity guidance is sufficient. Full extension suite1579pass/3expectedfail had only this intentional snapshot delta; all four existing oracle generators were rerun against their goldens after repinning and pass. Combined extension coverage1580pass/3expectedfail; no full-suite repetition or new production change. Source generic MV8question/load+8answer CRUD rows passed in the full suite.

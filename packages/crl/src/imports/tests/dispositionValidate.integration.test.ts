@@ -8,8 +8,11 @@ import { validateCRLImports } from "../validate";
 const POLICY = (approveActivity: string, denyRef: string, denyActivity: string) =>
   `library "Policy".
 concept "Q":
-- type is Condition.
+- shape is Record.
+- type is Observation.
+- value type is boolean.
 - code is \`q\`.
+- shape reduction is most recent.
 decision "Cov":
 first:
 - when "Q" then recommend activity "certify.Approve".
@@ -61,13 +64,15 @@ describe("validateCRLImports — disposition config (end-to-end, multi-file path
     expect(r.success).toBe(false);
   });
 
-  it("configured project: a determination declared CPGServiceRequest → disposition-request-type", () => {
+  it.each(["CPGCommunicationRequest", "CPGServiceRequest", "CPGMedicationRequest"])("configured project preserves supported activity type %s", req => {
     const root = project(
       { dispositions: { options: OPTIONS } },
-      POLICY(ACT("certify.Approve"), "not-certify.Deny", ACT("not-certify.Deny", "CPGServiceRequest")),
+      POLICY(ACT("certify.Approve"), "not-certify.Deny", ACT("not-certify.Deny", req)),
     );
     const r = validateCRLImports(root);
-    expect(r.validationErrors.some((e) => e.kind === "disposition-request-type")).toBe(true);
+    expect(r.validationErrors.filter(e => e.kind.startsWith("disposition-"))).toEqual([]);
+    expect({errors: r.validationErrors, diagnostics: r.importDiagnostics}).toEqual({errors: [], diagnostics: []});
+    expect(r.success).toBe(true);
   });
 
   it("MALFORMED config surfaces as a blocking disposition-config diagnostic, and the closed set is NOT flooded", () => {

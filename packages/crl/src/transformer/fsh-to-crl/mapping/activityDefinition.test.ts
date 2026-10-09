@@ -1,15 +1,14 @@
-// REFACTOR:grounded (MR10): imports must produce the supported Task token.
+// REFACTOR:grounded (MR10): imports preserve supported activity resource kinds.
 import { describe, expect, it } from "vitest";
 import { buildCRL } from "../../../index";
 import { ACTIVITY_DEFINITION_URLS, getActivityPerformClause } from "./activityDefinition";
 
 describe("Task request import", () => {
-  it.each(["#CommunicationRequest", { code: "CommunicationRequest" }, "#Task", { code: "Task" }])(
-    "maps resource kind %j to a supported Task activity",
-    value => {
+  it.each([["#CommunicationRequest", "CPGCommunicationRequest"], [{ code: "CommunicationRequest" }, "CPGCommunicationRequest"], ["#Task", "CPGTaskRequest"], [{ code: "Task" }, "CPGTaskRequest"], ["#ServiceRequest", "CPGServiceRequest"]])(
+    "preserves resource kind %j as %s",
+    (value, token) => {
       const result = getActivityPerformClause({ rules: [{ path: "kind", value }] });
-      expect(result.clauseString).toContain("CPGTaskRequest");
-      expect(result.clauseString).not.toContain("CPGCommunicationRequest");
+      expect(result.clauseString).toContain(token as string);
       expect(buildCRL('library "Imported".\nactivity "Notify":\n- ' + result.clauseString.trim() + '.').success).toBe(true);
     },
   );

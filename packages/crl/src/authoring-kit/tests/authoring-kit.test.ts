@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.29");
+    expect(kit.schemaVersion).toBe("2.30");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -671,8 +671,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.29");
-    expect(kit.contentHash).toBe("49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69");
+    expect(kit.schemaVersion).toBe("2.30");
+    expect(kit.contentHash).toBe("4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea");
   });
 
   // @kit criterion:description-navigation
@@ -854,10 +854,11 @@ describe("authoring-kit — getAuthoringKit", () => {
       (r) => r.id === "pa-disposition-set",
     );
     expect(rule).toBeDefined();
-    // config-driven membership (no shared library) + the never-CPGServiceRequest guard
+    // Configured membership and independent resource type preserve clinical intent.
     expect(rule!.rule).toMatch(/configured|crl\.dispositions/i);
     expect(rule!.rule).not.toMatch(/Medical Policy Determination/); // the shared-lib model is gone
-    expect(rule!.rule).toMatch(/CPGServiceRequest/);
+    expect(rule!.rule).toMatch(/coverage conclusion versus a service order/);
+    expect(rule!.rule).toMatch(/request type is authored independently/);
     // exactly one determination per case
     expect(rule!.rule).toMatch(/exactly one|mutual.{0,3}exclus|first:/i);
     // finality-by-mode (pended non-final)

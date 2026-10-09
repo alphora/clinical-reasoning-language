@@ -1630,6 +1630,16 @@
       },
       {
         "kind": "completion",
+        "label": "CPGCommunicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGCommunicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
         "label": "CPGDispenseMedication",
         "itemKind": 24,
         "insertText": null,
@@ -1772,6 +1782,16 @@
         "insertText": null,
         "sortText": null,
         "detail": "CPG activity type — `request CPGTaskRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGCommunicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGCommunicationRequest.`",
         "documentation": null,
         "range": null
       },

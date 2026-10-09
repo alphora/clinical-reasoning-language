@@ -10,13 +10,14 @@ import {
 const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
 
 describe("cpgActivityProfiles — IG-verified mapping table", () => {
-  it("contains exactly 14 entries matching the CRL grammar allowlist", () => {
-    expect(ALL_CPG_ACTIVITY_PROFILES.length).toBe(14);
+  it("contains exactly 15 entries matching the CRL grammar allowlist", () => {
+    expect(ALL_CPG_ACTIVITY_PROFILES.length).toBe(15);
     const tokens = ALL_CPG_ACTIVITY_PROFILES.map((e) => e.token).sort();
     expect(tokens).toEqual(
       [
         "CPGAdministerMedication",
         "CPGTaskRequest",
+        "CPGCommunicationRequest",
         "CPGDispenseMedication",
         "CPGDocumentMedication",
         "CPGEnrollment",
@@ -86,6 +87,7 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
       CPGMedicationRequest: "MedicationRequest",
       CPGImmunizationRequest: "MedicationRequest",
       CPGTaskRequest: "Task",
+      CPGCommunicationRequest: "CommunicationRequest",
       CPGQuestionnaire: "Task",
       CPGEnrollment: "Task",
       CPGProposeDiagnosis: "Task",
@@ -104,6 +106,7 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
 
   it("dynamicValuePath is null for the v2.1-deferred profiles (CPGTaskRequest, CPGQuestionnaire)", () => {
     expect(lookupCpgActivityProfile("CPGTaskRequest")!.dynamicValuePath).toBeNull();
+    expect(lookupCpgActivityProfile("CPGCommunicationRequest")!.dynamicValuePath).toBeNull();
     expect(lookupCpgActivityProfile("CPGQuestionnaire")!.dynamicValuePath).toBeNull();
   });
 

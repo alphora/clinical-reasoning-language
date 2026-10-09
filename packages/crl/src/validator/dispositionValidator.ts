@@ -5,7 +5,6 @@ import type {
   WhenBlockBody,
   BlockBody,
   ActionStatement,
-  Activity,
   Location,
 } from "../ast/types";
 import { getRefName } from "../ast/types";
@@ -15,12 +14,8 @@ import type { SourceContext } from "../imports/scopes";
 import type {
   DispositionNonFinalLeafError,
   DispositionNotConfiguredError,
-  DispositionRequestTypeError,
   ValidationError,
 } from "./validator";
-
-/** REFACTOR:grounded (MR10): a PA determination is a Task, never a service order — its activity must carry this request type. */
-const REQUIRED_REQUEST_TYPE = "CPGTaskRequest";
 
 /** Source attribution for a diagnostic (multi-file mode). */
 interface Attribution {
@@ -36,7 +31,6 @@ interface Attribution {
  * config set is a CLOSED whitelist:
  *   - `disposition-not-configured` — every `recommend activity "X"` must name a configured determination
  *     (`<category>.<key>`, or a bare `<category>` for a single-option category); anything else is invalid.
- *   - `disposition-request-type`  — every configured determination ACTIVITY must use `request CPGTaskRequest`.
  *   - `disposition-non-final-leaf` — under `standalone` mode (our tree IS the whole adjudication), a recommended
  *     determination must be FINAL; a non-final leaf (e.g. `pended`) is legitimate only in `embedded` mode.
  *
@@ -68,12 +62,10 @@ export class DispositionValidator {
       for (const { stmt, scope } of sources) {
         const attrib: Attribution = { libraryName: scope.currentLibrary, filePath: scope.filePath };
         if (stmt.type === "Decision") this.walkDecision(stmt, validLeaves, standalone, attrib, errors);
-        else if (stmt.type === "Activity") this.checkActivity(stmt, validLeaves, attrib, errors);
       }
     } else {
       for (const stmt of ast.statements) {
         if (stmt.type === "Decision") this.walkDecision(stmt, validLeaves, standalone, undefined, errors);
-        else if (stmt.type === "Activity") this.checkActivity(stmt, validLeaves, undefined, errors);
       }
     }
     return errors;
@@ -162,29 +154,7 @@ export class DispositionValidator {
     }
   }
 
-  // -------------------------- activity declarations (request type) --------------------------
 
-  private checkActivity(
-    activity: Activity,
-    valid: Map<string, ResolvedOption>,
-    attrib: Attribution | undefined,
-    errors: ValidationError[],
-  ): void {
-    if (!valid.has(activity.name)) return; // not a configured determination → the request-type rule doesn't apply
-    const requestType = activity.body.request.activityType;
-    if (requestType !== REQUIRED_REQUEST_TYPE) {
-      const e: DispositionRequestTypeError = {
-        kind: "disposition-request-type",
-        activityName: activity.name,
-        actualRequestType: requestType,
-        message:
-          `Determination activity "${activity.name}" must be \`request ${REQUIRED_REQUEST_TYPE}\` — a coverage ` +
-          `determination is COMMUNICATED, not ordered — but is \`request ${requestType}\`.`,
-        ...locate(activity.body.request.location, attrib),
-      };
-      errors.push(e);
-    }
-  }
 }
 
 /** Render the valid-name set for a diagnostic, capped so a large vocabulary doesn't produce a huge message. */

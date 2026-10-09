@@ -46,14 +46,15 @@ describe("DispositionValidator — closed-set (config-gated)", () => {
     expect(errs.some((e) => e.kind === "disposition-not-configured" && (e as any).activityName === "Deny")).toBe(true);
   });
 
-  it("a configured determination activity with request CPGServiceRequest → disposition-request-type", () => {
+  // @kit configure-dispositions:generic-activity-kind
+  it.each(["CPGTaskRequest", "CPGCommunicationRequest", "CPGServiceRequest", "CPGMedicationRequest"])("configured activity request %s does not constrain MV classification", req => {
     const src =
       HEADER +
       `decision "Cov":\nfirst:\n- when "Q" then recommend activity "certify.Approve".\n- otherwise then recommend activity "not-certify.Deny".\n` +
       activity("certify.Approve") +
-      activity("not-certify.Deny", "CPGServiceRequest");
+      activity("not-certify.Deny", req);
     const errs = dispErrors(src);
-    expect(errs.some((e) => e.kind === "disposition-request-type" && (e as any).activityName === "not-certify.Deny")).toBe(true);
+    expect(errs).toEqual([]);
   });
 
   it("bare `certify` (single-option category) is valid; bare `not-certify` (multi-option) is NOT", () => {
@@ -134,7 +135,7 @@ describe("DispositionValidator — closed-set (config-gated)", () => {
       activity("Anything") + activity("Nope");
     const errs = new Validator()
       .validate(parseInput(src), {})
-      .errors.filter((e) => e.kind === "disposition-not-configured" || e.kind === "disposition-request-type");
+      .errors.filter((e) => e.kind === "disposition-not-configured");
     expect(errs).toEqual([]);
   });
 });

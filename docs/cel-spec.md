@@ -234,6 +234,7 @@ Most CRL `request CPG<Type>` tokens align with the [CPG IG Activity Profiles](ht
 | `CPGServiceRequest` | `CPGServiceRequest` extends `ServiceRequest` | `ServiceRequest` |
 | `CPGMedicationRequest` | `CPGMedicationRequest` extends `MedicationRequest` | `MedicationRequest` |
 | `CPGImmunizationRequest` | `CPGImmunizationRequest` extends `MedicationRequest` | `MedicationRequest` |
+| `CPGCommunicationRequest` | `cpg-communicationrequest` | `CommunicationRequest` |
 | `CPGTaskRequest` | Generic computable activity / core FHIR Task target | `Task` |
 | `CPGQuestionnaire` | `CPGQuestionnaireTask` extends `CPGTask` (Task) | `Task` |
 | `CPGEnrollment` | `CPGEnrollmentTask` extends `CPGTask` | `Task` |

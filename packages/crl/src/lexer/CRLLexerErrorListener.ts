@@ -184,10 +184,7 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
         details = parsed;
         switch (parsed.errorType) {
           case "InvalidActivityType":
-            // REFACTOR:grounded (MR10): retired authored token has an executable Task replacement.
-            message = parsed.value === "CPGCommunicationRequest"
-              ? "Activity type CPGCommunicationRequest is retired; use CPGTaskRequest. It emits a FHIR Task."
-              : `Invalid activity type: ${parsed.value}`;
+            message = `Invalid activity type: ${parsed.value}`;
             break;
           case "InvalidConceptType":
             message = `Invalid concept type: ${parsed.value}`;

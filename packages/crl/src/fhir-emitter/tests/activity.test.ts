@@ -163,7 +163,7 @@ describe("activity — emitActivityDefinition", () => {
     );
   });
 
-  it("all 14 CRL CPG tokens round-trip the lookup-table fixed fields", () => {
+  it("all supported CRL CPG tokens round-trip the lookup-table fixed fields", () => {
     for (const { token, profile } of ALL_CPG_ACTIVITY_PROFILES) {
       const a = activity(`Test ${token}`, token as ActivityType);
       const { resource, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
@@ -294,15 +294,43 @@ describe("activity — emitActivityDefinition", () => {
     );
   });
 
-  it("I2: a determination authored as a NON-TaskRequest → disposition-request-type error, no CR dynamicValues", () => {
+  it("configured ServiceRequest retains its own kind without Task metadata", () => {
     const a = activity("not-certify.Deny", "CPGServiceRequest" as ActivityType);
     const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
     const { resource, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
       clock: FIXED_CLOCK,
       dispositionConfig: config,
     });
-    expect(errors.some((e) => e.kind === "disposition-request-type")).toBe(true);
+    expect(errors).toEqual([]);
+    expect(resource!.resource.kind).toBe("ServiceRequest");
     expect((resource!.resource as Record<string, unknown>).dynamicValue).toBeUndefined();
+  });
+
+  // @kit dispositions:generic-authored-activity
+  it.each(["CPGServiceRequest", "CPGMedicationRequest"])("configured %s preserves ordinary authored terminology", token => {
+    const a = activity("not-certify.Deny", token as ActivityType, { withTerm: "Requested services" });
+    const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
+    const opts = { clock: FIXED_CLOCK, dispositionConfig: config };
+    const ordinary = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, { clock: FIXED_CLOCK });
+    const configured = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, opts);
+    expect(configured.errors).toEqual([]);
+    expect(configured.resource).toEqual(ordinary.resource);
+    const dv = configured.resource!.resource.dynamicValue as Array<{path:string}>;
+    expect(dv.map(v=>v.path)).toEqual([token === "CPGServiceRequest" ? "code" : "medicationCodeableConcept"]);
+    const viaInterface = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, opts, "interface", true);
+    expect(viaInterface.resource).toBeNull();
+    expect(viaInterface.errors.map(e=>e.kind)).toContain("emit-activity-terminology-interface-unsupported");
+  });
+
+  it.each([false, true])("CommunicationRequest preserves its own payload mapping, configured=%s", configured => {
+    const a = activity("certify.Approve", "CPGCommunicationRequest" as ActivityType, { withText: "Authored narrative" });
+    const config = normalizeDispositionConfig({ options: { certify: { Approve: { label: "Approve" } } } }).config;
+    const result = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, { clock: FIXED_CLOCK, ...(configured ? { dispositionConfig: config } : {}) });
+    expect(result.errors).toEqual([]);
+    expect(result.resource!.resource.kind).toBe("CommunicationRequest");
+    const dv = result.resource!.resource.dynamicValue as Array<{path:string;expression:{expression:string}}>;
+    expect(dv.map(v=>v.path)).toEqual(configured ? ["payload.contentString", "note.text", "reasonCode"] : ["payload.contentString"]);
+    expect(dv[0].expression.expression).toBe(configured ? "'Approve'" : "'Authored narrative'");
   });
 
   it("I3: a non-determination activity named exactly like a multi-option category → disposition-ambiguous-category error", () => {

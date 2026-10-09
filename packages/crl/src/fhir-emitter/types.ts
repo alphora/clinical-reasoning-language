@@ -395,6 +395,7 @@ export interface UnmatchedReference {
     // removed). It carries no machine signal, so routing it to `unmatched` would
     // wrongly pin `success:false`.
     | "unsupported-task-with-terminology"
+    | "unsupported-communication-with-terminology"
     | "unsupported-questionnaire-with";
   text: string;
   line?: number;

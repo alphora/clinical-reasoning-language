@@ -7,19 +7,36 @@ import {emitCrlTwoLane,writeTwoLane} from '@smile-digital-health/crl';
 import {resolveAnswerTarget,previewAnswerChange,AnswerCaseImpactError} from './answerEditing.ts';
 import {planDirectAnswerEdit,mvPublicationOptions} from './mvDirectEdit.ts';
 import {MvEditTransaction} from './mvEditTransaction.ts';
-export function answerFixture(){
+export function answerFixture(request='CPGServiceRequest',configured=false){
  const root=mkdtempSync(join(tmpdir(),'answer-crud-')),project=join(root,'policy'),dir=join(project,'src/crl');mkdirSync(dir,{recursive:true});
  const system='http://example.org/answers/CodeSystem/choices',policyPath=join(dir,'policy.crl'),terms=join(dir,'terms.crl'),other=join(dir,'other.crl'),sidecarPath=join(project,'src/medical-validation/policy.json');
- writeFileSync(join(project,'package.json'),JSON.stringify({name:'answer-policy',version:'1.0.0',crl:{canonicalBase:'http://example.org/answers',date:'2026-10-08',status:'draft'}}));
+ writeFileSync(join(project,'package.json'),JSON.stringify({name:'answer-policy',version:'1.0.0',crl:{canonicalBase:'http://example.org/answers',date:'2026-10-08',status:'draft',...(configured?{dispositions:{options:{certify:{Refer:{label:'Refer'}}}}}:{})}}));
  writeFileSync(terms,'library "Terms".\nterminology "Choices":\n- system is `'+system+'`.\n- code is `yes` display is `Yes` description is `Evidence supplied`.\n- code is `no` display is `No`.\n');
  const question=(name)=>`concept "${name}":\n- shape is Record.\n- type is Observation.\n- value type is CodeableConcept.\n- code is \`${name.toLowerCase()}\`.\n- value domain is answer options.\n- shape reduction is most recent.\n- value from is "Terms"."Choices":\n  - not qualifying is \`no\`.\npresentation for "${name}":\n- question text is "${name}?".\n`;
  writeFileSync(other,'library "Other".\n'+question('Second'));
- writeFileSync(policyPath,'library "Policy".\n'+question('Complaint')+'concept "Qualifies":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- shape reduction is most recent.\n- definition is "Complaint" in qualifying.\nactivity "Refer":\n- request CPGServiceRequest.\ndecision "Review":\n- when "Qualifies" then recommend activity "Refer".\n');
+ const activity=configured?'certify.Refer':'Refer';
+ writeFileSync(policyPath,'library "Policy".\n'+question('Complaint')+`concept "Qualifies":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- shape reduction is most recent.\n- definition is "Complaint" in qualifying.\nactivity "${activity}":\n- request ${request}.\ndecision "Review":\n- when "Qualifies" then recommend activity "${activity}".\n`);
  mkdirSync(join(project,'src/medical-validation'),{recursive:true});writeFileSync(sidecarPath,JSON.stringify({schemaVersion:2,byCaseId:{a:'pass'},notesByCaseId:{a:[{id:'n',text:'Keep',created:1}]}}));
  const emission=emitCrlTwoLane(policyPath,mvPublicationOptions(project));assert.equal(emission.success,true,JSON.stringify(emission.fhir.errors));writeTwoLane(emission,join(project,'src'));
  return {root,project,policyPath,terms,other,system,sidecarPath,target:()=>resolveAnswerTarget(policyPath,'Policy','Complaint'),options:()=>({policyPath,target:resolveAnswerTarget(policyPath,'Policy','Complaint'),sidecarPath,id:randomUUID(),editedAt:'2026-10-08T00:00:00.000Z',scratchRoot:join(root,'scratch')}),close:()=>rmSync(root,{recursive:true,force:true})};
 }
 const publish=(f,change)=>{const plan=planDirectAnswerEdit({...f.options(),change}),tx=MvEditTransaction.prepare({artifactRoot:f.project,storageRoot:join(f.root,'recovery'),units:plan.units});tx.publish();return plan;};
+for(const request of ['CPGTaskRequest','CPGCommunicationRequest','CPGServiceRequest','CPGMedicationRequest'])for(const configured of [false,true]){
+ test(`direct answer CRUD preserves ${request}, configured=${configured}`,()=>{
+  const f=answerFixture(request,configured);try{
+   const before=emitCrlTwoLane(f.policyPath,mvPublicationOptions(f.project)).fhir.resources.filter(r=>r.resourceType==='ActivityDefinition').map(r=>({relativePath:r.relativePath,resource:r.resource}));
+   const activities=readFileSync(f.policyPath,'utf8').split('activity ')[1];
+   publish(f,{operation:'update',system:f.system,code:'yes',display:'Documented',description:'Evidence'});
+   publish(f,{operation:'create',system:f.system,code:'other',display:'Other',qualifications:Object.fromEntries(f.target().consumers.map(c=>[c.key,false]))});
+   publish(f,{operation:'delete',system:f.system,code:'other'});
+   assert.equal(readFileSync(f.policyPath,'utf8').split('activity ')[1],activities);
+   const after=emitCrlTwoLane(f.policyPath,mvPublicationOptions(f.project));assert.equal(after.success,true);
+   assert.deepEqual(after.fhir.resources.filter(r=>r.resourceType==='ActivityDefinition').map(r=>({relativePath:r.relativePath,resource:r.resource})),before);
+   assert.match(readFileSync(f.terms,'utf8'),/display is `Documented`/);
+   assert.doesNotMatch(readFileSync(f.terms,'utf8'),/code is `other`/);
+  }finally{f.close();}
+ });
+}
 test('answer update directly publishes terminology, ValueSet compose/expansion and CodeSystem definition without changing coding',()=>{
  const f=answerFixture();try{
   const plan=publish(f,{operation:'update',system:f.system,code:'yes',display:'Documented',description:'Supporting evidence'});

@@ -183,6 +183,7 @@ const CPG_TO_FHIR: Record<string, string> = {
   // ImmunizationRecommendation is the planning/request-shaped R4 type.
   CPGImmunizationRequest: "ImmunizationRecommendation",
   CPGTaskRequest: "Task",
+  CPGCommunicationRequest: "CommunicationRequest",
   CPGQuestionnaire: "Task",
   CPGEnrollment: "Task",
   CPGProposeDiagnosis: "Task",

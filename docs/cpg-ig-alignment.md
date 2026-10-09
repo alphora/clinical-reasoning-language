@@ -29,7 +29,7 @@ This is the rule. Every CRL `request CPG<Type>` token references a specific Requ
 
 ### Verified token ↔ IG profile mapping
 
-The generic `CPGTaskRequest` row is a CRL alias, not a published CPG Request profile. It uses the existing computable ActivityDefinition profile and concrete core Task target; it does not claim the abstract CPGTask or a nonexistent cpg-taskrequest canonical. Its determination label goes to Task.description, free-text narrative to note.text, and PAS/reason coding to reasonCode. Terminology-with lowering remains unsupported. Other rows were verified against the published `StructureDefinition-<id>.json` artifacts at `https://build.fhir.org/ig/HL7/cqf-recommendations/`. The Definition column profile fixes `kind` and `intent`, patterns `code`, and constrains `profile` and `doNotPerform` per the IG (relevant for the FHIR-def emit lane, Todo 2).
+The generic `CPGTaskRequest` row is a CRL alias, not a published CPG Request profile. It uses the existing computable ActivityDefinition profile and concrete core Task target; it does not claim the abstract CPGTask or a nonexistent cpg-taskrequest canonical. CommunicationRequest remains a distinct supported profile with payload.contentString labels. Review classification does not impose a resource kind; automatic disposition metadata currently covers Task and CommunicationRequest, while other profiles preserve ordinary authored coding. The Task determination label goes to Task.description, free-text narrative to note.text, and PAS/reason coding to reasonCode. Terminology-with lowering remains unsupported. Other rows were verified against the published `StructureDefinition-<id>.json` artifacts at `https://build.fhir.org/ig/HL7/cqf-recommendations/`. The Definition column profile fixes `kind` and `intent`, patterns `code`, and constrains `profile` and `doNotPerform` per the IG (relevant for the FHIR-def emit lane, Todo 2).
 
 **Important distinction the published spec exposes that FSH source hid:** the `ActivityDefinition.code` element is constrained via `patternCodeableConcept`, not `fixedCodeableConcept`. The activity-type Coding entry MUST be present in `code.coding[]`, but additional codings MAY be added by emitters / consumers. The FHIR-def emit lane should append, not overwrite.
 
@@ -65,6 +65,7 @@ The exact `path` per profile (`code` for ServiceRequest-like, `medicationCodeabl
 | `CPGServiceRequest` | `cpg-servicerequestactivity` | `CPGServiceRequest` | `ServiceRequest` | `order-service` |
 | `CPGMedicationRequest` | `cpg-medicationrequestactivity` | `CPGMedicationRequest` | `MedicationRequest` | `order-medication` |
 | `CPGImmunizationRequest` | `cpg-immunizationactivity` | `CPGImmunizationRequest` | `MedicationRequest` ⚠️ | `recommend-immunization` |
+| `CPGCommunicationRequest` | `cpg-communicationactivity` | `cpg-communicationrequest` | `CommunicationRequest` | `send-message` |
 | `CPGTaskRequest` | `cpg-computableactivity` (generic) | Core FHIR `Task` | `Task` | `send-message` |
 | `CPGQuestionnaire` | `cpg-collectinformationactivity` | `CPGQuestionnaireTask` | `Task` | `collect-information` |
 | `CPGEnrollment` | `cpg-enrollmentactivity` | `CPGEnrollmentTask` | `Task` | `enrollment` |

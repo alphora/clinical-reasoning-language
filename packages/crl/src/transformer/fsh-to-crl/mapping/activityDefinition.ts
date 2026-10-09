@@ -19,9 +19,9 @@ export const ACTIVITY_DEFINITION_URLS = [
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-reportflagactivity",
 ];
 
-// REFACTOR:grounded (MR10): imported resource kinds must not manufacture retired/unknown tokens.
+// Imported activities preserve their resource kind; generic Task uses its explicit alias.
 function requestToken(resourceKind: string): string {
-  return resourceKind === "CommunicationRequest" || resourceKind === "Task" ? "CPGTaskRequest" : "CPG" + resourceKind;
+  return resourceKind === "Task" ? "CPGTaskRequest" : "CPG" + resourceKind;
 }
 
 function formatActivityValue(value: string | undefined): string {

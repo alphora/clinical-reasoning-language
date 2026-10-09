@@ -8,12 +8,13 @@ import { emitCelToFhir } from "../emitFhir";
 const fixture = path.resolve(__dirname, "../../../tests/fixtures/task-request/cases.cel");
 
 describe("CPGTaskRequest replacement", () => {
-  it("accepts the new token and gives the retired token an actionable migration error", () => {
+  it("accepts distinct Task and CommunicationRequest activity types", () => {
     const source = 'library "Test".\nactivity "Notify":\n- request CPGTaskRequest.\n';
     expect(buildCRL(source).success).toBe(true);
-    const retired = buildCRL(source.replace("CPGTaskRequest", "CPGCommunicationRequest"));
-    expect(retired.success).toBe(false);
-    expect(JSON.stringify(retired.errors)).toContain("use CPGTaskRequest");
+    const communication = buildCRL(source.replace("CPGTaskRequest", "CPGCommunicationRequest"));
+    expect(communication.success).toBe(true);
+    expect(communication.result!.statements[0].type).toBe("Activity");
+    expect((communication.result!.statements[0] as any).body.request.activityType).toBe("CPGCommunicationRequest");
   });
 
   it("emits activity-derived Task facts with required fields, patient binding and standard prohibition", () => {

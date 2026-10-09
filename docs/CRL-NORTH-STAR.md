@@ -70,6 +70,8 @@ against those data. A generated Questionnaire or QuestionnaireResponse proves ne
 succeeded nor that the policy's expected disposition was reached. Inspect errors, relevant item states,
 answers, and the intended decision results separately.
 
+Operator clarification (2026-10-09): Medical Review must work on existing content and remain generic across activity types. Loading and question/answer editing must not require Task or change unrelated activities. CPGTaskRequest emits core Task; CPGCommunicationRequest remains a distinct supported CommunicationRequest activity. Other supported request profiles retain their authored resource kinds and coding. Configured disposition membership and finality do not impose a request type. Automatic label/narrative/PAS metadata currently has explicit Task and CommunicationRequest mappings; other profiles follow ordinary authored emission. Clinical act/meaning remains a policy-fidelity concern rather than an inference from MV classification.
+
 ## 2. The local domain is a production analytical identity
 
 Local codes are production analytical identities, not test shims. External terminology adds a source

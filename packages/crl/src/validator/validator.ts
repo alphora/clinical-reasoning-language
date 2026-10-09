@@ -67,7 +67,6 @@ export type ValidationErrorKind =
   // Configurable PA determinations (feature: configurable PA leaves). Only enforced when the project EXPLICITLY
   // configures `crl.dispositions.options` (the closed-set trigger); absent config = today's behavior.
   | "disposition-not-configured"
-  | "disposition-request-type"
   | "disposition-non-final-leaf"
   // #154/#203 — registry-backed metadata (@tag) enforcement.
   | "meta-malformed-tag"
@@ -263,13 +262,6 @@ export interface ReservedLibraryNameError extends ValidationErrorBase {
 export interface DispositionNotConfiguredError extends ValidationErrorBase {
   kind: "disposition-not-configured";
   activityName: string;
-}
-// A configured determination activity whose `request` type is not `CPGTaskRequest` (a determination is
-// COMMUNICATED, not ordered — meaning enforced by validation, not grammar).
-export interface DispositionRequestTypeError extends ValidationErrorBase {
-  kind: "disposition-request-type";
-  activityName: string;
-  actualRequestType: string;
 }
 // A non-final determination (e.g. `pended`) recommended under `standalone` mode, where our tree IS the whole
 // adjudication and every leaf must be FINAL. Legitimate only in `embedded` mode (our tree feeds a larger one).
@@ -673,7 +665,6 @@ export type ValidationError =
   | DecisionShapeError
   | ReservedLibraryNameError
   | DispositionNotConfiguredError
-  | DispositionRequestTypeError
   | DispositionNonFinalLeafError
   | AgePredicateUnsupportedError
   | RepresentationShapeError
@@ -724,8 +715,7 @@ const SOFT_DEMOTABLE_KINDS: ReadonlySet<ValidationErrorKind> = new Set([
   "unresolved-reference",
   "qualified-ref-unresolved",
   // Mid-authoring, recommending a determination before wiring it into the config is incomplete-but-fixable state
-  // (parallels unresolved-reference) — demote under soft. `disposition-request-type` is a STRUCTURAL defect
-  // (a determination modeled as an order) and stays a hard error (like decision-shape), so it is NOT listed.
+  // (parallels unresolved-reference) — demote under soft. Resource kind is authored independently.
   "disposition-not-configured",
   // #154: a missing required @tag field is incomplete-but-fixable authoring state (parallels unresolved-reference)
   // → demote under soft. An INVALID enum value (`meta-invalid-field`) is misuse, not incompleteness → stays a hard error.

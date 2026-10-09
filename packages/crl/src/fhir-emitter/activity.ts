@@ -163,7 +163,7 @@ export function emitActivityDefinition(
   // A configured PA determination (`<category>.<key>` in `crl.dispositions`) is customized ONLY on its
   // `dynamicValue` (below). Its `title`/`description`/`code` follow the SAME path as any other activity —
   // the stable activity name drives the id/name/url/title; the config LABEL surfaces at runtime on the
-  // produced Task (`payload`), NOT on the artifact's title.
+  // produced request at its type-specific label path, NOT on the artifact's title.
   const determination = opts.dispositionConfig?.configured
     ? resolveDeterminationLeaf(opts.dispositionConfig, activity.name)
     : undefined;
@@ -253,12 +253,13 @@ export function emitActivityDefinition(
   // deferred edge (the deliverable's activities are text dispositions with no
   // `with` terminology); guard it loudly rather than emit a dangling reference.
   // Do NOT solve the general case here.
-  // Round-2 I1: exclude determinations here too — a determination never binds a terminology (its `with` is a
-  // free-text narrative), so on the Interface split path it must fall through to the determination handling
-  // below (which ignores a non-free-text `with`), NOT hard-error via this Interface-edge guard. Keeps the
-  // determination's terminology-`with` behavior consistent between the direct and Interface-scoped paths.
+  // Only explicit disposition metadata mappings bypass ordinary terminology lowering.
   const withClause = activity.body.withClause;
-  if (isInterfaceScoped && !determination && withClause?.terminologyReference !== undefined) {
+  const isTaskRequest = activity.body.request.activityType === "CPGTaskRequest";
+  const isCommunication = activity.body.request.activityType === "CPGCommunicationRequest";
+  // Review classification does not change an activity's resource kind or terminology.
+  const dispositionMetadata = determination && (isTaskRequest || isCommunication);
+  if (isInterfaceScoped && !dispositionMetadata && withClause?.terminologyReference !== undefined) {
     errors.push({
       type: "Validation",
       kind: "emit-activity-terminology-interface-unsupported",
@@ -275,12 +276,9 @@ export function emitActivityDefinition(
   // dynamicValue (path per profile, via buildDynamicValue) OR a free-text narrative routed below. All
   // dynamicValue expressions the emitter authors are static CQL (`text/cql-expression`).
   const dynamicValues: Record<string, unknown>[] = [];
-  // Impl-review I1: a determination's `with` is always a free-text narrative (→ `note.text` below); a
-  // determination never binds a terminology, so SKIP the terminology-lowering path for it — otherwise a
-  // determination whose `with` were a terminology ref would push a spurious
-  // `unsupported-task-with-terminology` (pinning success:false) AND still emit the determination, a
-  // confusing half-state. For non-determinations, buildDynamicValue handles terminology (free-text → null).
-  if (withClause && !determination) {
+  // Task/CommunicationRequest dispositions use their label/narrative mapping.
+  // Configured service and medication activities still bind their authored terminology.
+  if (withClause && !dispositionMetadata) {
     const dvResult = buildDynamicValue(activity, withClause, profile, terminologyResolver);
     errors.push(...dvResult.errors);
     unmatched.push(...dvResult.unmatched);
@@ -290,36 +288,17 @@ export function emitActivityDefinition(
   // A free-text `with` narrative (backtick text, not a terminology reference).
   const withNarrative =
     withClause && withClause.terminologyReference === undefined ? withClause.activityTypeValue : undefined;
-  // REFACTOR:grounded (MR10): R4 Task.description, note.text and reasonCode carry the determination.
-  const isTaskRequest = activity.body.request.activityType === "CPGTaskRequest";
-
-  if (determination && !isTaskRequest) {
-    // Impl-review I2: a configured determination MUST be a CPGTaskRequest (also validated as
-    // `disposition-request-type`). Defend the emit path so a leaf mis-authored as e.g. CPGServiceRequest never
-    // gets Task dynamicValues (payload/note/reasonCode) written onto a non-Task ActivityDefinition
-    // — fail loudly instead of emitting an invalid resource.
-    errors.push({
-      type: "Validation",
-      kind: "disposition-request-type",
-      message: `Configured determination "${activity.name}" must be a CPGTaskRequest, not ${activity.body.request.activityType}; no determination dynamicValue emitted.`,
-      line: activity.location?.start.line,
-      column: activity.location?.start.column,
-    });
-  } else if (determination) {
-    // Configurable PA determinations (feature: configurable PA leaves) — the produced Task
-    // (derived by the service from `kind`) carries the outcome three ways (R4 shape): the config LABEL is the
-    // human description (`description`); the `with` narrative is a supplementary `note.text`; and the
-    // machine-readable PAS review-action Coding (+ the option's config reason Coding) is the `reasonCode`.
-    // Retires the coded-HCR01 boundary — the X12 278 HCR01 outcome is now coded on the produced resource.
-    dynamicValues.push(cqlDynamicValue("description", cqlStringLiteral(determination.label)));
+  if (dispositionMetadata) {
+    // Only these explicit request mappings carry automatic disposition metadata.
+    // Other profiles retain ordinary authored lowering, including coded service/medication requests.
+    const labelPath = isTaskRequest ? "description" : "payload.contentString";
+    dynamicValues.push(cqlDynamicValue(labelPath, cqlStringLiteral(determination.label)));
     if (withNarrative !== undefined) {
       dynamicValues.push(cqlDynamicValue("note.text", cqlStringLiteral(withNarrative)));
     }
     dynamicValues.push(cqlDynamicValue("reasonCode", reviewActionCql(determination)));
-  } else if (isTaskRequest && withNarrative !== undefined) {
-    // A plain (non-determination) Task activity: the `with` narrative IS the message body
-    // (R4 Task description).
-    dynamicValues.push(cqlDynamicValue("description", cqlStringLiteral(withNarrative)));
+  } else if ((isTaskRequest || isCommunication) && withNarrative !== undefined) {
+    dynamicValues.push(cqlDynamicValue(isTaskRequest ? "description" : "payload.contentString", cqlStringLiteral(withNarrative)));
   }
 
   if (dynamicValues.length > 0) resource.dynamicValue = dynamicValues;
@@ -410,8 +389,8 @@ function buildDynamicValue(
   }
 
   // Free-text branch — handled by the caller (emitActivityDefinition), which has the disposition context to
-  // route it: a Task `with` narrative becomes `description` (plain) or `note.text`
-  // (determination); any other kind's free-text `with` is dropped (#181). Nothing to lower here; NOT routed to
+  // route it: Task uses description, CommunicationRequest uses payload.contentString,
+  // and either mapped disposition uses note.text. Other kinds keep ordinary authored behavior. Nothing to lower here; NOT routed to
   // `unmatched` (which would silently pin the whole emit's `success:false`).
   if (hasFreeText) {
     return { entry: null, errors, unmatched };
@@ -433,6 +412,8 @@ function buildDynamicValue(
     const kind: UnmatchedReference["kind"] =
       activityType === "CPGTaskRequest"
         ? "unsupported-task-with-terminology"
+        : activityType === "CPGCommunicationRequest"
+          ? "unsupported-communication-with-terminology"
         : activityType === "CPGQuestionnaire"
           ? "unsupported-questionnaire-with"
           : "unresolved-terminology";
