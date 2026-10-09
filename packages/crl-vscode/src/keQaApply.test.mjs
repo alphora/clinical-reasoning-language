@@ -35,7 +35,7 @@ function command(f){
 }
 test('KE discovery and real preview expose current requests and never write the artifact',async()=>{
  const f=fixture();try{saveQuestionRequest(f.root,f.flags,f.wording(),'Requested?','Requested detail');saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Requested Yes',description:'Answer detail'});
-  const before=snapshot(f.root),d=discoverKeUpdates(f.root);assert.equal(d.requests.length,2);assert.equal(d.hasSource,true);assert.equal(d.hasFhir,true);assert.equal(d.hasCql,true);
+  const before=snapshot(f.root),d=discoverKeUpdates(f.root);assert.equal(d.requests.length,2);assert.equal(d.hasCrl,true);assert.equal(d.hasSource,undefined);assert.equal(d.hasFhir,true);assert.equal(d.hasCql,true);
   const p=await f.call('preview');assert.equal(p.state,'preview');assert.ok(p.changedPaths.includes('src/fhir'));assert.deepEqual(snapshot(f.root),before);
  }finally{f.close();}
 });
@@ -71,6 +71,7 @@ test('KE recovery preserves conflicting external bytes and continues to block pu
  }finally{f.close();}
 });
 const native=process.env.CRL_KE_NATIVE_ACCEPTANCE==='1'?test:test.skip;
+// @kit mv-wording-patches:ke-static-apply
 native('native KE application updates definitions and static Q/QR, leaves pending MV flags untouched, repeats without writes',async()=>{
  const f=fixture();try{saveQuestionRequest(f.root,f.flags,f.wording(),'Requested question?','Requested detail');saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Requested Yes',description:'Requested answer detail'});
   const mv=mvBytes(f),activities=definitions(f).filter(r=>r.resource.resourceType==='ActivityDefinition');assert.ok(activities.length);
@@ -94,6 +95,7 @@ native('current ordinary native forms receive missing authored help without nati
   const before=snapshot(f.root),repeat=await f.call('apply',noNative);assert.equal(repeat.state,'no-op');assert.deepEqual(snapshot(f.root),before);
  }finally{f.close();}
 },120000);
+// @kit mv-wording-patches:deleted-selections
 native('deleted selected answer is cleared in CEL, test data and static responses while expected outcome remains authored',async()=>{
  const f=fixture();try{const target=f.answer();saveAnswerRequest(f.root,f.flags,target,{operation:'create',system:f.system,code:'replacement',display:'Replacement',description:'',qualifications:{'["L","Q"]':false}});saveAnswerRequest(f.root,f.flags,target,{operation:'delete',system:f.system,code:'yes'});
   const mv=mvBytes(f),result=await f.call('apply');assert.equal(result.state,'changed');assert.deepEqual(result.clearedCases,[{file:'src/cel/mv/cases.cel',caseName:'Selected',factName:'Answer'}]);assert.match(result.message,/expected outcomes/);

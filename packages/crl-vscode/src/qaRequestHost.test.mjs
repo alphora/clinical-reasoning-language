@@ -25,6 +25,7 @@ function harness(f){
  for(const name of ['saveCard','qaRequestAction'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,c);
  return{c,posts,errors,pin};
 }
+// @kit mv-wording-patches:mv-only-save
 test('actual cockpit Q/A Save writes flags with no source publication or KELP dependency',async()=>{
  const f=qaFixture();try{const h=harness(f),before=[readFileSync(f.policy,'utf8'),readFileSync(f.terms,'utf8')];
   await h.c.saveCard({token:'pin',key:'q',fields:{questionText:'Requested question? ',questionDescription:'Requested detail'}});

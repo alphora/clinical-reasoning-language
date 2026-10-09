@@ -45,7 +45,7 @@ export class MvDefinitionFreshness {
       try {
         writeTwoLane(emitted, join(scratch, 'src'));
         const drift = ['cql', 'fhir'].flatMap(lane => generatedDefinitionDrift(readEditTree(join(root, 'src', lane)), readEditTree(join(scratch, 'src', lane)), join(root, 'src', lane)));
-        value = drift.length ? { state: 'drift', digest, message: 'Generated definitions differ from the current CRL. A direct Save will regenerate this policy; current Pass is unavailable.' } : { state: 'current', digest };
+        value = drift.length ? { state: 'drift', digest, message: 'Generated definitions differ from the current CRL. Regenerate CQL/FHIR definitions in the owning KE workflow; current Pass is unavailable.' } : { state: 'current', digest };
       } finally { assertOrdinaryEditPath(scratch);if(realpathSync(resolve(scratchRoot))!==owner || realpathSync(scratch)!==join(owner,scratch.split(/[\\/]/).at(-1)!))throw new Error('Freshness scratch ownership changed.');rmSync(scratch, { recursive: true, force: true }); }
       this.cached = { key, value }; return value;
     } catch (error) { return { state: 'unknown', message: String(error instanceof Error ? error.message : error) }; }

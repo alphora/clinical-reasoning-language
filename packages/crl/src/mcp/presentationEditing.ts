@@ -84,7 +84,7 @@ export function registerPresentationEditing(server: McpServer) {
     {
       title: "Preview question wording edit",
       description:
-        "Preview an ordinary CRL question text/description edit without writing. Edits existing field owners: an inherited description can affect its shared default and other uses. Inspect fields, owner scope, impact and source/edits before applying. No new per-use override is inferred. Omit a field to keep it; an empty description requests removal and refuses if unexpected inherited text would appear. Returns a previewToken binding the request, saved source, configuration and discovered dependencies. Source validation does not establish emission readiness, native behavior or clinical approval. Medical Review tree Save separately coordinates CRL and generated artifacts with managed scope ownership.",
+        "Preview an ordinary CRL question text/description edit without writing. Edits existing field owners: an inherited description can affect its shared default and other uses. Inspect fields, owner scope, impact and source/edits before applying. No new per-use override is inferred. Omit a field to keep it; an empty description requests removal and refuses if unexpected inherited text would appear. Returns a previewToken binding the request, saved source, configuration and discovered dependencies. Source validation does not establish emission readiness, native behavior or clinical approval. Medical Review Q/A Save writes only MV requested-state flags; separate KE application updates source, definitions and static forms without changing MV status.",
       inputSchema: z.object({ ...targetSchema, request: requestSchema }).strict(),
       annotations: { readOnlyHint: true, destructiveHint: false },
     },

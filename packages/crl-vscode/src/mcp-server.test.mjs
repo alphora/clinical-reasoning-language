@@ -10,6 +10,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
 import { getAuthoringKit } from "../../crl/dist/authoring-kit/index.js";
+import { isQaEditFlag } from "../../crl/dist/flags/mvFlagReview.js";
 import { renderAuthoringKitMarkdown } from "../../crl/dist/authoring-kit/export.js";
 import { readFileSync, mkdtempSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -171,8 +172,8 @@ check("authoring_kit full exports all 22 artifacts and determination guidance", 
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-  assert.equal(kit.schemaVersion, "2.31");
-  assert.equal(kit.contentHash, "713344a161486ea034ec04d45fe5a465a79d8ec35da6293a9a1cc030ea9f8495");
+  assert.equal(kit.schemaVersion, "2.32");
+  assert.equal(kit.contentHash, "ce4f381b5c3d07884093106821955958aaea4f1226c1cef30f60b5252b29330e");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -619,7 +620,7 @@ check("title creation survives persisted reload, legacy retry, and conflict reje
   let modelFunction;
   function visit(n) { if (ts.isFunctionDeclaration(n) && n.name?.text === "flagActionViewModel") modelFunction = n.getText(source); ts.forEachChild(n, visit); }
   visit(source); assert.ok(modelFunction);
-  const context = vm.createContext({ flagDisplayNameOf: () => undefined, FLAG_VIEW_PLUMBING: new Set(), issueRefOf: () => undefined, gidsForFlag: () => ["target"], isAuthoringFlag, flagsList: [disk], flagStoreWarning: false });
+  const context = vm.createContext({ flagDisplayNameOf: () => undefined, FLAG_VIEW_PLUMBING: new Set(), issueRefOf: () => undefined, gidsForFlag: () => ["target"], isAuthoringFlag, isQaEditFlag, flagsList: [disk], flagStoreWarning: false });
   vm.runInContext(transformSync(modelFunction, { loader: "ts", target: "es2022" }).code, context);
   assert.equal(disk.anchor.occurrenceKey, undefined, "bounded VM fixture has no occurrence helper dependency");
   const model = context.flagActionViewModel(disk); assert.equal(model.summary, title); assert.equal(model.description, description);

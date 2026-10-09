@@ -1,4 +1,4 @@
-// REFACTOR:grounded: wording targets and retained legacy proposal history; tree Save uses mvDirectEdit.
+// REFACTOR:grounded: wording targets and retained legacy proposal history; tree Q/A Save uses MV-only requested-state flags.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync, renameSync, unlinkSync, readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, isAbsolute } from "node:path";

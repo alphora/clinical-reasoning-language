@@ -11,12 +11,14 @@ const a: QaEditRequest = {kind:"answer-crud",target:{kind:"answer",file:"src/crl
   before:state("Original"),desired:state("Edited")};
 describe("MV current-state edit flags",()=>{
  it("loads one Question Edit request without discarding payload",()=>{const f=buildQaEditFlag(q)!;expect(coerceFlag(JSON.parse(JSON.stringify(f)))).toEqual(f);});
+ // @kit mv-wording-patches:current-state
  it("question identity excludes wording, distinguishes presentation scope",()=>{
   const f=buildQaEditFlag(q)!;const r={...q,desired:{text:"Second edit",description:""}} as QaEditRequest;
   const next=buildQaEditFlag(r,f,"later")!;expect(next.id).toBe(f.id);expect(next.createdAt).toBe(f.createdAt);
   expect(next.editRequest?.before).toEqual(q.before);
   expect(qaEditFlagId({...q.target,context:{decision:"D",criteria:[]}} as any)).not.toBe(f.id);
  });
+ // @kit mv-wording-patches:answer-delete
  it("answer update then delete retains only requested deletion and original baseline",()=>{
   const f=buildQaEditFlag(a)!;const next=buildQaEditFlag({...a,desired:null},f)!;
   expect(next.id).toBe(f.id);expect(next.editRequest).toMatchObject({before:state("Original"),desired:null});
@@ -48,10 +50,12 @@ describe("MV current-state edit flags",()=>{
   expect(coerceQaEditRequest({...a,desired:{display:"Edited",description:"",qualifications:{bad:true}}})).toBeUndefined();
   expect(coerceQaEditRequest({...a,desired:{display:"Edited",description:"",qualifications:{'["L", "Q1"]':true}}})).toBeUndefined();
  });
+ // @kit mv-wording-patches:reserved-ui
  it("only dedicated Q/A UI creates reserved types",()=>{
   for(const tag of ["question-edit","answer-crud"])expect(validateFlagFields({tag,title:"Generic mutation"}).ok).toBe(false);
   expect(flagTags().filter(f=>f.editor).map(f=>f.displayName)).toEqual(["Question Edit","Answer CRUD"]);
  });
+ // @kit review-flags:manual-mv-review
  it("manual Pending -> Fixed -> Approved blocks completion until approval",()=>{
   const pending=buildQaEditFlag(q)!;expect(mvReviewStatus(pending)).toBe("pending-fix");
   expect(()=>transitionMvFlag(pending,"approved")).toThrow("Fixed");

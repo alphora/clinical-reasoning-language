@@ -26,7 +26,7 @@ const pending=(f:MvFlag)=>f.category==='validation' && !!f.editRequest && mvRevi
 function hasFiles(dir:string,extension:string):boolean {return existsSync(dir) && readdirSync(dir,{withFileTypes:true}).some(e=>e.isFile()?e.name.endsWith(extension):e.isDirectory() && hasFiles(join(dir,e.name),extension));}
 export function discoverKeUpdates(root:string){
   const list=flags(root);
-  return {schemaVersion:1,artifactRoot:root,hasSource:hasFiles(join(root,'src/crl'),'.crl'),hasFhir:hasFiles(join(root,'src/fhir'),'.json'),hasCql:hasFiles(join(root,'src/cql'),'.cql'),
+  return {schemaVersion:1,artifactRoot:root,hasCrl:hasFiles(join(root,'src/crl'),'.crl'),hasFhir:hasFiles(join(root,'src/fhir'),'.json'),hasCql:hasFiles(join(root,'src/cql'),'.cql'),
     pendingFindings:list.filter(f=>!f.editRequest && (f.category==='validation'?mvReviewStatus(f)==='pending-fix':f.status==='open')).map(f=>({id:f.id,category:f.category,gist:f.gist})),
     requests:list.filter(pending).map(f=>({id:f.id,revision:mvFlagRevision(f),gist:f.gist,editRequest:f.editRequest})),requiredScopes:scopes};
 }
