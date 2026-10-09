@@ -24,7 +24,9 @@ export interface FlagActionView {
   typeLabel: string;
   /** Current workflow (`extraction` | `validation`); KE findings retain extraction ownership. */
   category: string;
-  status: "open" | "resolved";
+  // REFACTOR:grounded: MV status is manual Pending fix -> Fixed -> Approved; KE remains open/resolved.
+  status: "open" | "fixed" | "approved" | "resolved";
+  qaEdit?: boolean;
   /** the target's SHORT label (the header) + its FULL self-describing label (the anchor's retained `label`). */
   targetLabel: string;
   targetTitle?: string;
@@ -77,7 +79,7 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   const rows =
     row("Type", escapeHtml(v.typeLabel)) +
     row("Workflow", escapeHtml(v.category === "extraction" ? "KE" : v.category === "validation" ? "MV" : v.category)) +
-    row("Status", `<span class="fa-status fa-status-${v.status}">${v.status === "resolved" ? "resolved" : "open"}</span>`) +
+    row("Status", `<span class="fa-status fa-status-${v.status}">${v.category === "validation" ? v.status === "fixed" ? "Fixed" : v.status === "approved" || v.status === "resolved" ? "Approved" : "Pending fix" : v.status}</span>`) +
     row("Description", v.description?.trim() ? escapeHtml(v.description) : em, true) + // .trim(): a whitespace-only value reads as empty (em-dash)
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
     (v.issueRef?.trim() ? row("Ref", escapeHtml(v.issueRef)) : "") +
@@ -101,9 +103,9 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   const toggle = authoring && v.status === "open"
     ? `<button type="button" class="fa-btn fa-primary" data-flag-action-answer>Answer Flag</button>` +
       `<button type="button" class="fa-btn" data-flag-action-ignore>Ignore Flag</button>`
-    : v.status === "resolved"
+    : v.status === "resolved" || v.status === "approved"
       ? `<button type="button" class="fa-btn fa-toggle" data-flag-action-toggle>↻ Reopen flag</button>`
-      : `<button type="button" class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>✓ Resolve flag</button>`;
+      : `<button type="button" class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>${v.status === "fixed" ? "Approve flag" : "Mark Fixed"}</button>`;
   const issue =
     v.issueNo !== undefined
       ? `<button type="button" class="fa-btn" data-flag-action-issue>↗ Open issue #${escapeHtml(String(v.issueNo))}</button>`
@@ -119,8 +121,8 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     `<div class="flag-head"><span class="flag-title" title="${escapeHtml(headerText)}">Flag — ${escapeHtml(headerText)}</span>` +
     `<button type="button" class="flag-close" data-flag-action-close aria-label="Close">✕</button></div>` +
     `<div class="fa-body">${rows}${details}</div>` +
-    (authoring || v.readOnly ? `<div class="fa-note">KE flag · Content read only</div>` : "") +
-    `<div class="flag-actions">${authoring || v.readOnly ? issue+toggle : del+issue+edit+toggle}</div>` +
+    (v.qaEdit ? `<div class="fa-note">Use the pinned Question and Answer controls to review or change this request.</div>` : authoring || v.readOnly ? `<div class="fa-note">KE flag · Content read only</div>` : "") +
+    `<div class="flag-actions">${v.qaEdit ? issue : authoring || v.readOnly ? issue+toggle : del+issue+edit+toggle}</div>` +
     `</div>`
   );
 }

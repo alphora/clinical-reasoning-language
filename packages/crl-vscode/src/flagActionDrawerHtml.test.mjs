@@ -1,3 +1,4 @@
+// REFACTOR:grounded: MV manual Fixed/Approved; KE retains Answer/Ignore and specialized requests use Q/A controls.
 // Flag-ACTION drawer — renderFlagActionDrawer: the read-only view. Post disc-359: the HEADER is the summary (not the long
 // target label); Target + id live in a collapsible Details (auto-opened + noted when the target isn't in the current tree).
 // Pure HTML; no vscode.
@@ -58,7 +59,7 @@ test("renderFlagActionDrawer: the visible body rows — Type, Workflow, Status, 
   const h = renderFlagActionDrawer(OPEN_VIEW);
   assert.match(h, />Type<\/span><span class="fa-val[^"]*">CRL vs customer intent</);
   assert.match(h, />Workflow<\/span><span class="fa-val[^"]*">MV</);
-  assert.match(h, /fa-status fa-status-open">open</);
+  assert.match(h, /fa-status fa-status-open">Pending fix</);
   assert.match(h, /line one\nline two/); // multiline description preserved (fa-pre → pre-wrap)
   assert.match(h, />kind<\/span><span class="fa-val[^"]*">intent-divergence</);
   assert.match(h, />Ref<\/span><span class="fa-val[^"]*">#42</);
@@ -84,9 +85,9 @@ test("renderFlagActionDrawer: target NOT present → Details AUTO-OPENS + a note
   assert.match(h, /fa-note">This flag's target isn't drawn in the current tree/);
 });
 
-test("renderFlagActionDrawer: OPEN → primary Resolve; RESOLVED → Reopen (no primary); Open-issue only with a numeric issueNo", () => {
+test("renderFlagActionDrawer: Pending → Mark Fixed; legacy Approved → Reopen (no primary); Open-issue only with a numeric issueNo", () => {
   const open = renderFlagActionDrawer(OPEN_VIEW);
-  assert.match(open, /class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>✓ Resolve flag</);
+  assert.match(open, /class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>Mark Fixed</);
   assert.match(open, /data-flag-action-issue>↗ Open issue #42</);
   const resolved = renderFlagActionDrawer({ ...OPEN_VIEW, status: "resolved" });
   assert.match(resolved, /class="fa-btn fa-toggle" data-flag-action-toggle>↻ Reopen flag</);
@@ -183,3 +184,9 @@ test('Open KE flags offer Answer and Ignore, while closed KE flags offer Reopen'
 });
 
 console.log("flagActionDrawerHtml.test: ok");
+
+test('manual Fixed -> Approve and Q/A generic drawer has no mutation actions',()=>{
+ const fixed=renderFlagActionDrawer({...OPEN_VIEW,status:'fixed'});assert.match(fixed,/Fixed<\/span>/);assert.match(fixed,/data-flag-action-toggle>Approve flag/);
+ const approved=renderFlagActionDrawer({...OPEN_VIEW,status:'approved'});assert.match(approved,/Approved<\/span>/);assert.match(approved,/Reopen flag/);
+ for(const status of ['open','fixed','approved']){const special=renderFlagActionDrawer({...OPEN_VIEW,qaEdit:true,status});assert.doesNotMatch(special,/data-flag-action-(toggle|edit|delete|answer|ignore)/);assert.match(special,/pinned Question and Answer controls/);}
+});

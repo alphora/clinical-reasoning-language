@@ -2,6 +2,7 @@
 import type { CrlConceptNode, ScenarioViewModel } from "@smile-digital-health/crl";
 import type { QExpr, Questionnaire } from "./questionnaireModel";
 import type { WordingTarget } from "./presentationProposal";
+import type { QaFlagView } from "./qaFlagEditing";
 
 export interface RouteCard {
   id: string; ownerKey: string; concept: string; library: string;
@@ -9,9 +10,10 @@ export interface RouteCard {
   occurrences: { ownerKey: string; criterionPaths: { lib: string; name: string }[][] }[];
   text: string; description: string; value: string; determination: string;
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
+  questionRequest?: QaFlagView;
   criteria: { lib: string; name: string }[];
   criterionPaths: { lib: string; name: string }[][];
-  answerChoices: { system?: string; code: string; display: string; description?:string; editable?:boolean; readOnlyReason?:string; selected: boolean }[];
+  answerChoices: { system?: string; code: string; display: string; description?:string; editable?:boolean; readOnlyReason?:string; selected: boolean; request?:QaFlagView; pendingDelete?:boolean }[];
   choicesFrom?: string;
   answerEditor?:{editable:boolean;readOnlyReason?:string;terminology?:string;systems?:string[];consumers?:{key:string;label:string}[];uses?:string[]};
 }

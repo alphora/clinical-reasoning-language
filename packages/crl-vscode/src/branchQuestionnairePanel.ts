@@ -26,7 +26,8 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
         if(current!==panel || message?.gen!==generation)return;
         if(message.type==='ready'){ready=true;post({type:'routeCards',...payload});return;}
         if(message.token!==payload?.token)return;
-        if(['routeCardSave','routeCardAnswerSave','routeCardDraft'].includes(message.type))onMessage(message);
+        // REFACTOR:grounded: Q/A request status and revert remain in the same MV UI.
+        if(['routeCardSave','routeCardAnswerSave','routeCardDraft','qaRequestAction'].includes(message.type))onMessage(message);
       });
       panel.onDidDispose(()=>{listener.dispose();if(current!==panel)return;current=undefined;payload=undefined;ready=false;onClosed();});
       const nonce=randomUUID();

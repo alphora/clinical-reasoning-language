@@ -12,7 +12,8 @@ export function canonicalMvValue(v: unknown): string {
 /** Apply-selection fingerprint only, not an automatic fix attestation. */
 export const mvFlagRevision = (f: MvFlag): string => createHash("sha256").update(canonicalMvValue(f)).digest("hex");
 export const isQaEditFlag = (f: Pick<MvFlag, "tag">): boolean => f.tag === "question-edit" || f.tag === "answer-crud";
-export const qaEditFlagId = (t: QaEditTarget): string => "qa-" + createHash("sha256").update(canonicalMvValue(t)).digest("hex");
+export const qaEditFlagId = (t: QaEditTarget): string => "qa-" + createHash("sha256").update(canonicalMvValue(
+  t.kind === "question" && t.presentationKey ? { ...t, context: undefined } : t)).digest("hex");
 export function mvReviewStatus(f: Pick<MvFlag, "category" | "status">): MvReviewStatus {
   if (f.category !== "validation") throw new Error("MV review status applies only to MV flags.");
   return f.status === "approved" || f.status === "resolved" ? "approved" : f.status === "fixed" ? "fixed" : "pending-fix";

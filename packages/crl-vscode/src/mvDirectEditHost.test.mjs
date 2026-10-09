@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MV/KE workflow): MV Save no longer publishes source; retained checks cover historical recovery/read paths.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -32,22 +33,24 @@ function harness(){
  });install(c,['assertMvWriteAllowed','saveCard','recoverPolicyEdit','adoptPublishedReviewSidecar']);
  return {c,messages,errors,rebuilds,finish,choose:()=>choose(),saves:()=>saves,recoveries:()=>recoveries,payload:{token:'pin',key:'question',fields:{questionText:'New wording',questionDescription:'Details'}}};
 }
-test('a rejected overlapping Save cannot unlock the active coordinated Save',async()=>{
- const h=harness(),first=h.c.saveCard(h.payload);assert.equal(h.c.mvEditBusy,true);assert.equal(h.saves(),1);
- await h.c.saveCard(h.payload);assert.equal(h.c.mvEditBusy,true);assert.equal(h.saves(),1);
- assert.ok(h.messages.some(m=>m?.ok===false&&/in progress/.test(m.message)));
- h.finish();await first;assert.equal(h.c.mvEditBusy,false);
-});
-test('a recovery picker cannot acquire or release another Save ownership after its await',async()=>{
- const h=harness(),recovery=h.c.recoverPolicyEdit();const save=h.c.saveCard(h.payload);assert.equal(h.c.mvEditBusy,true);
- h.choose();await recovery;assert.equal(h.recoveries(),0);assert.equal(h.c.mvEditBusy,true);assert.ok(h.errors.some(m=>/in progress/.test(m)));
- h.finish();await save;assert.equal(h.c.mvEditBusy,false);
-});
+
+
 test('a queued preserving rebuild rechecks busy when it runs and drops retargeted work',()=>{
  let callback;const rebuilt=[];const c=vm.createContext({currentCel:'one',mvEditBusy:false,mvDeferredRebuild:false,debounce:undefined,setTimeout:f=>{callback=f;return 1;},clearTimeout:()=>{},rebuild:p=>rebuilt.push(p)});
  install(c,['scheduleRebuild']);c.scheduleRebuild();c.mvEditBusy=true;callback();assert.deepEqual(rebuilt,[]);assert.equal(c.mvDeferredRebuild,true);
  c.mvEditBusy=false;c.scheduleRebuild();callback();assert.deepEqual(rebuilt,[true]);
  c.scheduleRebuild();c.currentCel='two';callback();assert.deepEqual(rebuilt,[true]);
+});
+
+test('historical recovery picker rechecks an edit that became busy while awaiting selection',async()=>{
+ const h=harness(),recovery=h.c.recoverPolicyEdit();h.c.mvEditBusy=true;h.choose();await recovery;
+ assert.equal(h.recoveries(),0);assert.equal(h.c.mvEditBusy,true);assert.ok(h.errors.some(m=>/in progress/.test(m)));
+});
+test('successful historical recovery refreshes compiler/model even when sidecar reload fails',async()=>{
+ const h=harness(),warnings=[];let invalidated=0;
+ Object.assign(h.c,{loadEditRecovery:()=>{},reloadPublishedReviewSidecar:()=>{throw Error('Unreadable review state');},snapshotCapture:{settleEmpty:()=>{}},definitionFreshness:{invalidate:()=>invalidated++}});
+ h.c.vscode.commands={executeCommand:async()=>invalidated++};h.c.vscode.window.showWarningMessage=m=>warnings.push(m);
+ const recovery=h.c.recoverPolicyEdit();h.choose();await recovery;assert.equal(h.recoveries(),1);assert.equal(invalidated,2);assert.deepEqual(h.rebuilds,[true]);assert.equal(h.c.mvEditBusy,false);assert.match(warnings[0],/recovery completed/);
 });
 test('approval rechecks definitions and refuses a new revision until the reviewed model refreshes',()=>{
  let calls=0,scheduled=0,frozen=0;const root=path.resolve('synthetic-approval');
@@ -116,13 +119,7 @@ test('changed wording or scope does not transplant an old draft into a different
  g.c.pinCards('case','route',undefined,true,'traversal',g.preserved);assert.equal(g.c.pinnedCards.payload.cards[0].draftText,undefined);
 });
 
-test('a cosmetic refresh failure does not stop coordinated KELP Save after local publication',async()=>{
- const h=harness();let saved=false;const warnings=[];
- Object.assign(h.c,{definitionFreshness:{inputFiles:[],invalidate:()=>{}},reloadPublishedReviewSidecar:()=>{},clearReviewGridState:()=>{throw Error('synthetic UI refresh failure');},snapshotCapture:{settleEmpty:()=>{}},interactiveQuestionnaire:{definitionsChanged:()=>{}}});
- h.c.vscode.window.showWarningMessage=m=>warnings.push(m);
- h.c.coordinateDirectEdit=async options=>{await options.onLocalApplied({sidecar:{schemaVersion:2,byCaseId:{a:'pending'},definitionRevision:{id:'new'}}});saved=true;return {state:'saved'};};
- await h.c.saveCard(h.payload);assert.equal(saved,true);assert.match(warnings[0],/reopen Medical Review/);assert.equal(h.c.mvEditBusy,false);assert.equal(h.c.currentDefinitions.state,'unknown');
-});
+
 
 test('a preserving viewport request is consumed and does not suppress a later model change',()=>{
  const text=bodies.get('renderPane'),start=text.indexOf('v.preserveTreeViewport ='),end=text.indexOf('v.preserveNextTreeViewport = false;',start)+'v.preserveNextTreeViewport = false;'.length;
@@ -131,22 +128,9 @@ test('a preserving viewport request is consumed and does not suppress a later mo
  c.indexVersion=3;vm.runInContext(code,c);assert.equal(c.v.preserveTreeViewport,false);
 });
 
-test('a failed first-edit sidecar reload withholds completion and freezes the old interactive form while KELP Save proceeds',async()=>{
- const h=harness();let saved=false,frozen=0;
- Object.assign(h.c,{mvDefinitionRevision:undefined,currentDefinitions:{state:'current',digest:'old'},modelDefinitionDigest:'old',definitionFreshness:{inputFiles:[],invalidate:()=>{}},reloadPublishedReviewSidecar:()=>{throw Error('Unreadable sidecar');},interactiveQuestionnaire:{definitionsChanged:()=>frozen++}});
- h.c.vscode.window.showWarningMessage=()=>{};install(h.c,['reviewDefinitionsCurrent']);assert.equal(h.c.reviewDefinitionsCurrent(),true);
- h.c.coordinateDirectEdit=async options=>{await options.onLocalApplied({sidecar:{schemaVersion:2,byCaseId:{a:'pending'},definitionRevision:{id:'first-edit'}}});saved=true;return {state:'saved'};};
- await h.c.saveCard(h.payload);assert.equal(saved,true);assert.equal(h.c.mvDefinitionRevision.id,'first-edit');assert.equal(frozen,1);assert.equal(h.c.reviewDefinitionsCurrent(),false);
-});
 
-test('failed reload followed by a deferred rebuild never restores the pre-edit Pass maps',async()=>{
- const h=harness();let saved=false;
- Object.assign(h.c,{mvDefinitionRevision:undefined,currentDefinitions:{state:'current',digest:'old'},modelDefinitionDigest:'old',definitionFreshness:{inputFiles:[],invalidate:()=>{}},reloadPublishedReviewSidecar:()=>{throw Error('Unreadable sidecar');},interactiveQuestionnaire:{definitionsChanged:()=>{}},mvDeferredRebuild:true,
-  rebuild:()=>{h.c.currentDefinitions={state:'current',digest:'new'};h.c.modelDefinitionDigest='new';}});
- h.c.vscode.window.showWarningMessage=()=>{};
- h.c.coordinateDirectEdit=async options=>{await options.onLocalApplied({sidecar:{schemaVersion:2,byCaseId:{a:'pending'},definitionRevision:{id:'edit'}}});saved=true;return {state:'saved'};};
- await h.c.saveCard(h.payload);assert.equal(saved,true);assert.equal(h.c.currentDefinitions.state,'current');assert.equal(h.c.reviewByCaseId.a,'pending');assert.ok(!Object.values(h.c.reviewByCaseId).every(s=>s==='pass'));
-});
+
+
 
 test('definition banner preserves legacy review and explains a changed reviewed-model digest',()=>{
  const c=vm.createContext({mvDefinitionRevision:undefined,mvEditBusy:false,mvRecoveryBlock:undefined,mvSaveNotice:undefined,currentDefinitions:{state:'unknown',message:'Direct editing metadata unavailable'},modelDefinitionDigest:'old'});
@@ -155,22 +139,11 @@ test('definition banner preserves legacy review and explains a changed reviewed-
  c.currentDefinitions={state:'current',digest:'new'};assert.match(c.definitionStatusMessage(),/refresh the reviewed tree/);
 });
 
-test('direct Save refuses unsaved imported definition inputs before compiling or acquiring scopes',async()=>{
- const h=harness(),foreign=path.resolve('foreign-package/input.crl');h.c.definitionFreshness.inputFiles=[foreign];h.c.vscode.workspace.textDocuments=[{isDirty:true,uri:{fsPath:foreign}}];
- await h.c.saveCard(h.payload);assert.equal(h.saves(),0);assert.ok(h.errors.some(m=>m.includes(foreign)));assert.equal(h.c.mvEditBusy,false);
-});
 
-test('successful recovery still refreshes the compiler and model when review sidecar reload reports an error',async()=>{
- const h=harness(),warnings=[];let invalidated=0;
- Object.assign(h.c,{loadEditRecovery:()=>{},reloadPublishedReviewSidecar:()=>{throw Error('Unreadable review state');},snapshotCapture:{settleEmpty:()=>{}},definitionFreshness:{invalidate:()=>invalidated++}});
- h.c.vscode.commands={executeCommand:async()=>invalidated++};h.c.vscode.window.showWarningMessage=m=>warnings.push(m);
- const recovery=h.c.recoverPolicyEdit();h.choose();await recovery;assert.equal(h.recoveries(),1);assert.equal(invalidated,2);assert.deepEqual(h.rebuilds,[true]);assert.equal(h.c.mvEditBusy,false);assert.match(warnings[0],/recovery completed/);
-});
 
-test('unrelated dirty notes and documentation do not block direct Save',async()=>{
- const h=harness(),root=h.c.resolveCelSuite().suite.projectRoot;h.c.vscode.workspace.textDocuments=[{isDirty:true,uri:{fsPath:path.join(root,'README.md')}},{isDirty:true,uri:{fsPath:path.join(root,'tests/scratch.cel')}}];
- const save=h.c.saveCard(h.payload);assert.equal(h.saves(),1);h.finish();await save;assert.deepEqual(h.errors,[]);
-});
+
+
+
 
 test('legacy interactive publication preserves defaults on malformed configured dates and warns; edited policies require repair',()=>{
  const warnings=[],c=vm.createContext({join:path.join,mvDefinitionRevision:undefined,resolveCelSuite:()=>({ok:true,suite:{projectRoot:'/artifact'}}),readFileSync:()=>JSON.stringify({crl:{date:'2026-13-45'}}),mvPublicationOptions:()=>{throw Error('Invalid date');},vscode:{window:{showWarningMessage:m=>warnings.push(m)}}});
@@ -178,14 +151,7 @@ test('legacy interactive publication preserves defaults on malformed configured 
  c.mvDefinitionRevision={id:'edit'};assert.throws(()=>c.interactivePublication('policy.cel'),/Invalid date/);
 });
 
-for(const missing of ['project','cli','invalid-config','invalid-cli'])test(`host Save remains successful with KELP ${missing}`,async()=>{
- const h=harness();if(missing==='project')h.c.findKelpProject=()=>undefined;
- if(missing==='cli')h.c.resolveKelpEntry=()=>undefined;
- if(missing==='invalid-config')h.c.findKelpProject=()=>{throw Error('Invalid config');};
- if(missing==='invalid-cli')h.c.resolveKelpEntry=()=>{throw Error('Invalid CLI');};
- const promise=h.c.saveCard(h.payload);assert.equal(h.saves(),1);h.finish();await promise;
- assert.ok(h.messages.some(m=>m?.ok===true&&m.message==='Question saved to CRL and FHIR.'));assert.equal(h.errors.length,0);
-});
+
 
 test('completed local Save does not offer already released scopes as retained locks',async()=>{
  const h=harness();let picked=false;h.c.inspectScopeOperations=()=>({errors:[],operations:[{file:'/synthetic/completed.json',operation:{id:randomUUID(),phase:'saved',localComplete:true,acquired:['fhir'],released:['fhir'],preExisting:['mv']}}]});h.c.loadEditRecovery=()=>{};

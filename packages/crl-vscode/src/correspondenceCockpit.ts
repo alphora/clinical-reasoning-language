@@ -89,6 +89,7 @@ import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueR
 import { getGithubIssue, updateGithubIssue } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { renderFlagActionDrawer, type FlagActionField } from "./flagActionDrawerHtml";
+import { saveQuestionRequest, saveAnswerRequest, overlayQaRequests, changeQaRequest } from "./qaFlagEditing";
 import { computeFlagPlacement, conceptFlagTargetsForGids } from "./flagPlacement";
 import { flagCloseEligibility } from "./flagCloseEligibility";
 import { countEmbeddedFlags } from "./embeddedFlagDetect"; // #212 S3: the un-migrated-flag safety-net detector (pure)
@@ -103,6 +104,7 @@ import {
   loadFlags as loadStoredFlags,
   saveFlag,
   removeFlag,
+  transitionMvFlag, renewMvFlag, isQaEditFlag, mvReviewStatus,
   validateAndBuildMvFlagDraft,
   resolveAnchor,
   type OccurrenceRef,
@@ -166,11 +168,10 @@ import { treeTraversal, treeTraversalSignature, terminalTraversals, treeFocusPai
 import { installUnpinnedTreeFocus, paintPinnedTraversal, sanitizeUnpinnedTreeFocusSnapshot, UNPINNED_TREE_FOCUS_STYLE } from './unpinnedTreeFocusWebview';
 import { installFlowDisclosureFocus } from "./flowDisclosureFocus";
 import { installFlowComponentContainers } from "./flowComponentContainers";
-import {resolveAnswerTarget,AnswerCaseImpactError,type AnswerTarget,type AnswerChange} from "./answerEditing";
+import {resolveAnswerTarget,type AnswerTarget,type AnswerChange} from "./answerEditing";
 import { graphWordingSources, resolveSourceWordingTarget, pendingPresentationProposals, withdrawPresentationProposal, type WordingTarget } from "./presentationProposal";
-import { createDirectEditCompileCache, mvPublicationOptions, planDirectQuestionEdit, planDirectAnswerEdit, recheckDirectEditInputs } from './mvDirectEdit';
-import { coordinateDirectEdit, DirectEditAppliedError, inspectScopeOperations } from './mvScopeCoordinator';
-import { findKelpProject, kelpArtifactRoot, resolveKelpEntry, createKelpRunner, KelpEditScopes } from './kelpEditScopes';
+import { mvPublicationOptions } from './mvDirectEdit';
+import { inspectScopeOperations } from './mvScopeCoordinator';
 import { reconcileScopeOperation } from './mvEditRecovery';
 import { inspectMvEdits } from './mvEditTransaction';
 import { MvDefinitionFreshness, type DefinitionFreshness } from './mvDefinitionFreshness';
@@ -1085,7 +1086,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     let progress = "";
     if (mode === "medical-validation") {
       const p = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
-      const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
+      const resolvedCount = flagsList.filter((f) => !isOpen(f)).length;
       const fc: FlagChrome = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagStateError };
       // #224 ii.3 Slice 2b — the THIRD gate half: model-level criterion verdicts. `criterionProgress` tallies the LIVE
       // rendered single-criterion identities (a stale-or-changed pass is NOT a pass); it is "" / inert when the policy has
@@ -1270,7 +1271,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  the whole-policy list, which includes resolved flags.) */
   const flagPickItem = (f: MvFlag): { label: string; description: string; flag: MvFlag; iconPath: vscode.ThemeIcon } => {
     const a = f.anchor;
-    const resolved = f.status === "resolved";
+    const resolved = !isOpen(f);
     return {
       label: `${f.tag}${f.gist ? " — " + f.gist : ""}`,
       description: `${a.scope}:${a.name}${a.occurrenceKey ? " · " + parseOccurrenceKey(a.occurrenceKey).signature : ""} · ${f.status}${f.fields.ref ? " · " + f.fields.ref : ""}`,
@@ -1484,16 +1485,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const current = loaded.flags.find((f) => f.id === flag.id);
     if (!current) return stale("the flag changed on disk — reopen it");
     if (current.category !== flag.category || current.status !== flag.status) return stale("the flag changed on disk — reopen it");
+    if(isQaEditFlag(current))return flagNote("Use the pinned Question and Answer controls for this request.");
     if (isAuthoringFlag(current) && next === "resolved") return flagNote("Answer or ignore the KE flag");
     try {
-      assertMvWriteAllowed(); saveFlag(dir, { ...current, status: next, editedAt: new Date().toISOString() });
+      assertMvWriteAllowed(); saveFlag(dir, current.category === "validation" ? transitionMvFlag(current,next) : { ...current, status: next, editedAt: new Date().toISOString() });
     } catch (e) {
       return flagNote(`could not write the flag: ${e instanceof Error ? e.message : String(e)}`);
     }
     reloadReviewFlags();
     renderTreeChrome(); // EXPLICIT refresh (the store watcher also fires — belt and suspenders)
     driveFlagBadges();
-    flagNote(next === "resolved" ? "flag resolved" : "flag reopened");
+    flagNote(next === "fixed" ? "Flag marked Fixed" : next === "approved" ? "Flag approved" : next === "resolved" ? "flag resolved" : "flag reopened");
   }
 
   /** The action drawer's Answer/Ignore and Resolve/Reopen. Single-flight (a rapid 2nd click must not overlap the write). Writes via
@@ -1528,7 +1530,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           }
         }
       } else {
-        await writeFlagStatus(view.flag, view.flag.status === "resolved" ? "open" : "resolved", view.ver, view.cel);
+        const next:FlagStatus=view.flag.category === "validation" ? mvReviewStatus(view.flag)==="pending-fix" ? "fixed" : mvReviewStatus(view.flag)==="fixed" ? "approved" : "open" : view.flag.status==="resolved"?"open":"resolved";
+        await writeFlagStatus(view.flag,next,view.ver,view.cel);
       }
     } finally {
       flagActionBusy = false;
@@ -2613,6 +2616,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!pinnedCards || pinnedCards.epoch!==indexVersion || mode!=="medical-validation" || message.token!==pinnedCards.token) return;
     if(message.type==='routeCardSave' || message.type==='routeCardAnswerSave')void saveCard(message);
     else if(message.type==='routeCardDraft')acceptCardDraft(message,true);
+    else if(message.type==='qaRequestAction')qaRequestAction(message);
   }, () => { const tree=views.get('tree');if(tree)void tree.panel.webview.postMessage({type:'branchQuestionnaireState',gen:tree.gen,open:false}); });
   function acceptCardDraft(msg: any, fromBranch=false): void {
     const pin=pinnedCards;
@@ -2707,10 +2711,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         if(target){
           card.answerEditor={editable:target.editable,readOnlyReason:target.readOnlyReason,terminology:target.terminology,systems:target.systems,consumers:target.consumers.map(c=>({key:c.key,label:c.library+': '+c.concept})),uses:target.uses};
           card.answerChoices=card.answerChoices.map(c=>{const member=target.members.find(m=>m.system===c.system && m.code===c.code);return {...c,editable:member?.editable ?? false,readOnlyReason:member?.readOnlyReason};});
-          if(target.editable)answerTargets.set(card.id,target);
+          // REFACTOR:grounded: reviewing an applied request does not require authoring permission on remaining answers.
+          answerTargets.set(card.id,target);
         }else card.answerEditor={editable:false,readOnlyReason:'Answer terminology ownership is unavailable. Validate its CRL owner.'};
       }catch(error){card.answerEditor={editable:false,readOnlyReason:String(error)};}
     }
+    // REFACTOR:grounded: preview current MV intent; authored content is retained in review details.
+    if(answerSelection?.ok)overlayQaRequests(answerSelection.suite.projectRoot,built.cards,built.targets,answerTargets,flagsList);
+    else if(currentCel){const selected=resolveCelSuite(currentCel);if(selected.ok)overlayQaRequests(selected.suite.projectRoot,built.cards,built.targets,answerTargets,flagsList);}
     if(priorPin && priorPin.caseId===caseId && priorPin.routeId===routeId){
       const consumed=new Set<string>();
       for(const card of built.cards){
@@ -2745,73 +2753,45 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     driveLeafMarks();
   }
   function hasPendingWording(): boolean { const src = currentCel && findPolicySrc(currentCel); if (!src) return false; const p = pendingPresentationProposals(src); return !!(p.pending || p.unreadable); }
+  // REFACTOR:grounded: MV Q/A Save records intent only, never publishes KE-owned content.
   async function saveCard(msg: { token?: unknown; key?: string; fields?: unknown; answer?: unknown }): Promise<void> {
-    let ownsBusy=false;
     const pin=pinnedCards,view=views.get('tree'),cel=currentCel;
     if(!pin || !view || !cel || pin.epoch!==indexVersion || msg.token!==pin.token || !msg.key || mode!=='medical-validation')return;
-    const answer=msg.answer as AnswerChange|undefined,answerTarget=answer?pin.answerTargets?.get(msg.key):undefined;
-    const target=pin.targets.get(msg.key),fields=msg.fields as {questionText?:unknown;questionDescription?:unknown}|undefined;
+    const answer=msg.answer as AnswerChange|undefined,target=pin.targets.get(msg.key),answerTarget=pin.answerTargets.get(msg.key);
+    const fields=msg.fields as {questionText?:unknown;questionDescription?:unknown}|undefined;
     if(answer ? !answerTarget : !target || typeof fields?.questionText!=='string' || typeof fields.questionDescription!=='string')return;
-    const subject=answer?'Answer':'Question';
-    const result=(ok:boolean,message:string,caseImpact?:{file:string;message:string}[],caseImpactToken?:string)=>{
-      branchQuestionnaire.post({type:'routeCardSaveResult',token:pin.token,key:msg.key,ok,message,...(caseImpact?{caseImpact,caseImpactToken}:{})});
-      void view.panel.webview.postMessage({type:'routeCardSaveResult',gen:view.gen,token:pin.token,key:msg.key,ok,message,...(caseImpact?{caseImpact,caseImpactToken}:{})});
-      if(ok)void vscode.window.showInformationMessage(message);else void vscode.window.showErrorMessage(message);
+    const result=(ok:boolean,message:string)=>{
+      branchQuestionnaire.post({type:'routeCardSaveResult',token:pin.token,key:msg.key,ok,message});
+      void view.panel.webview.postMessage({type:'routeCardSaveResult',gen:view.gen,token:pin.token,key:msg.key,ok,message});
+      if(!ok)void vscode.window.showErrorMessage(message);
     };
     try {
       assertMvWriteAllowed();
-      if(reviewGridSnapshot && reviewGridDirty)throw new Error("Apply or cancel your unsaved review picks before editing the policy.");
-      mvEditBusy=true;
-      ownsBusy=true;
-      const selected=resolveCelSuite(cel);if(!selected.ok)throw new Error(selected.diagnostics.map(d=>d.message).join('; '));
-      const {projectRoot:root,policySrc:src,policyPath}=selected.suite;
-      if(!policyPath || resolve(src)!==resolve(root,'src') || !mvSidecarPath)throw new Error('This policy needs one artifact package with src/crl and src/medical-validation.');
-      const assertBuffers=()=>{
-        if(currentCel!==cel)throw new Error('Policy selection changed during Save.');
-        const dirty=vscode.workspace.textDocuments.filter(d=>d.isDirty && (definitionFreshness.inputFiles.includes(d.uri.fsPath) || d.uri.fsPath===mvSidecarPath || /\.crl$|[\\/]package\.json$|[\\/]src[\\/](cql|fhir)[\\/]/i.test(d.uri.fsPath) && !relative(root,d.uri.fsPath).startsWith('..') && !isAbsolute(relative(root,d.uri.fsPath))));
-        if(dirty.length)throw new Error(`Save or revert the unsaved policy files before editing: ${dirty.map(d=>d.uri.fsPath).join(', ')}`);
-      };
-      assertBuffers();
-      let scopes:KelpEditScopes|undefined;
-      try{
-        const config=findKelpProject(root);
-        if(config && resolve(kelpArtifactRoot(root,config))===resolve(root)){
-          const entry=resolveKelpEntry({setting:vscode.workspace.getConfiguration('kelp',vscode.Uri.file(root)).get<string>('cliPath'),environment:process.env.KELP_BIN_PATH,extensionPath:vscode.extensions.getExtension('kelp.kelp-vscode')?.extensionPath});
-          if(entry)scopes=new KelpEditScopes(root,createKelpRunner(entry,root));
-        }
-      }catch(error){console.warn('Medical Review local Save: KELP unavailable.',error);}
-      const compileCache=createDirectEditCompileCache(),id=randomUUID(),storage=editStorage(root),editedAt=new Date().toISOString(),sidecarPath=mvSidecarPath;
-
-      const outcome=await coordinateDirectEdit({artifactRoot:root,storageRoot:storage,id,scopes,
-        plan:partition=>{assertBuffers();
-          // Rebuild the immutable receipt with the current lock partition captured by this attempt.
-          const common={policyPath,sidecarPath,id,editedAt,scratchRoot:join(storage,'scratch'),compileCache,...partition};
-          return answer ? planDirectAnswerEdit({...common,target:answerTarget!,change:answer}) : planDirectQuestionEdit({...common,target:target!,questionText:fields!.questionText as string,questionDescription:fields!.questionDescription as string});},
-        checkInputs:p=>{assertBuffers();if(answer)p.recheck!();else recheckDirectEditInputs(p,target!,fields!.questionText as string,fields!.questionDescription as string);},
-        onLocalApplied:async(plan)=>{
-          if(currentCel!==cel)return; // Save still belongs to the captured policy after a UI retarget.
-          // Publication already established this revision even if the subsequent sidecar reload fails.
-          adoptPublishedReviewSidecar(plan.sidecar);
-          if(plan.reviewWarning){mvSaveNotice=plan.reviewWarning;void vscode.window.showWarningMessage(plan.reviewWarning);}
-          definitionFreshness.invalidate();
-          try{
-            interactiveQuestionnaire.definitionsChanged(cel);
-            reloadPublishedReviewSidecar();clearReviewGridState();snapshotCapture.settleEmpty();
-            await vscode.commands.executeCommand('crl.invalidateProjectCache');
-            rebuild(true);
-          }catch(error){
-            currentDefinitions={state:'unknown',message:`Edit applied; reopen Medical Review to refresh: ${String(error)}`};
-            void vscode.window.showWarningMessage(currentDefinitions.message);
-          }
-        }});
-      result(true,subject+' saved to CRL and FHIR.');
-    }catch(error){
-      if(error instanceof DirectEditAppliedError)mvRecoveryBlock=error.message;
-      result(false,String(error instanceof Error?error.message:error),error instanceof AnswerCaseImpactError?error.caseImpact:undefined,error instanceof AnswerCaseImpactError?error.caseImpactToken:undefined);
-    }finally{
-      if(ownsBusy){mvEditBusy=false;renderTreeChrome();
-        if(mvDeferredRebuild && !mvRecoveryBlock){mvDeferredRebuild=false;rebuild(true);}}
-    }
+      const selected=resolveCelSuite(cel),dir=flagStoreDir(cel);
+      if(!selected.ok || !dir)throw new Error('The artifact or MV flag store is unavailable.');
+      const flag=answer ? saveAnswerRequest(selected.suite.projectRoot,dir,answerTarget!,answer) :
+        saveQuestionRequest(selected.suite.projectRoot,dir,target!,fields!.questionText as string,fields!.questionDescription as string);
+      result(true,flag?'Request saved for KE.':'Request cleared.');
+      // Close only the saved editor; preserve other pending Q/A drafts while repainting their requested state.
+      const card=pin.payload.cards.find((c:any)=>c.id===msg.key);
+      if(card){card.editing=false;delete card.answerDraft;delete card.draftText;delete card.draftDescription;}
+      reloadReviewFlags();renderTreeChrome();driveFlagBadges();
+      pinCards(pin.caseId,pin.routeId,undefined,pin.payload.showQuestions,pin.traversalKey,pin);
+    }catch(error){result(false,error instanceof Error?error.message:String(error));}
+  }
+  // REFACTOR:grounded: status/revert actions are bound to a captured Q/A request in the current pin.
+  function qaRequestAction(msg:{token?:unknown;key?:string;requestId?:unknown;value?:unknown}):void {
+    const pin=pinnedCards,cel=currentCel;
+    if(!pin || !cel || pin.epoch!==indexVersion || msg.token!==pin.token || mode!=='medical-validation')return;
+    const card=pin.payload.cards.find((c:any)=>c.id===msg.key);
+    const ids=card?[card.questionRequest?.id,...card.answerChoices.map((c:any)=>c.request?.id)]:[];
+    if(typeof msg.requestId!=='string' || !ids.includes(msg.requestId) || !['revert','fixed','approved','open'].includes(String(msg.value)))return;
+    try{
+      assertMvWriteAllowed();const dir=flagStoreDir(cel);if(!dir)throw new Error('No MV flag store.');
+      changeQaRequest(dir,msg.requestId,msg.value as 'revert'|'fixed'|'approved'|'open');
+      reloadReviewFlags();renderTreeChrome();driveFlagBadges();
+      pinCards(pin.caseId,pin.routeId,undefined,pin.payload.showQuestions,pin.traversalKey,pin);
+    }catch(error){void vscode.window.showErrorMessage(error instanceof Error?error.message:String(error));}
   }
 
   async function showEditHistory():Promise<void>{
@@ -2906,6 +2886,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(msg.type==='toggleQuestionnairePane' && (msg.value==='questionnaire'||msg.value==='fhirQuestionnaire')){toggleQuestionnairePane(msg.value);return;}
       if(msg.type==='openInteractiveQuestionnaire' && mode==='medical-validation' && currentCel){interactiveQuestionnaire.open(currentCel);return;}
       if (msg.type === "routeCardSave" || msg.type === "routeCardAnswerSave") { void saveCard(msg); return; }
+      if (msg.type === "qaRequestAction") { qaRequestAction(msg);return; }
       if (msg.type === "mvEditHistory") { void showEditHistory(); return; }
       if (msg.type === "mvEditRecovery") { void recoverPolicyEdit(); return; }
       if (msg.type === "routeCardSource" && pinnedCards && pinnedCards.token === msg.token && pinnedCards.epoch === indexVersion) {
@@ -4224,7 +4205,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const tree = views.get("tree");
     if (!tree) return;
     // Only the human MV "Type" tags (a `displayName`) are offered — the AI-authoring extraction tags are hidden from the drawer.
-    const mvTypes = flagTags().filter((t) => t.displayName !== undefined);
+    const mvTypes = flagTags().filter((t) => t.displayName !== undefined && !t.editor);
     // One-slot dispatcher (design 354; Todo 3 adds edit): create → edit → action → empty. Never more than one set (each open
     // clears the others via the settle choke-point) — this precedence is just a total order for the "both somehow set" impossibility.
     const editFlag = flagEditDraft?.flag;
@@ -4306,6 +4287,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       targetPresent: gidsForFlag(flag).length > 0, // disc 359: no charted node → auto-open Details + a note (the gold link can't point)
       descriptionOnly: flagDisplayNameOf(flag.tag) === undefined, // Non-MV types retain their restricted form when mutable.
       readOnly: isAuthoringFlag(flag),
+      qaEdit: isQaEditFlag(flag),
     };
   }
 
@@ -4346,6 +4328,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function openFlagEditDraft(): void {
     const view = flagActionView;
     if (!view || flagActionBusy) return;
+    if(isQaEditFlag(view.flag))return flagNote("Use the pinned Question and Answer controls to edit this request.");
     // KE records remain read-only; validation tags determine the full or description-only form.
     if (isAuthoringFlag(view.flag)) return flagNote("Authoring flags are read only in Medical Validation");
     const descriptionOnly = flagDisplayNameOf(view.flag.tag) === undefined;
@@ -4431,15 +4414,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         postFlagDrawer();
         return void flagNote("the flag changed on disk — reopen it");
       }
+      if(isQaEditFlag(current))return fail("Use the pinned Question and Answer controls to edit this request.");
       if (isAuthoringFlag(current)) return fail("Authoring flags are read only in Medical Validation");
       // Todo 3.5: the DESCRIPTION-ONLY save (a mutable legacy flag) — write ONLY the description; PRESERVE tag/gist/fields/status verbatim.
       // No `validateFlagFields` (nothing to validate), no field-ownership merge, no eligibility re-gate (a legacy flag is expected to
       // be non-MV), no relabel (the Type didn't change). The description is free text — the store holds newlines fine.
       if (draft.descriptionOnly) {
         const desc = stub.trim();
-        const updated: MvFlag = { ...current, editedAt: new Date().toISOString() };
+        let updated: MvFlag = { ...current };
         if (desc) updated.description = desc;
         else delete updated.description;
+        updated=renewMvFlag(current,{description:updated.description});
         try {
           assertMvWriteAllowed(); saveFlag(dir, updated);
         } catch (e) {
@@ -4465,16 +4450,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const oldRuleKeys = new Set(flagFieldRulesOf(current.tag).map((r) => r.key));
       const formFields: Record<string, string> = {};
       for (const [k, v] of Object.entries(payloadFields)) if (newRuleKeys.has(k) && !EDIT_PRESERVED_FIELDS.has(k)) formFields[k] = v;
-      const val = validateFlagFields({ tag: rawTag, gist: summary, status: current.status, fields: formFields });
+      const val = validateFlagFields({ tag: rawTag, gist: summary, status: "open", fields: formFields });
       if (!val.ok) return fail(`can't save: ${val.message}`);
       if (flagDisplayNameOf(val.canon) === undefined) return fail("that flag type can't be set here"); // never retype to a non-MV tag
       const preserved: Record<string, string> = {};
       for (const [k, v] of Object.entries(current.fields)) if (EDIT_PRESERVED_FIELDS.has(k) || (!oldRuleKeys.has(k) && !newRuleKeys.has(k))) preserved[k] = v;
       const mergedFields = { ...preserved, ...val.fields };
       const desc = stub.trim();
-      const updated: MvFlag = { ...current, tag: val.canon, category: val.category, gist: val.gist, fields: mergedFields, editedAt: new Date().toISOString() };
+      let updated: MvFlag = { ...current, tag: val.canon, category: val.category, gist: val.gist, fields: mergedFields };
       if (desc) updated.description = desc;
       else delete updated.description;
+      updated=renewMvFlag(current,{tag:updated.tag,gist:updated.gist,fields:updated.fields,description:updated.description});
       try {
         assertMvWriteAllowed(); saveFlag(dir, updated);
       } catch (e) {
@@ -4540,6 +4526,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   async function deleteFlagFromDrawer(): Promise<void> {
     const view = flagActionView;
     if (!view || flagActionBusy) return;
+    if(isQaEditFlag(view.flag))return flagNote("Use the pinned Question and Answer controls to revert this request.");
     const cel = view.cel;
     if (currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the flag"); // upfront guard (Claude nit, mirrors saveFlagEdit)
     flagActionBusy = true; // set BEFORE the modal (impl-review gpt56 #4: rapid clicks can't stack confirmations)
@@ -4560,6 +4547,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         return flagNote("the flag was already removed");
       }
       const current = load1.flags.find((f) => f.id === view.flag.id)!;
+      if(isQaEditFlag(current))return flagNote("Use the pinned Question and Answer controls to revert this request.");
       if (isAuthoringFlag(current)) return flagNote("Authoring flags are read only in Medical Validation");
       const summaryLabel = current.gist || flagDisplayNameOf(current.tag) || current.tag;
       // Name the exact remote consequence; be honest when the workspace-trust gate is already known-failed (disc 363 finding #6).
@@ -4584,6 +4572,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         driveFlagBadges();
         return flagNote("the flag was already removed");
       }
+      if(isQaEditFlag(load2.flags.find(f=>f.id===view.flag.id)!))return flagNote("Use the pinned Question and Answer controls to revert this request.");
       if (isAuthoringFlag(load2.flags.find(f=>f.id===view.flag.id)!)) return flagNote("Authoring flags are read only in Medical Validation");
       if (elig2.refStr !== elig1.refStr) return flagNote("the flag changed on disk — reopen it"); // the named issue moved under us → reconfirm
       // LOCAL DELETE first (disc 363 finding #4/#8): a throw → note + drawer stays + GitHub is NEVER touched.
@@ -5552,7 +5541,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Review status — the pure helpers (the exact composition the tree chrome uses) + per-case detail. Snapshot `flagStateError`
     // ONCE (used for BOTH the mvComplete gate and the exposed field, so a same-policy reload mid-fetch can't tear them — Claude nit).
     const flagStateErrorSnapshot = flagStateError;
-    const resolvedCount = flagsList.filter((f) => f.status === "resolved").length;
+    const resolvedCount = flagsList.filter((f) => !isOpen(f)).length;
     const progress = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
     const fc = { open: flagsList.length - resolvedCount, resolved: resolvedCount, error: flagStateErrorSnapshot };
     const cases: ReviewContextCase[] = [...scenarioByCaseId].map(([caseId, sv]) => ({

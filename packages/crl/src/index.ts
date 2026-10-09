@@ -425,7 +425,7 @@ export type { MvFlag, MvFlagAnchor, MvFlagStatus, MvFlagCategory, MvFlagScope } 
 // REFACTOR:grounded (MV/KE workflow): desired-state flags and MV-owned lifecycle.
 export { coerceQaEditRequest, isQaSourcePath } from "./flags/qaEditRequest";
 export type { QaEditRequest, QaEditTarget, QuestionEditTarget, AnswerEditTarget, QuestionEditState, AnswerEditState } from "./flags/qaEditRequest";
-export { buildQaEditFlag, qaEditFlagId, isQaEditFlag, mvReviewStatus, transitionMvFlag, renewMvFlag, mvFlagRevision } from "./flags/mvFlagReview";
+export { buildQaEditFlag, qaEditFlagId, isQaEditFlag, mvReviewStatus, transitionMvFlag, renewMvFlag, mvFlagRevision, canonicalMvValue } from "./flags/mvFlagReview";
 export type { MvReviewStatus } from "./flags/mvFlagReview";
 export { flagStoreDir, legacyFlagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, removeFlag } from "./flags/mvFlagStore";
 export type { FlagStoreLoad } from "./flags/mvFlagStore";

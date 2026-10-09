@@ -2,6 +2,8 @@
 export interface QuestionEditTarget {
   kind: "question"; file: string; library: string; concept: string;
   context?: { decision: string; criteria: string[] };
+  /** Canonical field-owner presentation scopes; traversal context is only an apply hint. */
+  presentationKey?: string;
 }
 export interface AnswerEditTarget {
   kind: "answer"; file: string; library: string; terminology: string; system: string; code: string;
@@ -47,6 +49,7 @@ export function coerceQaEditRequest(v: unknown): QaEditRequest | undefined {
     const before = questionState(v.before), desired = questionState(v.desired);
     if (!before || !desired) return undefined;
     const target: QuestionEditTarget = { kind: "question", file: t.file, library: t.library, concept: t.concept };
+    if (t.presentationKey !== undefined) { if (!named(t.presentationKey)) return undefined; target.presentationKey = t.presentationKey; }
     if (t.context !== undefined) {
       if (!object(t.context) || !named(t.context.decision) || !Array.isArray(t.context.criteria) || !t.context.criteria.every(named)) return undefined;
       target.context = { decision: t.context.decision, criteria: [...t.context.criteria] };

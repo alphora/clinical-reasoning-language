@@ -121,10 +121,31 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const paths={edit:'M4 16 L16 4 L20 8 L8 20 L4 20 Z M13 7 L17 11',delete:'M4 7 H20 M9 7 V4 H15 V7 M6 7 L7 20 H17 L18 7 M10 10 V17 M14 10 V17',add:'M12 5 V19 M5 12 H19'};
     icon.append(svgEl('path',{d:paths[kind],fill:'none',stroke:'currentColor','stroke-width':1.7,'stroke-linecap':'round','stroke-linejoin':'round'}));button.append(icon);return button;
   }
+  // REFACTOR:grounded: pending intent previews stay separate from authored content used for manual approval.
+  function requestControls(card:any,request:any,ownerKey:string,question=false):HTMLElement {
+    const group=document.createElement('div');group.className=question?'route-question-request':'route-answer-request';
+    const button=document.createElement('button');button.className='route-request-flag route-icon-button';
+    button.title='Review '+(question?'Question Edit':'Answer CRUD')+' request';button.setAttribute('aria-label',button.title);
+    const icon=svgEl('svg',{viewBox:'0 0 16 16',width:14,height:14,'aria-hidden':'true'}),glyph=svgEl('text',{x:8,y:11.5,'text-anchor':'middle',fill:'#333','font-size':12});glyph.textContent='⚑';icon.append(svgEl('circle',{cx:8,cy:8,r:7,fill:'#e6c200'}),glyph);button.append(icon);
+    button.onclick=()=>{card.requestOpen=card.requestOpen===request.id?undefined:request.id;card.editing=false;delete card.answerDraft;sendDraft(card);render();};
+    if(request.status!=='approved')group.append(button);
+    if(card.requestOpen===request.id && request.status!=='approved'){
+      const detail=document.createElement('div');detail.className='route-request-details';
+      const status=document.createElement('p');status.textContent=request.status==='fixed'?'Fixed — review authored content':'Pending fix';detail.append(status);
+      for(const [title,value] of [['Authored',request.authored],['Requested',request.requested]]){const label=document.createElement('strong'),text=document.createElement('div');label.textContent=title;text.textContent=value;text.className='route-request-value';detail.append(label,text);}
+      for(const [action,label] of request.status==='pending-fix'?[['fixed','Mark Fixed'],['revert','Revert request']]:[['approved','Approve'],['open','Reopen']]){
+        const control=document.createElement('button');control.textContent=label;control.disabled=!!card.saving;
+        control.onclick=()=>api.postMessage({type:'qaRequestAction',gen:generation(),token:snapshot.token,key:card.id,requestId:request.id,value:action});detail.append(control);
+      }
+      group.append(detail);
+    }
+    return group;
+  }
   function cardForm(card: any, index: number, ownerKey: string, cardWidth: number): HTMLDivElement {
       const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id; form.dataset.ownerKey = ownerKey; form.style.width = standalone ? "100%" : cardWidth + "px";
       const caption = document.createElement("div"); caption.className = "route-card-caption"; caption.textContent = (!standalone ? "Q" : "") + String(card.questionNumber ?? index + 1); form.append(caption);
       const text = document.createElement("div"); text.className = "route-card-question"; text.textContent = card.text; form.append(text);
+      if(card.questionRequest)form.append(requestControls(card,card.questionRequest,ownerKey,true));
       if (card.description) {
         const toggle=document.createElement("button"); toggle.className="route-description-toggle"; toggle.textContent="Description"; toggle.setAttribute("aria-expanded", String(!!card.descriptionOpen));
         toggle.onclick=()=>{card.descriptionOpen=!card.descriptionOpen;rerenderAtControl(toggle,card.id,ownerKey,'.route-description-toggle');}; form.append(toggle);
@@ -142,6 +163,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
           const list=document.createElement("ul");list.className="route-answer-choices";
           for(const choice of card.answerChoices ?? []){
             const row=document.createElement('li'),line=document.createElement('div'),label=document.createElement('span'),actions=document.createElement('span');line.className='route-answer-line';label.className='route-answer-label';label.textContent=choice.display;actions.className='route-answer-actions';line.append(label,actions);row.append(line);
+            if(choice.pendingDelete){label.classList.add('route-answer-deleted');const mark=document.createElement('span');mark.className='route-choice-deletion';mark.textContent='Pending deletion';row.append(mark);}
+            if(choice.request){const controls=requestControls(card,choice.request,ownerKey),badge=controls.querySelector('.route-request-flag');if(badge)actions.append(badge);row.append(controls);}
             if(choice.description){const description=document.createElement('div');description.className='route-answer-description';description.textContent=choice.description;row.append(description);}
             if(choice.selected){row.className="is-selected";const mark=document.createElement("span");mark.className="route-choice-selected";mark.textContent="Selected";label.append(mark);}
             if(choice.editable){
@@ -173,7 +196,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
           }
         }
       }
-      const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.statusMessage ?? (card.proposal ? "Saved to CRL and FHIR" : ""); form.append(status);
+      const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.statusMessage ?? (card.proposal ? "Request saved for KE" : ""); form.append(status);
       if (card.readOnlyReason) { const reason = document.createElement("p"); reason.textContent = card.readOnlyReason; form.append(reason); }
       if (card.editable) {
         const edit = iconButton('route-card-edit','Edit question','edit');form.append(edit);
@@ -465,6 +488,7 @@ ${VERDICT_ICON_STYLE}
 .route-editor input,.route-editor select{display:block;box-sizing:border-box;width:100%;color:var(--vscode-input-foreground,#ddd);background:var(--vscode-input-background,#333);border:1px solid var(--vscode-input-border,#555);padding:4px}.route-answer-description{white-space:pre-wrap;font-size:11px;opacity:.9;margin:3px 0}.route-answer-readonly,.route-answer-impact{font-size:11px;color:var(--vscode-descriptionForeground,#aaa)}.route-editor{border-top:1px solid var(--vscode-panel-border,#555);margin-top:6px;padding-top:4px}.route-editor-title{margin:4px 0}.route-answer-impact summary{cursor:pointer}.route-answer-case-impact{white-space:pre-wrap;color:var(--vscode-errorForeground,#f99)}
 .route-verdict-badge.route-workflow-cue,.route-branch-nav.route-workflow-cue[aria-disabled=false]{filter:drop-shadow(0 0 3px #ffd54f) drop-shadow(0 0 6px #ffd54f)}
 .route-card{user-select:text}
+.route-request-flag{color:#e6c200;border-radius:50%;font-size:12px}.route-question-request>.route-request-flag{position:absolute;top:4px;right:26px}.route-answer-request{margin:2px 0}.route-request-details{border-top:1px solid var(--vscode-panel-border,#555);margin:5px 0;padding:5px;font-size:11px}.route-request-details p{margin:3px 0}.route-request-value{white-space:pre-wrap;margin:3px 0 7px}.route-answer-deleted{text-decoration:line-through;opacity:.65}.route-choice-deletion{font-size:10px;color:var(--vscode-descriptionForeground,#aaa)}
 .route-wording-label{display:block;margin-top:8px}.route-wording-select{max-width:100%;color:inherit;background:var(--vscode-dropdown-background,#333)}
 .flow-row.flow-pinned.leaf-allpass>.flow-allpass-badge{display:none}
 .route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; border-radius:3px; background:rgba(180,180,180,.15); color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }

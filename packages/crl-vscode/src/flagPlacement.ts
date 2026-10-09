@@ -6,13 +6,15 @@
 // pure function of plain data.
 
 import type { MvFlag, MvFlagAnchor } from "@smile-digital-health/crl";
+import { isOpen } from "@smile-digital-health/crl";
 
 /** Keep workflow step and status associated: resolved authoring work is not an open authoring finding. */
 export function summarizeFlagBadges(byGid: ReadonlyMap<string, readonly MvFlag[]>) {
   return [...byGid].map(([gid,flags])=>({
     gid,
-    open: flags.filter(f=>f.status!=="resolved").length,
-    resolved: flags.filter(f=>f.status==="resolved").length,
+    // REFACTOR:grounded: Fixed remains open; only Approved (or legacy resolved) completes MV review.
+    open: flags.filter(isOpen).length,
+    resolved: flags.filter(f=>!isOpen(f)).length,
     authoringOpen: flags.filter(f=>f.category==="extraction" && f.status!=="resolved").length,
     authoringResolved: flags.filter(f=>f.category==="extraction" && f.status==="resolved").length,
   }));
