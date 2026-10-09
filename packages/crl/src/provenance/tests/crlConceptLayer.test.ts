@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Tests for buildCrlConceptLayer (#166 Slice 1) — the headless concept inventory. Verifies the cross-pane JOIN
 // invariant (concept node key === decision-row concept refKey === indexer node key), definitionRefs edges (defined-as
 // inference incl. dedup + cross-lib qualified, definition-is narrative, coded-from → none), the raw layer signals,
@@ -45,7 +46,7 @@ concept "NarrP":
 - type is Encounter.
 - definition is "P" performed.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -59,7 +60,7 @@ concept "Q":
 - type is Condition.
 - code is \`q\`.
 activity "W":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`w\`.
 decision "Unused":
 first:
@@ -336,7 +337,7 @@ concept "Wraps Reference":
 - value type is boolean.
 - definition is "Reference Q" in qualifying.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:

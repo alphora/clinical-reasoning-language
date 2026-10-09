@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,7 +18,7 @@ ${approveActivity}
 ${denyActivity}
 `;
 
-const ACT = (name: string, req = "CPGCommunicationRequest") =>
+const ACT = (name: string, req = "CPGTaskRequest") =>
   `activity "${name}":\n- request ${req}.\n- with \`text\`.`;
 
 function project(pkgCrl: Record<string, unknown>, crl: string): string {

@@ -35,7 +35,7 @@ presentation for "Second Answer":
 - question text is "Second answer".
 
 activity "Complete":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `COMPLETE`.
 
 decision "Interactive Test":

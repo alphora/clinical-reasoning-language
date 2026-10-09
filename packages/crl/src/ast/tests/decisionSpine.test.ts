@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { renderScenario, type ViewNode } from "../../cre/viewModel";
@@ -50,13 +51,13 @@ concept "G":
 - type is Condition.
 - code is \`g\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 activity "Y":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`y\`.
 activity "Z":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`z\`.
 decision "Sub":
 first:
@@ -169,7 +170,7 @@ concept "P":
 - type is Condition.
 - code is \`p\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "C":
 first:
@@ -294,10 +295,10 @@ concept "Crit":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Sub":
 first:
@@ -359,7 +360,7 @@ concept "P":
 - type is Condition.
 - code is \`p\`.
 activity "Done":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Sub":
 first:

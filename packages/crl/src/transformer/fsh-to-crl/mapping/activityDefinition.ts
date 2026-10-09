@@ -1,7 +1,9 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { toIdentifier, extractCodeExpression } from "../utils/fshPathFunctions";
 
 export const ACTIVITY_DEFINITION_URLS = [
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationactivity",
+  "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-computableactivity",
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-collectinformationactivity",
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-enrollmentactivity",
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-generatereportactivityn",
@@ -16,6 +18,11 @@ export const ACTIVITY_DEFINITION_URLS = [
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recordinferenceactivity",
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-reportflagactivity",
 ];
+
+// REFACTOR:grounded (MR10): imported resource kinds must not manufacture retired/unknown tokens.
+function requestToken(resourceKind: string): string {
+  return resourceKind === "CommunicationRequest" || resourceKind === "Task" ? "CPGTaskRequest" : "CPG" + resourceKind;
+}
 
 function formatActivityValue(value: string | undefined): string {
   if (!value) {
@@ -50,9 +57,9 @@ export function getActivityPerformClause(activityDef: ActivityDef): {
     const kindRule = activityDef.rules.find((r: ActivityDefRule) => r.path === "kind");
     if (kindRule) {
       if (typeof kindRule.value === "string") {
-        kind = "CPG" + kindRule.value.replace(/#/g, "");
+        kind = requestToken(kindRule.value.replace(/#/g, ""));
       } else if (kindRule.value && typeof kindRule.value === "object" && "code" in kindRule.value) {
-        kind = "CPG" + String(kindRule.value.code).replace(/#/g, "");
+        kind = requestToken(String(kindRule.value.code).replace(/#/g, ""));
       }
     }
     // Check for doNotPerform
@@ -280,7 +287,7 @@ export function emitActivityBlock(
       doReferences.push({ id: activityId, placeholder });
     }
   } else {
-    // Neither: emit a CPGCommunicationRequest activity
+    // Neither: emit a CPGTaskRequest activity
     const activityId = getNextActivityId();
     const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
     output += ` do ${placeholder}.\n`;
@@ -288,7 +295,7 @@ export function emitActivityBlock(
       id: activityId,
       name: doIdentifier,
       value: activityDescription,
-      original: `activity ${doIdentifier}\n    request CPGCommunicationRequest${formatActivityValue("`" + (activityDescription ?? "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
+      original: `activity ${doIdentifier}\n    request CPGTaskRequest${formatActivityValue("`" + (activityDescription ?? "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
     });
     doReferences.push({ id: activityId, placeholder });
   }

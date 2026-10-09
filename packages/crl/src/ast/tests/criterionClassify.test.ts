@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
@@ -37,10 +38,10 @@ concept "Has Diagnosis":
 - code is \`dx\`.`;
 
 const ACT = `activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 
 describe("criterion — grammar + AST", () => {

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -191,7 +192,7 @@ describe("empty reference is no longer a silent sentinel", () => {
     const errs = validate(`decision "D":
 - when "" then recommend activity "X".
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.`);
     expect(errs.some((e) => e.kind === "unresolved-reference")).toBe(true);
     // It is NOT silently skipped, and it is not a decision-shape error.

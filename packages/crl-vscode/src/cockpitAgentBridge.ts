@@ -50,13 +50,11 @@ export interface OpenFlagDrawerArgs {
   /** A `validation-concern` `kind` — validated against the registry enum by the cockpit before prefilling. */
   validationKind?: string;
   summary?: string;
-  /** The fuller concern text → the flag's GitHub issue body (the drawer's Description field). */
+  /** The fuller concern text → the flag Description (the drawer's Description field). */
   description?: string;
 }
-/** The result of an AGENT submit (#210 Todo C) — `ok` = the flag was written; `message` is the human-readable outcome
- *  (issue created / no issue + reason) the agent reports back in chat. On failure, `issued` = a GitHub issue was ALREADY
- *  created before the write failed, so the caller must NOT retry (a retry would POST a duplicate issue). */
-export type SubmitFlagResult = { ok: true; message: string } | { ok: false; reason: string; issued?: boolean };
+/** A local flag submission result. */
+export type SubmitFlagResult = { ok: true; message: string } | { ok: false; reason: string };
 
 /** #210 Todo D (disc 241) — the args the agent passes to `set_verdict`. `caseToken` is the OPAQUE cel-embedded id from the
  *  [cockpit] selected-case line (NOT a raw caseId — the cockpit re-resolves it against the live set); `verdict` is the raw
@@ -110,6 +108,8 @@ export interface ReviewContext {
   status: {
     progress: { total: number; passed: number; failed: number; pending: number; unreviewable: number; stale: number };
     mvComplete: boolean;
+    /** Definition compatibility is separate from the human review progress. */
+    definitions?: { state: 'current' | 'checking' | 'unknown' | 'drift'; digest?: string; message?: string };
     cases: ReviewContextCase[];
     flags: ReviewContextFlag[];
     /** a source (an unparseable `.crl`, OR a corrupt `medical-validation/flags/` store record) left the flag set UNKNOWN (mvComplete stays open). */
@@ -143,7 +143,7 @@ export interface CockpitAgentHooks {
   /** Open the flag drawer as a BLOCKING elicitation — the resolver is installed here (ONLY here, not on the human right-click
    *  or the autonomous submit). Settles on every terminal path (Insert-filed / Cancel / token / retarget / dispose / replace). */
   beginFlagDrawer(args: OpenFlagDrawerArgs, token: CancelToken): BeginFlagDrawer;
-  /** Fill AND submit the flag autonomously — writes it into the .crl + opens a GitHub issue (reuses the human Insert path).
+  /** Fill AND submit the flag autonomously — saves it in the policy flag store (reuses the human Insert path).
    *  Settles any pending elicitation `{replaced}` first (it shares the singleton drawer). */
   submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult>;
   /** #210 Todo D (disc 241) — set a case's review verdict. Re-resolves the opaque `caseToken` → the live caseId (rejects a
@@ -225,7 +225,7 @@ class CockpitAgentBridge {
     return this.hooks.beginFlagDrawer(args, token);
   }
 
-  /** Fill AND submit the flag — writes the flag into the .crl + opens a GitHub issue. Used ONLY on an explicit submit/file
+  /** Fill AND submit the flag — saves the flag in the policy flag store. Used ONLY on an explicit submit/file
    *  command (`openFlagDrawer` is the default). Returns the human outcome for the agent to relay, or an actionable reason. */
   async submitFlag(args: OpenFlagDrawerArgs): Promise<SubmitFlagResult> {
     if (!this.hooks) return { ok: false, reason: "the Medical Validation cockpit is not open — open it first" };

@@ -40,7 +40,7 @@ describe("named answer closure ownership and imported classification", () => {
       writeFileSync(shared, `library "Shared".\n${terms}`);
       const second = emitFhirDefFromPath(file, { date: "2026-09-08" });
       expect(second.success).toBe(true); writeFhirResources(second, output);
-      expect(JSON.parse(readFileSync(written, "utf8")).concept).toEqual([{ code: "none", display: "None" }]);
+      expect(JSON.parse(readFileSync(written, "utf8")).concept).toEqual([{ code: "none", display: "None", definition: "No documented qualifying complaint." }]);
     });
   });
   it.each(["additional", "consistent", "conflicting"])("checks members of an already emitted local system (%s)", (mode) => {
@@ -134,7 +134,7 @@ concept "Second Question":
       ]));
       const owned = fhir.resources.filter((entry) => entry.resourceType === "CodeSystem" && (entry.resource as any).url === `${base}/CodeSystem/p-complaint-answer-codes`);
       expect(owned).toHaveLength(1);
-      expect((owned[0].resource as any).concept).toEqual([{ code: "none", display: "None" }]);
+      expect((owned[0].resource as any).concept).toEqual([{ code: "none", display: "None", definition: "No documented qualifying complaint." }]);
       const valueSet = fhir.resources.find((entry) => entry.resourceType === "ValueSet" && (entry.resource as any).expansion?.contains?.some((code: any) => code.code === "symptom"))!;
       expect((valueSet.resource as any).expansion.contains.map((code: any) => code.system)).toEqual([`${base}/CodeSystem/p-complaint-answer-codes`, "urn:standard"]);
       const cel = join(directory, "cases.cel");

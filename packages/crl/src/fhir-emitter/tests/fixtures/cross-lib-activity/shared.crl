@@ -8,5 +8,5 @@ library "Shared".
 // `Shared` CQL/Library is emitted, and its ActivityDefinition + Recommendation
 // PlanDefinition rebind their `library[]` onto Root's Interface library.
 activity "Shared Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied.`.

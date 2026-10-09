@@ -22,10 +22,10 @@ concept "Gate":
 - code is `gate`.
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT APPROVED`.
 
 // `and` prior — negates to a disjunction.

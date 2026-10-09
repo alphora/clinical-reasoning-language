@@ -8,10 +8,10 @@ concept "Evidence":
 presentation for "Evidence":
 - question text is `Is the synthetic evidence confirmed?`.
 activity "Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Synthetic met`.
 activity "Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Synthetic unmet`.
 decision "Determination":
 first:

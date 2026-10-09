@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import * as path from "node:path";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import * as os from "node:os";
@@ -47,10 +48,10 @@ const POLICY = [
   '- code is `other-flag`.',
   '- definition is exists this.',
   'activity "Approve":',
-  '- request CPGCommunicationRequest.',
+  '- request CPGTaskRequest.',
   '- with `approve`.',
   'activity "Deny":',
-  '- request CPGCommunicationRequest.',
+  '- request CPGTaskRequest.',
   '- with `deny`.',
   'decision "D":',
   'first:',

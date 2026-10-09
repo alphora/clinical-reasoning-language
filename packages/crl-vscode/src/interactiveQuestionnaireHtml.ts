@@ -6,6 +6,8 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   retain: typeof retainInteractiveQuestionnaire, inspect: (q: unknown) => string[], booleanControls: typeof installBooleanAnswerClearControls) {
   const w = globalThis as any, doc = w.document, api = w.acquireVsCodeApi();
   const select = doc.getElementById("codeset"), start = doc.getElementById("start"), next = doc.getElementById("continue");
+  const restart = doc.getElementById("restart");
+  let stale=false;
   const reset = doc.getElementById("reset"), cancel = doc.getElementById("cancel"), status = doc.getElementById("status");
   const mount = doc.getElementById("form"), outcomes = doc.getElementById("outcomes");
   const results = doc.getElementById("results"), warnings = doc.getElementById("warnings"), warningList = doc.getElementById("warning-list");
@@ -25,6 +27,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   const controls = () => {
     start.disabled = busy || !select.value || hasResult; next.disabled = busy || !ready || !q || blocked || editError;
     select.disabled = transitioning;
+    if(stale){start.disabled=true;next.disabled=true;reset.disabled=true;select.disabled=true;cancel.disabled=true;return;}
     reset.disabled = !select.value || transitioning; cancel.disabled = !busy || transitioning;
     mount.inert = busy || !ready;
     mount.setAttribute("aria-busy", String(busy || !ready));
@@ -114,15 +117,20 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   start.addEventListener("click", () => { if (busy || hasResult) return; busy = true; status.textContent = "Evaluating…"; controls(); send("start"); });
   const clear = () => { ++render; ready = false; blocked = false; editError = false; hasResult = false; q = response = snapshot = undefined; mount.replaceChildren(); outcomes.replaceChildren(); results.hidden = true; evaluationWarnings = []; showWarnings(); controls(); };
   select.addEventListener("change", () => { if (transitioning) return; transitioning = true; clear(); busy = true; controls(); send("select", { id: select.value }); });
+  restart.addEventListener("click",()=>{if(stale){status.textContent="Preparing current definitions...";send("restart");}});
   reset.addEventListener("click", () => { if (transitioning) return; transitioning = true; clear(); busy = true; controls(); send("reset"); });
   cancel.addEventListener("click", () => { if (transitioning || !busy) return; transitioning = true; controls(); send("cancel"); });
   w.addEventListener("message", (event: any) => {
     const m = event.data;
+    if(m.type === "definitionStale"){if(typeof m.token!=="number" || m.token<=token)return;token=m.token;stale=true;busy=false;transitioning=false;mount.inert=true;restart.hidden=false;status.textContent=m.message;controls();return;}
+    if(m.type === "restartError"){if(m.token!==token)return;status.textContent=m.message;return;}
     if (m.type === "initial") {
+      stale=false;mount.inert=false;restart.hidden=true;
       dependencies = m.dependencies ?? {};
       definitionWarnings = m.warnings ?? []; warnings.open = false;
       token = m.token; busy = false; transitioning = false; clear(); select.replaceChildren();
       for (const state of m.states) { const o = doc.createElement("option"); o.value = state.id; o.textContent = state.label; select.appendChild(o); }
+      if(m.selectedId)select.value=m.selectedId;
       select.hidden = m.states.length < 2;
       doc.getElementById("codeset-label").hidden = m.states.length < 2;
       subject = m.subject;
@@ -162,7 +170,7 @@ body{padding:16px;color:var(--vscode-editor-foreground,#222);background:var(--vs
 nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}button,select{padding:6px 10px;font:inherit}button{cursor:pointer}button:disabled{cursor:default}#status{line-height:1.5}#form[aria-busy=true]{opacity:.6}h1{font-size:18px}#results{margin-top:20px;padding:12px 16px;border:1px solid var(--vscode-panel-border,#777);border-radius:4px}#results h2{font-size:16px;margin:0 0 8px}#outcomes p{margin:6px 0;overflow-wrap:anywhere}#warnings{margin:12px 0}#warnings summary{cursor:pointer;color:var(--vscode-editorWarning-foreground,#c79420)}#warning-list{line-height:1.5;overflow-wrap:anywhere}
 </style></head><body><h1>Interactive FHIR Questionnaire</h1><nav>
 <label id="codeset-label" for="codeset">Initial state</label><select id="codeset"></select>
-<button id="start">Start</button><button id="continue" disabled>Continue / Re-evaluate</button><button id="reset">Reset</button><button id="cancel" disabled>Cancel</button>
+<button id="restart" hidden>Restart with current definitions</button><button id="start">Start</button><button id="continue" disabled>Continue / Re-evaluate</button><button id="reset">Reset</button><button id="cancel" disabled>Cancel</button>
 </nav><p id="status" role="status">Loading initial states…</p><details id="warnings" hidden><summary id="warning-summary">Warnings</summary><ul id="warning-list"></ul></details><div id="form"></div><section id="results" aria-labelledby="result-heading" aria-live="polite" hidden><h2 id="result-heading">Result</h2><div id="outcomes"></div></section>
 <script nonce="${nonce}" src="${asset("zone.min.js")}"></script><script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script><script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>
 <script nonce="${nonce}">(${installInteractiveQuestionnaire.toString()})(${pruneInteractiveResponse.toString()},${questionnaireWithoutDefaults.toString()},${retainInteractiveQuestionnaire.toString()},${inspect.toString()},${installBooleanAnswerClearControls.toString()});</script></body></html>`;

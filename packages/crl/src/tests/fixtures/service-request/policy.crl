@@ -98,11 +98,11 @@ concept "Requested Service Is Covered":
 - definition is "Requested Service" in "Covered Services".
 
 activity "Approve Endoluminal Ablation":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 
 activity "Deny Endoluminal Ablation":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT APPROVED`.
 
 // If coverage cannot be established from the data, the tree PAUSES and the

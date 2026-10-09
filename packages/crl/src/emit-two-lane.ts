@@ -1,5 +1,7 @@
 import { emitFhirDefFromPath, isFhirDefError, isFhirDefWarning, type Capability } from "./fhir-emitter";
-import { emitCQLImports } from "./imports/emit";
+import type { emitCQLImports } from "./imports/emit";
+
+import { emitDefinitionLanesFromPath } from "./fhir-emitter/closureOrchestrator";
 
 /** One emitted CQL library file (name + source) — a caller writes it to `<out>/cql/`. */
 export interface TwoLaneCqlLibrary {
@@ -44,13 +46,15 @@ export interface EmitCrlTwoLaneResult {
  */
 export function emitCrlTwoLane(
   filePath: string,
-  opts: { date?: string; capability?: Capability } = {},
+  opts: { date?: string; capability?: Capability; sourceOverlays?: ReadonlyMap<string, string> } = {},
 ): EmitCrlTwoLaneResult {
-  const fhir = emitFhirDefFromPath(filePath, {
+  // REFACTOR:grounded (Medical Review): one candidate graph supplies both lanes.
+  const lanes = emitDefinitionLanesFromPath(filePath, {
     ...(opts.date !== undefined ? { date: opts.date } : {}),
     ...(opts.capability !== undefined ? { capability: opts.capability } : {}),
-  });
-  const cql = emitCQLImports(filePath);
+  }, opts.sourceOverlays);
+  const { fhir } = lanes;
+  const cql = lanes.cql!;
 
   // CQL filename-collision pre-check (two libraries writing the same file).
   const seen = new Set<string>();

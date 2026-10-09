@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,7 +12,7 @@ export async function checkEmitBundle(client) {
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "bundle-test", version: "1.0.0",
       crl: { canonicalBase: "http://example.org/bundle", date: "2026-09-20" } }));
     const file = join(root, "policy.crl");
-    const source = 'library "Policy".\nconcept "Answer": - type is Observation. - shape is Record. - value type is boolean. - code is `answer`. - shape reduction is most recent.\nactivity "Done": - request CPGCommunicationRequest. - with `Done`.\ndecision "Policy": first: - when "Answer" then recommend activity "Done".';
+    const source = 'library "Policy".\nconcept "Answer": - type is Observation. - shape is Record. - value type is boolean. - code is `answer`. - shape reduction is most recent.\nactivity "Done": - request CPGTaskRequest. - with `Done`.\ndecision "Policy": first: - when "Answer" then recommend activity "Done".';
     writeFileSync(file, source);
     const call = path => client.callTool({ name: "emit_crl_bundle", arguments: { path } });
     const response = await call(file);

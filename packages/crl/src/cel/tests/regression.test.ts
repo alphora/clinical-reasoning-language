@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded: regression success requires every case assertion to pass.
 import { afterEach, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -18,10 +19,10 @@ concept "A":
 - type is Condition.
 - code is \`a\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`approve\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`deny\`.
 decision "D":
 first:

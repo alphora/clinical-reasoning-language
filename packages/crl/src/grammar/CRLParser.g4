@@ -268,7 +268,7 @@ terminologySystem
 // whose display belongs to the code system, and forcing the author to retype it would invite drift from the
 // authority. Absent display ⇒ emit no `display`, never a manufactured one.
 terminologyCode
-    : DASH CODE_IS backtickString (DISPLAY_IS backtickString)? DOT
+    : DASH CODE_IS backtickString (DISPLAY_IS backtickString)? (DESCRIPTION_IS backtickString)? DOT
     ;
 
 // ============================
@@ -285,7 +285,7 @@ terminologyCode
 //      - request ProposeDiagnosis.
 //      - with "Colonoscopy".
 //   activity "Inform Clinician":
-//      - request CPGCommunicationRequest.
+//      - request CPGTaskRequest.
 //      - with `The message to send`.
 //      - because `Clinician's should be messaged about these things.`.
 //

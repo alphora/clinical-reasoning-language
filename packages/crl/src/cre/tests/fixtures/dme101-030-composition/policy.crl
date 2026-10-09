@@ -129,5 +129,5 @@ activity "certify.Approve":
 - with `Authorize coverage of the ultrasonic osteogenesis stimulator as medically necessary.`.
 
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Ultrasonic osteogenesis stimulator is not medically necessary for this presentation.`.

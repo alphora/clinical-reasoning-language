@@ -131,7 +131,7 @@ activity "Order Low BMI Follow-up":
 - with "Low BMI Follow-up Service Requests VS".
 
 activity "Send BMI Care Communication":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Document a follow-up care plan for low BMI`.
 - because `CMS69 requires documented care planning when BMI is low`.
 

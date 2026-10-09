@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded: one executable teaching input, shared by the kit and its behavior checks.
 // Synthetic eligibility slice, not a medical policy or a preferred ordering for every policy.
 export const UNCERTAINTY_REFERENCE_CRL = `library "Uncertainty Example".
@@ -76,8 +77,8 @@ concept "Current G A B Answers Include Uncertainty":
 - definition is any available value of "G" and "A" and "B" in "Uncertain Answers" using validity of "G".
 - shape reduction is most recent.
 
-activity "certify.Met": - request CPGCommunicationRequest. - with \`Met\`.
-activity "not-certify.Unmet": - request CPGCommunicationRequest. - with \`Unmet\`.
+activity "certify.Met": - request CPGTaskRequest. - with \`Met\`.
+activity "not-certify.Unmet": - request CPGTaskRequest. - with \`Unmet\`.
 
 decision "Synthetic Eligibility":
 first:

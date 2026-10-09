@@ -30,11 +30,11 @@ concept "Qualifying Symptom Documented":
 - definition is "Documented Symptom" in qualifying.
 
 activity "certify.Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 
 activity "not-certify.Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT APPROVED`.
 
 decision "Coverage Determination":

@@ -8,6 +8,7 @@ import type { Registry, RegistryEntry } from "../imports/types";
 // REFACTOR:grounded (#320, 615): declarations own answer codes; concepts declare only exclusions.
 export interface AnswerMember extends PublicationCode {
   readonly display: string;
+  readonly description?: string;
   readonly location?: Location;
 }
 export interface AnswerDomainError {
@@ -39,7 +40,7 @@ export function readFiniteAnswerMembers(terminology: Readonly<Terminology>):
     seen.add(key);
     if (!line.display?.trim()) return { kind: "error", code: "answer-options-missing-display",
       message: `Answer code ${system}|${line.code} requires an authored display.`, location: line.location };
-    members.push(Object.freeze({ system: system!, code: line.code, display: line.display, location: line.location }));
+    members.push(Object.freeze({ system: system!, code: line.code, display: line.display, ...(line.description === undefined ? {} : { description: line.description }), location: line.location }));
   }
   return { kind: "resolved", members: Object.freeze(members) };
 }

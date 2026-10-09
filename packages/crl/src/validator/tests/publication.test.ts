@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, expect, it } from "vitest";
 import { parseInput } from "../../ast/tests/parseInput";
 import type { Concept } from "../../ast/types";
@@ -13,10 +14,10 @@ const publication = `concept "Answer":
 - shape reduction is most recent.
 presentation for "Answer": - question text is "Is the finding present?".`;
 const activities = `activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.`;
 
 const validate = (body: string) => {

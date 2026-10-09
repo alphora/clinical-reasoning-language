@@ -1,80 +1,60 @@
-import { describe, it, expect, vi } from "vitest";
-import { createRequire } from "node:module";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-const extensionRoot = fileURLToPath(new URL("../", import.meta.url));
-const harness = vi.hoisted(() => ({ panels: [], sessions: [] }));
-vi.mock("vscode", () => ({
-  ViewColumn: { Beside: 2 },
-  Uri: { joinPath: (...p) => p.map(x => x.fsPath ?? x).join("/") },
-  window: { tabGroups: { all: [] }, createWebviewPanel: () => {
-    const panel = { messages: [], reveal: vi.fn(),
-      webview: { cspSource: "local:", asWebviewUri: x => x, postMessage(m) { panel.messages.push(m); }, onDidReceiveMessage(f) { panel.receive = f; return { dispose() {} }; } },
-      onDidDispose(f) { panel.closed = f; }, dispose() { panel.disposed = true; panel.closed?.(); },
-    }; harness.panels.push(panel); return panel;
-  } },
-}));
-vi.mock("./interactiveQuestionnaire", () => ({
-  prepareInteractivePolicy: () => ({ planId: "p", definitions: {}, warnings: ["Definition warning"], initialStates: [1, 2].map(n => ({ id: String(n), label: `Codeset ${n}`, subject: `Patient/p${n}`, bundle: {} })) }),
-  nativeInteractiveRunner: () => {},
-  InteractiveSession: class {
-    result; cancel = vi.fn(); reset = vi.fn();
-    constructor() { harness.sessions.push(this); }
-    evaluate = vi.fn(() => new Promise((resolve, reject) => { this.resolve = r => { this.result = r; resolve(r); }; this.reject = reject; }));
-  },
-}));
-import { createInteractiveQuestionnairePanel } from "./interactiveQuestionnairePanel.ts";
+// REFACTOR:grounded: exercise the actual panel host's retained-form and current-definition restart contract.
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
+import vm from 'node:vm';
+import ts from 'typescript';
+import {transformSync} from 'esbuild';
 
-describe("interactive panel ownership", () => {
-  const context = () => ({ extensionPath: extensionRoot, extensionUri: { fsPath: extensionRoot }, subscriptions: [] });
-  const init = async () => {
-    // Existing standalone module exists after the test project's mandatory build.
-    createRequire(import.meta.url)(resolve(extensionRoot, "dist/apply-session.js"));
-    const controller = createInteractiveQuestionnairePanel(context()); controller.open("policy-a.cel");
-    const panel = harness.panels.at(-1); await panel.receive({ type: "ready" });
-    return { controller, panel, session: harness.sessions.at(-1), token: panel.messages.at(-1).token };
-  };
-  it("selects one state, guards duplicate Continue, and ignores stale results after switching", async () => {
-    const { panel, session, token } = await init();
-    expect(panel.messages.at(-1).states).toHaveLength(2);
-    expect(panel.messages.at(-1).warnings).toEqual(["Definition warning"]);
-    expect(panel.messages.at(-1).error).toBeUndefined();
-    const work = panel.receive({ type: "start", token });
-    await panel.receive({ type: "start", token }); expect(session.evaluate).toHaveBeenCalledTimes(1);
-    await panel.receive({ type: "select", token, id: "2" });
-    await panel.receive({ type: "select", token, id: "1" });
-    const reset = panel.messages.at(-1); expect(reset.type).toBe("reset"); expect(reset.subject).toBe("Patient/p2");
-    expect(reset.id).toBe("2");
-    session.resolve({ questionnaire: { url: "old" }, activities: ["stale"] }); await work;
-    expect(panel.messages.at(-1)).toBe(reset);
-    await panel.receive({ type: "continue", token, response: { resourceType: "QuestionnaireResponse" } });
-    expect(session.evaluate).toHaveBeenCalledTimes(1);
-  });
-  it("cancels on close or policy change and does not close a replacement panel", async () => {
-    const { controller, panel, session } = await init();
-    controller.policyChanged("policy-b.cel"); expect(panel.disposed).toBe(true); expect(session.cancel).toHaveBeenCalled();
-    controller.open("policy-b.cel"); const replacement = harness.panels.at(-1); panel.closed();
-    expect(replacement.disposed).toBeUndefined(); controller.close(); expect(replacement.disposed).toBe(true);
-  });
-  it("errors preserve the current browser form and cancellation advances the token", async () => {
-    const { panel, session, token } = await init();
-    const work = panel.receive({ type: "start", token }); session.reject(Error("engine failure")); await work;
-    expect(panel.messages.at(-1)).toMatchObject({ type: "error", token, message: "Error: engine failure" });
-    await panel.receive({ type: "cancel", token }); expect(session.cancel).toHaveBeenCalled();
-    expect(panel.messages.at(-1).type).toBe("cancelled"); expect(panel.messages.at(-1).token).not.toBe(token);
-  });
-  it("Start is ignored once a form exists; Continue remains usable", async () => {
-    const { panel, session, token } = await init();
-    const first = panel.receive({ type: "start", token });
-    session.resolve({ questionnaire: { url: "q" }, response: {}, activities: [] }); await first;
-    await panel.receive({ type: "start", token }); expect(session.evaluate).toHaveBeenCalledTimes(1);
-    const response = { resourceType: "QuestionnaireResponse" }, questionnaire = { resourceType: "Questionnaire", url: "q", item: [] };
-    await panel.receive({ type: "continue", token, response });
-    expect(session.evaluate).toHaveBeenCalledTimes(1);
-    expect(panel.messages.at(-1)).toMatchObject({ type: "error", message: "A current Questionnaire and QuestionnaireResponse are required to continue." });
-    const next = panel.receive({ type: "continue", token, response, questionnaire });
-    expect(session.evaluate).toHaveBeenLastCalledWith(response, questionnaire);
-    expect(session.evaluate).toHaveBeenCalledTimes(2); session.reject(Error("failure")); await next;
-    expect(panel.messages.at(-1).type).toBe("error");
-  });
+const src=ts.createSourceFile('panel.ts',readFileSync(new URL('./interactiveQuestionnairePanel.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
+const body=src.statements.find(s=>ts.isFunctionDeclaration(s)&&s.name.text==='createInteractiveQuestionnairePanel').getText(src).replace(/^export /,'');
+function fixture(){
+ const messages=[],sessions=[];let receive,revision=1,finishCleanup,failPrepare=false,failAdapter=false,cleanupSafe=true;
+ const cleanup=new Promise(resolve=>finishCleanup=resolve);
+ const panel={reveal:()=>{},dispose:()=>{},onDidDispose:()=>{},webview:{postMessage:m=>messages.push(m),onDidReceiveMessage:f=>{receive=f;return {dispose:()=>{}};},asWebviewUri:()=>({toString:()=>''}),cspSource:'test'}};
+ class Session {
+  constructor(definitions){this.definitions=definitions;sessions.push(this);}
+  reset(state){this.selected=state.id;this.result=undefined;}
+  cancel(){this.cancelled=true;}
+  cancelAndWait(){this.cancel();return cleanup;}
+  async evaluate(){this.evaluated=true;return {questionnaire:{resourceType:'Questionnaire',id:String(this.definitions.revision)}};}
+ }
+ const c=vm.createContext({join,randomUUID,InteractiveSession:Session,
+  nativeInteractiveRunner:()=>({cleanupSafe:()=>cleanupSafe}),require:()=>{if(failAdapter)throw Error('Adapter unavailable');return {applySession:()=>{}};},
+  prepareInteractivePolicy:()=>{if(failPrepare)throw Error('Invalid current definitions');return {definitions:{revision},planId:'plan',initialStates:[{id:'one',label:'One'},{id:'two',label:'Two'}],warnings:[]};},
+  interactiveQuestionnaireDependencies:()=>({}),interactiveQuestionnaireHtml:()=>'<main>Actual HTML tested separately</main>',nextQuestionnaireColumn:()=>2,
+  vscode:{window:{createWebviewPanel:()=>panel},Uri:{joinPath:()=>({})}}});
+ vm.runInContext(transformSync(body,{loader:'ts',target:'es2022'}).code,c);
+ const api=c.createInteractiveQuestionnairePanel({subscriptions:[],extensionPath:'/synthetic',extensionUri:{}});
+ return {api,messages,sessions,receive:m=>receive(m),token:()=>messages.at(-1).token,finishCleanup,
+  revision:v=>revision=v,failPrepare:v=>failPrepare=v,failAdapter:v=>failAdapter=v,cleanupSafe:v=>cleanupSafe=v};
+}
+
+test('definition changes freeze evaluation and Restart uses current definitions while retaining the selected initial case',async()=>{
+ const f=fixture();f.api.open('policy.cel');await f.receive({type:'ready'});
+ await f.receive({type:'select',token:f.token(),id:'two'});f.revision(2);f.api.definitionsChanged('policy.cel');
+ await f.receive({type:'start',token:f.token()});assert.ok(!f.sessions.some(s=>s.evaluated));
+ const restarted=f.receive({type:'restart',token:f.token()});f.finishCleanup();await restarted;
+ assert.equal(f.messages.at(-1).type,'initial');assert.equal(f.messages.at(-1).selectedId,'two');assert.equal(f.sessions.at(-1).definitions.revision,2);
+ await f.receive({type:'start',token:f.token()});assert.equal(f.messages.at(-1).questionnaire.id,'2');
+});
+
+test('a definition revision arriving during native cleanup keeps the retained form stale until a fresh Restart',async()=>{
+ const f=fixture();f.api.open('policy.cel');await f.receive({type:'ready'});f.api.definitionsChanged('policy.cel');
+ const restart=f.receive({type:'restart',token:f.token()});f.revision(3);f.api.definitionsChanged('policy.cel');
+ f.finishCleanup();await restart;assert.equal(f.messages.at(-1).type,'definitionStale');assert.equal(f.sessions.length,1);
+ await f.receive({type:'restart',token:f.token()});assert.equal(f.messages.at(-1).type,'initial');assert.equal(f.sessions.at(-1).definitions.revision,3);
+});
+
+test('failed preparation or unsafe native cleanup preserves the old form and reports why Restart failed',async()=>{
+ const f=fixture();f.api.open('policy.cel');await f.receive({type:'ready'});f.api.definitionsChanged('policy.cel');
+ f.failPrepare(true);await f.receive({type:'restart',token:f.token()});assert.equal(f.messages.at(-1).type,'restartError');assert.equal(f.sessions.length,1);
+ f.failPrepare(false);f.cleanupSafe(false);f.finishCleanup();await f.receive({type:'restart',token:f.token()});
+ assert.match(f.messages.at(-1).message,/cleanup was not confirmed/);assert.equal(f.sessions.length,1);
+});
+
+test('a missing adapter becomes an in-panel error instead of throwing from open',async()=>{
+ const f=fixture();f.failAdapter(true);assert.doesNotThrow(()=>f.api.open('policy.cel'));await f.receive({type:'ready'});
+ assert.equal(f.messages.at(-1).type,'initial');assert.match(f.messages.at(-1).error,/Adapter unavailable/);
 });

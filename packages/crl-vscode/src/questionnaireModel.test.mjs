@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Unit tests for the pure, vscode-free `buildQuestionnaire` (#177 slice 2). Like renderScenarioHtml.test.mjs
 // and medicalValidationStore.test.mjs, esbuild bundles the extension TS to CJS and we import it under node.
 // Each fixture is a REAL view-model: we write a tiny CRL+CEL project to a temp dir, run `renderScenario`
@@ -28,7 +29,7 @@ concept "Y":
 - value type is boolean.
 - code is \`y\`.
 activity "A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "D":
 all:
@@ -182,7 +183,7 @@ concept "Composite":
 - value type is boolean.
 - defined as ("X" and "Y").
 activity "A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "D":
 first:
@@ -243,7 +244,7 @@ concept "Answer":
 - code is \`answer\`.
 - shape reduction is most recent.
 activity "A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "D":
 first:
@@ -276,7 +277,7 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Nest":
 - when "A" then:
@@ -324,7 +325,7 @@ concept "A":
 - type is Condition.
 - code is \`a\`.
 activity "not-certify.Unmet EIU":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Det":
 - when "A" then recommend activity "not-certify.Unmet EIU".`;
@@ -371,10 +372,10 @@ concept "Covered":
 - type is Condition.
 - code is \`cov\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Excl":
 first:
@@ -417,10 +418,10 @@ concept "Y":
 - type is Condition.
 - code is \`y\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "FallThrough":
 first:
@@ -464,10 +465,10 @@ concept "Covered":
 - type is Condition.
 - code is \`cov\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Preempt":
 first:
@@ -619,7 +620,7 @@ concept "Dx":
 - type is Condition.
 - code is \`dx\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Gap":
 - when "Dx" then recommend activity "Approve".`;
@@ -649,7 +650,7 @@ concept "A":
 - type is Condition.
 - code is \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "Otherwise":
 first:
@@ -680,7 +681,7 @@ check("EMPTY — a bare otherwise-only decision (zero whens) → zero questions,
   const crl = `# OE
 library "Empty".
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "Empty":
 - otherwise then recommend activity "Deny".`;
@@ -712,7 +713,7 @@ concept "S":
 - type is Condition.
 - code is \`s\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Top":
 - when "A" then:
@@ -774,7 +775,7 @@ concept "Shared":
 - type is Condition.
 - code is \`shared-b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Sub":
 - when "Shared" then recommend activity "Approve".`;
@@ -828,7 +829,7 @@ concept "A":
 - value type is Quantity.
 - code is \`a\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Quant":
 - when "A" then recommend activity "Approve".`;
@@ -1017,10 +1018,10 @@ concept "Other":
 - type is Condition.
 - code is \`oth\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "FS":
 first:
@@ -1055,7 +1056,7 @@ concept "Comp":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "CX":
 - when "Comp" then recommend activity "Approve".`;
@@ -1107,7 +1108,7 @@ concept "Root":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "CX":
 - when "Root" then recommend activity "Approve".`;
@@ -1163,7 +1164,7 @@ concept "Root":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "CX":
 - when "Root" then recommend activity "Approve".`;
@@ -1234,10 +1235,10 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "G":
 first:
@@ -1309,13 +1310,13 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "First":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Second":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "G":
 first:
@@ -1419,10 +1420,10 @@ concept "B":
 criterion "Excluded":
 - when ( "A" or "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "G":
 first:
@@ -1456,13 +1457,13 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "First":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Second":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "G":
 first:
@@ -1530,10 +1531,10 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "CX":
 first:
@@ -1585,10 +1586,10 @@ concept "C":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:
@@ -1655,10 +1656,10 @@ criterion "Inner":
 criterion "Outer":
 - when ( "C" and "Inner" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:
@@ -1690,10 +1691,10 @@ concept "B":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 all:
@@ -1728,10 +1729,10 @@ concept "B":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:
@@ -1761,10 +1762,10 @@ concept "D2":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:

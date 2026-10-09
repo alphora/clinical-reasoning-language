@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { test, expect } from "vitest";
 import { runInNewContext } from "node:vm";
 import { resolvePresentationTarget } from "@smile-digital-health/crl/language-services";
@@ -47,7 +48,7 @@ test("edited field conflicts retain old/current/draft values", () => {
 });
 test("owner changes conflict even when displayed wording is identical", () => {
   const decision =
-    '\nactivity "Met": - request CPGCommunicationRequest.\ndecision "D": - when "Answer" then recommend activity "Met".\n';
+    '\nactivity "Met": - request CPGTaskRequest.\ndecision "D": - when "Answer" then recommend activity "Met".\n';
   const context = { decision: "D", criteria: new Set() };
   const before = source + decision,
     after =
@@ -69,7 +70,7 @@ test("owner changes conflict even when displayed wording is identical", () => {
 test("criterion selection preserves identity and reports unsupported unused scopes", () => {
   const text =
     source +
-    '\nactivity "Met": - request CPGCommunicationRequest.\ncriterion "A": - when ("Answer").\ncriterion "Unused": - when ("Answer").\ndecision "D": - when "A" then recommend activity "Met".\npresentation for "Answer": - in criterion "A". - question text is "Same?".\npresentation for "Answer": - in criterion "Unused". - question text is "Same?".\n';
+    '\nactivity "Met": - request CPGTaskRequest.\ncriterion "A": - when ("Answer").\ncriterion "Unused": - when ("Answer").\ndecision "D": - when "A" then recommend activity "Met".\npresentation for "Answer": - in criterion "A". - question text is "Same?".\npresentation for "Answer": - in criterion "Unused". - question text is "Same?".\n';
   const s = wordingSelections(text, "Answer");
   expect(s.choices[1].request.context).toEqual({
     decision: "D",

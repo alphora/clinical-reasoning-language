@@ -1,10 +1,11 @@
-// REFACTOR:grounded: MV proposes wording; the CRL owner applies and re-emits it.
+// REFACTOR:grounded: wording targets and retained legacy proposal history; tree Save uses mvDirectEdit.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync, renameSync, unlinkSync, readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, isAbsolute } from "node:path";
 import { buildCRL, type PresentationContext, resolveCelImports } from "@smile-digital-health/crl";
 
 import { resolvePresentationTarget, planPresentationEdit } from "@smile-digital-health/crl/language-services";
+import { assertOrdinaryEditPath } from './mvEditTransaction';
 
 type Ast = NonNullable<ReturnType<typeof buildCRL>["result"]>;
 type Declaration = NonNullable<Ast["presentations"]>[number];
@@ -45,7 +46,7 @@ export function graphWordingSources(graph: ReturnType<typeof resolveCelImports>)
 /** Package provenance governs editing even when node_modules is inside the policy directory. */
 export function resolveSourceWordingTarget(source: {filePath:string; source:string; packaged:boolean}, concept: string, context?: PresentationContext): WordingTarget | undefined {
   const target=resolveWordingTarget(source.filePath, source.source, concept, context);
-  return target && source.packaged ? {...target, editable:false, readOnlyReason: target.readOnlyReason ?? "Wording belongs to an imported library. Its CRL owner must propose the change."} : target;
+  return target && source.packaged ? {...target, editable:false, readOnlyReason: target.readOnlyReason ?? "Wording belongs to an imported library. Edit it in its owning workspace."} : target;
 }
 
 /** Immutable proposal, with field-level ownership and exact baseline for the owning KE. */
@@ -93,4 +94,21 @@ export function pendingPresentationProposals(policySrc: string): { pending: numb
     } catch { unreadable++; }
   } } catch { unreadable++; }
   return { pending, unreadable };
+}
+
+/** Explicit disposition preserves the entire legacy record; it never changes authored policy. */
+export function withdrawPresentationProposal(policySrc: string, id: string, expected: string, at: string): void {
+  if(!/^[a-f0-9-]{36}$/.test(id) || !Number.isFinite(Date.parse(at)))throw new Error('Invalid legacy proposal identity.');
+  const path=join(policySrc,'medical-validation','crl-patches',id+'.crl.patch.json');
+  assertOrdinaryEditPath(path);
+  if(readFileSync(path,'utf8')!==expected)throw new Error('Legacy proposal changed. Reopen its history before withdrawing.');
+  const record=JSON.parse(expected);
+  if(record.schemaVersion!==1 || record.kind!=='crl-presentation-patch' || record.id!==id || ['applied','rejected','withdrawn','superseded'].includes(record.status))throw new Error('Only an intact pending legacy proposal can be withdrawn.');
+  const temporary=path+'.'+randomUUID()+'.tmp';
+  try{
+    writeFileSync(temporary,JSON.stringify({...record,status:'withdrawn',withdrawnAt:at},null,2)+'\n',{encoding:'utf8',flag:'wx'});
+    assertOrdinaryEditPath(path);
+    if(readFileSync(path,'utf8')!==expected)throw new Error('Legacy proposal changed. Reopen its history before withdrawing.');
+    renameSync(temporary,path);
+  }finally{if(existsSync(temporary))unlinkSync(temporary);}
 }

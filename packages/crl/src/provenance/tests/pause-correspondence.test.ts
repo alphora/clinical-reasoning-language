@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import * as path from "node:path";
@@ -8,7 +9,7 @@ import {checkCockpitCorrespondence} from "../correspondenceCheck";
 import {resolveCelImports} from "../../cel/imports";
 import {executionRuntimePaths} from "../runPath";
 import type {ScenarioViewModel, ViewNode} from "../../cre/viewModel";
-const POLICY = "library \"P\".\nconcept \"A\":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `a`.\n- shape reduction is most recent.\nconcept \"B\":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `b`.\n- shape reduction is most recent.\nactivity \"Met\": - request CPGCommunicationRequest. - with `MET`.\nactivity \"Unmet\": - request CPGCommunicationRequest. - with `UNMET`.\ndecision \"D\": first:\n- when \"A\" then use decision \"Sub\".\n- otherwise then recommend activity \"Unmet\".\ndecision \"Sub\": first:\n- when \"B\" then recommend activity \"Met\".\n- otherwise then recommend activity \"Unmet\".\n";
+const POLICY = "library \"P\".\nconcept \"A\":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `a`.\n- shape reduction is most recent.\nconcept \"B\":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `b`.\n- shape reduction is most recent.\nactivity \"Met\": - request CPGTaskRequest. - with `MET`.\nactivity \"Unmet\": - request CPGTaskRequest. - with `UNMET`.\ndecision \"D\": first:\n- when \"A\" then use decision \"Sub\".\n- otherwise then recommend activity \"Unmet\".\ndecision \"Sub\": first:\n- when \"B\" then recommend activity \"Met\".\n- otherwise then recommend activity \"Unmet\".\n";
 const CASES = "library \"Cases\". covers \"P\".\nfact \"Patient\": - name is \"Synthetic\". - birth date is \"1970-01-01\". - defined by \"Patient\".\nfact \"A yes\": - value is true. - date is \"2026-09-16\". - defined by \"P\".\"A\".\nfact \"B yes\": - value is true. - date is \"2026-09-16\". - defined by \"P\".\"B\".\ncase \"Root pause\": - id is \"root-pause\". - subject is \"Patient\". - result is \"D\" is pause.\ncase \"Sub pause\": - id is \"sub-pause\". - subject is \"Patient\". - fact is \"A yes\". - result is \"D\" is pause.\ncase \"Complete\": - id is \"complete\". - subject is \"Patient\". - fact is \"A yes\". - fact is \"B yes\". - result is \"D\" is \"Met\".\n";
 
 const dirs: string[]=[];

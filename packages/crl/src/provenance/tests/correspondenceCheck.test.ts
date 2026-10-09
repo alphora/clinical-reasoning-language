@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Provenance↔cockpit correspondence check (#170 todo 2). Builds the #170 minimal fixture decision D in lib L and
 // asserts, through the REAL `validateProvenanceFiles(..., "final")` gate, that a cockpit-correspondence finding fires
 // iff the cockpit would light rows off a case's run path (bleed) or miss rows on it (miss). The load-bearing case is
@@ -37,10 +38,10 @@ concept "Criterion Met":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "D":
 first:
@@ -606,7 +607,7 @@ concept "Drug Requested":
 - type is Condition.
 - code is \`drug\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "Sub":
 first:
@@ -825,10 +826,10 @@ concept "Crohns Indication":
 concept "UC Indication":
 - defined as ( "Shared Age" sem-and "UC Marker" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "D":
 first:
@@ -950,10 +951,10 @@ concept "Needs Labs":
 - type is Condition.
 - code is \`lab\`.
 activity "Order Imaging":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`oi\`.
 activity "Order Labs":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ol\`.
 decision "D":
 all:

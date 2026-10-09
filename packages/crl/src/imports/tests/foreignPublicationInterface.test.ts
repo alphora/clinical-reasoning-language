@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import * as path from "path";
@@ -23,10 +24,10 @@ const local = `concept "Unused":
 - definition is exists this.
 `;
 const decision = `activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 decision "D":
 first:

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 import { buildCRL } from "../../index";
 import { prepareSingleLibraryPublication } from "../publicationProgram";
@@ -22,8 +23,8 @@ concept "Covered Request":
 - value type is boolean.
 - definition is "Request" has a value.
 - shape reduction is most recent.
-activity "Yes": - request CPGCommunicationRequest. - with \`YES\`.
-activity "No": - request CPGCommunicationRequest. - with \`NO\`.
+activity "Yes": - request CPGTaskRequest. - with \`YES\`.
+activity "No": - request CPGTaskRequest. - with \`NO\`.
 decision "D": first:
 - when "Covered Request" then recommend activity "Yes".
 - otherwise then recommend activity "No".

@@ -7,7 +7,7 @@ concept "Requested Service":
 - code is `requested-service`.
 
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied.`.
 
 decision "Coverage Determination":

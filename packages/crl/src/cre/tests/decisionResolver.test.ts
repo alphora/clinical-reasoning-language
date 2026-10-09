@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { parseInput } from "../../ast/tests/parseInput";
 import { idOf } from "../../ast/decisionSpine";
 import type { CRL, Decision, QualifiedReference, ReferenceName } from "../../ast/types";
@@ -24,7 +25,7 @@ function libWith(libName: string, decName: string): CRL {
   return parseInput(`# ${libName}
 library "${libName}".
 activity "Act":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "${decName}":
 first:

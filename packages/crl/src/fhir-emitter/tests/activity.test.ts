@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, expect, it } from "vitest";
 
 import type { Activity, ActivityType } from "../../ast/types";
@@ -206,8 +207,8 @@ describe("activity — emitActivityDefinition", () => {
     expect(r.title).toBe("Title Only Activity");
   });
 
-  it("a CONFIGURED determination `certify.Approve` emits payload(label) + reasonCode(PAS review action + option reason)", () => {
-    const a = activity("certify.Approve", "CPGCommunicationRequest" as ActivityType);
+  it("a CONFIGURED determination `certify.Approve` emits description(label) + reasonCode(PAS review action + option reason)", () => {
+    const a = activity("certify.Approve", "CPGTaskRequest" as ActivityType);
     const config = normalizeDispositionConfig({
       options: {
         certify: {
@@ -224,7 +225,7 @@ describe("activity — emitActivityDefinition", () => {
     // No `with` on this activity → no `note.text`; label → payload, coded outcome → reasonCode.
     expect(r.dynamicValue).toEqual([
       {
-        path: "payload.contentString",
+        path: "description",
         expression: { language: "text/cql-expression", expression: "'Approve'" },
       },
       {
@@ -239,8 +240,8 @@ describe("activity — emitActivityDefinition", () => {
   });
 
   // @kit dispositions:label-narrative-reason-code
-  it("a determination with a `with` narrative emits payload(label) + note(with) + reasonCode; no option code → just the review-action Coding", () => {
-    const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType, {
+  it("a determination with a `with` narrative emits description(label) + note(with) + reasonCode; no option code → just the review-action Coding", () => {
+    const a = activity("not-certify.Deny", "CPGTaskRequest" as ActivityType, {
       withText: "Prior authorization request denied.",
     });
     const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
@@ -251,7 +252,7 @@ describe("activity — emitActivityDefinition", () => {
     const r = resource!.resource as Record<string, unknown>;
     expect(r.dynamicValue).toEqual([
       {
-        path: "payload.contentString",
+        path: "description",
         expression: { language: "text/cql-expression", expression: "'Deny'" },
       },
       {
@@ -269,8 +270,8 @@ describe("activity — emitActivityDefinition", () => {
     ]);
   });
 
-  it("determination label + `with` narrative are CQL-escaped in payload/note (single-quote, backslash, newline)", () => {
-    const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType, {
+  it("determination label + `with` narrative are CQL-escaped in description/note (single-quote, backslash, newline)", () => {
+    const a = activity("not-certify.Deny", "CPGTaskRequest" as ActivityType, {
       withText: "See the payer's policy\nat C:\\rules.",
     });
     const config = normalizeDispositionConfig({
@@ -284,7 +285,7 @@ describe("activity — emitActivityDefinition", () => {
       path: string;
       expression: { expression: string };
     }>;
-    expect(dv.find((e) => e.path === "payload.contentString")!.expression.expression).toBe(
+    expect(dv.find((e) => e.path === "description")!.expression.expression).toBe(
       "'Deny — physician\\'s call'",
     );
     // single-quote → \', backslash → \\, raw newline → \n
@@ -293,7 +294,7 @@ describe("activity — emitActivityDefinition", () => {
     );
   });
 
-  it("I2: a determination authored as a NON-CommunicationRequest → disposition-request-type error, no CR dynamicValues", () => {
+  it("I2: a determination authored as a NON-TaskRequest → disposition-request-type error, no CR dynamicValues", () => {
     const a = activity("not-certify.Deny", "CPGServiceRequest" as ActivityType);
     const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
     const { resource, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
@@ -305,7 +306,7 @@ describe("activity — emitActivityDefinition", () => {
   });
 
   it("I3: a non-determination activity named exactly like a multi-option category → disposition-ambiguous-category error", () => {
-    const a = activity("not-certify", "CPGCommunicationRequest" as ActivityType);
+    const a = activity("not-certify", "CPGTaskRequest" as ActivityType);
     const config = normalizeDispositionConfig({
       options: { "not-certify": { Deny: { label: "Deny" }, EIU: { label: "Deny EIU" } } },
     }).config;
@@ -317,7 +318,7 @@ describe("activity — emitActivityDefinition", () => {
   });
 
   it("an UNCONFIGURED activity (no dispositionConfig) emits NO reasonCode dynamicValue (today's behavior)", () => {
-    const a = activity("certify.Approve", "CPGCommunicationRequest" as ActivityType);
+    const a = activity("certify.Approve", "CPGTaskRequest" as ActivityType);
     const { resource } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, { clock: FIXED_CLOCK });
     expect((resource!.resource as Record<string, unknown>).dynamicValue).toBeUndefined();
   });
@@ -351,8 +352,8 @@ describe("activity — emitActivityDefinition", () => {
     expect(r.dynamicValue).toBeUndefined();
   });
 
-  it("plain CommunicationRequest free-text `with` → `payload.contentString` dynamicValue (message body; resolves #181)", () => {
-    const a = activity("With Text", "CPGCommunicationRequest" as ActivityType, {
+  it("plain TaskRequest free-text `with` → `description` dynamicValue (message body; resolves #181)", () => {
+    const a = activity("With Text", "CPGTaskRequest" as ActivityType, {
       withText: "Confirm BP control remains adequate.",
     });
     const { resource, unmatched, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
@@ -363,7 +364,7 @@ describe("activity — emitActivityDefinition", () => {
     const r = resource!.resource as Record<string, unknown>;
     expect(r.dynamicValue).toEqual([
       {
-        path: "payload.contentString",
+        path: "description",
         expression: {
           language: "text/cql-expression",
           expression: "'Confirm BP control remains adequate.'",
@@ -379,7 +380,7 @@ describe("activity — emitActivityDefinition", () => {
     const { resource, unmatched, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
       clock: FIXED_CLOCK,
     });
-    // A free-text `with` on a non-CommunicationRequest kind has nowhere conformant to go: NOT routed to
+    // A free-text `with` on a non-TaskRequest kind has nowhere conformant to go: NOT routed to
     // `unmatched` (which would silently pin success:false) and NOT emitted.
     expect(unmatched).toEqual([]);
     expect(errors).toEqual([]);
@@ -387,14 +388,14 @@ describe("activity — emitActivityDefinition", () => {
     expect(r.dynamicValue).toBeUndefined();
   });
 
-  it("CPGCommunicationRequest with terminology ref → unsupported-communication-with-terminology (distinct kind, round-2 Q9)", () => {
-    const a = activity("CommReq With Term", "CPGCommunicationRequest" as ActivityType, {
+  it("CPGTaskRequest with terminology ref → unsupported-task-with-terminology (distinct kind, round-2 Q9)", () => {
+    const a = activity("CommReq With Term", "CPGTaskRequest" as ActivityType, {
       withTerm: "Some VS",
     });
     const { resource, unmatched } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
       clock: FIXED_CLOCK,
     });
-    expect(unmatched.some((u) => u.kind === "unsupported-communication-with-terminology")).toBe(true);
+    expect(unmatched.some((u) => u.kind === "unsupported-task-with-terminology")).toBe(true);
     const r = resource!.resource as Record<string, unknown>;
     expect(r.dynamicValue).toBeUndefined();
   });

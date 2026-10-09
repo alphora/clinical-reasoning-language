@@ -1368,9 +1368,13 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   // tiebreak among themselves. `.error-node` (a pass node whose case's RUN errored — the host filters error ⊆ pass) is
   // painted INSTEAD of `.review-pass` (error-over-pass), a subdued red wash distinct from the failed-criterion STROKE channel.
   `.flow-row.review-pass>rect{fill:${TOK_VERDICT_PASS};fill-opacity:.2}` + // #218: shared TOK_* consts (legend swatches key on the same) → paint/legend can't drift
+  `.flow-outline.review-pass>rect{fill:${TOK_VERDICT_PASS};fill-opacity:.2}` + // #218: shared TOK_* consts (legend swatches key on the same) → paint/legend can't drift
   `.flow-row.review-fail>rect{fill:${TOK_VERDICT_FAIL};fill-opacity:.2}` +
+  `.flow-outline.review-fail>rect{fill:${TOK_VERDICT_FAIL};fill-opacity:.2}` +
   `.flow-row.review-pending>rect{fill:${TOK_VERDICT_PENDING};fill-opacity:.16}` +
+  `.flow-outline.review-pending>rect{fill:${TOK_VERDICT_PENDING};fill-opacity:.16}` +
   `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.22}` +
+  `.flow-outline.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.22}` +
   // #210 ALL-PASS ✓ BADGE — a green circle + white check, HIDDEN until the host toggles `.leaf-allpass` (every route producing
   // this outcome is pass). Theme-aware WITHOUT a media query: solid green + white read on light AND dark. A thin separation
   // ring (`--vscode-editorWidget-background`, the node's own fill) keeps the badge green legible over the `.review-pass` green

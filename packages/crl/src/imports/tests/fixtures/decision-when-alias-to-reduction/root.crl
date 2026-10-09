@@ -28,8 +28,8 @@ first:
 - otherwise then recommend activity "not-certify.Deny".
 
 activity "certify.Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Coverage determination: APPROVE / Certified.`.
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Coverage determination: DENY / Not Certified.`.

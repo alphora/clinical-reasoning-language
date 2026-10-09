@@ -8,13 +8,14 @@ const suiteHash = (s: string) => createHash("sha256").update(s).digest("hex");
 import { produceResults, produceRegressionResults } from "../produce";
 import { readSuiteResult } from "../readSuiteResult";
 import type { ProducerCaseState } from "../manifest";
+import { emitResultDefinitionClosure } from '../definitionClosure';
 
 const engine = vi.hoisted(() => ({ state: "generated" as ProducerCaseState, calls: 0, hasInputs: true, inputChanged: undefined as (() => void) | undefined, wait: undefined as (() => Promise<void>) | undefined, probeWait: undefined as Promise<void> | undefined, uncertainAt: 0 }));
 vi.mock("../spawn", async original => ({ ...await original<typeof import("../spawn")>(), verifyJar: () => ({ ok: true, hasLauncher: true, sha256: "engine-sha" }), resolveJavaAsync: async () => { await engine.probeWait; return { ok: true, javaExe: "fake-java", major: 21 }; } }));
 vi.mock("../runtimeFingerprint", async original => ({ ...await original<typeof import("../runtimeFingerprint")>(), runtimeFingerprint: async () => ({sha256:"runtime",cleanupConfirmed:true}) }));
 vi.mock("../driver", () => ({ driverReady: () => ({ ok: true }) }));
-vi.mock("../../emit-two-lane", () => ({ emitCrlTwoLane: () => ({ success: true, cqlLibraries: [], fhir: { resources: [
-  { resource: { resourceType: "PlanDefinition", id: "policy", type: { coding: [{ code: "workflow-definition" }] }, date: "2026-09-13", action: engine.hasInputs ? [{ input: [{ type: "Observation", profile: ["http://example.org/A"] }] }] : [] } },
+vi.mock("../../emit-two-lane", () => ({ emitCrlTwoLane: (_path: string, options: {date?: string} = {}) => ({ success: true, cqlLibraries: [], fhir: { resources: [
+  { resource: { resourceType: "PlanDefinition", id: "policy", type: { coding: [{ code: "workflow-definition" }] }, date: options.date ?? "2026-09-13", action: engine.hasInputs ? [{ input: [{ type: "Observation", profile: ["http://example.org/A"] }] }] : [] } },
 ] } }) }));
 vi.mock("../runProducer", () => ({ runOneCase: async (opts: { artifactRoot: string }, input: { caseName: string; compartmentId: string }) => {
   engine.calls++; await engine.wait?.(); engine.inputChanged?.();
@@ -52,6 +53,16 @@ beforeEach(() => {
 });
 afterEach(() => { for (const p of roots.splice(0)) rmSync(p, { recursive: true, force: true }); });
 const request = () => ({ celPath: join(root, "src/cel/mv/a.cel"), crlPath: join(root, "src/crl/policy.crl"), outRoot: root, useCase: "prior-auth" as const, crlVersion: "test", jarPath: "fake.jar" });
+
+it('result manifest identifies the exact publication settings MV saved',async()=>{
+ const definitionOptions={date:'2026-10-08',capability:'publishable' as const};
+ const result=await produceResults({...request(),definitionOptions});expect(result.ok).toBe(true);if(!result.ok)throw Error(result.reason);
+ expect(result.manifest.provenance.definitionClosureSha256).toBe(emitResultDefinitionClosure(request().crlPath,definitionOptions).definitionClosureSha256);
+ expect(result.manifest.provenance.definitionClosureSha256).not.toBe(emitResultDefinitionClosure(request().crlPath).definitionClosureSha256);
+ const compartment=result.manifest.cases[0].compartmentDir;
+ expect(readSuiteResult(request().celPath,compartment,result.manifest.provenance.definitionClosureSha256).stale).toBeUndefined();
+ expect(readSuiteResult(request().celPath,compartment,'different-definitions')).toMatchObject({stale:true,q:{resourceType:'Questionnaire'}});
+});
 
 it("publishes two same-name MV cases once, replaces all generated files and verifies manifest-bound reading", async () => {
   put("tests/results/questionnaire-manifest-old-library.json", "{}");

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { checkFhirPackage } from "./fhir-package-smoke.mjs";
 import { checkEmitBundle } from "./emit-bundle-smoke.mjs";
 // REFACTOR:grounded (#320, plan595): both BMI kit payloads are versioned and verified through MCP.
@@ -371,8 +372,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.28");
-    assert.equal(kit.contentHash, "105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652");
+    assert.equal(kit.schemaVersion, "2.29");
+    assert.equal(kit.contentHash, "49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 22);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -468,7 +469,7 @@ concept "X":
 - value type is boolean.
 - code is \`x\`.
 activity "A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "D":
 first:

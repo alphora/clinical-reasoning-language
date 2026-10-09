@@ -549,7 +549,7 @@ Intent: the operator requires coherent versions/audit metadata in local builds a
 | Kit updated | `mcp/server.ts` schema, description, handler forwarding; core `cli/tests/run-mcp-server.test.mjs` and bundled `crl-vscode/src/mcp-server.test.mjs`, both `title creation survives persisted reload, legacy retry, and conflict rejection`. Synthetic concept C/Observation/code c, explicit CRL path under src/crl, sibling src/cel; rentalTitle/rentalDescription fixtures. Actual MCP creates disk record; legacy retry with changed detail returns same record and bytes; alias conflict refuses and preserves bytes. | Three owning executions share `review-flags:title-description`. Titles and descriptions are synthetic explanatory samples, not clinical source assertions. Core/bundled protocol observations are separate from installed-artifact delivery. |
 | Kit updated | `correspondenceCockpit.ts`, `flagDrawerHtml.ts`, `flagDrawerHtml.test.mjs`: `flag form names the two inputs Title and Description` asserts label and aria-label; bundled MCP test executes the source-extracted host view-model function in a VM with synthetic helper stubs and the action renderer on persisted record, asserting header and separate Description. | User-facing Title labels, required/single-line/forbidden-character messages, explanatory placeholder; existing internal summary/stub message fields retained. Renderer tests alone do not prove installed UI. Dedicated installed-window check is required in delivery evidence. |
 | Kit updated | `authoring-kit/index.ts`: rule summary/write clause and three existing store examples prefer title, retain gist compatibility, describe matching aliases and unchanged persisted schema. `authoring-kit.test.ts` version/hash pins and supported example argument keys; both MCP version/hash pins. | Schema2.10 already identifies this content; no additional content bump for audit-only correction. Full payload delta must contain only schema, review-flags text/derived index and three examples; all19 reference artifacts remain unchanged. Existing kit search/prerequisite/example gates still apply. |
-| Existing guidance sufficient | Existing `review-flags:description` tests retain top-level plain text, outer trim/blank omission, arbitrary internal text, nested/nontext refusal, and byte-preserving retry assertions. `review-flags` Accept/Reject guidance and corresponding host/workflow tests are unchanged. | This audit changes no Description behavior, flag ID, anchor, ownership/status transition, native runtime or root canonical behavior. Prior 6.3.0 proof remains bounded to its exact recorded scenarios. |
+| Existing guidance sufficient | Existing `review-flags:description` tests retain top-level plain text, outer trim/blank omission, arbitrary internal text, nested/nontext refusal, and byte-preserving retry assertions. `review-flags` teaches Answer/Ignore; the description-storage API assertions remain applicable. | This audit changes no Description behavior, flag ID, anchor, ownership/status transition, native runtime or root canonical behavior. Prior 6.3.0 proof remains bounded to its exact recorded scenarios. |
 | Not author-facing | Package/lock files move root/core/extension together to6.3.2; audit.json and ledger/inventory supply explicit provenance. Test tags are aligned immediately above owning declarations. | No dependency or export-name addition. Public CreateFlagInput now has optional title/gist properties; downstream code that reads gist as always-present must narrow it. Existing gist-only callers remain valid. The VM test uses already-present TypeScript/esbuild development dependencies. Content identity and package version are distinct; metadata does not hash itself. |
 | Outside content commit, inspected | Existing edits in `.claude/skills/crl-release/SKILL.md`, `AGENTS.md`, `mail-context.md`: normal installed-Code test-host rule, mail listener instructions and removal of an old mail hold. | Preserved byte-for-byte. These do not alter shipped code or kit claims; the installed-host procedure follows the current operator rule. |
 
@@ -572,7 +572,7 @@ All paths in the inventory were reviewed against the saved audit, including old/
 | Kit updated | `emit/tests/publicationHasValue.test.ts`, `publicationProgram.test.ts`, `validator/tests/publication.test.ts`, shared `intakeExample.ts`: selected local text/string/dateTime answers, missing/false presence, typed CEL/FHIR/CRE/CQL, invalid-type and temporal controls, dependencies and profiles. `publicationHasValue` helper has production callers in publication preparation, CQL and CRE. | `text-answers`, type/reference rules, `intake-reference` CRL/CEL and temporal variants. Source typechecks/emit/CRE evidence separate from native sessions. Presentation choice and RecordSet expansion remain outside scope. |
 | Kit updated | `fhir-emitter/tests/decision.test.ts` (`emit-output-root:policy-canonical`), `closureOrchestrator.test.ts`, all renamed root-golden fixtures: root name cannot change policy id/url/path, support resources stay distinct, multiple unreferenced roots error. | `emit-output-root`, `chaining-necessity`, reference artifacts: independently invoked roots need separate policy packages. Native generated Questionnaire has policy identity; saved MV per-case review copies remain distinct. Golden replacements do not certify clinical meaning. |
 | Kit updated | `tests/emit-writers.test.ts`, `cli/tests/run-emitter.test.ts`, `results/tests/{orphans,produceCleanup,suiteProduction}.test.ts`: complete generated-tree replacement after preflight, arbitrary output siblings removed, source siblings retained, malformed/collision inputs preserve prior output, empty output replacement, filesystem failures reported. Existing retry assertions retain verified successful cases. | `emitted-trees-are-ours`, `emit-output-root`, produce-results/verifyLoop, MCP and user/tool guides. No custom-file preservation, transaction/rollback promise or pruning opt-out. Git handles history. Platform-conditional link checks retain their limits. |
-| Kit updated | `flagWorkflowHost.test.mjs`, `flagActionDrawerHtml.test.mjs`, `cockpitWebviewScript.test.mjs`: KE Accept transfers current stored record to open validation category; Reject resolves extraction without MV copy; Reopen retained, fields/content preserved, stale intent and write failures refused, delegated buttons route correctly. | `review-flags`: Accept/Reject workflow, current category determines KE/MV display even when authoring tag remains. Tests exercise host/storage and drawer wiring; actual installed rendering is a separate release gate. No human review completion implied. |
+| Kit updated | `flagWorkflowHost.test.mjs`, `flagActionDrawerHtml.test.mjs`, `cockpitWebviewScript.test.mjs`: KE Answer creates a distinct open validation answer and resolves the original extraction question; Ignore resolves extraction without an MV copy; Reopen retained, fields/content preserved, stale intent and write failures refused, delegated buttons route correctly. | `review-flags`: Answer/Ignore workflow, original KE ownership remains and the answer is independently MV-owned. Tests exercise host/storage and drawer wiring; actual installed rendering is a separate release gate. No human review completion implied. |
 | Existing guidance sufficient | `policyLaunchTarget.test.mjs` and host launch call: mixed MV/regression/unclassified policy resolves only src/cel/mv, including active-editor bypass. | Existing `mv-vs-regression`/MV suite guidance already assigns human review to MV paths. UI picker text and editor selection are launch behavior, not CRL semantics. Resolver tests do not prove rendered-client behavior. |
 | Kit updated | `flags/tests/buildFlagDraft.test.ts` and real core/bundled `run-mcp-server.test.mjs`/`mcp-server.test.mjs` (`review-flags:description`): trim/blank omission, internal text preserved, SDK nontext and MCP schema rejection, fields.description refusal, actual top-level disk persistence, retry returns original detail/id, legacy and explicit keys unchanged. Both UI dry/final builds pass Description. | `review-flags`, flag example and retrieval aliases: short gist/title, top-level detail, optional issue link. Description is excluded from creation-time retry identity; retries do not update existing records. No MCP edit API or migration. Existing free-text/store inputs remain uncapped. |
 | Not author-facing | Grammar-generated type aliases, internal publication helpers, manifest cleanup traversal, version/lock updates, test source-shape pins, package hash/schema delivery pins and current inventory/ledger metadata. | Supporting implementation of mapped claims, not independent authoring concepts. No new native runtime dependencies. |
@@ -1639,3 +1639,410 @@ an invalidated mapping. Source kit 1.38 is unreleased until the release gates ru
 ### Security follow-up source review 898
 
 The 2.20 delta also includes session.ts selecting its default engine with the captured environment; session.test.ts adds the no-override cache/path/hash assertion. Existing native-apply-session and native-execution teaching is sufficient. spawn.test.ts compares source acquisition identity to cli-build.json (internal provenance consistency). The native-acceptance session helper is rebuilt against the new engine; no Java helper source change. Runtime delta, toolchain, HTTP/XSLT qualification limits and BOM annotation version are documented explicitly. These are provenance/qualification changes, not changed clinical or language semantics. No owning @kit assertion was removed. Native six-step and typed four-step source controls passed; installed receipts remain separate. External review findings and dispositions are in discussion898.
+# Medical Review flag lifecycle maintenance (pending source delta, 2026-10-08)
+
+Baseline audited content349c245a5a6d7e9b8f5a0c3cefaa27cd88939518, schema2.28/hash105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652. Target is uncommitted source against cb4dd54e6fea8cf359663956a93b8121ae82662a, schema2.29/hash957a1a77f85ec9740c29fdf262eaaccaea9f9d7ee7876129e53484a560bff055. Prior audit stamp retained; delivery/export is not claimed.
+
+| Disposition | Changed inputs and exact evidence | Scope and limits |
+|---|---|---|
+| Kit updated | review-flags rule and automation clause: Answer creates separate open validation/other answer with original Description under Question: and Answer: header, then resolves original KE; Ignore resolves KE only. flagWorkflowStore.test.mjs preserves original metadata, tests creation/resolve failures, version retry, collision refusal, and real vocabulary edit eligibility. flagWorkflowHost.test.mjs executes Answer/Ignore, actual local submit, full answer edit/correlation preservation, hidden correlation rows, delete consequence, stale intents and persistent partial-save warning. flagActionDrawerHtml.test.mjs checks open Answer/Ignore, resolved Reopen and no KE edit/delete. | Operator explicitly requests replacement lifecycle and local MV creation. MCP KE authoring write capabilities remain separate. Optimistic existing MV ownership boundary is not cross-process CAS. Unsupported hard-link filesystems refuse Answer with actionable message and original open. |
+| Kit updated | navigation adds Answer/Ignore aliases; retired search words point to corrected entry rather than positive retired teaching. authoring-kit.test.ts pins schema/hash; query.test.ts checks entry/navigation/content contracts. | Owning165kit tests pass; source kit is not installed/released. All reference artifacts unchanged. |
+| Not author-facing | flagWorkflowStore hard-link exclusive publication, revision hashing, cleanup and host busy/policy guards; source-only doctrine comments and agentChat local failure result; label-script existing-issue maintenance wording. | Internal recovery mechanics, not language changes. Existing GitHub utilities remain separate; no MV creation caller. |
+| Existing guidance sufficient | Stable flag ID/anchor/Description store, MCP creation/status and evidence ownership retain existing reviewed behavior. | This slice changes human MV controls, not clinical eligibility, authored CRL or native determination behavior. |
+
+Changed paths are recorded completely in discussion1010, its diff and new files, with additional kit before-state tmp/mr-flags-kit-before.md; startup pane ordering and operator-dirty fixture are separate. Four owning extension suites218tests pass, core/extension build/types pass,165kit tests pass. Source rendered Edge receipt verifies Answer/Ignore intents, KE read-only and MV edit; actual host/store tests provide write evidence. Installed VSIX and release acceptance remain unexecuted. Code review round2 pending; no completed audit claim.
+# Medical Review direct wording maintenance (pending source delta, 2026-10-08)
+
+Audited baseline349c245a5a6d7e9b8f5a0c3cefaa27cd88939518, schema2.28/hash105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652. Target is uncommitted source against cb4dd54e6fea8cf359663956a93b8121ae82662a, schema2.29/hash9f34860b3ebd93f55a7a0f4017cfde319f49901e3c71d13d60f46eba66f9ea49. Prior audit stamp retained; no source audit, installed delivery or release claimed. This updates the preceding pending flag-only identity.
+
+| Disposition | Changed authority and exact evidence | Scope and limits |
+|---|---|---|
+| Kit updated | shared-wording-editing and mv-wording-patches: operator expressly requires direct owned CRL/generated FHIR Save with optional best-effort KELP coordination and no KE-agent run. mvDirectEdit.test.mjs checks emitted text/description, pass-only demotion, failure/note/history preservation, shared imported local owner, broken/multiple-policy refusal, missing/extra/publication drift refusal and no live writes during planning. mvScopeCoordinator.test.mjs and mvEditTransaction.test.mjs cover real Git/bare remote commit/outcome/ownership, recoverable publication and exact baselines. | Local complete candidate compilation and recoverable publication are distinct from KELP network execution, native runtime correctness and renewed medical approval. Single independent local policy and pinned metadata remain current limits; KELP is optional. |
+| Kit updated | Existing routeCards legacy proposal helper remains history; explicit Withdraw preserves original evidence and refuses changed records. New tree saves create direct-edits receipts. | Legacy pending/unreadable gate remains; no automatic supersession or handoff/KE rerun for new Save. Host/UI source integration review1014 and actual rendered/native direct Save/Restart acceptance pending. |
+| Existing guidance sufficient | Neutral method mapped composition, inference, Criterion, case authoring, partial-answer and native evidence rules are unchanged by question wording/local flag lifecycle. No reference artifact rewritten. | In-play native execution/medical acceptance distinctions remain required; current kit source is pending rather than silently accepted as audited. CPGTaskRequest remains a separate unfinished requested migration. |
+| Not author-facing | Captured import package snapshot, per-operation compile cache, Git dirt inventory, journal idempotence/phase-only historical inspection, per-entry recovery diagnostics and shared host correlation constant. | Internal mechanics; full current-source and candidate validation remains fail-closed. No cross-process atomicity or universally refreshed native result claim. |
+
+Source kit168owning tests pass after wording update. Most recent intermediate8extension suites138pass, following earlier harness-only failures now corrected; further final retention/operation fixes are under current10suite rerun. Actual source-rendered flags Edge receipt proves repeated-answer, newest deletion and empty-title fallback; direct host/interactive acceptance not established by that receipt. Plan1011, core1012, coordinator1013, flags1010, host1014 contain complete change descriptions/input/diffs/findings/dispositions. All five-round limits respected; bounded findings corrected without a sixth review, no formal whole-slice panel convergence claimed.
+
+# Medical Review answer CRUD maintenance (pending source delta, 2026-10-08)
+
+Audited baseline349c245a5a6d7e9b8f5a0c3cefaa27cd88939518, schema2.28/hash105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652. Target is uncommitted source against cb4dd54e6fea8cf359663956a93b8121ae82662a, schema2.29/hash8415752bbdc0ca6c5803248c7d45e3c3b329a1fe2033d7a0e5b41fbed49b8da3. This supersedes the preceding pending wording-only identity. Existing audit stamp retained; no completed audit, export, installed delivery or release claimed.
+
+| Disposition | Changed authority and exact evidence | Scope and limits |
+|---|---|---|
+| Kit updated | terminology-forms and shared answer example add optional member description, CRL terminology ownership, associated ValueSet/local CodeSystem CRUD and independent per-question classification. namedAnswerDescriptions.test.ts checks compose/expansion standard extension, CS definition, both merge orders, conflicts, external VS-only and existing CS metadata. terminologyEdit.test.ts checks lossless literal/token edits, BOM/Unicode/CRLF, repeated system groups, CRUD/classifications and refusals. namedAnswerClosure.test.ts verifies the shared example across emitted artifacts. | Existing finite-domain and classification semantics retained. No external CodeSystem manufacture; opaque/nonlocal vocabularies are read-only. Member coding identity cannot change during update. |
+| Existing guidance sufficient | Mapped neutral method0.1.1 clauses retain source fidelity, per-concept qualification, author/client/native evidence distinctions and full artifact regeneration. All reference artifacts unchanged. | This is tooling plus synthetic acceptance; no customer policy binding, independent clinical acceptance or full pipeline run. |
+| Not author-facing | answerEditing.ts ownership resolution, multi-file overlays, saved CEL impact receipt and existing direct-edit publisher integration. | KELP owns concurrency. Exact CEL-impact acknowledgement prevents applying unshown consequences; no case data rewrite. No independent locking framework added. |
+
+Four owning core suites113PASS; six extension suites246PASS plus36owning extension MCP tests and full core MCP smoke, fresh core/extension build and extension typecheck pass. Actual rendered branch questionnaire/controller and host Save use real compiler/publication with injected KELP CLI: CRUD, shared classification, description, refresh, nonlocal read-only and concrete example-impact acknowledgement pass; screenshot inspected. Four actual native apply calls verify original, updated, created and deleted choices from republished definitions, retaining the old session immutable. Evidence tmp/mr-answer-browser/verification.json and tmp/mr-answer-native/verification.json. Native description display, installed VSCode host and live KELP network remain unverified. Plan1015/code1016 contain actual review evidence/dispositions; no source audit stamp advanced.
+
+Final target validation additionally rechecks initiating question source identity/terminology binding at every preview and post-lock validation. New namesake-after-pin test passes. Native code R3 converged0C0I0N after five accepted findings; external code review incomplete (R1 turn-budget/no substantive findings, R2 internal error). MCP schema/hash assertions corrected for pending source identity; earlier missing flagsList VM dependency corrected, owning36PASS. No audit metadata changed.
+
+# Medical Review optional KELP correction (pending source delta, 2026-10-08)
+
+Operator requires filesystem Save regardless of absent/failing KELP. Audited baseline remains349c245a5a6d7e9b8f5a0c3cefaa27cd88939518, kit2.28/hash105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652. Pending uncommitted target against cb4dd54e6fea8cf359663956a93b8121ae82662a remains schema2.29 (one increment for the ongoing unreleased feature), hash13ba0e1aa51883354b76cca831b9a0190690cc56d6f0681f982809b45cd365e9. Previous pending hash8415752bbdc0ca6c5803248c7d45e3c3b329a1fe2033d7a0e5b41fbed49b8da3 captured in tmp/mr-kelp-optional-kit-before.json; full after/delta inspected. Audit stamp unchanged; no export, commit, install or release.
+
+| Disposition | Exact owning evidence | Scope/limits |
+|---|---|---|
+| Kit updated | mv-wording-patches removes managed CLI/ownership prerequisite, states optional best-effort lock/Save/release and CLI-free journal recovery. mvScopeCoordinator.test.mjs failure rows no-cli/status/lock/save/release/mapping assert actual source, FHIR and MV bytes plus localComplete; foreign-lock row preserves peer owner and no release; interrupted no-CLI row recovers recorded files. mvDirectEditHost.test.mjs project/CLI/malformed config/path rows assert successful UI response, plus completed-operation picker control. | Valid complete compiler/input/filesystem checks remain; KELP-only availability is not local-edit authorization. No new language, emission or clinical semantics. Live KELP network unverified. |
+| Existing guidance sufficient | Existing wording/terminology owner, classification, frozen native session, stale approval and notes/history rules. Real compiler browser direct CRUD plus two no-KELP saves preserve actual generated outputs and refresh. | Installed/nonlocal terminology remains read-only; this change concerns KELP availability, not terminology ownership. No policy rewrite or KE-agent run. |
+| Not author-facing | LocalComplete journal marker, receipt diagnostics, recovery list filters, concise pinned icon/delete/disclosure/font controls; three hash pins updated to actual pending kit identity. | Product controls do not teach compiler internals. Actual rendering inspected at320px. No changes to maintained clinical fixture. |
+
+Owning six-suite90PASS before final UI/hash changes; prior final six-suite286PASS, core kit90PASS, actual core MCP smoke PASS; fresh core/extension build/types pass. Counts overlap and are not cumulative. Source-rendered browser actual host/real compiler/publication plus injected KELP and absent/invalid KELP paths PASS (tmp/mr-answer-icons-browser/verification.json). Plan1019/code1020 record reviewers and dispositions. Reference CRL/CEL artifacts unchanged; no new native runtime rerun warranted for this coordination/UI-only correction.
+
+
+Final local verification: six targeted suites / 270 PASS after the bounded corrections (tmp/mr-kelp-optional-completion-tests.log); prior six extension/UI/MCP suites / 286 PASS, three owning suites / 61 PASS, core kit / 90 PASS and core MCP smoke PASS. Counts overlap, not cumulative. Final source compile/typecheck/esbuild PASS after retaining question drafts (tmp/mr-kelp-optional-final-compile.log). Final real rendered UI/host/compiler/browser PASS: compact icons, inherited 12px label, plus only expanded, one visible editor, concise deletion, CRUD and CRL/FHIR publication, no-CLI/invalid-config saves, notes and examples preserved, shared users refreshed, zero KE-agent runs. Screenshots inspected; receipt tmp/mr-answer-icons-browser/verification.json. No installed VSCode/live KELP network acceptance, commit/install/release or peer message. Final mail: no pending unanswered sent/received exchanges; three old expired questions were answered before expiry. Native final0C0I0N; external final1C3I3N disposed5Accept0Refine2Reject, cumulative17Accept6Refine4Reject. Warranted final corrections tested; no whole-panel post-correction convergence claimed at the bounded cap.
+
+
+# Medical Review Task request maintenance (pending source delta, 2026-10-08)
+
+QUOTED operator: "CPGCommunicationRequest needs to become a CPGTaskRequest." Audited baseline349c245a5a6d7e9b8f5a0c3cefaa27cd88939518, kit2.28/hash105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652 remains unchanged. Pending uncommitted target against cb4dd54e6fea8cf359663956a93b8121ae82662a is kit2.29/hash49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69 (one increment for the ongoing unreleased MR feature). No audit-stamp advance, installed kit, commit or release. Current complete changed-path inventory tmp/mr10-changed.json and dirty-before diff tmp/mr10-code.diff; prior Git authority tmp/mr10-provenance.txt. Existing older audit history is preserved as history, not current positive teaching.
+
+| Disposition | Owning assertion/example | Scope and proof limit |
+|---|---|---|
+| Kit updated | dispositions, disposition-mode, configure-dispositions, current token list, all runnable reference/examples: CPGTaskRequest emits Task; configured label -> description, narrative -> note.text, unchanged PAS and optional reason -> reasonCode. activity.test.ts configured label/no-narrative/reason, narrative/no-reason, escaping and wrong-request-type rows; dispositionValidation.test.ts configured Task acceptance and ServiceRequest refusal; cpgActivityProfiles.test.ts generic computable AD/core Task target. | Existing published generic profiles, no invented cpg-taskrequest URL or abstract-profile-only claim. Generic Task terminology-with lowering remains explicitly unsupported; other activity families retain their mappings. |
+| Kit updated | Shared task-request fixture and cel/emitter/tests/taskRequest.test.ts accept new token, actionable retirement message, activity-derived CEL Task patient for, required status/intent and standard request-doNotPerform modifierExtension. | Real native apply verifies fresh artifacts in tmp/mr10-native/verification.json: Approve, Deny, missing-input pause, free-text Task and prohibited Task. Actual output description/note/reason/PAS/for/status/intent and prohibition checked. Native CEL input Task accepted. This is synthetic mechanical evidence, not customer medical acceptance. |
+| Existing guidance sufficient | Literal-only migration of owning CRL/CEL test fixtures, kit reference declarations and parser/catalog expectations; maintained Bleph uses same activities renamed to Task token. | Full policy CQL remains byte-identical after regeneration, all16MV and30regression CRE cases pass. All26FHIR/eightCQL files replaced from one successful emission; original decisions and questions unchanged. Historical native receipts are not relabeled as fresh execution. |
+| Not author-facing | Structural administrative Task floor, renamed unmatched kind, test hash pins and generated grammar/type rebuild. | No new clinical defaults, KELP locking, UI or independent state framework. Real FHIR CommunicationRequest input support remains. |
+
+Plan1024: native0C/1I/0N, accepted CEL gap; external internal error on first call and one retry, no review completed. Code1025 records substantive review and final verification. Owning/core/build/MCP results will be finalized there; no unsupported audit/export claim.
+
+Final MR10 local evidence:17affected suites443PASS;5MV suites116PASS; fresh core/extension build/types and real core MCP PASS; final five native calls PASS; all46Bleph CRE cases PASS and policy CQL unchanged. Broader338suite run5483PASS/32skip identified only the nine old AD goldens and a shared-registry proof pin, all resolved/rechecked in443PASS. Task defaults remain bounded to CEL activity outputs; shared concept registry unchanged. Native1025final0C0I0N converged; external unavailable. Kit2.29/hash49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69 source remains pending, prior2.28stamp retained. No completed audit/release/install/commit.
+
+# Completed Medical Review release audit 6.4.36 (target stamp pending)
+
+Baseline349c245a5a6d7e9b8f5a0c3cefaa27cd88939518 (kit2.28) resolves and is an ancestor of the reviewed candidate. This section supersedes pending MR sections above as current audit status; those sections retain exact per-feature owning assertions, shared inputs, failure cases and bounded proof. Candidate kit2.29/hash49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69. The target full SHA will be recorded with the separate metadata stamp after checks/review. No historical audit identity is rewritten.
+
+Intent is the operator's MR1-MR10 request and subsequent UI/local-save corrections. MR11 Request promotion is explicitly deferred. Reviews1009-1025 cover feature plans/code and findings; release1026/1027 cover audit and qualification. External reviewer unavailable after two internal errors; native coverage is identified separately. This is tooling/emission evidence, not independent medical-policy approval.
+
+The complete delta includes the prior2.28 stamp and6.4.35 metadata, disposed as metadata-only after inspection, and every changed/untracked path below. Literal-only request-token migrations preserve assertion/fixture semantics; nine generated AD goldens now target core Task/generic computable activity, with fresh native controls in the Task maintenance section. All other changes join the existing MR flag, wording, answer and optional-KELP mappings above. Workflow/verdict cues are presentation of human review, never an engine truth override; route/body/input approval and checked Criterion coverage is in branchVerdictHost/cockpitWebviewScript/treeHighlight/flowPinGlow owning suites and rendered receipts discussed1021-1023. No owning @kit claim was removed; changed token inputs retain their existing claims. New direct-edit/answer/flag tests are mapped above instead of blanket-excluded as untagged.
+
+Kit updated: named local terminology descriptions and membership CRUD, associated VS/CS and complete generated FHIR publication, optional best-effort KELP with unconditional valid local writes, KE Answer/Ignore local MV lifecycle, CPGTaskRequest replacement and bounded native Task mappings. Existing guidance sufficient: clinical/missing semantics, genuine CommunicationRequest input resources, ordinary source representation and native response/retention/pruning boundaries. Not author-facing: version/hash/test census, recoverable publication internals, UI icon/layout and review cue mechanics. Explicit limitations: external terminology editing remains read-only; native interactive sessions require Restart after edits; live KELP network, arbitrary imported/computed native behavior, customer deployment and clinical acceptance are not certified. All reference CRL declarations with the retired activity token are migrated; no claim that their old generated bytes are unchanged. Maintained Bleph CQL remains byte-identical;46 CRE cases and5 fresh synthetic native Task calls pass.
+
+Installed qualification session.cjs and typed.cjs retain all six/four existing steps and now assert exact Task description, intent/status and absent payload, plus patient reference in the six-step control. Native installed execution remains a release gate; source passes alone do not certify it. Full source/root test results and installed receipts are recorded by release qualification separately.
+
+Complete changed-path inventory, grouped dispositions above:
+- `docs/cel-spec.md` — literal-only token migration.
+- `docs/cpg-ig-alignment.md`
+- `docs/mv-component-view.md`
+- `docs/mv-presentation-patches.md`
+- `docs/named-answer-valuesets-and-presentation.md`
+- `docs/shared-presentation-editing.md`
+- `examples/bleph-medical-validation/medical-validation.code-workspace`
+- `examples/bleph-medical-validation/src/crl/medical-policy-determination.crl` — literal-only token migration.
+- `examples/bleph-medical-validation/src/fhir/ActivityDefinition/l34194-bleph-example-certify-met.json`
+- `examples/bleph-medical-validation/src/fhir/ActivityDefinition/l34194-bleph-example-not-certify-unmet.json`
+Operator active MV sidecar excluded from release (not audited/shipped).
+- `harness/PlanDefinition-apply/policies/dme101-030/src/dme101-030.crl` — literal-only token migration.
+- `harness/PlanDefinition-apply/policies/patient-age/src/crl/patient-age.crl` — literal-only token migration.
+- `harness/PlanDefinition-apply/src/patient-age-upper/src/crl/patient-age-upper.crl` — literal-only token migration.
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/README.md`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/scripts/create-mv-labels.mjs`
+- `packages/crl-vscode/src/agentChat.ts`
+- `packages/crl-vscode/src/answerEditing.test.mjs`
+- `packages/crl-vscode/src/answerEditing.ts`
+- `packages/crl-vscode/src/branchQuestionnairePanel.test.mjs`
+- `packages/crl-vscode/src/branchQuestionnairePanel.ts`
+- `packages/crl-vscode/src/branchVerdictHost.test.mjs`
+- `packages/crl-vscode/src/cockpitAgentBridge.ts`
+- `packages/crl-vscode/src/cockpitWebviewScript.test.mjs`
+- `packages/crl-vscode/src/correspondenceCockpit.ts`
+- `packages/crl-vscode/src/criterionReviewProjection.test.mjs`
+- `packages/crl-vscode/src/criterionReviewProjection.ts`
+- `packages/crl-vscode/src/editorAgentPrompt.test.mjs`
+- `packages/crl-vscode/src/editorAgentPrompt.ts`
+- `packages/crl-vscode/src/extension.ts`
+- `packages/crl-vscode/src/flagActionDrawerHtml.test.mjs`
+- `packages/crl-vscode/src/flagActionDrawerHtml.ts`
+- `packages/crl-vscode/src/flagCloseEligibility.ts`
+- `packages/crl-vscode/src/flagDrawerHtml.test.mjs`
+- `packages/crl-vscode/src/flagDrawerHtml.ts`
+- `packages/crl-vscode/src/flagIssueText.ts`
+- `packages/crl-vscode/src/flagWorkflow.ts`
+- `packages/crl-vscode/src/flagWorkflowHost.test.mjs`
+- `packages/crl-vscode/src/flagWorkflowStore.test.mjs`
+- `packages/crl-vscode/src/flagWorkflowStore.ts`
+- `packages/crl-vscode/src/flowPaneHtml.ts`
+- `packages/crl-vscode/src/flowQuestionnaireParity.test.mjs`
+- `packages/crl-vscode/src/githubIssue.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaire.test.mjs`
+- `packages/crl-vscode/src/interactiveQuestionnaire.ts`
+- `packages/crl-vscode/src/interactiveQuestionnaireHtml.ts`
+- `packages/crl-vscode/src/interactiveQuestionnairePanel.test.mjs`
+- `packages/crl-vscode/src/interactiveQuestionnairePanel.ts`
+- `packages/crl-vscode/src/kelpEditScopes.test.mjs`
+- `packages/crl-vscode/src/kelpEditScopes.ts`
+- `packages/crl-vscode/src/mcp-server.test.mjs`
+- `packages/crl-vscode/src/medicalValidationStore.ts`
+- `packages/crl-vscode/src/mvDefinitionFreshness.ts`
+- `packages/crl-vscode/src/mvDefinitionRevision.test.mjs`
+- `packages/crl-vscode/src/mvDirectEdit.test.mjs`
+- `packages/crl-vscode/src/mvDirectEdit.ts`
+- `packages/crl-vscode/src/mvDirectEditHost.test.mjs`
+- `packages/crl-vscode/src/mvEditRecovery.ts`
+- `packages/crl-vscode/src/mvEditTransaction.test.mjs`
+- `packages/crl-vscode/src/mvEditTransaction.ts`
+- `packages/crl-vscode/src/mvScopeCoordinator.test.mjs`
+- `packages/crl-vscode/src/mvScopeCoordinator.ts`
+- `packages/crl-vscode/src/mvWorkspaceFixture.test.mjs`
+- `packages/crl-vscode/src/package.test.mjs`
+- `packages/crl-vscode/src/paneOrder.test.mjs`
+- `packages/crl-vscode/src/paneOrder.ts`
+- `packages/crl-vscode/src/presentationEditor.test.mjs`
+- `packages/crl-vscode/src/presentationProposal.ts`
+- `packages/crl-vscode/src/questionnaireModel.test.mjs`
+- `packages/crl-vscode/src/questionnairePaneHtml.test.mjs`
+- `packages/crl-vscode/src/routeCards.test.mjs`
+- `packages/crl-vscode/src/routeCards.ts`
+- `packages/crl-vscode/src/routeCardsWebview.ts`
+- `packages/crl-vscode/src/testdata/interactive-questionnaire/src/crl/policy.crl` — literal-only token migration.
+- `packages/crl-vscode/test/flowPinGlow.browser.cjs`
+- `packages/crl-vscode/test/oracle/golden/completion.json` — literal-only token migration.
+- `packages/crl-vscode/test/treeHighlight.browser.cjs`
+- `packages/crl-vscode/test/treeHighlight.fixture.ts`
+- `packages/crl/USER_GUIDE.md`
+- `packages/crl/package.json`
+- `packages/crl/scripts/native-acceptance/intake.cjs` — literal-only token migration.
+- `packages/crl/scripts/qualification/fixtures/native/src/crl/policy.crl` — literal-only token migration.
+- `packages/crl/scripts/qualification/session.cjs`
+- `packages/crl/scripts/qualification/typed.cjs`
+- `packages/crl/src/ast/builder.ts`
+- `packages/crl/src/ast/tests/activity-structure.test.ts`
+- `packages/crl/src/ast/tests/builder.test.ts`
+- `packages/crl/src/ast/tests/concept-model-t1.test.ts`
+- `packages/crl/src/ast/tests/criterionClassify.test.ts`
+- `packages/crl/src/ast/tests/decisionSpine.test.ts`
+- `packages/crl/src/ast/tests/definedAsBooleanComposition-t1.test.ts`
+- `packages/crl/src/ast/tests/guardDefines.test.ts`
+- `packages/crl/src/ast/types.ts`
+- `packages/crl/src/authoring-kit/answerExample.ts`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/codedSourceExample.ts`
+- `packages/crl/src/authoring-kit/decisionExamples.ts`
+- `packages/crl/src/authoring-kit/genderExample.ts`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/intakeExample.ts`
+- `packages/crl/src/authoring-kit/navigation.ts`
+- `packages/crl/src/authoring-kit/reference.ts`
+- `packages/crl/src/authoring-kit/selectionExample.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/authoring-kit/tests/test-inventory.json`
+- `packages/crl/src/authoring-kit/uncertaintyExample.ts`
+- `packages/crl/src/cel/emitter/emitFhir.ts`
+- `packages/crl/src/cel/emitter/tests/taskRequest.test.ts`
+- `packages/crl/src/cel/tests/offPathWarnings.test.ts`
+- `packages/crl/src/cel/tests/regression.test.ts`
+- `packages/crl/src/cli/tests/emit-bundle-smoke.mjs`
+- `packages/crl/src/cli/tests/run-emitter.test.ts`
+- `packages/crl/src/cli/tests/run-mcp-server.test.mjs`
+- `packages/crl/src/cql-emitter/tests/bmiRetirement.test.ts`
+- `packages/crl/src/cql-emitter/tests/compositionErrorKinds.test.ts`
+- `packages/crl/src/cql-emitter/tests/criterionLoweringPin.test.ts`
+- `packages/crl/src/cql-emitter/tests/fixtures/age-chain/age-chain.crl` — literal-only token migration.
+- `packages/crl/src/cql-emitter/tests/fixtures/guard-define/guard-define.crl` — literal-only token migration.
+- `packages/crl/src/cql-emitter/tests/fixtures/heterogeneous-source/heterogeneous-source.crl` — literal-only token migration.
+- `packages/crl/src/cql-emitter/tests/fixtures/pure-question/pure-question.crl` — literal-only token migration.
+- `packages/crl/src/cql-emitter/tests/fixtures/semnot-age-232/semnot-age-232.crl` — literal-only token migration.
+- `packages/crl/src/cql-emitter/tests/layeredEmit.test.ts`
+- `packages/crl/src/cql-emitter/tests/publicationRecord.test.ts`
+- `packages/crl/src/cre/tests/branchConditionEval.test.ts`
+- `packages/crl/src/cre/tests/caseFactDates.test.ts`
+- `packages/crl/src/cre/tests/composition.test.ts`
+- `packages/crl/src/cre/tests/conceptTruth.test.ts`
+- `packages/crl/src/cre/tests/criterionEval.test.ts`
+- `packages/crl/src/cre/tests/decisionResolver.test.ts`
+- `packages/crl/src/cre/tests/fixtures/condition-status/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/dme-interface-ownvalue/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/dme-membership-intent/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/dme-membership-nobase/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/dme-source-membership/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/dme101-030-composition/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/dme101-030-membership/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/membership-refusal/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/fixtures/source-projectionless/policy.crl` — literal-only token migration.
+- `packages/crl/src/cre/tests/interfaceOwnValue.test.ts`
+- `packages/crl/src/cre/tests/pauseResult.test.ts`
+- `packages/crl/src/cre/tests/pipelineFamily.test.ts`
+- `packages/crl/src/cre/tests/publication.test.ts`
+- `packages/crl/src/cre/tests/publicationImports.test.ts`
+- `packages/crl/src/cre/tests/publicationRequest.test.ts`
+- `packages/crl/src/cre/tests/run.test.ts`
+- `packages/crl/src/cre/tests/unsatisfiedFrontier.test.ts`
+- `packages/crl/src/cre/tests/viewModel.test.ts`
+- `packages/crl/src/editing/presentationEdit.test.ts`
+- `packages/crl/src/editing/presentationFile.ts`
+- `packages/crl/src/editing/terminologyEdit.test.ts`
+- `packages/crl/src/editing/terminologyEdit.ts`
+- `packages/crl/src/emit-two-lane.test.ts`
+- `packages/crl/src/emit-two-lane.ts`
+- `packages/crl/src/emit/answerDomain.ts`
+- `packages/crl/src/emit/tests/fixtures/producer-wire/policy.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/fixtures/publication-age.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/fixtures/publication-bmi.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/fixtures/publication-gender.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/fixtures/publication-imports/policy.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/fixtures/publication-quantity.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/fixtures/publication-source.crl` — literal-only token migration.
+- `packages/crl/src/emit/tests/publicationAnyMembership.test.ts`
+- `packages/crl/src/emit/tests/publicationHasValue.test.ts`
+- `packages/crl/src/emit/tests/publicationRequest.test.ts`
+- `packages/crl/src/fhir-emitter/activity.ts`
+- `packages/crl/src/fhir-emitter/closureOrchestrator.ts`
+- `packages/crl/src/fhir-emitter/cpgActivityProfiles.ts`
+- `packages/crl/src/fhir-emitter/metadata.ts`
+- `packages/crl/src/fhir-emitter/namedAnswerSet.ts`
+- `packages/crl/src/fhir-emitter/tests/activity.test.ts`
+- `packages/crl/src/fhir-emitter/tests/answerOptionsBinding.test.ts`
+- `packages/crl/src/fhir-emitter/tests/closureOrchestrator.test.ts`
+- `packages/crl/src/fhir-emitter/tests/corpusProbe.test.ts`
+- `packages/crl/src/fhir-emitter/tests/cpgActivityProfiles.test.ts`
+- `packages/crl/src/fhir-emitter/tests/fixtures/activities-only-nonekind-consumer/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/activities-only-standalone/dispositions.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/activities-only-sub-only-recommend/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/activities-only-two-decisions/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/code-is-two-libraries/main.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/code-is-two-libraries/sub.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/cross-lib-activity-collision/shared-a.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/cross-lib-activity-collision/shared-b.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/cross-lib-activity-missing/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/cross-lib-activity/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/cross-lib-decision-split/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/cross-lib-decision/shared.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/malformed-dispositions/malformed-dispositions.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/none-code-is-sibling/sib.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/fixtures/patient-age/src/crl/patient-age.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/golden/bleph/ActivityDefinition/mcpm-bleph-certify-met.json`
+- `packages/crl/src/fhir-emitter/tests/golden/bleph/ActivityDefinition/mcpm-bleph-not-certify-unmet.json`
+- `packages/crl/src/fhir-emitter/tests/golden/cms22/ActivityDefinition/cms22-confirm-continued-control.json`
+- `packages/crl/src/fhir-emitter/tests/golden/cms22/ActivityDefinition/cms22-document-provisional-hypertension.json`
+- `packages/crl/src/fhir-emitter/tests/golden/cms69/ActivityDefinition/cms69-send-bmi-care-communication.json`
+- `packages/crl/src/fhir-emitter/tests/golden/coded-question/ActivityDefinition/coded-question-certify-met.json`
+- `packages/crl/src/fhir-emitter/tests/golden/coded-question/ActivityDefinition/coded-question-not-certify-unmet.json`
+- `packages/crl/src/fhir-emitter/tests/golden/example-bothrep/src/crl/example-bothrep.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/golden/example-direct/src/crl/example-direct.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/golden/example-for-emit/src/crl/example-for-emit.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/golden/example-nested/src/crl/example-nested.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/golden/example-semand/src/crl/example-semand.crl` — literal-only token migration.
+- `packages/crl/src/fhir-emitter/tests/golden/service-request/ActivityDefinition/service-request-approve-endoluminal-ablation.json`
+- `packages/crl/src/fhir-emitter/tests/golden/service-request/ActivityDefinition/service-request-deny-endoluminal-ablation.json`
+- `packages/crl/src/fhir-emitter/tests/membershipPublication.test.ts`
+- `packages/crl/src/fhir-emitter/tests/namedAnswerClosure.test.ts`
+- `packages/crl/src/fhir-emitter/tests/namedAnswerDescriptions.test.ts`
+- `packages/crl/src/fhir-emitter/tests/presentationEmit.test.ts`
+- `packages/crl/src/fhir-emitter/tests/selectedPublication.test.ts`
+- `packages/crl/src/fhir-emitter/types.ts`
+- `packages/crl/src/fhir-emitter/valueSet.ts`
+- `packages/crl/src/flags/flagVocab.ts`
+- `packages/crl/src/flags/mvFlag.ts`
+- `packages/crl/src/flags/tests/buildFlagDraft.test.ts`
+- `packages/crl/src/flags/tests/occurrenceSig.test.ts`
+- `packages/crl/src/grammar/CRLLexer.g4` — literal-only token migration.
+- `packages/crl/src/grammar/CRLParser.g4`
+- `packages/crl/src/imports/index.ts`
+- `packages/crl/src/imports/packageSnapshot.ts`
+- `packages/crl/src/imports/registry.ts`
+- `packages/crl/src/imports/tests/criterionAcceptance.test.ts`
+- `packages/crl/src/imports/tests/criterionDescription.test.ts`
+- `packages/crl/src/imports/tests/criterionEmitEndToEnd.test.ts`
+- `packages/crl/src/imports/tests/criterionTripwire.test.ts`
+- `packages/crl/src/imports/tests/dispositionValidate.integration.test.ts`
+- `packages/crl/src/imports/tests/fixtures/criterion-foreign-qualified/root.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/fixtures/decision-when-alias-to-reduction/root.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/fixtures/decision-when-named-reduction/root.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/fixtures/decision-when-reduction/root.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/fixtures/sibling-slug-collision/sib-one.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/fixtures/sibling-slug-collision/sib-two.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/fixtures/standalone-age/standalone-age.crl` — literal-only token migration.
+- `packages/crl/src/imports/tests/foreignPublicationInterface.test.ts`
+- `packages/crl/src/imports/tests/publicationEmit.test.ts`
+- `packages/crl/src/imports/tests/source-publication-identity.test.ts`
+- `packages/crl/src/imports/types.ts`
+- `packages/crl/src/index.ts`
+- `packages/crl/src/language-services/index.ts`
+- `packages/crl/src/language-services/tests/criterionRename.test.ts`
+- `packages/crl/src/language-services/tests/hover.test.ts`
+- `packages/crl/src/lexer/CRLLexerErrorListener.ts`
+- `packages/crl/src/mcp/presentationEditing.ts`
+- `packages/crl/src/provenance/crlConceptLayer.ts`
+- `packages/crl/src/provenance/tests/conceptShape.test.ts`
+- `packages/crl/src/provenance/tests/correspondence.test.ts`
+- `packages/crl/src/provenance/tests/correspondenceCheck.test.ts`
+- `packages/crl/src/provenance/tests/coverage.test.ts`
+- `packages/crl/src/provenance/tests/criterionReachability.test.ts`
+- `packages/crl/src/provenance/tests/crlConceptLayer.test.ts`
+- `packages/crl/src/provenance/tests/crlStructure.test.ts`
+- `packages/crl/src/provenance/tests/cross-lib-boundary.test.ts`
+- `packages/crl/src/provenance/tests/cross-lib-chain.test.ts`
+- `packages/crl/src/provenance/tests/definedAsExpr.test.ts`
+- `packages/crl/src/provenance/tests/delegated-reachability.test.ts`
+- `packages/crl/src/provenance/tests/derivedFromContract.test.ts`
+- `packages/crl/src/provenance/tests/derivedFromResolution.test.ts`
+- `packages/crl/src/provenance/tests/failedCriteria.test.ts`
+- `packages/crl/src/provenance/tests/fixtures/chainFixture.ts`
+- `packages/crl/src/provenance/tests/generate-default-chain.test.ts`
+- `packages/crl/src/provenance/tests/generate-disposition-path.test.ts`
+- `packages/crl/src/provenance/tests/generate-loop.test.ts`
+- `packages/crl/src/provenance/tests/generate.test.ts`
+- `packages/crl/src/provenance/tests/guardOutline.test.ts`
+- `packages/crl/src/provenance/tests/indexer.test.ts`
+- `packages/crl/src/provenance/tests/merge.test.ts`
+- `packages/crl/src/provenance/tests/pause-correspondence.test.ts`
+- `packages/crl/src/provenance/tests/validators.test.ts`
+- `packages/crl/src/results/definitionClosure.ts`
+- `packages/crl/src/results/produce.ts`
+- `packages/crl/src/results/readSuiteResult.ts`
+- `packages/crl/src/results/tests/definitionClosure.test.ts`
+- `packages/crl/src/results/tests/suiteProduction.test.ts`
+- `packages/crl/src/template-match/tests/membershipPattern.test.ts`
+- `packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/corpus/coded-question/coded-question.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/obesity/policy-layered.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/obesity/policy-recordset.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/obesity/policy.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/policies/dme101-030/dme101-030.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/policies/patient-age-remote/patient-age-remote.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/policies/resource-coverage/resource-coverage.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/service-request/policy.crl` — literal-only token migration.
+- `packages/crl/src/tests/fixtures/task-request/cases.cel`
+- `packages/crl/src/tests/fixtures/task-request/package.json`
+- `packages/crl/src/tests/fixtures/task-request/policy.crl`
+- `packages/crl/src/tests/regression/testdata/IMMZ_All_Decisions.crl` — literal-only token migration.
+- `packages/crl/src/tests/regression/testdata/clinical-reasoning-language-example.crl` — literal-only token migration.
+- `packages/crl/src/tests/regression/testdata/regression-ast-expected.json` — literal-only token migration.
+- `packages/crl/src/tests/regression/testdata/regression-lexer-expected.tokens` — literal-only token migration.
+- `packages/crl/src/tests/regression/testdata/regression-parser-expected.parse` — literal-only token migration.
+- `packages/crl/src/tests/regression/testdata/regression-transformer-expected.crl` — literal-only token migration.
+- `packages/crl/src/transformer/fsh-to-crl/docs/Activity Deduplication and Reference Requirements.md`
+- `packages/crl/src/transformer/fsh-to-crl/docs/ActivityMappingRules.md` — literal-only token migration.
+- `packages/crl/src/transformer/fsh-to-crl/docs/FSH-to-CRL-Transformer-Requirements.md`
+- `packages/crl/src/transformer/fsh-to-crl/mapping/activityDefinition.test.ts`
+- `packages/crl/src/transformer/fsh-to-crl/mapping/activityDefinition.ts`
+- `packages/crl/src/validator/dispositionValidator.ts`
+- `packages/crl/src/validator/tests/criterionSemantics.test.ts`
+- `packages/crl/src/validator/tests/decisionShape.test.ts`
+- `packages/crl/src/validator/tests/dispositionValidation.test.ts`
+- `packages/crl/src/validator/tests/publication.test.ts`
+- `packages/crl/src/validator/tests/useSiteType.test.ts`
+- `packages/crl/src/validator/validator.ts`
+- `packages/crl/test/acceptance/bleph/src/crl/medical-policy-determination.crl` — literal-only token migration.
+- `packages/crl/test/acceptance/passive-retention/nested/src/crl/synthetic-interview.crl` — literal-only token migration.
+- `packages/crl/test/acceptance/passive-retention/progressive/src/crl/synthetic-interview.crl` — literal-only token migration.
+
+Release qualification test corrections: six language-service test imports combine Vitest default and named namespaces to retain all80 actual exports rather than discarding star reexports. Tree pin VM supplies the new currentCel guard. FHIR header assertion binds the shared addHeader implementation plus success/failure calls. These are Not author-facing test harness changes; no shipped language/API behavior change, no removed assertions. Full supplemental diff and source metadata in discussion1027. Bleph source binding will advance only after fresh native16-case regeneration; patient data/result artifact checks retained.
+- `packages/crl-vscode/src/catalog.test.mjs`
+- `packages/crl-vscode/src/completion.test.mjs`
+- `packages/crl-vscode/src/concepts.test.mjs`
+- `packages/crl-vscode/src/crl-patterns-coverage.test.mjs`
+- `packages/crl-vscode/src/embedded-catalog.test.mjs`
+- `packages/crl-vscode/src/highlight.test.mjs`
+- `packages/crl-vscode/src/fhirQuestionnaireBranch.test.mjs`
+
+Final maintained Bleph regeneration: all16 native MV cases generated Questionnaire/QuestionnaireResponse with actual6.4.36 provenance; all32 artifact hashes/resources checked. Source/config binding repinned only after this run; prior CQL/clinical conditions remain unchanged. Producer generation does not adjudicate native outcomes against CEL expectations, so no clinical-approval claim. Fresh native5 synthetic Task controls separately assert Task semantics. Source/installed qualification is separate. Operator active MV sidecar and ke-ui-demo edit excluded from candidate commit.
+
+Generated native qualification delta paths (all read and hash-verified; existing guidance sufficient with generation/proof limits above):
+- `examples/bleph-medical-validation/tests/results/questionnaire-manifest-mv.json`

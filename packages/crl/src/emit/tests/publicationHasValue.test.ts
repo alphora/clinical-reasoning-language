@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -186,7 +187,7 @@ describe("typed intake and selected-value presence", () => {
   it("newer valueless text displaces old text in CRE and does not produce the present branch", () => {
     const source =
       INTAKE_CRL.slice(0, INTAKE_CRL.indexOf('decision "Intake"')) +
-      'activity "Missing": - request CPGCommunicationRequest. - with `MISSING`.\ndecision "Intake": first: - when "Has Primary Diagnosis" then recommend activity "Human Review". - otherwise then recommend activity "Missing".';
+      'activity "Missing": - request CPGTaskRequest. - with `MISSING`.\ndecision "Intake": first: - when "Has Primary Diagnosis" then recommend activity "Human Review". - otherwise then recommend activity "Missing".';
     const cel = `library "Cases". covers "Intake".
       fact "Patient": - defined by "Patient".
       fact "Old": - defined by "Intake"."Primary Diagnosis". - value is "Earlier". - date is "2026-01-01".
@@ -274,7 +275,7 @@ describe("typed intake and selected-value presence", () => {
         '- value domain is answer options.\n- value from is "Answers":\n  - not qualifying is `na`.\n' +
         'terminology "Answers": - system is `urn:answers`. - code is `unknown` display is `Unknown`. - code is `na` display is `N/A`.\n' +
         intakePresence("Has Choice", '"Choice"') +
-        'activity "Yes": - request CPGCommunicationRequest. - with `PRESENT`.\nactivity "No": - request CPGCommunicationRequest. - with `ABSENT`.\ndecision "Intake": first: - when "Has Choice" then recommend activity "Yes". - otherwise then recommend activity "No".';
+        'activity "Yes": - request CPGTaskRequest. - with `PRESENT`.\nactivity "No": - request CPGTaskRequest. - with `ABSENT`.\ndecision "Intake": first: - when "Has Choice" then recommend activity "Yes". - otherwise then recommend activity "No".';
       const cel = `library "Cases". covers "Intake". fact "Patient": - defined by "Patient".
       fact "Answer": - defined by "Intake"."Choice". - value is "${value}".
       case "Answered": - subject is "Patient". - fact is "Answer". - result is "Intake" is "Yes".`;

@@ -13,7 +13,7 @@ export type MvFlagStatus = "open" | "resolved";
  *  deleted `rewriteMetaStatus` (#212 step 4) so both callers keep the `FlagStatus` name without depending on `.crl` refactors. */
 export type FlagStatus = MvFlagStatus;
 /** Current workflow ownership, not the author: `extraction` belongs to KE; `validation` belongs to MV.
- *  Accepting a KE flag changes category to validation while preserving its concern tag and content.
+ *  MV answering resolves KE and creates a distinct validation flag; the original category is preserved.
  *  New flags start in their tag's default category; agents can also file MV flags. */
 export type MvFlagCategory = "extraction" | "validation";
 export type MvFlagScope = "concept" | "decision" | "library";

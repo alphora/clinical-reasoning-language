@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -39,7 +40,7 @@ concept "Flagged":
 - definition is any of "A" and "B" in "Flagged Answers" using validity of "A".
 - shape reduction is most recent.
 activity "Passed":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Passed\`.
 decision "Aggregate":
 first:

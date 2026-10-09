@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /** Synthetic executable source-only example shared by kit, CRE and emitter tests. */
 export const CODED_SOURCE_POLICY = `library "Coded Source".
 terminology "Tests":
@@ -25,8 +26,8 @@ concept "Is Negative":
 - value type is boolean.
 - definition is "Result" in "Negative".
 - shape reduction is most recent.
-activity "Yes": - request CPGCommunicationRequest. - with \`YES\`.
-activity "No": - request CPGCommunicationRequest. - with \`NO\`.
+activity "Yes": - request CPGTaskRequest. - with \`YES\`.
+activity "No": - request CPGTaskRequest. - with \`NO\`.
 decision "D": first:
 - when "Is Negative" then recommend activity "Yes".
 - otherwise then recommend activity "No".

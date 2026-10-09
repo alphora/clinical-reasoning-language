@@ -227,14 +227,14 @@ CRL kind → FHIR resource:
   - Concept → its `conceptType` (must be in allowlist; else `unsupported-yet`).
   - Activity → mapped via the CPG profile table:
 
-CRL `request CPG<Type>` tokens align with the [CPG IG Activity Profiles](https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles) Request-column profile names (with the `Task` suffix dropped consistently per CRL convention). The FHIR resource produced when a recommendation is applied derives from the parent of the IG Request profile. See [`docs/cpg-ig-alignment.md`](cpg-ig-alignment.md) for the verified token mapping table + the design rationale + how to add a new activity / concept type.
+Most CRL `request CPG<Type>` tokens align with the [CPG IG Activity Profiles](https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles) Request-column profile names (with the `Task` suffix dropped consistently per CRL convention). `CPGTaskRequest` is a CRL alias using the generic computable ActivityDefinition and concrete core FHIR Task target; it does not name a published CPGTaskRequest profile. The other applied resource types derive from their IG Request profiles. See [`docs/cpg-ig-alignment.md`](cpg-ig-alignment.md) for the verified token mapping table + the design rationale + how to add a new activity / concept type.
 
 | CRL token | IG Request profile (extends) | FHIR resource |
 |---|---|---|
 | `CPGServiceRequest` | `CPGServiceRequest` extends `ServiceRequest` | `ServiceRequest` |
 | `CPGMedicationRequest` | `CPGMedicationRequest` extends `MedicationRequest` | `MedicationRequest` |
 | `CPGImmunizationRequest` | `CPGImmunizationRequest` extends `MedicationRequest` | `MedicationRequest` |
-| `CPGCommunicationRequest` | `CPGCommunicationRequest` extends `CommunicationRequest` | `CommunicationRequest` |
+| `CPGTaskRequest` | Generic computable activity / core FHIR Task target | `Task` |
 | `CPGQuestionnaire` | `CPGQuestionnaireTask` extends `CPGTask` (Task) | `Task` |
 | `CPGEnrollment` | `CPGEnrollmentTask` extends `CPGTask` | `Task` |
 | `CPGProposeDiagnosis` | `CPGProposeDiagnosisTask` extends `CPGTask` | `Task` |

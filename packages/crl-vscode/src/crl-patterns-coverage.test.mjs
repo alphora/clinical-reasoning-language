@@ -9,7 +9,7 @@ import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 import * as mod from "@smile-digital-health/crl/language-services";
-const { parseCatalog } = mod.default ?? mod;
+const { parseCatalog } = ({...mod.default, ...mod});
 
 test("catalog ↔ CRLCommon.cql: every referenced function is defined", () => {
 const here = dirname(fileURLToPath(import.meta.url));

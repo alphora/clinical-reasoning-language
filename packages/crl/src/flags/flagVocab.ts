@@ -8,11 +8,12 @@
 // PURE by construction: imports only the record model (`mvFlag`) — NEVER the barrel (`../index` would cycle: index → flagVocab
 // → index) and never the `.crl` registry/parser.
 //
-// Two axes, kept orthogonal: `category` = default workflow for new flags (extraction = KE; validation = MV; accepting a KE record transfers it to MV) — NOT
+// Two axes, kept orthogonal: `category` = default workflow for new flags (extraction = KE; validation = MV; MV answering creates a separate validation record) — NOT
 // "who" (the #210 cockpit agent files validation-category flags autonomously). `tag` = WHAT (the human MV Type, for the four
 // `displayName`d validation tags; the AI's finer authoring vocabulary, for the extraction tags). The optional `kind` on
 // validation-concern is AI-only finer metadata — descriptive, never gate/label-affecting.
 import type { FlagStatus, MvFlagCategory } from "./mvFlag";
+export const HOST_FLAG_CORRELATION_FIELDS = ["ke-flag", "ke-question-revision", "mv-answer"] as const;
 
 export type { FlagStatus } from "./mvFlag"; // re-home point: the flag surfaces import `FlagStatus` from the vocab (or the barrel)
 
@@ -37,7 +38,7 @@ export interface FlagTagInfo {
   fields: FieldRule[];
 }
 
-/** A GitHub label for an MV flag Type — created in each content repo (Todo 4) + attached to the issue at create time
+/** A GitHub label for an MV flag Type — created in each content repo (Todo 4) + maintained on existing linked issues
  *  (Todo 3). `flagVocab` is the SINGLE source of truth for the MV label set; the content-repo labels are derived from it. */
 export interface FlagLabel {
   /** the label name, e.g. `mv:crl-vs-narrative`. */
@@ -115,8 +116,7 @@ const FLAG_TAGS: readonly FlagTagDef[] = [
     category: "extraction",
     fields: [STATUS, { key: "direction", required: true, values: ["over-reach", "criterion-drop"] }, KEY, REF],
   },
-  // ── the human MV "Type" tags (validation category, `displayName` present → shown in the drawer). All four create a GitHub
-  //    issue when a human (or the cockpit agent, for validation-concern) files them; each carries a colocated `mv:*` label.
+  // Human MV Types create local validation records. Legacy linked issues use the colocated labels.
   {
     id: "validation-concern",
     aliases: [],
@@ -148,7 +148,7 @@ const FLAG_TAGS: readonly FlagTagDef[] = [
     aliases: [],
     category: "validation",
     displayName: "Other", // a concern that doesn't fit the first three — explained in the description
-    label: { name: "mv:other", color: "6a737d", blurb: "a concern that doesn't fit the other types (see the issue body)" },
+    label: { name: "mv:other", color: "6a737d", blurb: "a concern that doesn't fit the other types (see the flag description)" },
     fields: [STATUS, REF],
   },
 ];
@@ -274,6 +274,10 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   const description = input.description?.trim();
 
   const provided = input.fields ?? {};
+  for (const key of HOST_FLAG_CORRELATION_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(provided, key))
+      return { ok: false, reason: "invalid-value", message: `${key} is host-owned and cannot be authored in flag fields` };
+  }
   if (Object.prototype.hasOwnProperty.call(provided, "title"))
     return { ok: false, reason: "invalid-value", message: "use top-level `title`, not `fields.title`" };
   if (Object.prototype.hasOwnProperty.call(provided, "description"))

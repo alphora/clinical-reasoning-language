@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * Current worked publication examples. Each source is consumed by the kit and
  * its validation/emission/CRE tests. Verification stamps name independent evidence;
@@ -9,7 +10,7 @@
  * determination is a plain LOCAL `activity` named `<category>.<key>` — certify/not-certify/pended are PAS
  * review-actions — validated against the deployment's `crl.dispositions` config (NOT a shared vendored library,
  * which the model retired: a determination may live in a separate library, so config can't generate it). Every
- * determination is COMMUNICATED (`CPGCommunicationRequest`), never ordered. `certify.Approve` + `not-certify.Deny`
+ * determination is COMMUNICATED (`CPGTaskRequest`), never ordered. `certify.Approve` + `not-certify.Deny`
  * are the baseline; `not-certify.EIU` is a second not-certify flavor (experimental/investigational/unproven) that
  * shares the A3 outcome but communicates a distinct reason.
  */
@@ -18,11 +19,11 @@ const DETERMINATION_ACTIVITIES = `
 // ===== Determination activities (local; validated against crl.dispositions) =====
 
 activity "certify.Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Certified in total (X12 278 HCR01 A1) — a communicated coverage determination, not a service order.\`.
 
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Not certified (X12 278 HCR01 A3) — a communicated coverage determination, not a service order.\`.
 `;
 
@@ -30,7 +31,7 @@ const DETERMINATION_ACTIVITIES_WITH_EIU =
   DETERMINATION_ACTIVITIES +
   `
 activity "not-certify.EIU":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Not certified — experimental/investigational/unproven (X12 278 HCR01 A3); a denial reason distinct from a medical-necessity not-certify (both are X12 A3), not a service order.\`.
 `;
 
@@ -492,10 +493,10 @@ first:
 // The under-21 declaration above is an alternative projection example. Use it as the
 // guard in this single policy decision when that is the intended eligibility question.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Eligibility: APPROVE — age criterion met.\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Eligibility: DENY — age criterion not met.\`.
 
 presentation for "Age 18 Or Older":
@@ -587,10 +588,10 @@ first:
 // The uncoded infant-age declaration above illustrates a separate projection. It is not
 // a second policy entry point; replace the guard when authoring that independent example.
 activity "Threshold Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Synthetic demonstration: threshold met.\`.
 
 activity "Threshold Not Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Synthetic demonstration: threshold not met.\`.
 `;

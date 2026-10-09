@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ it.each(["concept", "decision"])("renames presentation %s references without tou
     const name = kind === "concept" ? "Answer" : "Coverage";
     const source = `library "P".
 concept "Answer": - type is Observation. - value type is boolean. - code is \`answer\`.
-activity "Met": - request CPGCommunicationRequest. - with \`MET\`.
+activity "Met": - request CPGTaskRequest. - with \`MET\`.
 decision "Coverage": - when "Answer" then recommend activity "Met".
 presentation for "Answer": - question text is "${name}". - in decision "Coverage".
 `;
@@ -43,7 +44,7 @@ concept "Answer": - type is Observation. - value type is boolean. - code is \`an
 criterion "Review": - when ("Answer").
 criterion "Nested": - when ("Review").
 presentation for "Answer": - question text is "Review". - in criterion "Review".
-activity "Met": - request CPGCommunicationRequest. - with \`MET\`.
+activity "Met": - request CPGTaskRequest. - with \`MET\`.
 decision "D": - when "Review" then recommend activity "Met".
 `;
     writeFileSync(file, source);

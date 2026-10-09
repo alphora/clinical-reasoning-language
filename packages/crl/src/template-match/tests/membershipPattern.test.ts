@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Mixed matcher/internal legacy predicate tests. Current selected-publication
 // admission and assertable qualifications are covered by publication owner tests.
 import * as path from "node:path";
@@ -275,7 +276,7 @@ describe("#189 gap 3 T3 — the lowering", () => {
           '- definition is "Requested Service" in "Covered Services".',
           "",
           'activity "Approve":',
-          "- request CPGCommunicationRequest.",
+          "- request CPGTaskRequest.",
           "- with `APPROVED`.",
           "",
           'decision "D":',

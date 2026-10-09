@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { checkFhirPackage } from "../../crl/src/cli/tests/fhir-package-smoke.mjs";
 import { checkEmitBundle } from "../../crl/src/cli/tests/emit-bundle-smoke.mjs";
 // Integration test: spawn the BUILT dist/mcp-server.js as a real MCP stdio
@@ -170,8 +171,8 @@ check("authoring_kit full exports all 22 artifacts and determination guidance", 
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-  assert.equal(kit.schemaVersion, "2.28");
-  assert.equal(kit.contentHash, "105ddb71fd9588e9ec0a72fdab730e14af14a4c372b1353e471364b7f5015652");
+  assert.equal(kit.schemaVersion, "2.29");
+  assert.equal(kit.contentHash, "49e8c0af9291e4d5bd9e8b03c24fbc49639a40c9af8a1d7f2b9f672985159e69");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 22);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -460,7 +461,7 @@ check("validate_crl via inline code → single-file mode (no cross-file context)
     "- request CPGServiceRequest.",
     "- with `ok`.",
     'activity "Deny":',
-    "- request CPGCommunicationRequest.",
+    "- request CPGTaskRequest.",
     "- with `no`.",
   ].join("\n");
 
@@ -618,7 +619,7 @@ check("title creation survives persisted reload, legacy retry, and conflict reje
   let modelFunction;
   function visit(n) { if (ts.isFunctionDeclaration(n) && n.name?.text === "flagActionViewModel") modelFunction = n.getText(source); ts.forEachChild(n, visit); }
   visit(source); assert.ok(modelFunction);
-  const context = vm.createContext({ flagDisplayNameOf: () => undefined, FLAG_VIEW_PLUMBING: new Set(), issueRefOf: () => undefined, gidsForFlag: () => ["target"], isAuthoringFlag });
+  const context = vm.createContext({ flagDisplayNameOf: () => undefined, FLAG_VIEW_PLUMBING: new Set(), issueRefOf: () => undefined, gidsForFlag: () => ["target"], isAuthoringFlag, flagsList: [disk], flagStoreWarning: false });
   vm.runInContext(transformSync(modelFunction, { loader: "ts", target: "es2022" }).code, context);
   assert.equal(disk.anchor.occurrenceKey, undefined, "bounded VM fixture has no occurrence helper dependency");
   const model = context.flagActionViewModel(disk); assert.equal(model.summary, title); assert.equal(model.description, description);

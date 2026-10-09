@@ -12,5 +12,5 @@ concept "Feature B":
 - code is `feature-b`.
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `approve`.

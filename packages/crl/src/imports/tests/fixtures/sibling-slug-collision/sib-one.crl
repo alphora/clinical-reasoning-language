@@ -7,5 +7,5 @@ concept "Alpha":
 - code is `alpha`.
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `approve`.

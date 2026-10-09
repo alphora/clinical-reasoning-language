@@ -87,6 +87,34 @@ const script=esbuild.buildSync({stdin:{contents:`
    pinned=true;const terminal=Object.keys(data.choices)[0];ui.show({...data.choices[terminal][0],gen:1,token:'ignored'});check(!root.querySelector('.tree-focus-selected'),'unpinned paint ignored while pinned');
    return {checks:checks.length,terminals:Object.keys(data.choices).length,traversals:Object.values(data.choices).reduce((n,a)=>n+a.length,0)};
  };
+ window.runReviewChecks=()=>{
+   ui.reset();root.innerHTML=data.reviewFixture.html;
+   const clrRO=()=>{for(const el of root.querySelectorAll('.review-pass,.review-fail,.review-pending,.error-node,.leaf-allpass'))el.classList.remove('review-pass','review-fail','review-pending','error-node','leaf-allpass')};
+   const overlay=m=>{${handler('markReviewOverlay')}};
+   const criteria=m=>{${handler('criterionVerdicts')}};
+   let count=0;
+   for(const step of data.reviewFixture.steps){
+     const m={...step,type:'markReviewOverlay',gen,fail:[],pending:[],error:[],allPassLeaves:[],derivedGids:step.label==='all approved paths'?step.byState.pass:[]};
+     overlay(m);criteria(m);
+     const actual=[...root.querySelectorAll('.review-pass')].map(n=>n.id).sort();
+     check(JSON.stringify(actual)===JSON.stringify([...new Set(step.pass)].sort()),step.label+' exact body paint');
+     for(const [gid,state] of Object.entries(step.states)){
+       const el=document.getElementById(gid);check(el.classList.contains('crit-'+state)===(state!=='unreviewed'),step.label+' occurrence check matches projection');
+     }
+     if(step.label==='all approved paths'){
+       check(actual.length>10,'real Bleph body coverage');
+       check(data.reviewFixture.inputs.some(k=>row(k)?.classList.contains('review-pass')),'real Bleph INPUT green');
+       check(!root.querySelector('[data-flow-choice].review-pass'),'answer options remain unpainted');
+       check(root.querySelector('[data-criterion-verdict]')?.getAttribute('aria-label').includes('encoding verdict not recorded'),'derived approval accessible provenance');
+     }
+     if(step.label==='explicit criterion Pass without cases')check(actual.length>10,'explicit criterion Pass paints full Bleph contents');
+     if(step.label==='all To do'||step.label==='definitions checking'||step.label==='passing verdict on errored case')check(actual.length===0,'clear/demotion/freshness/error removes all body green');
+     overlay({...m,gen:gen-1,pass:['bogus']});check(JSON.stringify([...root.querySelectorAll('.review-pass')].map(n=>n.id).sort())===JSON.stringify(actual),'stale generation cannot change approval');
+     count++;
+   }
+   const last=data.reviewFixture.steps[0];overlay({...last,gen,fail:[],pending:[],error:[],allPassLeaves:[]});criteria({...last,gen,derivedGids:last.byState.pass});
+   return {reviewSteps:count,reviewInputs:data.reviewFixture.inputs.length,reviewCriteria:last.allGids.length};
+ };
  window.showTraversal=(terminal,i=0)=>{pinned=false;key=terminal;index=i;const options=data.choices[key];ui.show({...options[i],gen:1,token:key,navigation:{current:i+1,total:options.length}})};
  window.showInput=()=>{pinned=false;click(root.querySelector('.flow-input-row'))};
  let routeCards,pin,gen=1,pinEpoch=1,pinnedFlowKey='',pinnedRouteKeys=[],pinnedPathKeys=[],pinnedGroupKeys=[],pinnedGroupOutcomes=[],pinnedRouteLabel='',currentRouteKeys=[],currentRouteLabel='',currentRouteCase='',currentRouteId='',treeFocusUi=ui;
@@ -305,6 +333,7 @@ async function rpc(target,method,params={}){
    await evaluate("showPinnedCase('upper-photos-unmet')");await fullScreenshot('pinned-inputs');
    await evaluate('showPtosisUnmet()');await fullScreenshot('ptosis-unmet');
    Object.assign(receipt,await evaluate('runGroupGlowChecks()'));await fullScreenshot('mixed-group-glow');
+   Object.assign(receipt,await evaluate('runReviewChecks()'));await fullScreenshot('criterion-review-pass');
    fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(receipt,null,2));console.log(JSON.stringify(receipt));
  }finally{if(target)await rpc(target,'Browser.close').catch(()=>{});if(browser.pid&&browser.exitCode===null)browser.kill();fs.closeSync(log);server.closeAllConnections();server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

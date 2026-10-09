@@ -1,7 +1,7 @@
 /**
  * CRL → CPG IG ActivityDefinition profile mapping table.
  *
- * Each entry is **manually verified once** against the published
+ * Except for the generic CPGTaskRequest alias below, each entry is **manually verified once** against the published
  * `StructureDefinition-cpg-<lowercase>activity.json` artifact at
  * https://build.fhir.org/ig/HL7/cqf-recommendations/ (verification log
  * in `docs/cpg-ig-alignment.md`). The verification is for the
@@ -32,8 +32,8 @@
  *
  * Null `dynamicValuePath` means the CRL `with` clause has no obvious
  * IG-conformant slot for this profile. Per plan v2.1 dispositions:
- *   - CPGCommunicationRequest: corpus has zero terminology-`with` cases;
- *     hypothetical case emits `unsupported-communication-with-terminology`.
+ *   - CPGTaskRequest: terminology-`with` lowering is not supported;
+ *     hypothetical case emits `unsupported-task-with-terminology`.
  *   - CPGQuestionnaire: corpus modeling errors corrected in commit
  *     `8295898`; future authoring with this combination emits without
  *     dynamicValue + log.
@@ -87,14 +87,14 @@ const TABLE: ReadonlyArray<readonly [string, CpgActivityProfile]> = [
     activityTypeCode: "recommend-immunization",
     dynamicValuePath: "medicationCodeableConcept",
   }],
-  ["CPGCommunicationRequest", {
-    profileUrl: `${CPG_BASE}/cpg-communicationactivity`,
-    kind: "CommunicationRequest",
-    targetProfile: `${CPG_BASE}/cpg-communicationrequest`,
+  ["CPGTaskRequest", {
+    // REFACTOR:grounded (MR10): generic Task alias, not a fabricated CPG Request profile.
+    profileUrl: `${CPG_BASE}/cpg-computableactivity`,
+    kind: "Task",
+    targetProfile: "http://hl7.org/fhir/StructureDefinition/Task",
     activityTypeCode: "send-message",
-    // Plan v2.1 C2 — corpus has zero terminology-`with` cases for
-    // CPGCommunicationRequest (only free-text); hypothetical terminology
-    // case emits `unsupported-communication-with-terminology`.
+    // Generic Task requests accept free-text descriptions; terminology-with
+    // lowering remains unsupported, rather than emitting an unverified value shape.
     dynamicValuePath: null,
   }],
   ["CPGQuestionnaire", {

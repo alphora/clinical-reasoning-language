@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import * as catalogMod from "@smile-digital-health/crl/language-services";
 
 test("embedded-catalog — top-level checks", () => {
-const { parseCatalog } = catalogMod.default ?? catalogMod;
+const { parseCatalog } = ({...catalogMod.default, ...catalogMod});
 
 const here = dirname(fileURLToPath(import.meta.url));
 const catalogMdPath = resolve(here, "../../crl/src/cql-emitter/catalog/inference-pattern-catalog.md");

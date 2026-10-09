@@ -1713,7 +1713,7 @@
     "line": 105,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 105,
@@ -1779,7 +1779,7 @@
     "line": 110,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 110,
@@ -1911,7 +1911,7 @@
     "line": 120,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 120,
@@ -1977,7 +1977,7 @@
     "line": 125,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 125,
@@ -2043,7 +2043,7 @@
     "line": 130,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 130,
@@ -2109,7 +2109,7 @@
     "line": 135,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 135,
@@ -2175,7 +2175,7 @@
     "line": 140,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 140,
@@ -2241,7 +2241,7 @@
     "line": 145,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 145,
@@ -2331,7 +2331,7 @@
     "line": 151,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 151,
@@ -2397,7 +2397,7 @@
     "line": 156,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 156,
@@ -2487,7 +2487,7 @@
     "line": 162,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 162,
@@ -2553,7 +2553,7 @@
     "line": 167,
     "column": 10,
     "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
+    "text": "CPGTaskRequest"
   },
   {
     "line": 167,

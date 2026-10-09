@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded: warnings are advisory and require a demonstrated skipped local question.
 import { afterEach, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -27,7 +28,7 @@ activity "Met":
 - request CPGServiceRequest.
 - with \`met\`.
 activity "Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`unmet\`.
 decision "D":
 first:

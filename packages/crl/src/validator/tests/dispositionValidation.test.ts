@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { parseInput } from "../../ast/tests/parseInput";
 import { normalizeDispositionConfig } from "../../dispositions";
 import type { ResolvedDispositionConfig } from "../../dispositions/types";
@@ -20,11 +21,11 @@ function dispErrors(src: string, config: ResolvedDispositionConfig = CONFIGURED)
 }
 
 const HEADER = `library "T".\nconcept "Q":\n- type is Condition.\n- code is \`q\`.\n`;
-const activity = (name: string, req = "CPGCommunicationRequest") =>
+const activity = (name: string, req = "CPGTaskRequest") =>
   `activity "${name}":\n- request ${req}.\n- with \`text\`.\n`;
 
 describe("DispositionValidator — closed-set (config-gated)", () => {
-  it("clean: recommends only configured determinations, all CPGCommunicationRequest", () => {
+  it("clean: recommends only configured determinations, all CPGTaskRequest", () => {
     const src =
       HEADER +
       `decision "Cov":\nfirst:\n- when "Q" then recommend activity "certify.Approve".\n- otherwise then recommend activity "not-certify.Deny".\n` +

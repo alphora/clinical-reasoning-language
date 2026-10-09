@@ -4,5 +4,5 @@ library "SharedB".
 // Defines an activity named `Deny` — SAME name as SharedA's. Because
 // `recommendationIdForLib` is policy-id-scoped, both collapse onto one id/url.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied by B.`.

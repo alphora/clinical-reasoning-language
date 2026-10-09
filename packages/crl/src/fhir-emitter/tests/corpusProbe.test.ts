@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * Corpus integration probe — exercises the parse → emit pipeline against
  * real CRL fixtures (cms22-strategy + cms69-strategy). Validates that
@@ -118,7 +119,7 @@ describe("corpus probe — cms22-strategy.crl", () => {
     // TODO: restore do-not-perform emit coverage with a dedicated example in a
     // context where suppression is genuinely the recommendation.
     expect(doNotPerformCount).toBe(0);
-    // #181 — the corpus's free-text `with` cases (CPGCommunicationRequest
+    // #181 — the corpus's free-text `with` cases (CPGTaskRequest
     // activities "Confirm Continued Control" + "Document Provisional
     // Hypertension") are IGNORED: they produce NO unmatched reference (a free-text
     // `with` carries no machine signal), so the clean corpus has ZERO unmatched.

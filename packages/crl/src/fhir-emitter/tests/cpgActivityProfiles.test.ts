@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -15,7 +16,7 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
     expect(tokens).toEqual(
       [
         "CPGAdministerMedication",
-        "CPGCommunicationRequest",
+        "CPGTaskRequest",
         "CPGDispenseMedication",
         "CPGDocumentMedication",
         "CPGEnrollment",
@@ -28,7 +29,7 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
         "CPGRecordInference",
         "CPGReportFlag",
         "CPGServiceRequest",
-      ],
+      ].sort(),
     );
   });
 
@@ -55,7 +56,10 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
 
   it("targetProfile URLs match the IG Request profile form `cpg-<name>` (no `activity` suffix)", () => {
     for (const { token, profile } of ALL_CPG_ACTIVITY_PROFILES) {
-      expect(profile.targetProfile.startsWith(CPG_BASE + "/cpg-")).toBe(true);
+      if (token === "CPGTaskRequest") {
+        expect(profile.targetProfile).toBe("http://hl7.org/fhir/StructureDefinition/Task");
+        expect(profile.profileUrl).toBe(`${CPG_BASE}/cpg-computableactivity`);
+      } else expect(profile.targetProfile.startsWith(CPG_BASE + "/cpg-")).toBe(true);
       expect(profile.targetProfile.endsWith("activity")).toBe(false);
       if (token === "CPGServiceRequest") {
         expect(profile.targetProfile).toBe(`${CPG_BASE}/cpg-servicerequest`);
@@ -81,7 +85,7 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
       CPGServiceRequest: "ServiceRequest",
       CPGMedicationRequest: "MedicationRequest",
       CPGImmunizationRequest: "MedicationRequest",
-      CPGCommunicationRequest: "CommunicationRequest",
+      CPGTaskRequest: "Task",
       CPGQuestionnaire: "Task",
       CPGEnrollment: "Task",
       CPGProposeDiagnosis: "Task",
@@ -98,8 +102,8 @@ describe("cpgActivityProfiles — IG-verified mapping table", () => {
     }
   });
 
-  it("dynamicValuePath is null for the v2.1-deferred profiles (CPGCommunicationRequest, CPGQuestionnaire)", () => {
-    expect(lookupCpgActivityProfile("CPGCommunicationRequest")!.dynamicValuePath).toBeNull();
+  it("dynamicValuePath is null for the v2.1-deferred profiles (CPGTaskRequest, CPGQuestionnaire)", () => {
+    expect(lookupCpgActivityProfile("CPGTaskRequest")!.dynamicValuePath).toBeNull();
     expect(lookupCpgActivityProfile("CPGQuestionnaire")!.dynamicValuePath).toBeNull();
   });
 

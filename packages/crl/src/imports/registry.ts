@@ -13,6 +13,8 @@ import {
   RegistryDuplicateDiagnostic,
 } from "./types";
 
+import { readPackageSnapshot, type PackageSnapshot } from "./packageSnapshot";
+
 const SKIP_DIRS = new Set(["node_modules", "dist", "build"]);
 
 function listCrlFiles(dir: string): string[] {
@@ -81,6 +83,7 @@ export function findProjectRoot(startPath: string): string | null {
 function scanProjectLocal(
   projectRoot: string,
   overlays?: ReadonlyMap<string, string>,
+  packageSnapshot?: PackageSnapshot,
 ): {
   entries: RegistryEntry[];
   diagnostics: ImportDiagnostic[];
@@ -88,7 +91,7 @@ function scanProjectLocal(
   const entries: RegistryEntry[] = [];
   const diagnostics: ImportDiagnostic[] = [];
 
-  const packageIdentity = packageIdentityFrom(readPackageJson(path.join(projectRoot, "package.json")));
+  const packageIdentity = packageIdentityFrom(packageSnapshot ? packageSnapshot.raw : readPackageJson(path.join(projectRoot, "package.json")));
   for (const filePath of listCrlFiles(projectRoot)) {
     const canonical = canonicalizeFsPath(filePath);
     let source: string;
@@ -353,17 +356,20 @@ export function buildRegistry(
 ): {
   registry: Registry;
   diagnostics: ImportDiagnostic[];
+  packageSnapshot: PackageSnapshot;
 } {
   // Resolve against one invocation snapshot. A prior package version must not
   // survive an edit merely because an IDE/MCP process remains alive.
   packageJsonCache.clear();
+  const packageSnapshot = readPackageSnapshot(projectRoot);
+  if (packageSnapshot.raw !== undefined) packageJsonCache.set(path.join(projectRoot, "package.json"), packageSnapshot.raw);
   const diagnostics: ImportDiagnostic[] = [];
   const registry: Registry = {
     byNameLocal: new Map(),
     byNamePackage: new Map(),
   };
 
-  const { entries: localEntries, diagnostics: localDiags } = scanProjectLocal(projectRoot, overlays);
+  const { entries: localEntries, diagnostics: localDiags } = scanProjectLocal(projectRoot, overlays, packageSnapshot);
   diagnostics.push(...localDiags);
   for (const entry of localEntries) {
     if (entry.name === null) continue;
@@ -397,7 +403,7 @@ export function buildRegistry(
     registry.byNamePackage.set(entry.name, entry);
   }
 
-  return { registry, diagnostics };
+  return { registry, diagnostics, packageSnapshot };
 }
 
 // Internal use only; exported for unit tests of finer-grained behavior.

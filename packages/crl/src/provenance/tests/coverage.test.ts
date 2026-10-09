@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -20,7 +21,7 @@ concept "Crit":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "Dec":
 first:
@@ -30,7 +31,7 @@ first:
 const SHARED_CRL = `# S
 library "Shared Lib".
 activity "SharedAct":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`s\`.`;
 
 const CEL = `# C

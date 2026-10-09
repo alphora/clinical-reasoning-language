@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // #224 ii.1c — a concept referenced ONLY inside a `criterion` body must still be
 // decision-REACHED (and gating). Provenance is a SOURCE-side consumer (no expansion /
 // materialization), so the reachability walk FOLLOWS criterion refs into their bodies via the
@@ -43,7 +44,7 @@ activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 
 const conceptRef = (name: string): ProvNodeRef => ({ lib: "Policy", kind: "concept", name });

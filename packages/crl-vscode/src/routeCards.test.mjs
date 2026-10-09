@@ -1,4 +1,5 @@
-// REFACTOR:grounded: cards preserve typed answers and MV patches never mutate source content.
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
+// REFACTOR:grounded: cards preserve typed answers; legacy proposal format/history tests are separate from direct tree Save.
 import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -6,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { buildCRL, buildExecutionModel, resolveCelImports, nodeKey, conceptDeclRef } from '@smile-digital-health/crl';
 import { buildRouteCards, definitionValueInputs, formatAnswer } from './routeCards.ts';
-import { createPresentationProposal, resolveWordingTarget, resolveSourceWordingTarget, savePresentationProposal, graphWordingSources, pendingPresentationProposals } from './presentationProposal.ts';
+import { createPresentationProposal, resolveWordingTarget, resolveSourceWordingTarget, savePresentationProposal, graphWordingSources, pendingPresentationProposals, withdrawPresentationProposal } from './presentationProposal.ts';
 import { executionRoutes, buildRouteQuestionnaire } from './executionRoutes.ts';
 
 const base = `library "L".\nconcept "Complaint":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is \`complaint\`.\n- shape reduction is most recent.\n`;
@@ -24,6 +25,20 @@ test('wording proposal preserves baseline, validates new CRL, and writes only in
     assert.equal(readFileSync(file,'utf8'),base+presentation); assert.deepEqual(readdirSync(src).sort(),['crl','medical-validation']);
     assert.throws(()=>savePresentationProposal(src,proposal),/exist/i);
   } finally { rmSync(root,{recursive:true,force:true}); }
+});
+test('explicit legacy withdrawal preserves evidence and refuses a changed record',()=>{
+ const root=mkdtempSync(join(tmpdir(),'mv-withdraw-')),src=join(root,'src'),file=join(src,'crl','policy.crl');
+ mkdirSync(join(src,'crl'),{recursive:true});writeFileSync(file,base+presentation);
+ try{
+  const proposal=createPresentationProposal(resolveWordingTarget(file,base+presentation,'Complaint'),'New question','New description',src,{});
+  const path=savePresentationProposal(src,proposal),raw=readFileSync(path,'utf8'),at='2026-10-08T20:00:00.000Z';
+  writeFileSync(path,raw+'\n');assert.throws(()=>withdrawPresentationProposal(src,proposal.id,raw,at),/changed/);
+  assert.equal(pendingPresentationProposals(src).pending,1);writeFileSync(path,raw);
+  withdrawPresentationProposal(src,proposal.id,raw,at);
+  assert.deepEqual(JSON.parse(readFileSync(path,'utf8')),{...JSON.parse(raw),status:'withdrawn',withdrawnAt:at});
+  assert.equal(pendingPresentationProposals(src).pending,0);assert.equal(readFileSync(file,'utf8'),base+presentation);
+  assert.throws(()=>withdrawPresentationProposal(src,proposal.id,readFileSync(path,'utf8'),at),/pending legacy/);
+ }finally{rmSync(root,{recursive:true,force:true});}
 });
 test('missing presentation creates a validated default proposal, without accepting blank/unrepresentable text',()=>{
   const src=resolve('test-policy/src'), target=resolveWordingTarget(join(src,'crl/policy.crl'),base,'Complaint'); assert.ok(target);
@@ -52,7 +67,7 @@ test('cards show a coded selected answer rather than qualification Boolean, with
 // @kit mv-wording-patches:field-owners
 test('scoped text and inherited description retain different owners in the patch',()=>{
   const src=resolve('test-policy/src');
-  const source=base+presentation+`\nactivity "Met":\n- request CPGCommunicationRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n`;
+  const source=base+presentation+`\nactivity "Met":\n- request CPGTaskRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n`;
   const target=resolveWordingTarget(join(src,'crl/policy.crl'),source,'Complaint',{decision:'D',criteria:new Set()});
   assert.ok(target); assert.equal(target.questionText,'Scoped complaint?'); assert.equal(target.questionDescription,'Select one.');
   assert.notDeepEqual(target.owners.questionText.location,target.owners.questionDescription.location);
@@ -124,7 +139,7 @@ test('pending and malformed MV patches prevent completion, explicit dispositions
 
 test('adding a missing description stays in the existing scoped presentation',()=>{
   const src=resolve('test-policy/src');
-  const source=base+presentation.replace('- question description is "Select one.".','')+`\nactivity "Met":\n- request CPGCommunicationRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n`;
+  const source=base+presentation.replace('- question description is "Select one.".','')+`\nactivity "Met":\n- request CPGTaskRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n`;
   const target=resolveWordingTarget(join(src,'crl/policy.crl'),source,'Complaint',{decision:'D',criteria:new Set()}); assert.ok(target);
   const p=createPresentationProposal(target,'Scoped complaint?','New scoped guidance',src,{caseId:'c',routeId:'r',unsavedBaseline:false});
   assert.equal(p.fields[0].declaration.contexts[0].kind,'decision');

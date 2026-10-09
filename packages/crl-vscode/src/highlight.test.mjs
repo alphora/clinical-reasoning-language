@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const { loadCrlRules, applyHighlight, removeHighlight, clearStaleCrlAssociations } = mod.default ?? mod;
+const { loadCrlRules, applyHighlight, removeHighlight, clearStaleCrlAssociations } = ({...mod.default, ...mod});
 const here = dirname(fileURLToPath(import.meta.url));
 const grammar = resolve(here, "../syntaxes/crl.tmLanguage.json");
 

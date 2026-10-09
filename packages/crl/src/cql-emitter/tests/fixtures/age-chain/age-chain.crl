@@ -24,10 +24,10 @@ concept "Adult Eighteen Or Older":
   - value projection is age today at least 18 years.
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `approve`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `deny`.
 
 decision "D":

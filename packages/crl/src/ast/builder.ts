@@ -618,16 +618,15 @@ export class CRLAstBuilder
   visitTerminologyCode(
     ctx: import("../grammar/generated/antlr/CRLParser").TerminologyCodeContext,
   ): TerminologyCode {
-    // #313 — `- code is `x` [display is `y`].` The rule now holds up to TWO backtickStrings, so index them:
-    // [0] is the code, [1] the optional display. ⚠ `ctx.backtickString()` with no argument returns the ARRAY
-    // in antlr4ts, so the previous `.text` read silently became a type error rather than a wrong value.
     const parts = ctx.backtickString();
     const code = parts[0].text.slice(1, -1);
-    const display = parts.length > 1 ? parts[1].text.slice(1, -1) : undefined;
+    const display = ctx.DISPLAY_IS() ? parts[1].text.slice(1, -1) : undefined;
+    const description = ctx.DESCRIPTION_IS() ? parts[ctx.DISPLAY_IS() ? 2 : 1].text.slice(1, -1) : undefined;
     return {
       type: "TerminologyCode",
       code,
       ...(display !== undefined ? { display } : {}),
+      ...(description !== undefined ? { description } : {}),
       location: getLocation(ctx),
     };
   }

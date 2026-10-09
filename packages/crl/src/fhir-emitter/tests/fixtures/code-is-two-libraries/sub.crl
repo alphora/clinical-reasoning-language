@@ -15,7 +15,7 @@ concept "Feature Sub":
 - definition is exists this.
 
 activity "Refer":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `refer`.
 
 decision "Sub Determination":

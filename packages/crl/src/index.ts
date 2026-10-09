@@ -48,7 +48,7 @@ export type { ValidateImportsOptions, ValidateImportsResult } from "./imports/va
 export { tokenizeCEL, parseCEL, buildCEL } from "./cel";
 export type { CELToken, CELParseResult } from "./cel";
 export { resolveCelImports } from "./cel/imports";
-// REFACTOR:grounded: MV wording proposals use the emitter's presentation authority.
+// REFACTOR:grounded: MV direct wording edits use the emitter's presentation authority.
 export { createPresentationCatalog, type PresentationContext, type PresentationText } from "./emit/presentation";
 export type {
   ResolveCelImportsOptions,
@@ -380,6 +380,7 @@ export type {
 // the `emit_crl` MCP `out` directory (#237/T2).
 export { emitCrlTwoLane } from "./emit-two-lane";
 export { emitCrlBundle } from "./emit-bundle";
+export { emitResultDefinitionClosure, definitionClosureDigest, type DefinitionPublicationOptions } from './results/definitionClosure';
 export type { EmitCrlBundleResult, BundleDiagnostic } from "./emit-bundle";
 export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary } from "./emit-two-lane";
 export { writeTwoLane, EmitWriteError } from "./emit-writers";
@@ -414,7 +415,7 @@ export type { ParseMetaResult, ParsedMetaTag } from "./meta/parseMetaTag";
 // #212 step 4 — the CORE-owned flag VOCABULARY (moved OUT of the `.crl` meta-registry; flags left `.crl`). The single source
 // of the flag tags/fields/aliases/categories/enums for the cockpit drawer, the MCP flag tools, and the create seam. Plus the
 // pure field validator + the forbidden-char rules + the create-seam target/input types.
-export { flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagDisplayNameOf, flagLabelOf, allFlagLabels, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
+export { HOST_FLAG_CORRELATION_FIELDS, flagTags, isFlagTag, canonicalFlagTag, flagCategoryOf, flagDisplayNameOf, flagLabelOf, allFlagLabels, flagFieldRulesOf, validateFlagFields, FORBIDDEN_FLAG_CHARS, hasForbiddenFlagChars, FORBIDDEN_GIST_CHARS, hasForbiddenGistChars } from "./flags/flagVocab";
 export type { FlagTagInfo, FlagLabel, FieldRule, FlagStatus, CreateFlagTarget, CreateFlagInput, ValidateFlagFieldsResult, FlagFieldsFailure } from "./flags/flagVocab";
 
 // #212 — the `medical-validation/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The

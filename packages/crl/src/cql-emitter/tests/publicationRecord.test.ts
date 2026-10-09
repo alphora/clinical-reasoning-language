@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, expect, it } from "vitest";
 import { buildCRL } from "../../index";
 import { emitCQLFromAST } from "../emitCQL";
@@ -197,13 +198,13 @@ describe("selected-datum membership publication emit", () => {
   });
 
   it("refuses a separately named coded domain through validator-free decision emit", () => {
-    const result = emit(separateDomain + '\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with `APPROVED`.\ndecision "D":\nfirst:\n- when "Procedure" then recommend activity "Approve".\n');
+    const result = emit(separateDomain + '\nactivity "Approve":\n- request CPGTaskRequest.\n- with `APPROVED`.\ndecision "D":\nfirst:\n- when "Procedure" then recommend activity "Approve".\n');
     expect(result.success).toBe(false);
     expect(result.errors?.some((error) => typeof error === "object" && error.kind === "publication-unsupported-context")).toBe(true);
   });
 
   it.each(['"Procedure"', '"P"."Procedure"'])("refuses an already-lowered separately named coded domain without a scope (%s)", (guard) => {
-    const parsed = buildCRL(separateDomain + `\nactivity "Approve":\n- request CPGCommunicationRequest.\n- with \`APPROVED\`.\ndecision "D":\nfirst:\n- when ${guard} then recommend activity "Approve".\n`);
+    const parsed = buildCRL(separateDomain + `\nactivity "Approve":\n- request CPGTaskRequest.\n- with \`APPROVED\`.\ndecision "D":\nfirst:\n- when ${guard} then recommend activity "Approve".\n`);
     expect(parsed.success).toBe(true);
     const lowered = lowerLocalCodes(parsed.result!, { canonicalBase: "https://example.org", policyId: "membership-policy" });
     expect(lowered.errors).toEqual([]);

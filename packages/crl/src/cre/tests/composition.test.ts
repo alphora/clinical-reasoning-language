@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -64,7 +65,7 @@ const ACTIVITIES = `activity "Approve":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 
 const PATIENT = `fact "Pat":

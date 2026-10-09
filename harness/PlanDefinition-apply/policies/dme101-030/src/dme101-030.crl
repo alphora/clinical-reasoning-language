@@ -49,9 +49,9 @@ first:
 // ============ Activities (shareable PA determinations) ============
 
 activity "certify.Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Prior authorization request approved.`.
 
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Prior authorization request denied.`.

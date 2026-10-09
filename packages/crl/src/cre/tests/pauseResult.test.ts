@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -31,10 +32,10 @@ ${concept("X")}
 ${concept("Y")}
 ${options.extraConcept ?? ""}
 activity "A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`A\`.
 activity "pause":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`PAUSE-LABEL\`.
 decision "D":
 ${options.qualifier ?? "first"}:

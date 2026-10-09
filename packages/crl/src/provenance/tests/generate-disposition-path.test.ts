@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * #174 — `clusterBy:"disposition-path"` scaffold generation. The load-bearing assertion is the ROUND TRIP: a
  * disposition-path scaffold is correspondence-correct BY CONSTRUCTION, so feeding it back into
@@ -45,10 +46,10 @@ concept "Criterion Met":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "D":
 first:
@@ -280,10 +281,10 @@ concept "Needs Labs":
 - type is Condition.
 - code is \`lab\`.
 activity "Order Imaging":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`oi\`.
 activity "Order Labs":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ol\`.
 decision "D":
 all:
@@ -588,13 +589,13 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "DoA":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`da\`.
 activity "DoB":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`db\`.
 activity "DoC":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dc\`.
 decision "D":
 first:
@@ -723,10 +724,10 @@ concept "Crohns Indication":
 concept "UC Indication":
 - defined as ( "Shared Age" sem-and "UC Marker" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "D":
 first:

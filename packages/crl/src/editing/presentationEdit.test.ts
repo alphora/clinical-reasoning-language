@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import {
   planPresentationEdit,
   resolvePresentationTarget,
@@ -13,7 +14,7 @@ const presentation =
   '\npresentation for "Complaint":\n- question text is "Which complaint?".\n- question description is "Select one.".\n';
 const req = { library: "L", concept: "Complaint" };
 const scoped =
-  '\nactivity "Met":\n- request CPGCommunicationRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n';
+  '\nactivity "Met":\n- request CPGTaskRequest.\ndecision "D":\n- when "Complaint" then recommend activity "Met".\npresentation for "Complaint":\n- in decision "D".\n- question text is "Scoped complaint?".\n';
 
 function roundTrip(source: string, change: Parameters<typeof planPresentationEdit>[1]) {
   const p = planPresentationEdit(source, change);

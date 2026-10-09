@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // #171 — provenance addressing of DELEGATED `use decision` sub-nodes (Design (c): no inlining).
 //
 // A `use decision "SubDec"` must NOT inline SubDec's sub-nodes under the delegating parent's address. Each decision's
@@ -99,7 +100,7 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "Act":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "SubDec":
 first:
@@ -140,7 +141,7 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "Act":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "SubDec":
 first:
@@ -171,7 +172,7 @@ concept "X":
 - type is Condition.
 - code is \`x\`.
 activity "Act":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "C":
 first:
@@ -318,7 +319,7 @@ concept "OC":
 - type is Condition.
 - code is \`oc\`.
 activity "OAct":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`oa\`.
 decision "Sub":
 first:
@@ -398,7 +399,7 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "Act":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "D":
 first:
@@ -417,7 +418,7 @@ concept "C":
 - type is Condition.
 - code is \`c\`.
 activity "Act":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "A":
 first:

@@ -6,7 +6,7 @@ The SHARED, reusable prior-authorization DETERMINATION activities for every medi
 decision, as CONFIGURED-vocabulary dispositions (kit `configure-dispositions`): activity names are
 `<category>.<key>` — the category a PAS review-action (certify / not-certify / pended), the key a
 deployment reason/flavor. THIS deployment (IEHP) runs `mode: "embedded"`.
-All are COMMUNICATED determinations (CPGCommunicationRequest) — the payer communicates a decision; it
+All are COMMUNICATED determinations (CPGTaskRequest) — the payer communicates a decision; it
 NEVER orders the service (never CPGServiceRequest). A policy references the ones it uses and declares
 the matching keys in its package.json `crl.dispositions.options`.
 
@@ -35,9 +35,9 @@ from a sibling artifact.
 */
 
 activity "certify.Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Medical-policy criteria MET — the requested service meets this policy's coverage criteria. A communicated sub-determination (embedded mode: feeds a larger cross-company adjudication that issues the actual authorization); certify category / PAS review-action A1; NOT a service order.`.
 
 activity "not-certify.Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Medical-policy criteria NOT MET — the requested service does not meet this policy's coverage criteria. A communicated sub-determination (embedded mode); not-certify category / PAS review-action A3; NOT a service order.`.

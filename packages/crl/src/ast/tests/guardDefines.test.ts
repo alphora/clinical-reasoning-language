@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 
 import { buildCRL } from "../../index";
@@ -82,10 +83,10 @@ concept "B":
 - code is \`b\`.
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`NOT APPROVED\`.
 ${extra}
 decision "D":

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { createHash } from "crypto";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import * as os from "os";
@@ -25,10 +26,10 @@ concept "LeafB":
 concept "Crit":
 - defined as ( "LeafA" sem-or "LeafB" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "Dec":
 first:

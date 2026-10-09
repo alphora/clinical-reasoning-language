@@ -13,7 +13,7 @@ const {emitCrlBundle}=require(process.env.CRL_TEST_PACKAGE);
 const {INTAKE_CRL}=require(path.join(process.env.CRL_TEST_PACKAGE,'dist/authoring-kit/intakeExample'));
 const fixture=path.join(path.dirname(out),'intake-source');fs.mkdirSync(fixture,{recursive:true});
 fs.writeFileSync(path.join(fixture,'package.json'),JSON.stringify({name:'intake-native',version:'1.0.0',crl:{canonicalBase:'https://example.org/intake',date:'2026-09-21'}}));
-const source=INTAKE_CRL.replace('decision "Intake":','activity "Missing": - request CPGCommunicationRequest. - with `MISSING`.\ndecision "Intake":').replace('otherwise then recommend activity "Human Review".','otherwise then recommend activity "Missing".');
+const source=INTAKE_CRL.replace('decision "Intake":','activity "Missing": - request CPGTaskRequest. - with `MISSING`.\ndecision "Intake":').replace('otherwise then recommend activity "Human Review".','otherwise then recommend activity "Missing".');
 fs.writeFileSync(path.join(fixture,'policy.crl'),source);
 const emitted=emitCrlBundle(path.join(fixture,'policy.crl'));assert(emitted.success,JSON.stringify(emitted));
 const base=emitted.bundle;assert(!base.entry.some(e=>e.resource.resourceType==='Questionnaire'));base.entry.push({resource:{resourceType:'Patient',id:'p'}});
@@ -31,7 +31,7 @@ const engine=JSON.parse(fs.readFileSync(process.env.CRL_TEST_ENGINE));
   const result=await applySession({schemaVersion:1,requestId:'cumulative-'+step,caseId:'synthetic-intake',stepId:step,planDefinitionId:'intake-native',subjectReference:subject,repositoryJson:JSON.stringify(repo),requestDataJson:JSON.stringify(data)},{outDir:path.join(out,step),limits:{timeoutMs:120000}});
   assert(result.ok,JSON.stringify(result.error));assert(result.cleanupConfirmed);assert.equal(result.runtime.enginePath,path.resolve(engine.path));assert.equal(result.runtime.engineSha256,engine.sha256);
   const native=read(result.artifacts['native-result.json'].path);q=one(native,'Questionnaire');qr=one(native,'QuestionnaireResponse');
-  const activity=one(native,'CommunicationRequest');assert.deepEqual(activity.payload,[{contentString:['answer-c','change-a'].includes(step)?'HUMAN_REVIEW':'MISSING'}]);
+  const activity=one(native,'Task');assert.equal(activity.description,['answer-c','change-a'].includes(step)?'HUMAN_REVIEW':'MISSING');assert.equal(activity.for.reference,subject);assert.equal(activity.intent,'proposal');assert.ok(activity.status);assert.equal(activity.payload,undefined);
   if(slug){const dataAfter=read(result.artifacts['native-data.json'].path);const matches=dataAfter.entry.map(e=>e.resource).filter(r=>r.resourceType==='Observation'&&r.meta?.profile?.some(p=>p.split('|')[0].endsWith('-'+slug))&&r.effectiveDateTime===authored);assert.equal(matches.length,1,'one new extraction for '+slug);const extracted=matches[0];assert(extracted.id);if(ids.has(slug))assert.equal(extracted.id,ids.get(slug));else ids.set(slug,extracted.id);state.set(extracted.id,extracted);assert.equal(extracted[slug==='treatment-begun'?'valueBoolean':'valueString'],value);}
   if(priorB&&slug!=='treatment-begun'){assert.deepEqual(state.get(ids.get('treatment-begun')),priorB);const b=find(qr,'treatment-begun').item;assert.deepEqual(b.answer,[{valueBoolean:false}]);}
   if(step==='answer-b')assert.equal(find(qr,'primary-diagnosis').item.answer[0].valueString,'Alpha');

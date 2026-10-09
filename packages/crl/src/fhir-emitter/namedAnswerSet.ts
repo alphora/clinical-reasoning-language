@@ -53,7 +53,7 @@ export function buildNamedAnswerSetMap(ast: CRL, policyId: string, canonicalBase
 }
 
 /** Authored system identity, not whichever consumer happens to be visited first, owns metadata. */
-function emitOwnedCodeSystem(system: { id: string; url: string; members: readonly { code: string; display?: string }[] }, metadata: CpgMetadata, opts: EmitOptions): EmittedResource {
+function emitOwnedCodeSystem(system: { id: string; url: string; members: readonly { code: string; display?: string; definition?: string }[] }, metadata: CpgMetadata, opts: EmitOptions): EmittedResource {
   const level = opts.capability ?? "publishable";
   const title = system.id;
   const resource = {
@@ -67,7 +67,7 @@ function emitOwnedCodeSystem(system: { id: string; url: string; members: readonl
     ...(metadata.jurisdiction.length ? { jurisdiction: metadata.jurisdiction } : {}),
     ...(metadata.useContext.length ? { useContext: metadata.useContext } : {}),
     caseSensitive: true, content: "complete",
-    concept: system.members.map(({ code, display }) => ({ code, display })),
+    concept: system.members.map(({ code, display, definition }) => ({ code, display, ...(definition === undefined ? {} : {definition}) })),
   };
   return { resourceType: "CodeSystem", relativePath: `CodeSystem/${resource.id}.json`, resource,
     sourceKind: "AnswerOptions", sourceName: system.url };
@@ -78,11 +78,11 @@ export function emitOwnedValueSetCodeSystems(resources: readonly EmittedResource
   onError: (error: AnswerDomainError) => void): EmittedResource[] {
   const prefix = `${metadata.canonicalBase.replace(/\/$/, "")}/CodeSystem/`;
   const alreadyEmitted = new Map(resources.filter((r) => r.resourceType === "CodeSystem")
-    .map((r) => r.resource as { url?: string; concept?: { code: string; display?: string }[] }).map((r) => [r.url, r]));
-  const systems = new Map<string, Map<string, { code: string; display?: string }>>();
+    .map((r) => r.resource as { url?: string; concept?: { code: string; display?: string; definition?: string }[] }).map((r) => [r.url, r]));
+  const systems = new Map<string, Map<string, { code: string; display?: string; definition?: string }>>();
   for (const resource of resources) {
     if (resource.resourceType !== "ValueSet") continue;
-    const includes = (resource.resource as { compose?: { include?: { system?: string; concept?: { code: string; display?: string }[] }[] } }).compose?.include ?? [];
+    const includes = (resource.resource as { compose?: { include?: { system?: string; concept?: { code: string; display?: string; extension?: {url:string; valueString?:string}[] }[] }[] } }).compose?.include ?? [];
     for (const include of includes) {
       const url = include.system;
       if (!url?.startsWith(prefix) || !include.concept?.length) continue;
@@ -93,11 +93,15 @@ export function emitOwnedValueSetCodeSystems(resources: readonly EmittedResource
       }
       const members = systems.get(url) ?? new Map((alreadyEmitted.get(url)?.concept ?? []).map((member) => [member.code, member]));
       systems.set(url, members);
-      for (const member of include.concept) {
+      for (const entry of include.concept) {
+        const definition = entry.extension?.find(e=>e.url === "http://hl7.org/fhir/StructureDefinition/valueset-concept-definition")?.valueString;
+        const member = {code:entry.code,display:entry.display,...(definition === undefined ? {} : {definition})};
         const previous = members.get(member.code);
         if (previous?.display !== undefined && member.display !== undefined && previous.display !== member.display) {
           onError({ kind: "error", code: "answer-options-conflicting-display", message: `Locally owned ${url} declares conflicting displays for code ${member.code}.` });
-        } else if (!previous || previous.display === undefined) members.set(member.code, member);
+        } else if (previous?.definition !== undefined && member.definition !== undefined && previous.definition !== member.definition) {
+          onError({kind:"error",code:"answer-options-conflicting-description",message:`Locally owned ${url} declares conflicting descriptions for code ${member.code}.`});
+        } else members.set(member.code, {...previous,...member,display:member.display ?? previous?.display,...((member.definition ?? previous?.definition) === undefined ? {} : {definition:member.definition ?? previous?.definition})});
       }
     }
   }
@@ -106,7 +110,7 @@ export function emitOwnedValueSetCodeSystems(resources: readonly EmittedResource
     const existing = alreadyEmitted.get(url);
     if (existing) {
       // Preserve metadata and existing code order; the authored local vocabulary can add members.
-      existing.concept = [...members.values()].map(({ code, display }) => ({ code, display }));
+      existing.concept = [...members.values()].map(({ code, display, definition }) => ({ code, display, ...(definition === undefined ? {} : {definition}) }));
       return [];
     }
     return [emitOwnedCodeSystem({ id: url.slice(prefix.length), url,

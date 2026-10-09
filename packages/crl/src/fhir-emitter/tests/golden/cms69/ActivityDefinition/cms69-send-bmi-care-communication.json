@@ -3,7 +3,7 @@
   "id": "cms69-send-bmi-care-communication",
   "meta": {
     "profile": [
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationactivity",
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-computableactivity",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
     ]
@@ -38,8 +38,8 @@
   "library": [
     "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/Cms69Strategy"
   ],
-  "kind": "CommunicationRequest",
-  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest",
+  "kind": "Task",
+  "profile": "http://hl7.org/fhir/StructureDefinition/Task",
   "intent": "proposal",
   "doNotPerform": false,
   "code": {
@@ -52,7 +52,7 @@
   },
   "dynamicValue": [
     {
-      "path": "payload.contentString",
+      "path": "description",
       "expression": {
         "language": "text/cql-expression",
         "expression": "'Document a follow-up care plan for low BMI'"

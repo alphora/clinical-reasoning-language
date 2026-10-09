@@ -1,0 +1,23 @@
+// REFACTOR:grounded (MR10): shared executable Task request control.
+library "Task Request Fixture".
+concept "Ready":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `ready`.
+- shape reduction is most recent.
+decision "Review":
+first:
+- when "Ready" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+activity "certify.Approve":
+- request CPGTaskRequest.
+- with `Ready for review.`.
+activity "not-certify.Deny":
+- request CPGTaskRequest.
+activity "Notify":
+- request CPGTaskRequest.
+- with `Send the review result.`.
+activity "Do not notify":
+- request do not perform CPGTaskRequest.
+- with `Do not send the review result.`.

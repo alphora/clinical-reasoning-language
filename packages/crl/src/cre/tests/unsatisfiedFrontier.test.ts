@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 
 import { parseInput } from "../../ast/tests/parseInput";
@@ -298,7 +299,7 @@ activity "Approve":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 
   // Leaf A present, Leaf B ABSENT → the `and` guard is evaluated-false.

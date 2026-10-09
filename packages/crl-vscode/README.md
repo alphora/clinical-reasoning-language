@@ -123,16 +123,16 @@ If your existing user settings already have a token color for a CRL scope (e.g. 
 
 ## Medical Validation review flags → GitHub labels
 
-When a reviewer files a flag in the Medical Validation cockpit, the extension opens a **GitHub issue** in the policy's content repo (resolved from its `origin` remote) and tags it with a **Type** label. The four Types and their labels:
+Medical Validation flags save directly in the policy's flag store without creating GitHub issues. Existing linked issues remain available and retain their Type labels. The four Types and their legacy labels:
 
 | Type (in the drawer) | Label | Meaning |
 |---|---|---|
 | CRL vs customer intent | `mv:crl-vs-intent` | the narrative is right, but the CRL isn't what the customer wanted |
 | CRL vs narrative | `mv:crl-vs-narrative` | the CRL is faithful, but the source policy narrative is wrong |
 | Tooling bug | `mv:tooling-bug` | a defect in the CRL tooling, seen while validating |
-| Other | `mv:other` | doesn't fit the above — explained in the issue body |
+| Other | `mv:other` | doesn't fit the above — explained in the flag description |
 
-**One-time per content repo:** create the labels so issues land with the right color/description (otherwise GitHub auto-creates them plain grey). The set is derived from the CRL flag vocabulary (`allFlagLabels()` — the single source of truth), so run the bundled script rather than hand-maintaining a list:
+**For repositories maintaining existing linked issues:** create the labels to preserve their color/description. The set is derived from the CRL flag vocabulary (`allFlagLabels()` — the single source of truth), so run the bundled script rather than hand-maintaining a list:
 
 ```
 node packages/crl-vscode/scripts/create-mv-labels.mjs <owner>/<repo>
@@ -171,3 +171,9 @@ npm run package          # produces crl-language-support-<version>.vsix
 This release distributes the verified VSIX as a GitHub release asset. Marketplace publication is not part of this release workflow.
 
 For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see the [core README § Cutting a release](https://github.com/alphora/clinical-reasoning-language/blob/v5.3.0/packages/crl/README.md#cutting-a-release-build-both-artifacts--upload-to-github).
+
+## Medical Review answer editing
+
+Pin a route and show Questions in the tree, or open its CRL questionnaire. Expand Answer choices and use the pencil to edit or the trash icon to delete; the plus beside the expanded Answer choices adds an answer. Question and answer editors use matching fields and Save change / Cancel controls. Opening either editor closes the other. Save updates the associated local CRL terminology and regenerates its FHIR ValueSet and local CodeSystem along with the affected executable artifacts. Local Save works without KELP; when available, KELP lock, Save and unlock are best effort and do not block file writes; no KE-agent run is needed.
+
+Shared terminology affects every displayed consumer. Adding an answer asks whether it qualifies for each question. Coding identities stay fixed when editing wording. Deletion lists newly invalid saved examples before applying and retains their data for repair. Nonlocal CRL terminology and external CodeSystem answers show a read-only explanation. Open review cards refresh; an existing interactive FHIR session requires Restart against the new definitions.

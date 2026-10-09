@@ -209,6 +209,21 @@ function sourceOf(file: string, overlays: ReadonlyMap<string, string>) {
     return fail("source-limit", "CRL source exceeds the 1 MB editing limit.");
   return source;
 }
+
+/** Validate a group of local source edits against one shared project snapshot. No writes. */
+export function previewCrlSourceEdits(input: PresentationFileTarget, candidates: ReadonlyMap<string,string>) {
+  const target=resolvePresentationFile(input), snapshot=projectSnapshot(target,new Map()), overlays=new Map<string,string>(), sources=new Map<string,string>();
+  for(const [file,candidate] of candidates) {
+    const resolved=resolvePresentationFile({projectRoot:target.projectRoot,filePath:file});
+    sources.set(resolved.filePath,sourceOf(resolved.filePath,new Map()));
+    if(Buffer.byteLength(candidate,'utf8')>MAX_SOURCE_BYTES) return fail('source-limit','CRL source exceeds the 1 MB editing limit.');
+    overlays.set(resolved.filePath,candidate);
+  }
+  for(const [file,candidate] of overlays) validateCandidate({projectRoot:target.projectRoot,filePath:file},candidate,overlays);
+  if(projectSnapshot(target,new Map()).fingerprint!==snapshot.fingerprint) return fail('stale-project','Project inputs changed during answer preview.');
+  return {projectRoot:target.projectRoot,projectFingerprint:snapshot.fingerprint,sourceOverlays:overlays,sources,
+    beforeSha256:sourceSha256(JSON.stringify([...sources])),afterSha256:sourceSha256(JSON.stringify([...overlays]))};
+}
 function validateCandidate(
   target: PresentationFileTarget,
   candidate: string,

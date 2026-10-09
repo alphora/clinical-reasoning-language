@@ -11159,7 +11159,7 @@
         },
         {
           "line": 390,
-          "title": "CPGCommunicationRequest with terminology ref → unsupported-communication-with-terminology (distinct kind, round-2 Q9)",
+          "title": "CPGTaskRequest with terminology ref → unsupported-task-with-terminology (distinct kind, round-2 Q9)",
           "call": "it"
         },
         {
@@ -11979,7 +11979,7 @@
         },
         {
           "line": 100,
-          "title": "dynamicValuePath is null for the v2.1-deferred profiles (CPGCommunicationRequest, CPGQuestionnaire)",
+          "title": "dynamicValuePath is null for the v2.1-deferred profiles (CPGTaskRequest, CPGQuestionnaire)",
           "call": "it"
         },
         {
@@ -23452,7 +23452,7 @@
       "tests": [
         {
           "line": 27,
-          "title": "clean: recommends only configured determinations, all CPGCommunicationRequest",
+          "title": "clean: recommends only configured determinations, all CPGTaskRequest",
           "call": "it"
         },
         {

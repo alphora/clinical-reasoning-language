@@ -58,7 +58,7 @@ concept "Has Weight":
 - defined as exists ("Weight").
 
 activity "A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 
 decision "D":

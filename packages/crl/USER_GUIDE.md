@@ -36,7 +36,7 @@ Ordering is strict: `library` → `include`s → other statements. The library +
 - **Free text, markdown, evidence, meta, and system/code** values must be enclosed in backticks (`...`). Backticks are used for two purposes:
   Text content – e.g., `Some *markdown* text` for human-readable descriptions or rationale.
   External references – e.g., `http://snomed.info/sct` to denote URIs, system identifiers, or values outside the CRL namespace.
-  
+
 - **No escape characters** are allowed in quoted strings
 
 - **Presentation text** (`question text is` and `question description is`) accepts double quotes or backticks. These fields are literal text, not references. Use backticks when the text contains double quotes or multiple lines.
@@ -134,7 +134,7 @@ activity "Indicate":
 - with "Colonoscopy".
 
 activity "Message Care Plan":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Create a care plan`.
 - because `A new plan needs to be implemented.`.
 
@@ -154,7 +154,7 @@ activity "Contraindicated":
 
 #### Activity Types
 
-Must be one of the fixed CPG activity-type allowlist (e.g. `CPGServiceRequest`, `CPGCommunicationRequest`, `CPGImmunizationRequest`, `CPGMedicationRequest`, …) — see the **Activity types (`request`)** list below; an arbitrary FHIR resource name is rejected at parse time (`request` enters the lexer's activity mode with a closed allowlist).
+Must be one of the fixed CPG activity-type allowlist (e.g. `CPGServiceRequest`, `CPGTaskRequest`, `CPGImmunizationRequest`, `CPGMedicationRequest`, …) — see the **Activity types (`request`)** list below; an arbitrary FHIR resource name is rejected at parse time (`request` enters the lexer's activity mode with a closed allowlist).
 
 > **Note:** `do not perform` marks the activity as contraindicated or not to be executed.
 
@@ -776,7 +776,7 @@ Allowlist covers every base FHIR resource referenced by a CPG IG Request or Even
 
 CRL tokens align with the CPG IG Activity Profiles table's Request column with the `Task` suffix dropped consistently. See [`docs/cpg-ig-alignment.md`](docs/cpg-ig-alignment.md) for the full mapping.
 
-`CPGAdministerMedication`, `CPGCommunicationRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosis`, `CPGQuestionnaire`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlag`, `CPGServiceRequest`
+`CPGAdministerMedication`, `CPGTaskRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosis`, `CPGQuestionnaire`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlag`, `CPGServiceRequest`
 
 ### Parameter types (`param type is`)
 

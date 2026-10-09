@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * Integration test — the provenance feedback LOOP end-to-end (corpus-style proof; a real crl-content corpus is not in
  * this repo). It exercises the four moving parts together:
@@ -40,10 +41,10 @@ concept "LeafB":
 concept "Crit":
 - defined as ( "LeafA" sem-or "LeafB" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "Dec":
 first:

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Create/update the Medical-Validation flag labels (`mv:*`) in a GitHub content repo, DERIVED from the CRL flag vocabulary
 // (`allFlagLabels()` in @smile-digital-health/crl — the single source of truth for names/colors/descriptions). Run this once
-// per content repo so a flag's born-together issue lands with OUR label color + description instead of GitHub's default grey.
+// per content repo to maintain the color/description of labels on existing linked issues.
 //
 //   node packages/crl-vscode/scripts/create-mv-labels.mjs <owner>/<repo> [--dry-run]
 //

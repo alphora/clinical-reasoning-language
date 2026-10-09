@@ -11,8 +11,9 @@ export interface RouteCard {
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
   criteria: { lib: string; name: string }[];
   criterionPaths: { lib: string; name: string }[][];
-  answerChoices: { system?: string; code: string; display: string; selected: boolean }[];
+  answerChoices: { system?: string; code: string; display: string; description?:string; editable?:boolean; readOnlyReason?:string; selected: boolean }[];
   choicesFrom?: string;
+  answerEditor?:{editable:boolean;readOnlyReason?:string;terminology?:string;systems?:string[];consumers?:{key:string;label:string}[];uses?:string[]};
 }
 // One identity rule for answer text and choice selection; never borrow a known different system.
 export function resolveAnswerChoice(coding: {system?: string; code?: string}, options: {system?: string; code: string; display: string}[]) {
@@ -49,7 +50,7 @@ export function definitionValueInputs(concepts: CrlConceptNode[]) {
 
 export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor: (id: string) => string | undefined,
   wording: (lib: string, name: string, nodeId: string, criteria: string[]) => WordingTarget | undefined,
-  optionsFor: (lib: string, name: string) => { system?: string; code: string; display: string }[] = () => [],
+  optionsFor: (lib: string, name: string) => { system?: string; code: string; display: string; description?:string }[] = () => [],
   valueInputs: (lib: string, name: string) => CrlConceptNode[] = () => [],
   questionEnabled?: (lib: string, name: string) => boolean,
   choicesFromFor: (lib: string, name: string) => string | undefined = () => undefined) {

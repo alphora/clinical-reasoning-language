@@ -19,8 +19,8 @@ import type {
   ValidationError,
 } from "./validator";
 
-/** A PA determination is COMMUNICATED, never ordered — its activity must carry this request type. */
-const REQUIRED_REQUEST_TYPE = "CPGCommunicationRequest";
+/** REFACTOR:grounded (MR10): a PA determination is a Task, never a service order — its activity must carry this request type. */
+const REQUIRED_REQUEST_TYPE = "CPGTaskRequest";
 
 /** Source attribution for a diagnostic (multi-file mode). */
 interface Attribution {
@@ -36,7 +36,7 @@ interface Attribution {
  * config set is a CLOSED whitelist:
  *   - `disposition-not-configured` — every `recommend activity "X"` must name a configured determination
  *     (`<category>.<key>`, or a bare `<category>` for a single-option category); anything else is invalid.
- *   - `disposition-request-type`  — every configured determination ACTIVITY must use `request CPGCommunicationRequest`.
+ *   - `disposition-request-type`  — every configured determination ACTIVITY must use `request CPGTaskRequest`.
  *   - `disposition-non-final-leaf` — under `standalone` mode (our tree IS the whole adjudication), a recommended
  *     determination must be FINAL; a non-final leaf (e.g. `pended`) is legitimate only in `embedded` mode.
  *

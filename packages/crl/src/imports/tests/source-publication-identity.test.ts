@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded (#320, review 825) — reusable uncoded sources own physical
 // library layers without inventing a local CodeSystem or changing the policy URL.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
@@ -43,10 +44,10 @@ concept "Evidence":
 presentation for "Evidence":
 - question text is \`Is the evidence confirmed?\`.
 activity "Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Synthetic met\`.
 activity "Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`Synthetic unmet\`.
 decision "Determination":
 first:

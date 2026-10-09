@@ -16,7 +16,7 @@ export interface FlagDrawerTag {
   fields: { key: string; required: boolean; values?: readonly string[] }[];
 }
 
-/** Field keys NEVER author-input in the drawer. Host plumbing: `ref` (auto from the created issue), `key` (the GAP-3
+/** Field keys NEVER author-input in the drawer. Host plumbing: `ref` (a link on a previously filed flag), `key` (the GAP-3
  *  occurrence address), `status` (always `open` for a new flag; `createFlag` rejects a `fields.status`), `system` (derived).
  *  Plus `kind` — AI-only finer metadata (the cockpit agent may set it), hidden from the human MV drawer (the Type is the tag). */
 const HOST_MANAGED_FIELDS = new Set(["ref", "key", "status", "system", "kind"]);
@@ -37,24 +37,24 @@ export interface FlagDrawerOptions {
    *  agent-open path to draw the validator's eye to what's needed. Undefined for the human right-click (no ring). */
   focus?: string;
   /** Todo 3 (disc 358): render as the EDIT form for an existing flag, not the create form. Changes the heading ("Edit flag —"),
-   *  the submit copy ("Save changes"), the description placeholder (no "becomes the GitHub issue body"), and — CRITICALLY — the
+   *  the submit copy ("Save changes"), the description placeholder, and — CRITICALLY — the
    *  Save/Cancel/✕ intents to DISTINCT `data-flag-edit-{save,cancel}` (the create `data-flag-{insert,cancel,close}` route to the
    *  create-only `commitFlagDraft`/`closeFlagDrawer`, dead when only `flagEditDraft` is set — disc 358 accept #2). */
   edit?: boolean;
-  /** Todo 3.5 (operator): the DESCRIPTION-ONLY edit form for an AI/extraction flag — a human may fix only the description; the
-   *  Type/summary/fields stay the AI's (no silent retype). Renders JUST the Description textarea (+ a read-only summary for
+  /** Todo 3.5 (operator): the DESCRIPTION-ONLY edit form for a legacy validation flag — a human may fix only the description; the
+   *  Type/summary/fields stay unchanged (no silent retype). Renders JUST the Description textarea (+ a read-only summary for
    *  context) with the edit intents. Implies `edit`. */
   descriptionOnly?: boolean;
 }
 
 /** Render the create-flag drawer: a tag `<select>` (validation-concern first) + each tag's registry field controls (only
- *  the selected tag's group is visible; the webview toggles them client-side), a one-line summary (→ issue title + flag
- *  gist), a "just enough" stub (→ issue body), and Insert / Cancel. The whole thing carries `data-flag-drawer`. */
+ *  the selected tag's group is visible; the webview toggles them client-side), a one-line summary (→ flag title + flag
+ *  gist), a "just enough" description, and Save / Cancel. The whole thing carries `data-flag-drawer`. */
 export function renderFlagDrawer(opts: FlagDrawerOptions): string {
   // #210 (disc 239) — the CRL Assist purple focus ring: ` flag-focus` on the element the agent-open path derived as needed.
   const ring = (key: string): string => (opts.focus === key ? " flag-focus" : "");
 
-  // Todo 3.5: the DESCRIPTION-ONLY edit form (an AI/extraction flag). No Type select / fields / summary input — just a read-only
+  // Todo 3.5: the DESCRIPTION-ONLY edit form (a legacy validation flag). No Type select / fields / summary input — just a read-only
   // summary line (context) + the editable Description, with the edit intents. `flagCollect()` finds no tag/summary/field controls,
   // so it posts tag:''/summary:''/fields:{} + the stub — `saveFlagEdit` (descriptionOnly) ignores those and writes only the description.
   if (opts.descriptionOnly) {
@@ -65,7 +65,7 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
       `<button type="button" class="flag-close" data-flag-edit-cancel aria-label="Close">✕</button></div>` +
       ctx +
       `<label class="flag-col"><span class="flag-label">Description</span>` +
-      `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="add a note for this AI finding" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
+      `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="add a note for this finding" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
       `<div class="flag-actions">` +
       `<button type="button" class="flag-cancel" data-flag-edit-cancel>Cancel</button>` +
       `<button type="button" class="flag-save${ring("submit")}" data-flag-edit-save>Save changes</button>` +
@@ -117,10 +117,8 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
   const cancelIntent = opts.edit ? "data-flag-edit-cancel" : "data-flag-cancel";
   const submitIntent = opts.edit ? "data-flag-edit-save" : "data-flag-insert";
   const submitClass = opts.edit ? "flag-save" : "flag-insert";
-  const submitLabel = opts.edit ? "Save changes" : "Insert flag + create issue";
-  // The create form tells the author the description becomes the issue body; on edit that framing is wrong (the body only
-  // re-syncs on a Type change), so use a neutral placeholder.
-  const descPlaceholder = opts.edit ? "source context, reasoning, and the review question" : "source context, reasoning, and the review question — becomes the GitHub issue body";
+  const submitLabel = opts.edit ? "Save changes" : "Save flag";
+  const descPlaceholder = "source context, reasoning, and the review question";
 
   return (
     `<div class="flag-drawer${opts.edit ? " flag-edit-drawer" : ""}" data-flag-drawer>` +
@@ -130,7 +128,7 @@ export function renderFlagDrawer(opts: FlagDrawerOptions): string {
     `<select data-flag-tag aria-label="Flag type">${tagOptions}</select></label>` +
     `<div class="flag-fields">${fieldGroups}</div>` +
     `<label class="flag-row"><span class="flag-label">Title</span>` +
-    `<input type="text" class="flag-input${ring("summary")}" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the issue title & the flag" aria-label="Title"></label>` +
+    `<input type="text" class="flag-input${ring("summary")}" data-flag-summary value="${escapeHtml(opts.summary ?? "")}" placeholder="one line — the flag title" aria-label="Title"></label>` +
     `<label class="flag-col"><span class="flag-label">Description</span>` +
     `<textarea class="flag-input${ring("description")}" data-flag-stub placeholder="${escapeHtml(descPlaceholder)}" aria-label="Description">${escapeHtml(opts.stub ?? "")}</textarea></label>` +
     `<div class="flag-actions">` +

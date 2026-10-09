@@ -7,5 +7,5 @@ concept "Beta":
 - code is `beta`.
 
 activity "Refer":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `refer`.

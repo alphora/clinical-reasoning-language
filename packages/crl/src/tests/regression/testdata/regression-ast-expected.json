@@ -1582,7 +1582,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 105,
@@ -1637,7 +1637,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 110,
@@ -1747,7 +1747,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 120,
@@ -1802,7 +1802,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 125,
@@ -1857,7 +1857,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 130,
@@ -1912,7 +1912,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 135,
@@ -1967,7 +1967,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 140,
@@ -2022,7 +2022,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 145,
@@ -2091,7 +2091,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 151,
@@ -2146,7 +2146,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 156,
@@ -2215,7 +2215,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 162,
@@ -2270,7 +2270,7 @@
         "type": "ActivityBody",
         "request": {
           "type": "ActivityRequest",
-          "activityType": "CPGCommunicationRequest",
+          "activityType": "CPGTaskRequest",
           "location": {
             "start": {
               "line": 167,

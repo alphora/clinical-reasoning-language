@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // #236 Step J — the ACCEPTANCE battery. The headline claim of the flip is quantitative: a
 // criterion lowers to ONE named boolean define referenced BY IDENTITY, so a doubling-DAG that
 // would inline-expand to 2^k leaves instead emits LINEARLY (one define per criterion, each
@@ -63,7 +64,7 @@ activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 }
 
@@ -123,7 +124,7 @@ activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
     withFixture(crl, NOFACTS_CEL.replace('is "No"', 'is "No"'), ({ crl: crlPath }) => {
       const r = emitCQLImports(crlPath);
@@ -181,7 +182,7 @@ activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
     const cel = `# C
 library "C".

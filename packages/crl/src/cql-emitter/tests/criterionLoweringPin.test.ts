@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // #224 ii.1c (design §5.1 / disc 303 I2) — the emit family builds a criterion table from the
 // RAW graph AST (S6 closure) AND from the LOWERED AST (S7 case-features / S8 interface). #236: a
 // criterion lowers to a named define referenced by identity, and its atom-closure input[] is
@@ -42,7 +43,7 @@ activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`);
 
     const lowered = lowerLocalCodes(ast);

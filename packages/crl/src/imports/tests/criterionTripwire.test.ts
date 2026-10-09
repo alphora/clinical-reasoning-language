@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // #224 ii.2 Battery 2 (positive PRESENCE matrix) + Battery 6 (cross-lane coherence).
 //
 // The tripwire's safety argument (an un-expanded `BranchConditionCriterionRef` reaching a
@@ -59,7 +60,7 @@ activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 
 const CEL = `# C

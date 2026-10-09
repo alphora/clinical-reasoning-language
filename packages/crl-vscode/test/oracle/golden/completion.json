@@ -1620,11 +1620,11 @@
       },
       {
         "kind": "completion",
-        "label": "CPGCommunicationRequest",
+        "label": "CPGTaskRequest",
         "itemKind": 24,
         "insertText": null,
         "sortText": null,
-        "detail": "CPG activity type — `request CPGCommunicationRequest.`",
+        "detail": "CPG activity type — `request CPGTaskRequest.`",
         "documentation": null,
         "range": null
       },
@@ -1767,11 +1767,11 @@
       },
       {
         "kind": "completion",
-        "label": "CPGCommunicationRequest",
+        "label": "CPGTaskRequest",
         "itemKind": 24,
         "insertText": null,
         "sortText": null,
-        "detail": "CPG activity type — `request CPGCommunicationRequest.`",
+        "detail": "CPG activity type — `request CPGTaskRequest.`",
         "documentation": null,
         "range": null
       },

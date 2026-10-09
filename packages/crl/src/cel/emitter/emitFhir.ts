@@ -156,7 +156,7 @@ export function classifyConceptRole(c: Concept): FactRole {
 // on the emitted ActivityDefinition / the type of resource the activity
 // instantiates when applied). Tokens align with the CPG IG Request
 // column (https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles)
-// with the `Task` suffix consistently dropped — see grammar rename
+// with the `Task` suffix consistently dropped except generic CPGTaskRequest — see grammar rename
 // commit aligning to that convention.
 //
 // `kind` values verified against each cpg-XXX-activity profile FSH
@@ -164,7 +164,7 @@ export function classifyConceptRole(c: Concept): FactRole {
 //   * cpg-servicerequestactivity      kind = #ServiceRequest
 //   * cpg-medicationrequestactivity   kind = #MedicationRequest
 //   * cpg-immunizationactivity        kind = #MedicationRequest  (NOT ImmunizationRequest — IG models immunization recommendation as MedicationRequest)
-//   * cpg-communicationactivity       kind = #CommunicationRequest
+//   * CPGTaskRequest (generic computable activity) kind = #Task
 //   * cpg-collectinformationactivity  kind = #Task
 //   * cpg-enrollmentactivity          kind = #Task
 //   * cpg-proposediagnosisactivity    kind = #Task
@@ -182,7 +182,7 @@ const CPG_TO_FHIR: Record<string, string> = {
   // immunization. R4 doesn't have an ImmunizationRequest resource;
   // ImmunizationRecommendation is the planning/request-shaped R4 type.
   CPGImmunizationRequest: "ImmunizationRecommendation",
-  CPGCommunicationRequest: "CommunicationRequest",
+  CPGTaskRequest: "Task",
   CPGQuestionnaire: "Task",
   CPGEnrollment: "Task",
   CPGProposeDiagnosis: "Task",
@@ -1045,7 +1045,8 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // Subject reference.
   const subject = findSubject(ctx);
   if (subject && SUBJECT_RESOURCES.has(fhirType)) {
-    resourceBody.subject = { reference: `Patient/${makePatientId(ctx, subject.name)}` };
+    // REFACTOR:grounded (MR10): Task has `for`; other patient resources retain `subject`.
+    resourceBody[fhirType === "Task" ? "for" : "subject"] = { reference: `Patient/${makePatientId(ctx, subject.name)}` };
   }
 
   // #189 base QI-Core (disc 495): QI-Core MedicationRequest requires `requester` when intent is an order-type
@@ -1243,10 +1244,12 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   if (derived.definitionalDoNotPerform === true) {
     if (
       fhirType === "ServiceRequest" ||
-      fhirType === "MedicationRequest" ||
-      fhirType === "Task"
+      fhirType === "MedicationRequest"
     ) {
       resourceBody.doNotPerform = true;
+    } else if (fhirType === "Task") {
+      // REFACTOR:grounded (MR10): R4 Task prohibits action with this standard modifier extension.
+      resourceBody.modifierExtension = [{ url: "http://hl7.org/fhir/StructureDefinition/request-doNotPerform", valueBoolean: true }];
     } else {
       resourceBody.status = "entered-in-error";
     }
@@ -1271,16 +1274,18 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   if (factRefField?.intent === "absent") {
     if (
       fhirType === "ServiceRequest" ||
-      fhirType === "MedicationRequest" ||
-      fhirType === "Task"
+      fhirType === "MedicationRequest"
     ) {
       resourceBody.doNotPerform = true;
+    } else if (fhirType === "Task") {
+      // REFACTOR:grounded (MR10): R4 Task prohibits action with this standard modifier extension.
+      resourceBody.modifierExtension = [{ url: "http://hl7.org/fhir/StructureDefinition/request-doNotPerform", valueBoolean: true }];
     } else {
       // Best-effort: most resources have a `status` field. Mark as entered-in-error.
       resourceBody.status = "entered-in-error";
     }
   } else if (factRefField?.intent === "negative") {
-    resourceBody.status = "stopped";
+    resourceBody.status = fhirType === "Task" ? "cancelled" : "stopped";
   }
 
   // REFACTOR:grounded (#320, discussion 555): preflight resolves each case clause before emission.
@@ -1303,6 +1308,11 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   // overridable default when the source didn't supply it, so the emitted resource is valid FHIR. Author-set and
   // already-wired (`subject`) values are preserved (only MISSING elements are filled).
   applyStructuralDefaults(resourceBody, fhirType);
+  // REFACTOR:grounded (MR10): administrative completeness for activity outputs, without extending concept publications.
+  if (derived.kind === "Activity" && fhirType === "Task") {
+    resourceBody.status ??= "draft";
+    resourceBody.intent ??= "proposal";
+  }
 
   ctx.emittedIds.set(factName, { id, resourceType: fhirType });
 

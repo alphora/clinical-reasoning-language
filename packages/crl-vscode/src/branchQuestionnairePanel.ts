@@ -26,7 +26,7 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
         if(current!==panel || message?.gen!==generation)return;
         if(message.type==='ready'){ready=true;post({type:'routeCards',...payload});return;}
         if(message.token!==payload?.token)return;
-        if(['routeCardProposal','routeCardDraft'].includes(message.type))onMessage(message);
+        if(['routeCardSave','routeCardAnswerSave','routeCardDraft'].includes(message.type))onMessage(message);
       });
       panel.onDidDispose(()=>{listener.dispose();if(current!==panel)return;current=undefined;payload=undefined;ready=false;onClosed();});
       const nonce=randomUUID();
@@ -37,7 +37,7 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
       </style></head><body><main id="root"></main><script nonce="${nonce}">
         const api=acquireVsCodeApi(),gen=${generation};
         const ui=(${installRouteCards.toString()})(document.getElementById('root'),api,()=>gen,()=>{},true);
-        window.addEventListener('message',e=>{const m=e.data;if(m.gen!==gen)return;if(m.type==='routeCards')ui.show(m);else if(m.type==='routeCardProposalResult')ui.result(m);else if(m.type==='routeCardDraft')ui.draft(m);});
+        window.addEventListener('message',e=>{const m=e.data;if(m.gen!==gen)return;if(m.type==='routeCards')ui.show(m);else if(m.type==='routeCardSaveResult')ui.result(m);else if(m.type==='routeCardDraft')ui.draft(m);});
         api.postMessage({type:'ready',gen});
       </script></body></html>`;
     },

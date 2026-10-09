@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { planConditionBody } from "./planConditionTestHelpers";
 import { isFhirDefError } from "../types";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -24,10 +25,10 @@ concept "Answer":
 - code is \`answer\`.
 - shape reduction is most recent.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 `;
 const LOC = { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } };

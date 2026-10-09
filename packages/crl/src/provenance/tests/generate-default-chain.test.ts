@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * #175 final slice (Path 3, disc 154) — the DEFAULT `clusterBy:"decision"` provenance generate mode is now CHAIN-AWARE.
  *
@@ -93,7 +94,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "Sub":
 - when "Indic" then recommend activity "Final".
@@ -144,7 +145,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "SubA":
 - when "Indic" then recommend activity "Final".
@@ -202,10 +203,10 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 activity "Other":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`o\`.
 decision "Sub":
 - when "Indic" then recommend activity "Final".
@@ -418,7 +419,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "Sub":
 - when "Indic" then recommend activity "Final".
@@ -476,7 +477,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "Sub":
 - when "Indic" then recommend activity "Final".
@@ -571,10 +572,10 @@ concept "Crit":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Dec":
 first:

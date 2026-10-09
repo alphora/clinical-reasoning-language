@@ -172,7 +172,7 @@ check("contributes the crl.medical-validation.paneOrder setting (enum + ALL-pane
   // Operator's default (2026-08-16). Deliberately a SUBSET of the enum: the setting is the source of truth, so
   // the rest are opt-in via the enum a user editing this setting is already looking at. Defaulting to all seven
   // was tried and reverted — seven webviews side by side on a browser-only clinician's screen.
-  assert.deepEqual(prop.default, ["source", "fhirQuestionnaire", "tree"]);
+  assert.deepEqual(prop.default, ["source", "tree", "fhirQuestionnaire"]);
   assert.equal(prop.scope, "window");
 });
 

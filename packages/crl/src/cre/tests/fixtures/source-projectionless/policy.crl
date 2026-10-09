@@ -20,10 +20,10 @@ concept "Guard":
   - coded from "Denials".
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `ap`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `dn`.
 
 decision "D":

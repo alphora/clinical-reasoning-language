@@ -36,8 +36,8 @@ concept "Uncertainty":
 - definition is any available value of "Female Administrative Gender" in "Uncertain" using validity of "Female Administrative Gender".
 - shape reduction is most recent.
 
-activity "Met": - request CPGCommunicationRequest. - with `Met`.
-activity "Unmet": - request CPGCommunicationRequest. - with `Unmet`.
+activity "Met": - request CPGTaskRequest. - with `Met`.
+activity "Unmet": - request CPGTaskRequest. - with `Unmet`.
 decision "D": first:
 - when "Female Administrative Gender" then:
   first:

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Tests for the scenario view-model (roadmap item #2). renderScenario projects the CRE run into the
 // stable CRE↔UI contract: the FULL decision tree (AST spine) overlaid with run state. Covers the
 // reviewer-required cases: full-tree/preempted/condition-false, decision-not-found, guard/guarded-out,
@@ -47,10 +48,10 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "D":
 first:
@@ -149,10 +150,10 @@ concept "Contra":
 - type is Condition.
 - code is \`contra\`.
 activity "Referral":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`r\`.
 activity "Med":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`m\`.
 decision "D":
 - when "Indic" then:
@@ -224,7 +225,7 @@ concept "Indic":
 - type is Condition.
 - code is \`i\`.
 activity "SubRec":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`sr\`.
 decision "Sub":
 first:
@@ -337,10 +338,10 @@ concept "Crit":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Sub":
 first:
@@ -422,7 +423,7 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 - when "A" then:
@@ -474,7 +475,7 @@ concept "B":
 concept "Both":
 - defined as ( "A" sem-and "B" ).
 activity "Go":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`g\`.
 decision "D":
 - when "Both" then recommend activity "Go".`;
@@ -524,7 +525,7 @@ concept "Eligible":
 - type is Condition.
 - code is \`e\`.
 activity "Treat":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`t\`.
 decision "D":
 - when "Indic" then:
@@ -571,10 +572,10 @@ concept "Y":
 - type is Condition.
 - code is \`y\`.
 activity "DoX":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dx\`.
 activity "DoY":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dy\`.
 decision "D":
 all:

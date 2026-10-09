@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // Tests for buildConceptShapeIndex (#187 Todo 1b) — the per-concept `defined as` shape subtree the Medical-Validation
 // panes consume. Covers: the subtree shape (diamond first-wins, both-rep own-code-first, definition-is no-children),
@@ -61,7 +62,7 @@ concept "Sourced":
 concept "CrossComp":
 - defined as ( "A" sem-or "U"."Q" ).
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -337,7 +338,7 @@ concept "TopMid":
 concept "TopL2":
 - defined as ( "L2" ).
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:

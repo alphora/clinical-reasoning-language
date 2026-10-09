@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { planPresentationEdit } from "../../editing/presentationEdit";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +16,7 @@ const answer = `concept "Answer":
 - code is \`answer\`.
 - shape reduction is most recent.
 `;
-const activity = `activity "Met": - request CPGCommunicationRequest. - with \`MET\`.
+const activity = `activity "Met": - request CPGTaskRequest. - with \`MET\`.
 `;
 const wording = `presentation for "Answer":
 - question text is "Has the answer been documented?".

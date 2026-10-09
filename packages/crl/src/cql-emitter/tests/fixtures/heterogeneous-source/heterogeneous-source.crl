@@ -22,11 +22,11 @@ concept "Service Was Requested":
 - defined as exists ("Requested Service").
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT APPROVED`.
 
 decision "Requested Service Decision":

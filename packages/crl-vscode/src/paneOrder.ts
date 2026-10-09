@@ -55,7 +55,7 @@ export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
   // them never open. Discoverability comes from the settings enum, which is where someone editing paneOrder
   // already is.
   valid: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
-  canonical: ["source", "fhirQuestionnaire", "tree"],
+  canonical: ["source", "tree", "fhirQuestionnaire"],
 };
 
 /** Every internal pane, in a stable order — the ONE authoritative list. Anything that needs to enumerate panes

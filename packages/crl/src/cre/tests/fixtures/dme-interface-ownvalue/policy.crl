@@ -25,10 +25,10 @@ concept "Covered Device Requested":
 - defined as exists ("Covered Device").
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `approve`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `deny`.
 
 decision "D":

@@ -17,6 +17,12 @@ test("a valid draft → a complete MvFlag (concept anchor, canonical tag, host-i
   expect(typeof r.flag.dedupKey).toBe("string");
 });
 
+test.each(['ke-flag','ke-question-revision','mv-answer'])('both creation callers reject host-owned correlation %s',key=>{
+ const r=build({tag:'other',fields:{[key]:'forged',detail:'keep'}});
+ expect(r).toMatchObject({ok:false,reason:'invalid-value'});
+ if(!r.ok)expect(r.message).toContain('host-owned');
+});
+
 test("dedupKey is STABLE across builds of the same content (retry-idempotency) but DIFFERS by gist", () => {
   const a = build({ gist: "same" });
   const b = build({ gist: "same" }, () => "other-id"); // different id, same content

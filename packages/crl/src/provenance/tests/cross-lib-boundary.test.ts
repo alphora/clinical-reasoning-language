@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * #172 todo-3 (FULL) — BOUNDARY fixtures for cross-library provenance (disc 157 "Boundary fixtures to add"). The
  * cross-lib-chain.test.ts suite proves the headline single-sub round-trip; this suite exercises the four boundaries the
@@ -104,7 +105,7 @@ concept "ShrCrit":
 - type is Condition.
 - code is \`shr\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "SubS":
 - when "ShrCrit" then recommend activity "Approve".`;
@@ -209,7 +210,7 @@ concept "Crit":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "Sub":
 - when "Crit" then:
@@ -400,7 +401,7 @@ concept "SibCrit":
 - type is Condition.
 - code is \`sib\`.
 activity "SibNo":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`n\`.
 decision "SubP":
 first:
@@ -414,10 +415,10 @@ concept "ShrCrit":
 - type is Condition.
 - code is \`shr\`.
 activity "ShrYes":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "ShrNo":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`b\`.
 decision "SubS":
 first:
@@ -511,7 +512,7 @@ concept "Crit":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "D":
 - when "Crit" then recommend activity "Approve".`;
@@ -608,7 +609,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "SubA":
 - when "Indic" then recommend activity "Approve".`;
@@ -618,7 +619,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`b\`.
 decision "SubB":
 - when "Indic" then recommend activity "Approve".`;
@@ -692,10 +693,10 @@ concept "Crit":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Dec":
 first:
@@ -707,7 +708,7 @@ concept "Crit":
 - type is Condition.
 - code is \`c\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "Sub":
 - when "Crit" then recommend activity "Final".

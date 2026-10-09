@@ -22,6 +22,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readPackageSnapshot, type PackageSnapshot } from "../imports/packageSnapshot";
 
 import type { CRLError } from "../types/errors";
 
@@ -44,38 +45,25 @@ export type MetadataResult =
  * required fields).
  */
 export function readPackageMetadata(projectRoot: string): MetadataResult {
-  const path = join(projectRoot, "package.json");
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (e) {
-    return {
-      metadata: null,
-      errors: [
-        {
-          type: "Exception",
-          kind: "unreadable-package-json",
-          message: `Cannot read ${path}: ${(e as Error).message}`,
-        },
-      ],
-    };
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch (e) {
-    return {
-      metadata: null,
-      errors: [
-        {
-          type: "Exception",
-          kind: "unreadable-package-json",
-          message: `Cannot parse ${path}: ${(e as Error).message}`,
-        },
-      ],
-    };
-  }
-  return normalizePackageMetadata(raw);
+  return readEmissionMetadata(projectRoot).fhir;
+}
+
+/** One immutable package read, retaining the CQL lane's lightweight field tolerance. */
+export function readEmissionMetadata(projectRoot: string): ReturnType<typeof normalizeEmissionMetadata> {
+  return normalizeEmissionMetadata(readPackageSnapshot(projectRoot));
+}
+
+export function normalizeEmissionMetadata(snapshot: PackageSnapshot): {
+  fhir: MetadataResult; canonicalBase?: string; policyId?: string; dispositions?: unknown;
+} {
+  const raw = snapshot.raw;
+  const obj = raw !== null && typeof raw === 'object' ? raw as Record<string, unknown> : undefined;
+  const crl = obj?.crl !== null && typeof obj?.crl === 'object' ? obj.crl as Record<string, unknown> : undefined;
+  const canonicalBase = typeof crl?.canonicalBase === 'string' ? crl.canonicalBase.trim().replace(/\/+$/, '') || undefined : undefined;
+  const policyId = typeof obj?.name === 'string' ? obj.name.trim() || undefined : undefined;
+  const fhir: MetadataResult = snapshot.errors.length ? { metadata: null, errors: snapshot.errors } : normalizePackageMetadata(raw);
+  const dispositions = obj && !Array.isArray(obj) && crl && !Array.isArray(crl) ? crl.dispositions : undefined;
+  return { fhir, canonicalBase, policyId, dispositions };
 }
 
 /**

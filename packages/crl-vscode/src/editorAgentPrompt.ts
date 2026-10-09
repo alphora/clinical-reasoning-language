@@ -2,7 +2,7 @@
 // flag tool specs. PURE (no vscode) so it's node-testable; agentChat.ts composes it with the live bridge state. Thin by
 // design (A9/A11 of the plan): the KNOWLEDGE is the injected app-state + the tool schema; the heavier editor_kit /
 // user-guide knowledge is Todo D. The agent DEFAULTS to proposing (open the drawer prefilled for the validator to submit)
-// and FILES on an explicit submit command (writes the flag + opens an issue) — either way it never hand-edits CRL text;
+// and FILES on an explicit submit command (saves the flag in the policy flag store) — either way it never hand-edits CRL text;
 // the cockpit's flag machinery writes it.
 import type { ToolSpec } from "./agentTypes";
 import type { CockpitAppState } from "./cockpitAgentBridge";
@@ -28,7 +28,7 @@ const BASE_PROMPT =
   "NOT prompt for missing fields in chat, and you never hand-edit CRL). Two tools:\n" +
   `- ${OPEN_FLAG_DRAWER} is the DEFAULT: it opens the drawer prefilled with whatever you know, highlights what's still needed, ` +
   "and WAITS while the validator completes and submits it in the app. You get the outcome back when they finish.\n" +
-  `- ${SUBMIT_FLAG} fills AND submits autonomously — writes the flag into the .crl + opens a GitHub issue with no drawer step. ` +
+  `- ${SUBMIT_FLAG} fills AND submits autonomously — saves the flag in the policy flag store with no drawer step. ` +
   `Use it ONLY when the validator EXPLICITLY said to submit/file (e.g. "flag this and submit", "file it") AND you already ` +
   `have a summary + description. In every other case use ${OPEN_FLAG_DRAWER} and let the drawer collect the rest.\n\n` +
   "You can also SET A CASE'S REVIEW VERDICT (its pass/fail/pending state in the worklist):\n" +
@@ -53,11 +53,11 @@ const BASE_PROMPT =
   `- To raise a flag, just call ${OPEN_FLAG_DRAWER} with whatever the validator gave you (target + summary + description + ` +
   "kind, whichever you have). Don't ask for missing pieces first — the drawer does that.\n" +
   `- When you ${SUBMIT_FLAG}, state plainly what you're filing first (e.g. "Filing a flag on <target>: <summary>") — it ` +
-  "writes source + opens an issue.\n" +
+  "saves the flag in the policy flag store.\n" +
   "- The FLAG ANCHOR in the [cockpit] block is the last flag-capable node the validator clicked in the tree. It may differ " +
   "from what they are currently looking at — if their request seems to reference a different node, say so and ask them to " +
   "click it.\n" +
-  "- `summary` is the one-line title; `description` is the fuller concern (the issue body). Add the concern `kind` when it's clear.\n" +
+  "- `summary` is the one-line title; `description` is the fuller concern (the flag Description). Add the concern `kind` when it's clear.\n" +
   "- Pick the flag target that matches the concern (a whole decision, a concept's every use, or one condition/recommendation).\n" +
   "- Be concise.";
 
@@ -100,8 +100,8 @@ export function buildSystemPrompt(state: CockpitAppState | undefined): string {
 function flagProps(validationKinds: string[], withKind: boolean): Record<string, unknown> {
   const props: Record<string, unknown> = {
     target_id: { type: "string", description: "The id of the flag target (from the [cockpit] flag-targets list)." },
-    summary: { type: "string", description: "A one-line summary of the concern (becomes the issue title + the flag gist)." },
-    description: { type: "string", description: "The fuller concern text (becomes the flag's GitHub issue body). Fill this from what the validator tells you." },
+    summary: { type: "string", description: "A one-line summary of the concern (becomes the flag title)." },
+    description: { type: "string", description: "The fuller concern text (becomes the flag Description). Fill this from what the validator tells you." },
   };
   if (withKind) {
     const kinds = validationKinds.length ? validationKinds : DEFAULT_VALIDATION_KINDS;
@@ -123,13 +123,13 @@ export function openFlagDrawerTool(validationKinds: string[]): ToolSpec {
   };
 }
 
-/** The `submit_flag` tool — fills AND submits: writes the flag into the .crl + opens a GitHub issue. Use ONLY on an explicit
- *  submit/file command. Requires a `summary` (the flag's gist / the issue title). Ask for any missing info first. */
+/** The `submit_flag` tool — fills AND submits: saves the flag in the policy flag store. Use ONLY on an explicit
+ *  submit/file command. Requires a `summary` (the flag title). Ask for any missing info first. */
 export function submitFlagTool(validationKinds: string[]): ToolSpec {
   return {
     name: SUBMIT_FLAG,
     description:
-      "File a review flag: write it into the .crl source AND open a GitHub issue, in one step. Use this ONLY when the " +
+      "File a review flag: save it in the policy flag store, in one step. Use this ONLY when the " +
       `validator EXPLICITLY asked to submit/file (otherwise use ${OPEN_FLAG_DRAWER} and let them submit). Requires ` +
       "target_id + a one-line summary; include the description + kind when known. Ask for anything missing first, and state " +
       "what you're filing before you call this.",

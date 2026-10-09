@@ -426,7 +426,7 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
 });
 
 check("#218 legend: buildTreeChromeHtml appends flowLegendChrome(mode) AFTER the banner (MV-gating lives in the exported helper)", () => {
-  assert.ok(/return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
+  assert.ok(/return definitionStatus \+ progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires[\s\S]*?\+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
   assert.ok(/import \{[^}]*flowLegendChrome[^}]*\} from "\.\/flowPaneHtml"/.test(COCKPIT_SRC), "flowLegendChrome imported from flowPaneHtml (co-located with FLOW_STYLE + the shared TOK_* consts)");
 });
 
@@ -607,9 +607,9 @@ check("Slice 1b/#210/#217: driveDoneOverlay reviewed-only painting, delegating t
   // reviewed-only painting input: unreviewed cases can't vote.
   assert.ok(/buildReviewPerCase\(\s*Object\.keys\(reviewByCaseId\)/.test(COCKPIT_SRC), "buildReviewPerCase is fed Object.keys(reviewByCaseId), not scenarioByCaseId.keys()");
   // #217: the per-case lit reach moved into the shared litNodeKeysForCase (used by BOTH paint here and the right-click resolver).
-  assert.ok(/litNodeKeysForCase\(caseId, scenarioByCaseId\.get\(caseId\), m, dispositionLeafKeys, tree\.leafConcepts\)/.test(COCKPIT_SRC), "the paint callback delegates to the shared litNodeKeysForCase");
+  assert.ok(/litNodeKeysForCase\(caseId, sv, dispositionLeafKeys\)/.test(COCKPIT_SRC), "the paint callback delegates to the shared litNodeKeysForCase");
   assert.ok(!/const producedByCaseId = new Map/.test(COCKPIT_SRC) && !/producedByCaseId\.(get|set)\(/.test(COCKPIT_SRC), "the overlay-local producedByCaseId map is gone — litNodeKeysForCase recomputes produced (no overlay-run coupling)");
-  // the shared reach shape (interior ∪ produced ∪ yes) is asserted in the #217 litNodeKeysForCase check.
+  // Complete body reach is shared; the existing non-pass paint compatibility is host-tested.
   // the fold's isLeaf is unchanged.
   assert.ok(/deriveReviewOverlay\(reviewByCaseId, perCase, \(k\) => dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "the leaf-aware fold call is unchanged");
 });
@@ -710,14 +710,13 @@ check("#217 host: nodeVerdictMenu is routed, normalizes the hit to a SEMANTIC ke
   assert.ok(/caseIdsThroughReviewNode\(semanticKey\)/.test(m[1]), "resolves cases via the SHARED lit reach + the pure membership core over scenarioByCaseId");
   assert.ok(/setStatusBarMessage/.test(m[1]), "every no-op exit emits a transient status note (the native menu is already suppressed — no silent dead click)");
 });
-check("#217 host: litNodeKeysForCase is the SHARED reach — driveDoneOverlay paints with it, and it routes through questionnaireFor (NOT buildFocusedQuestionnaire)", () => {
-  const m = COCKPIT_SRC.match(/function litNodeKeysForCase\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "litNodeKeysForCase body");
-  assert.ok(/questionnaireFor\(caseId, sv\)/.test(m[1]), "routes through questionnaireFor (guards the focused/raw split)");
-  assert.ok(!/buildFocusedQuestionnaire/.test(m[1]), "must NOT call buildFocusedQuestionnaire (its memo poisons on a non-focused sv the resolver passes)");
-  assert.ok(/routesForCase\(caseId\)\.flatMap[\s\S]*producedDispositionLeafKeys\(sv, dispositionLeafKeys\)/.test(m[1]), "interior (minus disposition leaves) ∪ produced — recomputes produced (no overlay-local map)");
-  assert.ok(/litNodeKeysForCase\(caseId, scenarioByCaseId\.get\(caseId\), m, dispositionLeafKeys, tree\.leafConcepts\)/.test(COCKPIT_SRC), "driveDoneOverlay's paint callback uses the SAME shared reach");
+check("review reach shares complete route-owned bodies with the case menu, without clinical truth filtering", () => {
+  const body = COCKPIT_SRC.slice(COCKPIT_SRC.indexOf("function litNodeKeysForCase"), COCKPIT_SRC.indexOf("function driveDoneOverlay"));
+  assert.match(body, /caseReviewReach/);
+  assert.doesNotMatch(body, /leafBucketsFromQuestionnaire|questionnaireFor/);
+  assert.match(COCKPIT_SRC, /driveCriterionVerdicts\(projection\)/);
 });
+
 check("#217 host: applyVerdict is the shared persist tail (validates + returns boolean + aborts on save-fail), used by BOTH setWorklist and the quick-pick", () => {
   const m = COCKPIT_SRC.match(/function applyVerdict\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "applyVerdict body");
@@ -826,12 +825,14 @@ check("#233 Todo 2b host: buildLiveCriterionIdentities = REACHABLE gate set (cri
   assert.match(COCKPIT_SRC, /for \(const \[key, id\] of criterionGateIdentities\(guardOutlines, criterionIdentities\)\) out\.set\(key, \{ bodyHash: id\.bodyHash, elided: id\.elided \}\)/);
   assert.ok(!/go\.soleCriterion|\.soleCriterion/.test(COCKPIT_SRC), "no host code reads the retired soleCriterion sidecar");
 });
-check("#224 Slice 2b host: driveCriterionVerdicts groups occurrences by IDENTITY state (criterionVerdictState); unreviewed → no class", () => {
-  assert.match(COCKPIT_SRC, /function driveCriterionVerdicts\(\)/);
-  assert.match(COCKPIT_SRC, /criterionVerdictState\(criterionVerdicts\[key\], live\)/);
-  assert.match(COCKPIT_SRC, /if \(s !== "unreviewed"\) byState\[s\]\.push\(occ\.gid\)/);
-  assert.match(COCKPIT_SRC, /type: "criterionVerdicts", gen: tree\.gen, allGids, byState/);
+check("criterion display checks use the occurrence projection, separate from stored completion", () => {
+  assert.match(COCKPIT_SRC, /function driveCriterionVerdicts\(projection\?/);
+  assert.match(COCKPIT_SRC, /projection \?\? criterionReviewProjection\(tree\)/);
+  assert.match(COCKPIT_SRC, /byState\[state\]\.push\(occ\.gid\)/);
+  assert.match(COCKPIT_SRC, /type: "criterionVerdicts", gen: tree\.gen, allGids, byState, derivedGids/);
+  assert.match(SCRIPT, /Pass from reviewed contents; encoding verdict not recorded/);
 });
+
 check("#233/#(bulk-verdict) host: applyCriterionVerdict DELEGATES the guard policy to the SHARED computeCriterionVerdictUpdate (single + bulk share it) + persists the 3rd map with upd.map", () => {
   assert.match(COCKPIT_SRC, /function applyCriterionVerdict\(lib: string, name: string, value: unknown, expectedBodyHash: string, seenElided: boolean\)/);
   // The hash/elision guards (refuse-ALL on a moved hash; refuse a PASS on a seen-elided body) moved into the shared pure
@@ -876,7 +877,7 @@ check("#224 Slice 2b host: the MV gate + chrome compose the criterion half (crit
 });
 check("#224 Slice 2b host: persistMv marries the 3rd map (default = current) so a case/note change preserves criterion verdicts", () => {
   assert.match(COCKPIT_SRC, /nextCriterionVerdicts: Record<string, PersistedCriterionVerdict> = criterionVerdicts/);
-  assert.match(COCKPIT_SRC, /composeSidecar\(nextByCaseId, nextNotes, nextCriterionVerdicts\)/);
+  assert.match(COCKPIT_SRC, /composeSidecar\(nextByCaseId, nextNotes, nextCriterionVerdicts, mvDefinitionRevision\)/);
   assert.match(COCKPIT_SRC, /criterionVerdicts = nextCriterionVerdicts/);
 });
 // Concept placement and collapsed rollups are exercised behaviorally in flagPlacement.test.mjs,
@@ -963,7 +964,7 @@ check("#212 S3: writeFlagStatus is STORE-ONLY (no origin dispatch) — read-modi
   assert.match(m[1], /const loaded = loadStoredFlags\(dir\)/);
   assert.match(m[1], /if \(loaded\.warning\) return stale\(/); // a partially-unknown store must not be written into (MCP parity)
   assert.match(m[1], /loaded\.flags\.find\(\(f\) => f\.id === flag\.id\)/); // re-read the current record by id
-  assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, category, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT
+  assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT
 });
 // (design 354) `revealFlag` DELETED — "Reveal in source" only re-opened the `.cel` (near-useless); the non-modal action drawer
 // + the anchor signature it renders are the legibility replacement. Its removal is locked by the "'Reveal in source' is GONE" test.
@@ -1008,57 +1009,23 @@ check("#211: commitFlagDraft — in-flight guard + DRY-RUN before any POST; iden
   // identity is currentCel/mode — a same-policy rebuild (indexVersion bump) must NOT discard the draft (both reviewers)
   assert.match(m[1], /if \(currentCel !== cel \|\| mode !== "medical-validation"\)[\s\S]*?fail\("policy changed/);
   assert.doesNotMatch(m[1], /indexVersion !== ver/); // the buggy guard is gone
-  // the DRY-RUN (no ref) precedes the issue creation in the source
-  const dryIdx = m[1].indexOf("const dry = validateAndBuildMvFlagDraft(");
-  const repoIdx = m[1].indexOf("githubRepoForFile(");
-  assert.ok(dryIdx > 0 && repoIdx > 0 && dryIdx < repoIdx, "the seam validation (dry-run) precedes the repo resolve / POST");
-  assert.match(m[1], /if \(!dry\.ok\) return fail/); // abort with NO issue created; drawer stays open
-  // #212 S3: a corrupt store blocks BEFORE the issue POST (don't file an issue + advance store state while flag state is unknown)
-  assert.match(m[1], /if \(preStoreDir && loadStoredFlags\(preStoreDir\)\.warning\) return fail/);
+  assert.match(m[1], /if \(!built\.ok\) return fail/);
+  assert.match(m[1], /if \(loadStoredFlags\(storeDir\)\.warning\) return fail/);
+  assert.doesNotMatch(m[1], /createGithubIssue|githubRepoForFile|githubToken/);
   // #210 Todo C [critical, both reviewers]: the in-flight lock MUST be armed BEFORE the first await, or two rapid Inserts
   // (or an agent submit racing the live webview Insert) both pass the top `if (flagCommitting)` check and double-POST/write.
   const lockIdx = m[1].indexOf("flagCommitting = true");
   const firstOpenIdx = m[1].indexOf("await vscode.workspace.openTextDocument");
   assert.ok(lockIdx > 0 && firstOpenIdx > 0 && lockIdx < firstOpenIdx, "the in-flight lock is set BEFORE the first await (closes the double-commit TOCTOU)");
 });
-check("#211: commitFlagDraft — trust+github gated, pre-POST recheck, LOCK+try/finally, issueNote folded into ONE honest note", () => {
+check("MV flag submission is local: no issue creation, authentication or missing-issue warning", () => {
   const m = COCKPIT_SRC.match(/async function commitFlagDraft\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.match(m[1], /flagCommitting = true;[\s\S]*?try \{/); // lock past the dry-run boundary, then the wrapped body
-  assert.match(m[1], /\} finally \{\s*\n\s*flagCommitting = false;/); // released for a later retry
-  assert.match(m[1], /if \(!vscode\.workspace\.isTrusted\)/); // trust gate
-  assert.match(m[1], /githubRepoForFile\(vscode\.Uri\.file\(join\(policySrc, "crl"\)\)\)/); // #212 S2 C1: repo from policy src/crl (matches the read paths — no create-vs-read drift)
-  // a retarget during the async repo-resolve/auth aborts BEFORE any POST (no orphan issue for a policy the user left)
-  const repoAt = m[1].indexOf("githubRepoForFile(");
-  const rechecks = (m[1].match(/currentCel !== cel \|\| mode !== "medical-validation"/g) || []).length;
-  assert.ok(rechecks >= 3, "pre-write guard + at least two pre-POST rechecks");
-  assert.match(m[1], /ref = `#\$\{await createGithubIssue\(/); // ref from the created number
-  // 401 Bad credentials (a stale cached token) → force a FRESH session + retry ONCE, rather than dead-ending
-  assert.match(m[1], /e1 instanceof IssueCreateError && e1\.status === 401/);
-  assert.match(m[1], /const fresh = await githubToken\(true\)/);
-  assert.match(m[1], /catch \(e\)[\s\S]*?issue not created — \$\{e\.message\}/); // outer catch surfaces the RAW github message
-  assert.match(m[1], /const withRef = ref \? \{ \.\.\.fields, ref \} : fields/);
-  // #212 S3: the write goes to the `medical-validation/flags/` STORE via the SHARED seam (validateAndBuildMvFlagDraft — the same path the MCP
-  // tool uses; it host-injects id/createdAt/dedupKey). Built AFTER the POST, with the `ref`. description normalized by the shared builder in BOTH pre-POST and final calls.
-  assert.match(m[1], /const built = validateAndBuildMvFlagDraft\(doc2\.getText\(\)/); // the final build (with ref)
-  assert.doesNotMatch(m[1], /legacyToMvFlag|createFlag\(/); // the inline createFlag+legacyToMvFlag is GONE (in the seam now)
-  assert.equal((m[1].match(/description: stub/g) ?? []).length, 2);
-  assert.match(m[1], /const flag = built\.flag/);
-  assert.match(m[1], /saveFlag\(storeDir, flag\)/);
-  assert.doesNotMatch(m[1], /new vscode\.WorkspaceEdit\(\)/); // no more `.crl` text splice on create
-  assert.match(m[1], /issue \$\{ref\} created but the flag couldn't be written/); // honest post-POST failure (never silent)
-  assert.match(m[1], /const note = `issue \$\{ref\} created; flag added[\s\S]*?return \{ ok: true, note, ref \}/); // success → the note + a structured outcome for the agent
-  assert.match(m[1], /reportNoIssue\(noIssueMsg, issueNote \?\? "no issue link"\)/); // no issue → a LOUD, persistent warning with the reason
-  assert.match(m[1], /issue not created — \$\{e\.message\}/); // the RAW GitHub error is surfaced (e.g. a 403 scope message)
-  assert.match(m[1], /if \(currentCel === cel && mode === "medical-validation"\) \{[\s\S]*?reloadReviewFlags\(\)/); // refresh only if policy unchanged
-  assert.ok(repoAt > 0, "repo resolve present");
-});
-check("#211: reportNoIssue is a LOUD, actionable warning — Manage Trust / Sign in to GitHub (clears the no-nag latch)", () => {
-  const m = COCKPIT_SRC.match(/function reportNoIssue\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
-  assert.ok(m, "reportNoIssue body");
-  assert.match(m[1], /showWarningMessage\(msg, "Manage Workspace Trust"\)[\s\S]*?workbench\.trust\.manage/); // trust → one-click fix
-  assert.match(m[1], /showWarningMessage\(msg, "Sign in to GitHub"\)/); // not-signed-in → a re-auth action
-  assert.match(m[1], /githubAuthDeclined = false;[\s\S]*?getSession\("github", \["repo"\], \{ createIfNone: true \}\)/); // the action clears the latch + re-prompts
-  assert.match(m[1], /showWarningMessage\(msg\);/); // other reasons (github error / no origin) → the raw message
+  assert.match(m[1], /flagCommitting = true;[\s\S]*?try \{/);
+  assert.match(m[1], /\} finally \{\s*\n\s*flagCommitting = false;/);
+  assert.match(m[1], /saveFlag\(storeDir, built\.flag\)/);
+  assert.match(m[1], /flagDraft !== draft/);
+  assert.doesNotMatch(m[1], /createGithubIssue|githubToken|githubRepoForFile|reportNoIssue|new vscode\.WorkspaceEdit/);
+  assert.match(m[1], /return \{ ok: true, note: "flag saved" \}/);
 });
 check("#211: the drawer lives in a DEDICATED #flagDrawer region the render handler never wipes (survives a rebuild)", () => {
   assert.match(COCKPIT_SRC, /<div id="flagDrawer"><\/div>/); // shell region (sibling of #root)
@@ -1323,7 +1290,7 @@ check("tree-snapshot: the trigger is an IN-PANE chrome button on the tree pane (
   // host: the tree-chrome builder renders the export button
   assert.match(COCKPIT_SRC, /class="fc-toggle-btn fc-export" data-export-snapshot/, "the export button is in the tree chrome");
   assert.match(COCKPIT_SRC, /const exportBtn =/);
-  assert.match(COCKPIT_SRC, /return progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires \+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
+  assert.match(COCKPIT_SRC, /return definitionStatus \+ progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires[\s\S]*?\+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
   // webview: the fcChrome click delegate posts exportSnapshot
   assert.match(SCRIPT, /closest\('\[data-export-snapshot\]'\);.*v\.postMessage\(\{type:'exportSnapshot'\}\);return;/s);
   // host: the exportSnapshot message (tree-only) runs the command with a catch backstop
@@ -1405,7 +1372,7 @@ check("bulk-verdict: apply persists ONCE + repaints both halves + notifies once;
   assert.match(COCKPIT_SRC, /if \(!persistMv\(result\.reviewByCaseId, notesByCaseId, result\.criterionVerdicts\)\)\s*\{[\s\S]*?type: "reviewGridReenable"/, "persist-fail posts reviewGridReenable (drawer stays open, picks survive)");
   // success re-checks the snapshot is still ours, clears + empties the drawer, THEN chrome once, both overlays, one bridge notify.
   assert.match(COCKPIT_SRC, /if \(reviewGridSnapshot === snap\)\s*\{\s*\n\s*clearReviewGridState\(\);\s*\n\s*postFlagDrawer\(\);/, "success-clear is conditional on the grid still being current");
-  assert.match(COCKPIT_SRC, /else renderTreeChrome\(\);[\s\S]*?driveDoneOverlay\(\);[\s\S]*?driveCriterionVerdicts\(\);[\s\S]*?cockpitAgentBridge\.notifyChanged\(\);/, "chrome once, both overlays, then one bridge notify");
+  assert.match(COCKPIT_SRC, /else renderTreeChrome\(\);[\s\S]*?driveDoneOverlay\(\);[\s\S]*?cockpitAgentBridge\.notifyChanged\(\);/, "chrome once, both overlays, then one bridge notify");
 });
 
 check("bulk-verdict: the grid is a #flagDrawer MODE — its style/script fold into the cockpit shell, no separate panel shell", () => {
@@ -1471,11 +1438,12 @@ check("flag-action drawer: refreshFlagActionDrawer re-finds by id, RE-STAMPS ver
 });
 
 check("flag-action drawer: Resolve/Reopen is single-flight, writes via writeFlagStatus, then reconciles off the FRESH status", () => {
-  const m = COCKPIT_SRC.match(/async function flagActionToggle\(decision\?: "accept" \| "reject"\): Promise<void> \{([\s\S]*?)\n  \}/);
+  const m = COCKPIT_SRC.match(/async function flagActionToggle\(decision\?: "answer" \| "ignore"\): Promise<void> \{([\s\S]*?)\n  \}/);
   assert.ok(m, "flagActionToggle body");
   assert.match(m[1], /if \(!view \|\| flagActionBusy\) return;/, "single-flight guard");
   assert.match(m[1], /flagActionBusy = true;/);
-  assert.match(m[1], /await writeFlagStatus\(view\.flag, next, view\.ver, view\.cel, decision\);/);
+  assert.match(m[1], /await writeFlagStatus\(view\.flag,[^\n]*view\.ver, view\.cel\);/);
+  assert.match(m[1], /applyKeFlagAction\(dir, view\.flag, decision\)/);
   assert.match(m[1], /refreshFlagActionDrawer\(\);/, "reconcile AFTER the write so the button flips off fresh status");
 });
 
@@ -1791,17 +1759,17 @@ check("delete: closeIssueAsNotPlanned — warning fail-closed, resurrection + sh
   assert.match(b, /if \(!res\.ok && res\.status === 401\) \{[\s\S]*?githubToken\(true\)/);
   assert.match(b, /else reportPartialClose\(issueNo, cel, res\.reason\);/);
   // the partial-close warning is PERSISTENT + its Open-issue recovery is bound to the CAPTURED cel (not the live currentCel)
-  assert.match(COCKPIT_SRC, /function reportPartialClose\(issueNo: number, cel: string \| undefined, why: string\): void \{[\s\S]*?showWarningMessage\([\s\S]*?`Open issue #\$\{issueNo\}`\)[\s\S]*?openIssueNumber\(issueNo, cel\)/);
+  assert.match(COCKPIT_SRC, /function reportPartialClose\(issueNo: number, cel: string \| undefined, why: string\): void \{[\s\S]*?`Open issue #\$\{issueNo\}`[\s\S]*?showWarningMessage\([\s\S]*?openIssueNumber\(issueNo, cel\)/);
   assert.match(COCKPIT_SRC, /async function openIssueNumber\(issueNo: number, cel: string \| undefined\)[\s\S]*?const src = cel \? findPolicySrc\(cel\) : undefined;/);
 });
 
-check('KE Accept and Reject buttons dispatch distinct opaque intents', () => {
+check('KE Answer and Ignore buttons dispatch distinct opaque intents', () => {
  const marker = "fld.addEventListener('click',(e)=>{";
  const start = SCRIPT.indexOf(marker) + marker.length;
  const end = SCRIPT.indexOf("const ec=", start);
  assert.ok(start >= marker.length && end > start);
  const click = new Function('e', 'v', SCRIPT.slice(start, end));
- for (const [attribute, type] of [['data-flag-action-accept','flagActionAccept'],['data-flag-action-reject','flagActionReject']]) {
+ for (const [attribute, type] of [['data-flag-action-answer','flagActionAnswer'],['data-flag-action-ignore','flagActionIgnore']]) {
   const messages = [];
   click({target:{closest:selector=>{assert.ok(selector.includes('['+attribute+']'));return {hasAttribute:value=>value===attribute};}},preventDefault(){},stopPropagation(){}},{postMessage:m=>messages.push(m)});
   assert.deepEqual(messages,[{type}]);

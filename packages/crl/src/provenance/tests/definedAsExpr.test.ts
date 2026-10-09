@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded (#320, plan585): explicit age publication replaces legacy age authoring and lowering; unrelated contracts are retained.
 // Tests for buildDefExprIndex / collectDefExprLeafKeys (#187 Option-3, disc 199) — the per-concept `defined as`
 // OPERATOR tree the MV Questionnaire renders. The LOAD-BEARING test is the drift sweep: the operator tree's
@@ -63,7 +64,7 @@ concept "Top3":
 concept "DirectNested":
 - defined as ( "A" sem-and "Comp" ).
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -160,7 +161,7 @@ concept "Present":
 concept "Has Present":
 - defined as exists ( "Present" ).
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:

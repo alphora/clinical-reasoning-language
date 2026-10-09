@@ -1,5 +1,5 @@
 // Todo 4 (disc 363; impl-review both arms) — the PURE decision of whether deleting a flag should best-effort close its
-// born-together GitHub issue as NOT PLANNED. Extracted from the cockpit so the load-bearing eligibility (the two locked
+// existing linked GitHub issue as NOT PLANNED. Extracted from the cockpit so the load-bearing eligibility (the two locked
 // operator decisions + the fail-closed rules the impl panel surfaced) is node-testable without vscode. No `vscode` import.
 
 import type { MvFlag } from "@smile-digital-health/crl";
@@ -9,7 +9,7 @@ import { issueRefOf } from "./issueLink";
 export interface FlagCloseEligibility {
   /** the flag resolves cleanly (by id) in the passed load — false ⇒ already gone / among the unreadable set. */
   present: boolean;
-  /** close the born-together issue as not-planned? See the rule set below. */
+  /** close the existing linked issue as not-planned? See the rule set below. */
   willClose: boolean;
   /** the numeric issue number, when the flag's `ref` is `#<digits>`. */
   issueNo?: number;

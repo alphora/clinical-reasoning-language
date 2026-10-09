@@ -229,7 +229,7 @@ ACTIVITY_TYPE
     : ~[ \t\r\n.:()]+ {
         const validTypes = [
             'CPGAdministerMedication',
-            'CPGCommunicationRequest',
+            'CPGTaskRequest',
             'CPGDispenseMedication',
             'CPGDocumentMedication',
             'CPGEnrollment',

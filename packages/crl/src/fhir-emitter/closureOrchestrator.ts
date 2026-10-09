@@ -47,9 +47,9 @@ import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex"
 import { guardDefineNameCollisions } from "../ast/guardDefines";
 import { conceptDependencies } from "../ast/conceptDependencies";
 import { hasLocalPublicationContribution, type PublicationDescriptor, type PublicationProgram } from "../emit/publicationProgram";
-import { resolveDispositionConfig } from "../dispositions";
+import { normalizeDispositionConfig } from "../dispositions";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
-import { emitCQLImportsFromPrepared, type SuppressedActivityBinding } from "../imports/emit";
+import { emitCQLImportsFromPrepared, type SuppressedActivityBinding, type EmitImportsResult } from "../imports/emit";
 import { preparePublicationContext, type PreparedPublicationContext } from "../imports/preparePublicationContext";
 import type { PerLibraryEmit } from "../imports/emit";
 import { resolveImports } from "../imports/index";
@@ -85,7 +85,10 @@ import {
   type DecisionResolver,
 } from "./decision";
 import { emitCatalogLibrary, emitLibrary, libraryCanonicalUrl } from "./library";
-import { readPackageMetadata } from "./metadata";
+import { normalizeEmissionMetadata } from "./metadata";
+import { resolvePresentationFile } from "../editing/presentationFile";
+import { findProjectRoot } from "../imports/registry";
+import { resolve } from "node:path";
 import { resolveEmitClock } from "./reproDate";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
 import { CPG_FEATURE_EXPRESSION_EXT, isFhirDefError } from "./types";
@@ -2312,33 +2315,37 @@ export function emitFhirDefClosure(
  * High-level entry point for CLI + MCP. Walks imports from the given root
  * path, loads package metadata, and runs the closure emit pipeline.
  */
-export function emitFhirDefFromPath(
-  rootPath: string,
-  opts: EmitOptions = {},
-): FhirDefFromPathResult {
-  // REFACTOR:grounded (#320): resolve and prepare once with the actual loaded metadata.
-  const graph = resolveImports(rootPath);
+export function emitFhirDefFromPath(rootPath: string, opts: EmitOptions = {}): FhirDefFromPathResult {
+  return emitDefinitionLanesFromPath(rootPath, opts, undefined, false).fhir;
+}
 
-  // Try to load metadata; metadataErrors surface separately for CLI/MCP exit code computation.
-  const metadataErrors: CRLError[] = [];
-  let metadata: CpgMetadata | null = null;
-  if (graph.projectRoot) {
-    const metaResult = readPackageMetadata(graph.projectRoot);
-    if (metaResult.metadata) {
-      metadata = metaResult.metadata;
-    }
-    metadataErrors.push(...metaResult.errors);
+/** REFACTOR:grounded (Medical Review): candidate CQL/FHIR consume one source graph and preparation.
+ * No files are written. FHIR-only callers retain metadata-first failure behavior; two-lane callers
+ * still attempt the tolerant CQL lane after an unrelated FHIR metadata failure. */
+export function emitDefinitionLanesFromPath(
+  rootPath: string, opts: EmitOptions = {}, overlays?: ReadonlyMap<string, string>,
+  includeCqlOnMetadataFailure = true,
+): { fhir: FhirDefFromPathResult; cql?: EmitImportsResult } {
+  if (overlays?.size) {
+    const projectRoot = findProjectRoot(resolve(rootPath));
+    if (!projectRoot) throw new Error('Candidate emission requires an owning package.json project.');
+    for (const filePath of overlays.keys()) resolvePresentationFile({ projectRoot: resolve(projectRoot), filePath });
   }
-
+  const graph = resolveImports(rootPath, { overlays });
+  const captured = graph.packageSnapshot ? normalizeEmissionMetadata(graph.packageSnapshot) : undefined;
+  const metadataErrors = captured?.fhir.errors ?? [];
+  const metadata = captured?.fhir.metadata ?? null;
   if (!metadata) {
-    return {
-      success: false,
-      resources: [],
-      errors: [],
-      unmatched: [],
-      importDiagnostics: graph.diagnostics,
-      metadataErrors,
-    };
+    let cql: EmitImportsResult | undefined;
+    if (includeCqlOnMetadataFailure) {
+      cql = graph.resolvedLibraries.length === 0 || graph.diagnostics.some(d => d.severity === 'error')
+        ? { success: false, graph, importDiagnostics: graph.diagnostics, cqlByLibrary: [] }
+        : emitCQLImportsFromPrepared(preparePublicationContext(graph, {
+          canonicalBase: captured?.canonicalBase, policyId: captured?.policyId,
+        }));
+    }
+    return { fhir: { success: false, resources: [], errors: [], unmatched: [],
+      importDiagnostics: graph.diagnostics, metadataErrors }, cql };
   }
 
   // Slice 4c (E) — run the CQL lane FIRST to obtain the split-manifest, then
@@ -2363,8 +2370,7 @@ export function emitFhirDefFromPath(
   // `lowerLocalCodes` hard kinds the FHIR lane already surfaces itself). The prior
   // allowlist of 3 split kinds silently DROPPED `emit-codesystem-url-conflict`, so
   // MCP `emit_crl_fhir` could report success while the CQL lane failed.
-  // (The CLI re-runs `emitCQLImports` for the CQL-write side; this is the
-  // public/MCP path's guard.)
+  // The combined path returns this same CQL result to every definition caller.
   const prepared = preparePublicationContext(graph, {
     canonicalBase: metadata.canonicalBase,
     policyId: metadata.name,
@@ -2386,7 +2392,7 @@ export function emitFhirDefFromPath(
   // Impl-review C2: a MALFORMED config must NOT silently degrade to configured:false (which would drop all PA emit
   // while reporting success). Mirror validateCRLImports: on any error-severity config problem, WITHHOLD the config
   // and fold the errors into the emit result so `success` sinks (handled in the errors/success assembly below).
-  const dispositionResolution = graph.projectRoot ? resolveDispositionConfig(graph.projectRoot) : undefined;
+  const dispositionResolution = graph.projectRoot ? normalizeDispositionConfig(captured?.dispositions) : undefined;
   const dispositionConfigErrors = (dispositionResolution?.errors ?? []).filter((e) => e.severity === "error");
   const dispositionConfig = dispositionConfigErrors.length > 0 ? undefined : dispositionResolution?.config;
   const closureResult = emitFhirDefClosure(
@@ -2431,11 +2437,11 @@ export function emitFhirDefFromPath(
     metadataErrors.length === 0 &&
     importErrors.length === 0 &&
     dispositionEmitErrors.length === 0;
-  return {
+  return { cql: cqlImports, fhir: {
     ...closureResult,
     errors,
     success,
     importDiagnostics: graph.diagnostics,
     metadataErrors,
-  };
+  } };
 }

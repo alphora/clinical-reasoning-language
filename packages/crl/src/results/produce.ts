@@ -15,11 +15,11 @@ import path from "node:path";
 import { emitCelSuite, type CelSuiteEmission } from "../cel/suiteEmit";
 import { resolveCelSuite, type CelSuite } from "../cel/suite";
 import { canonicalizeFsPath } from "../imports/paths";
-import { emitCrlTwoLane } from "../emit-two-lane";
+import { emitResultDefinitionClosure, type DefinitionPublicationOptions } from './definitionClosure';
 import { buildProducerInputs } from "./caseInput";
 import { isInsideResultsTree, scanOrphans, splitOrphans } from "./orphans";
 import { suiteResultsManifestPath, type ProducerManifest } from "./manifest";
-import { buildEngineRepoBundle, cqlIndex } from "./repoBundle";
+import { buildEngineRepoBundle } from "./repoBundle";
 import { runOneCase } from "./runProducer";
 import {
   DEFAULT_BOUNDS,
@@ -43,6 +43,8 @@ import { isImplementedUseCase, type ResultUseCase } from "./useCases";
 export interface ProduceRequest {
   celPath: string;
   crlPath: string;
+  /** MV captures these once and uses them for Save, freshness and native refresh. Omitted retains normal defaults. */
+  definitionOptions?: DefinitionPublicationOptions;
   useCase: ResultUseCase;
   /** Deprecated: false is refused. Normal runs replace tests/results; explicit retry retains verified successes. */
   prune?: boolean;
@@ -271,7 +273,8 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     };
   }
 
-  const two = emitCrlTwoLane(req.crlPath);
+  const closure = emitResultDefinitionClosure(req.crlPath, req.definitionOptions);
+  const two = closure.emitted;
   // ⚠ A partial definition closure makes the engine evaluate a different artifact from the one the CEL
   // oracle describes, so every downstream state would be measured against the wrong definitions.
   if (two.success === false || (two.hardErrors?.length ?? 0) > 0) {
@@ -282,14 +285,12 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     };
   }
 
-  const cql = cqlIndex(two.cqlLibraries ?? []);
+  const cql = closure.cql;
   const { inputs, diagnostics } = buildProducerInputs(emission.result);
   if (diagnostics.length) return { ok: false, reason: "CEL cases have no native input", detail: diagnostics.map(d => `${d.sourceFile}: ${d.message}`) };
   const notEmitted: string[] = [];
 
-  const defs = (two.fhir.resources as unknown as { resource: Record<string, unknown> }[]).map(
-    (w) => w.resource,
-  );
+  const defs = closure.definitions;
   // ⚠ Select by the emitter's own `type` coding, never by a regex over ids: a root decision named "TAR"
   // matches no name heuristic, and an included artifact can match one by accident.
   const roots = defs.filter(
@@ -315,7 +316,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   const runtime = await runtimeFingerprint(java.javaExe, jarPath, req.bounds ?? DEFAULT_BOUNDS, req.signal);
   if (!runtime.cleanupConfirmed) quarantined = true;
   if (!runtime.sha256) return { ok: false, reason: runtime.reason ?? "Native runtime probe failed." };
-  const definitionClosureSha256 = digest({ defs, cql: Object.entries(cql).sort(([a],[b]) => a.localeCompare(b)) });
+  const definitionClosureSha256 = closure.definitionClosureSha256!;
   const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: jarCheck.sha256 });
   if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
       previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {

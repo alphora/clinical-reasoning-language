@@ -138,7 +138,7 @@ decision "IMMZDTImmunizationStrategy":
 done
 
 // Activity for "IMMZD2DTMeaslesDose0"
-activity "IMMZD2DTMeaslesDose0_activity" request CPGCommunicationRequest of `Ensure proper dosage based on patient weight.`.
+activity "IMMZD2DTMeaslesDose0_activity" request CPGTaskRequest of `Ensure proper dosage based on patient weight.`.
 
 // Concept declaration
 concept "Check Immunizations":
@@ -168,4 +168,4 @@ For a full example, see [`IMMZ_All_Decisions.crl`](../../../../examples/crl/who/
 - [SushiVisitor.md](./SushiVisitor.md)
 - [CRLLexer.g4](../../../../grammar/CRLLexer.g4)
 - [CRLParser.g4](../../../../grammar/CRLParser.g4)
-- [IMMZ_All_Decisions.crl](../../../../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl) 
+- [IMMZ_All_Decisions.crl](../../../../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl)

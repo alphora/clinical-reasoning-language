@@ -15,7 +15,7 @@ const {
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
   PARAMETER_TYPES,
-} = mod.default ?? mod;
+} = ({...mod.default, ...mod});
 
 const here = dirname(fileURLToPath(import.meta.url));
 const catalogPath = resolve(here, "../../crl/src/cql-emitter/catalog/inference-pattern-catalog.md");

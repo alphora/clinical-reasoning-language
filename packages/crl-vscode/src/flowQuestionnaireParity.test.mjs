@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // #242 PARITY: the MV Tree/Flow pane and the Questionnaire pane decompose a compound `when` guard into the SAME
 // STRUCTURE. They use TWO SEPARATE decomposers — the flow's AST-side `branchConditionToDefStruct` (crl core, via
 // `buildGuardOutlines`) and the questionnaire's runtime-view `buildGuardStruct` (questionnaireModel.ts) — so this pins
@@ -158,10 +159,10 @@ const CRIT_COMPOUND = `\ncriterion "Crit":\n- when ( "A" and "C" ).`;
 const crlWith = (guard, extra = "") => `library "G".
 ${CONCEPTS}${extra}
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "G":
 first:

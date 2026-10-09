@@ -4,8 +4,8 @@ const fs=require('fs'),path=require('path'),http=require('http'),assert=require(
 const work=path.resolve(__dirname,'../../..'),out=path.resolve(process.env.CRL_PIN_BROWSER_OUT||path.join(work,'tmp/pin-yellow-glow/browser'));
 fs.mkdirSync(out,{recursive:true});
 const alias={vscode:path.join(work,'packages/crl-vscode/test/oracle/vscode-stub.ts'),'@smile-digital-health/crl':path.join(work,'packages/crl/dist/index.js'),'@smile-digital-health/crl/provenance':path.join(work,'packages/crl/dist/provenance/index.js'),'@smile-digital-health/crl/language-services':path.join(work,'packages/crl/dist/language-services/index.js')};
-esbuild.buildSync({stdin:{contents:`export {renderFlowPane,FLOW_STYLE} from './packages/crl-vscode/src/flowPaneHtml';export {COCKPIT_WEBVIEW_SCRIPT} from './packages/crl-vscode/src/correspondenceCockpit';`,resolveDir:work,loader:'ts'},bundle:true,platform:'node',format:'cjs',outfile:path.join(out,'fixture.cjs'),alias});
-const {renderFlowPane,FLOW_STYLE,COCKPIT_WEBVIEW_SCRIPT:source}=require(path.join(out,'fixture.cjs'));
+esbuild.buildSync({stdin:{contents:`export {renderFlowPane,FLOW_STYLE} from './packages/crl-vscode/src/flowPaneHtml';export {COCKPIT_WEBVIEW_SCRIPT} from './packages/crl-vscode/src/correspondenceCockpit';export {ROUTE_CARD_STYLE} from './packages/crl-vscode/src/routeCardsWebview';`,resolveDir:work,loader:'ts'},bundle:true,platform:'node',format:'cjs',outfile:path.join(out,'fixture.cjs'),alias});
+const {renderFlowPane,FLOW_STYLE,ROUTE_CARD_STYLE,COCKPIT_WEBVIEW_SCRIPT:source}=require(path.join(out,'fixture.cjs'));
 const node=key=>({nodeKey:key,nodeId:key,decision:'Demo',lib:'Demo',kind:'action',label:key,refKeys:[],location:{},children:[],actionKind:'recommend-activity'});
 const data=renderFlowPane([{decision:'Demo',lib:'Demo',nodeKey:'demo',location:{},children:[node('a'),node('b'),node('c')]}],{concepts:[],revealPrefix:'pin_'});
 function handler(type){const marker=`if(m.type==='${type}'){`,at=source.indexOf(marker);assert(at>=0);const start=at+marker.length;let depth=1,end=start;for(;depth&&end<source.length;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}assert.equal(depth,0);return source.slice(start,end-1);}
@@ -16,6 +16,7 @@ const script=esbuild.buildSync({stdin:{contents:`
  import {installFlowPinVisibility} from './packages/crl-vscode/src/flowPinVisibility';
  import {paintPinnedTraversal} from './packages/crl-vscode/src/unpinnedTreeFocusWebview';
  import {installFlowLogicHighlight} from './packages/crl-vscode/src/flowLogicHighlight';
+ import {installRouteCards} from './packages/crl-vscode/src/routeCardsWebview';
  const root=document.getElementById('root');root.innerHTML=${JSON.stringify(data.html)};
  const pinVisibility=installFlowPinVisibility(root),gen=1,criterionDescriptionUi={refresh(){},beforeRender(){}};
  const logicUi=installFlowLogicHighlight(root);
@@ -32,6 +33,9 @@ const script=esbuild.buildSync({stdin:{contents:`
  const shown=()=>[...root.querySelectorAll('.flow-pin')].filter(p=>getComputedStyle(p).display!=='none'&&p.getClientRects().length).map(p=>p.parentElement.dataset.flowKey);
  const glowing=key=>getComputedStyle(control(key)).filter.includes('255, 213, 79');
  let count=0;const check=(value,label)=>{count++;if(!value)throw Error(label)},equal=(a,b,label)=>check(JSON.stringify(a)===JSON.stringify(b),label);
+ const sent=[],routeUi=installRouteCards(root,{postMessage:m=>sent.push(m)},()=>gen);
+ const traversal=(state,token='workflow',next=true)=>({token,pinKey:'b',cards:[],label:'Review',verdict:{state,label:state,count:1},navigation:{previous:true,next,current:1,total:2}});
+ window.showTraversal=(state,next=true)=>{pin('b');mark({gen:1,policyRoutesApproved:false});routeUi.show(traversal(state,'workflow',next))};
  window.runChecks=()=>{
   equal(shown(),['a'],'first pin offered');check(!glowing('a'),'wait for current verdict state');mark({gen:0,policyRoutesApproved:true});check(!glowing('a'),'stale acknowledgement keeps loading');mark({gen:1,policyRoutesApproved:false});check(glowing('a'),'first pin fuzzy yellow');
   document.dispatchEvent(new KeyboardEvent('keydown',{key:'Shift',shiftKey:true}));equal(shown(),['a','b','c'],'Shift shows all');check(glowing('a')&&!glowing('b')&&!glowing('c'),'only suggested pin glows');
@@ -54,12 +58,25 @@ const script=esbuild.buildSync({stdin:{contents:`
   mark({gen:1,policyRoutesApproved:'true'});check(!glowing('c'),'nonboolean approval rejected');
   document.body.dataset.mode='cockpit';mark({gen:1,policyRoutesApproved:true});check(!glowing('c'),'cue MV only');document.body.dataset.mode='medical-validation';
   pin('');mark({gen:1,policyRoutesApproved:true});check(!glowing('a'),'return to approved tree no yellow');mark({gen:1,policyRoutesApproved:false});check(glowing('a'),'reopened route review offers entry cue again');document.body.className='vscode-dark';document.body.style.background='#202020';
+  pin('b');mark({gen:1,policyRoutesApproved:false});
+  const cue=selector=>getComputedStyle(root.querySelector(selector)).filter.includes('255, 213, 79'),verdictSelector='.route-verdict-badge',nextSelector='.route-branch-nav[data-direction=next]';
+  for(const state of ['unreviewed','pending','fail']){routeUi.show(traversal(state));check(cue(verdictSelector),'unapproved verdict cue '+state);check(!cue(nextSelector),'no next cue before Pass '+state);check(!cue('.route-branch-nav[data-direction=previous]'),'previous never suggested');check(!glowing('b'),'unfinished exit pin unchanged');}
+  const focused=row('b');focused.focus({preventScroll:true});routeUi.verdict({token:'workflow',verdict:{state:'pass',label:'Pass',count:1}});check(!cue(verdictSelector)&&cue(nextSelector),'Pass moves cue to next without redraw');check(document.activeElement===focused,'workflow cue does not take focus');check(getComputedStyle(root.querySelector(verdictSelector+' circle')).fill==='rgb(63, 185, 80)','Pass circle keeps its verdict color');
+  routeUi.verdict({token:'old',verdict:{state:'fail'}});check(cue(nextSelector),'stale verdict cannot move guide');
+  root.querySelector(nextSelector).dispatchEvent(new MouseEvent('click',{bubbles:true}));equal(sent.pop(),{type:'navigatePinnedBranch',gen:1,token:'workflow',dir:'next'},'suggested navigation uses existing action');
+  routeUi.verdict({token:'workflow',verdict:{state:'pending',label:'Pending',count:1}});check(cue(verdictSelector)&&!cue(nextSelector),'changing Pass back to Pending returns cue');
+  routeUi.show(traversal('pass','workflow',false));check(!cue(nextSelector)&&!cue(verdictSelector),'no suggestion to use disabled final arrow');const before=sent.length;root.querySelector(nextSelector).dispatchEvent(new MouseEvent('click',{bubbles:true}));check(sent.length===before,'disabled final arrow remains disabled');
+  mark({gen:1,policyRoutesApproved:true});check(glowing('b'),'existing approved exit-pin cue remains');
+  routeUi.show(traversal('unreviewed','new-route'));check(cue(verdictSelector)&&!cue(nextSelector),'navigation to an unreviewed route resets suggestion');routeUi.verdict({token:'workflow',verdict:{state:'pass'}});check(cue(verdictSelector),'old route token remains ignored');
+  routeUi.questionnaireState(true);check(cue(verdictSelector),'detached questionnaire keeps verdict guide');routeUi.verdict({token:'new-route',verdict:{state:'pass',label:'Pass',count:1}});check(cue(nextSelector),'detached questionnaire uses same next guide');routeUi.questionnaireState(false);check(cue(nextSelector),'reattached cards retain guide');
+  for(const theme of ['vscode-dark','vscode-light','vscode-high-contrast-light']){document.body.className=theme;routeUi.show(traversal('pending'));check(cue(verdictSelector),'verdict cue visible '+theme);routeUi.show(traversal('pass'));check(cue(nextSelector),'next cue visible '+theme);}
+  routeUi.reset();check(!root.querySelector('.route-workflow-cue'),'reset removes obsolete guidance');pin('');mark({gen:1,policyRoutesApproved:false});check(glowing('a'),'return to normal tree retains first-pin cue');
   pinVisibility.dispose();check(!root.classList.contains('flow-show-all-pins'),'dispose clears held Shift');
   return {checks:count,scope:'Production renderer/controller and extracted webview handlers; not installed extension'};
  };
  window.ready=true;
  `,resolveDir:work,loader:'ts'},bundle:true,platform:'browser',format:'iife',write:false}).outputFiles[0].text;
-const html='<!doctype html><html><head><meta charset="utf-8"><style>:root{--vscode-foreground:#ddd;--vscode-editor-background:#202020;--vscode-panel-border:#777}body{background:#202020;color:#ddd}'+FLOW_STYLE+'</style></head><body class="vscode-dark" data-mode="medical-validation"><div id="root"></div><script>'+script.replace(/<\/script/gi,'<\\/script')+'</script></body></html>';
+const html='<!doctype html><html><head><meta charset="utf-8"><style>:root{--vscode-foreground:#ddd;--vscode-editor-background:#202020;--vscode-panel-border:#777}body{background:#202020;color:#ddd}'+FLOW_STYLE+ROUTE_CARD_STYLE+'</style></head><body class="vscode-dark" data-mode="medical-validation"><div id="root"></div><script>'+script.replace(/<\/script/gi,'<\\/script')+'</script></body></html>';
 fs.writeFileSync(path.join(out,'rendered.html'),html);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function rpc(target,method,params={}){const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject});try{return await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('CDP timeout '+method)),30000);ws.onmessage=e=>{const r=JSON.parse(e.data);if(r.id===1){clearTimeout(timer);r.error?reject(Error(JSON.stringify(r.error))):resolve(r.result)}};ws.send(JSON.stringify({id:1,method,params}))})}finally{ws.close()}}
@@ -73,7 +90,7 @@ async function rpc(target,method,params={}){const ws=new WebSocket(target.webSoc
   const evaluate=async expression=>{const r=await rpc(target,'Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value};
   let ready=false;for(let i=0;i<100&&!ready;i++){try{ready=await evaluate('window.ready===true')}catch(e){if(!/Execution context was destroyed|Cannot find context/.test(String(e)))throw e}if(!ready)await sleep(50)}assert(ready,'Browser fixture did not load');
   const receipt=await evaluate('runChecks()');
-  for(const [name,setup] of [['start',"pin('');mark({gen:1,policyRoutesApproved:false})"],['in-progress',"pin('b');mark({gen:1,policyRoutesApproved:false})"],['done',"mark({gen:1,policyRoutesApproved:true})"],['returned-tree',"pin('')"]]){
+  for(const [name,setup] of [['start',"pin('');mark({gen:1,policyRoutesApproved:false})"],['in-progress',"pin('b');mark({gen:1,policyRoutesApproved:false})"],['done',"mark({gen:1,policyRoutesApproved:true})"],['returned-tree',"pin('')"],['verdict-guide',"showTraversal('pending')"],['next-guide',"showTraversal('pass')"]]){
    await evaluate(setup);const image=await rpc(target,'Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(image.data,'base64'));
   }
   fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(receipt,null,2));console.log(JSON.stringify(receipt));

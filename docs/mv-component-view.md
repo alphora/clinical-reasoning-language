@@ -131,7 +131,7 @@ Approval is derived from a nonempty set of current frozen case verdicts, all Pas
 Fail, Pending, To do and ambiguous cases do not approve the policy routes. Removed
 cases do not count. The cue follows verdict changes and traversal navigation; a
 replacement tree waits for current verdict state before offering any cue. This
-route-approval signal does not change criterion verdicts or the validation gate.
+route-approval signal does not change stored criterion verdicts or the validation gate.
 Pin styling and the keyboard-focus outline remain independent of the cue.
 
 The pinned result’s verdict icon shows the worst case verdict in its group: Fail,
@@ -145,6 +145,22 @@ Criterion uses the same verdict labels and icon while retaining its shared
 criterion identity, body-hash validation, and elision safeguards. Its menu has
 one Criterion verdict entry; case-group verdict is provided on the result.
 
+A fresh explicit Criterion Pass colors its complete displayed body and input
+questions. Approval of every current case through a criterion checks its display
+and colors the body, equally for true and false paths and for ALL OF and ANY OF.
+Complete approved nested criteria also check their enclosing criterion. These
+checks use full model membership, so collapse does not imply approval. Shared
+criteria require coverage at every owner. Fail, Pending, changed bodies, incomplete
+bodies, and execution errors retain their review state. The derived check identifies
+its origin in the control's accessible label; the separate encoding-review
+completion gate still uses saved criterion judgments. Left-click question selection continues to follow clinical truth; its review
+menu includes cases reaching the question on either true or false paths. Existing
+non-pass route paint remains unchanged. Body green is withheld during saving,
+definition checks, recovery, or incomplete model coverage; saved judgments stay
+recorded. Input questions outside criteria follow the existing passing-path
+highlight: any approved case through their owner can color them green. Clearing a saved verdict
+falls back to approval from reviewed contents; Pending explicitly holds review.
+
 The plain flag icon represents MV flags only: grey adds a flag, yellow opens
 active flags, and green opens resolved flags. The adjacent KE marker represents
 only extraction (authoring) flags, yellow while active and green when resolved.
@@ -153,16 +169,18 @@ The policy-wide flag summary and list include both categories. A rollup that
 cannot create flags shows only KE when it contains KE flags and no MV flags.
 Workflow category, rather than the human or AI creator, controls this distinction.
 
-Open KE flags offer **Accept flag** and **Reject flag**. Accept transfers the existing
-record to MV and keeps it open, preserving its ID, content, references, and target.
-The KE marker disappears and the MV flag takes its place. Reject closes the KE flag
-without creating an MV flag; the closed KE flag can be reopened. The drawer shows
-current Workflow (KE or MV), rather than treating category as immutable origin.
+Open KE flags offer **Answer Flag** and **Ignore Flag**. Answer creates a separate,
+open MV flag with the original Description under `Question:`, followed by an `Answer:` section for the reviewer, then resolves the
+original KE record. The new MV flag opens for full editing. Ignore resolves only
+the KE record. Resolved KE flags can be reopened; KE content cannot be edited or
+deleted in MV. Details, existing issue links and Close remain available. KE
+authoring tools retain their existing write capabilities.
 
-KE content remains read-only until accepted. Accepted flags use the existing MV
-actions; a retained authoring tag keeps its description-only edit form. Details,
-issue links and Close remain available. The KE authoring tools retain their
-existing write capabilities.
+An answer is saved before KE resolution. If resolution fails, the original stays
+open and retrying Answer preserves the saved answer and its edits. After a KE
+question changes, reopen its drawer before acting. Reopening a resolved KE question creates
+a new question revision and a separate answer. New MV flags create no GitHub issue;
+existing linked issues remain accessible.
 
 Disclosure updates preserve tree chrome and restore the clicked control inside
 the same render transaction, before painting. Selection replay does not pan the

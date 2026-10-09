@@ -20,5 +20,5 @@ first:
 - otherwise then use decision "Two Lib Sub"."Sub Determination".
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `approve`.

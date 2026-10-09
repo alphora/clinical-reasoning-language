@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Removed unused CRLAstBuilder import
 
 import { Activity } from "../types";
@@ -34,7 +35,7 @@ describe("Activity Structure", () => {
 
   it("should correctly structure activity with type and free text", () => {
     const input =
-      '# Test\nlibrary "Test".\nactivity "another thing":\n- request CPGCommunicationRequest.\n- with `The message`.';
+      '# Test\nlibrary "Test".\nactivity "another thing":\n- request CPGTaskRequest.\n- with `The message`.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
@@ -42,14 +43,14 @@ describe("Activity Structure", () => {
     // Verify structure for free text
     expect(activity.type).toBe("Activity");
     expect(activity.name).toBe("another thing");
-    expect(activity.body.request.activityType).toBe("CPGCommunicationRequest");
+    expect(activity.body.request.activityType).toBe("CPGTaskRequest");
     expect(activity.body.withClause?.activityTypeValue).toBe("The message");
   });
 
   it("should correctly structure activity with type and terminology or free text", () => {
     const input1 = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis.\n- with "Colonoscopy".';
     const input2 =
-      '# Test\nlibrary "Test".\nactivity "Notify":\n- request CPGCommunicationRequest.\n- with `A notification message`.';
+      '# Test\nlibrary "Test".\nactivity "Notify":\n- request CPGTaskRequest.\n- with `A notification message`.';
 
     const result1 = parseInput(input1);
     const result2 = parseInput(input2);
@@ -65,14 +66,14 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with empty free text", () => {
-    const input = '# Test\nlibrary "Test".\nactivity "Empty Free Text":\n- request CPGCommunicationRequest.\n- with ``.';
+    const input = '# Test\nlibrary "Test".\nactivity "Empty Free Text":\n- request CPGTaskRequest.\n- with ``.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
 
     expect(activity.type).toBe("Activity");
     expect(activity.name).toBe("Empty Free Text");
-    expect(activity.body.request.activityType).toBe("CPGCommunicationRequest");
+    expect(activity.body.request.activityType).toBe("CPGTaskRequest");
     expect(activity.body.withClause?.activityTypeValue).toBeUndefined();
     expect(activity.body.withClause?.terminologyReference).toBeUndefined();
   });

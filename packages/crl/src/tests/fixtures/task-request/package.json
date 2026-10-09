@@ -1,0 +1,29 @@
+{
+  "name": "task-request-fixture",
+  "version": "1.0.0",
+  "crl": {
+    "name": "Task Request Fixture",
+    "canonicalBase": "http://example.org/task-request",
+    "date": "2026-10-08",
+    "dispositions": {
+      "version": 1,
+      "mode": "embedded",
+      "options": {
+        "certify": {
+          "Approve": {
+            "label": "Approved",
+            "code": {
+              "system": "urn:task-request:reason",
+              "code": "met"
+            }
+          }
+        },
+        "not-certify": {
+          "Deny": {
+            "label": "Denied"
+          }
+        }
+      }
+    }
+  }
+}

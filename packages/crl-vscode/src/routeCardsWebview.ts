@@ -27,6 +27,9 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const badge=root.querySelector<SVGGElement>('.route-verdict-badge');if(!badge)return;
     const verdict=snapshot?.verdict ?? {state:'unreviewed',label:'To do',count:0};
     badge.dataset.verdict=verdict.state;
+    badge.classList.toggle('route-workflow-cue',verdict.state!=='pass');
+    const next=root.querySelector<SVGGElement>('.route-branch-nav[data-direction=next]');
+    next?.classList.toggle('route-workflow-cue',verdict.state==='pass' && next.getAttribute('aria-disabled')==='false');
     const title=`Verdict: ${verdict.label} — set all ${verdict.count} cases reaching this result`;
     badge.setAttribute('aria-label',title);badge.querySelector('title')!.textContent=title;
   };
@@ -110,7 +113,13 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     originalBox = null;
   }
   function sendDraft(card: any) {
-    api.postMessage({type:'routeCardDraft',gen:generation(),token:snapshot.token,key:card.id,fields:{editing:!!card.editing,editingOwner:card.editingOwner??null,draftText:card.draftText??null,draftDescription:card.draftDescription??null}});
+    api.postMessage({type:'routeCardDraft',gen:generation(),token:snapshot.token,key:card.id,fields:{editing:!!card.editing,editingOwner:card.editingOwner??null,draftText:card.draftText??null,draftDescription:card.draftDescription??null,answerDraft:card.answerDraft??null}});
+  }
+  function iconButton(className:string,label:string,kind:'edit'|'delete'|'add') {
+    const button=document.createElement('button');button.className=className+' route-icon-button';button.title=label;button.setAttribute('aria-label',label);
+    const icon=svgEl('svg',{viewBox:'0 0 24 24',width:14,height:14,'aria-hidden':'true'});
+    const paths={edit:'M4 16 L16 4 L20 8 L8 20 L4 20 Z M13 7 L17 11',delete:'M4 7 H20 M9 7 V4 H15 V7 M6 7 L7 20 H17 L18 7 M10 10 V17 M14 10 V17',add:'M12 5 V19 M5 12 H19'};
+    icon.append(svgEl('path',{d:paths[kind],fill:'none',stroke:'currentColor','stroke-width':1.7,'stroke-linecap':'round','stroke-linejoin':'round'}));button.append(icon);return button;
   }
   function cardForm(card: any, index: number, ownerKey: string, cardWidth: number): HTMLDivElement {
       const form = document.createElement("div"); form.className = "route-card"; form.dataset.cardId = card.id; form.dataset.ownerKey = ownerKey; form.style.width = standalone ? "100%" : cardWidth + "px";
@@ -123,23 +132,53 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       }
       const value = document.createElement("div"); value.className = "route-card-value"; value.textContent = card.value; value.setAttribute("aria-label", "Answer: " + card.value); form.insertBefore(value, form.querySelector(".route-description-toggle"));
       if(card.answerChoices?.length || card.choicesFrom){
+        const section=document.createElement('div');section.className='route-answer-section';form.append(section);
         const toggle=document.createElement("button");toggle.className="route-choices-toggle";toggle.textContent="Answer choices"+(card.answerChoices?.length ? " ("+card.answerChoices.length+")" : "");toggle.setAttribute("aria-expanded",String(!!card.choicesOpen));
-        toggle.onclick=()=>{card.choicesOpen=!card.choicesOpen;rerenderAtControl(toggle,card.id,ownerKey,'.route-choices-toggle');};form.append(toggle);
+        toggle.onclick=()=>{card.choicesOpen=!card.choicesOpen;rerenderAtControl(toggle,card.id,ownerKey,'.route-choices-toggle');};
+        const heading=document.createElement('div');heading.className='route-choice-heading';heading.append(toggle);
+        if(card.choicesOpen && card.answerEditor?.editable){const add=iconButton('route-answer-create','Add answer','add');add.disabled=!!card.saving;add.onclick=()=>{card.editing=false;card.choicesOpen=true;card.answerDraft={operation:'create',system:card.answerEditor.systems?.[0]??'',code:'',display:'',description:'',qualifications:{}};sendDraft(card);render();root.querySelector<HTMLInputElement>('[data-card-id="'+card.id+'"] .route-answer-editor input')?.focus();};heading.append(add);}
+        section.append(heading);
         if(card.choicesOpen){
           const list=document.createElement("ul");list.className="route-answer-choices";
-          for(const choice of card.answerChoices ?? []){const row=document.createElement("li");row.textContent=choice.display;if(choice.selected){row.className="is-selected";const mark=document.createElement("span");mark.className="route-choice-selected";mark.textContent="Selected";row.append(mark);}list.append(row);}
+          for(const choice of card.answerChoices ?? []){
+            const row=document.createElement('li'),line=document.createElement('div'),label=document.createElement('span'),actions=document.createElement('span');line.className='route-answer-line';label.className='route-answer-label';label.textContent=choice.display;actions.className='route-answer-actions';line.append(label,actions);row.append(line);
+            if(choice.description){const description=document.createElement('div');description.className='route-answer-description';description.textContent=choice.description;row.append(description);}
+            if(choice.selected){row.className="is-selected";const mark=document.createElement("span");mark.className="route-choice-selected";mark.textContent="Selected";label.append(mark);}
+            if(choice.editable){
+              for(const operation of ['update','delete']){const button=iconButton('route-answer-'+operation,(operation==='update'?'Edit answer: ':'Delete answer: ')+choice.display,operation==='update'?'edit':'delete');button.disabled=!!card.saving || operation==='delete' && card.answerChoices.length===1;
+                if(operation==='delete' && card.answerChoices.length===1){button.title='Add a replacement before deleting the final answer.';button.setAttribute('aria-label','Delete answer: '+choice.display+'. '+button.title);}
+                button.onclick=()=>{card.editing=false;card.answerDraft={operation,system:choice.system,code:choice.code,display:choice.display,description:choice.description??''};sendDraft(card);render();root.querySelector<HTMLElement>('[data-card-id="'+card.id+'"] .route-answer-editor textarea, [data-card-id="'+card.id+'"] .route-answer-editor button')?.focus();};actions.append(button);}
+            }else if(choice.readOnlyReason){const reason=document.createElement('p');reason.className='route-answer-readonly';reason.textContent=choice.readOnlyReason;row.append(reason);}
+            list.append(row);
+          }
           if(!card.answerChoices?.length){const row=document.createElement("li");row.textContent="Choices from "+card.choicesFrom;list.append(row);}
-          form.append(list);
+          section.append(list);
+          if(!card.answerEditor?.editable && card.answerEditor?.readOnlyReason){const reason=document.createElement('p');reason.className='route-answer-readonly';reason.textContent=card.answerEditor.readOnlyReason;section.append(reason);}
+          if(card.answerDraft && card.answerEditor?.editable){
+            const draft=card.answerDraft,editor=document.createElement('div');editor.className='route-answer-editor route-editor';
+            const title=document.createElement('p');title.className='route-editor-title';title.textContent=(draft.operation==='create'?'Add':draft.operation==='delete'?'Delete':'Edit')+' Answer:';editor.append(title);
+            const uses=document.createElement('details'),summary=document.createElement('summary'),usage=document.createElement('p');uses.className='route-answer-impact';summary.textContent='Used in'+(card.answerEditor.uses?.length?' ('+card.answerEditor.uses.length+')':'');usage.textContent=(card.answerEditor.uses??[]).join('; ');uses.append(summary,usage);
+            const bind=(labelText:string,tag:'input'|'textarea',field:string,ariaLabel=labelText)=>{const label=document.createElement('label'),input=document.createElement(tag);label.textContent=labelText;input.setAttribute('aria-label',ariaLabel);input.value=draft[field]??'';input.oninput=()=>{draft[field]=input.value;sendDraft(card);};label.append(input);editor.append(label);return input;};
+            if(draft.operation==='create'){
+              const label=document.createElement('label');label.textContent='Code system';const select=document.createElement('select');select.setAttribute('aria-label','Code system');for(const system of card.answerEditor.systems??[]){const option=document.createElement('option');option.value=system;option.textContent=system;select.append(option);}select.value=draft.system;select.onchange=()=>{draft.system=select.value;sendDraft(card);};label.append(select);editor.append(label);bind('Code','input','code');
+              for(const consumer of card.answerEditor.consumers??[]){const label=document.createElement('label');label.textContent=consumer.label;const select=document.createElement('select');select.setAttribute('aria-label','Qualification for '+consumer.label);for(const [value,text] of [['','Choose qualification'],['yes','Qualifying'],['no','Nonqualifying']]){const option=document.createElement('option');option.value=value;option.textContent=text;select.append(option);}select.value=draft.qualifications?.[consumer.key]===true?'yes':draft.qualifications?.[consumer.key]===false?'no':'';select.onchange=()=>{draft.qualifications??={};if(select.value==='')delete draft.qualifications[consumer.key];else draft.qualifications[consumer.key]=select.value==='yes';sendDraft(card);};label.append(select);editor.append(label);}
+            }
+            if(draft.operation!=='delete'){bind('Answer','textarea','display','Answer text');bind('Description','textarea','description','Answer description');}
+            else {const prompt=document.createElement('p'),identity=document.createElement('p');prompt.textContent='Delete this answer?';identity.textContent=draft.display;editor.append(prompt,identity);}
+            if((card.answerEditor.uses?.length??0)>1)editor.append(uses);
+            if(draft.caseImpact?.length){const impact=document.createElement('ul');impact.className='route-answer-case-impact';for(const c of draft.caseImpact){const row=document.createElement('li');row.textContent=c.file+': '+c.message;impact.append(row);}editor.append(impact);}
+            const save=document.createElement('button');save.className='route-answer-save';save.textContent=draft.caseImpact?.length?'Apply and mark examples unrunnable':draft.operation==='delete'?'Delete answer':'Save change';save.disabled=!!card.saving;
+            save.onclick=()=>{card.saving=true;card.statusMessage='Saving…';save.disabled=true;sendDraft(card);const {caseImpact,caseImpactToken,...change}=draft;api.postMessage({type:'routeCardAnswerSave',gen:generation(),token:snapshot.token,key:card.id,answer:{...change,...(caseImpact?.length?{acknowledgedCaseImpact:caseImpactToken}:{})}});};
+            const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>{delete card.answerDraft;sendDraft(card);render();};editor.append(save,cancel);form.append(editor);
+          }
         }
       }
-      const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.statusMessage ?? (card.proposal ? "Saved for KE review" : ""); form.append(status);
+      const status = document.createElement("div"); status.className = "route-card-status"; status.setAttribute("role", "status"); status.textContent = card.statusMessage ?? (card.proposal ? "Saved to CRL and FHIR" : ""); form.append(status);
       if (card.readOnlyReason) { const reason = document.createElement("p"); reason.textContent = card.readOnlyReason; form.append(reason); }
       if (card.editable) {
-        const edit = document.createElement("button"); edit.className="route-card-edit"; edit.title="Edit question"; edit.setAttribute("aria-label","Edit question");
-        const pencil = svgEl("svg",{viewBox:"0 0 24 24",width:14,height:14,"aria-hidden":"true"});
-        pencil.append(svgEl("path",{d:"M4 16 L16 4 L20 8 L8 20 L4 20 Z M13 7 L17 11",fill:"none",stroke:"currentColor","stroke-width":1.7})); edit.append(pencil);form.append(edit);
-        const editor = document.createElement("div"); editor.className="route-card-editor"; editor.hidden = true;
-        const scope = document.createElement("p"); scope.textContent = "Edit Question:"; editor.append(scope);
+        const edit = iconButton('route-card-edit','Edit question','edit');form.append(edit);
+        const editor = document.createElement("div"); editor.className="route-card-editor route-editor"; editor.hidden = true;
+        const scope = document.createElement("p"); scope.className="route-editor-title";scope.textContent = "Edit Question:"; editor.append(scope);
         const input = document.createElement("textarea"), desc = document.createElement("textarea");
         input.setAttribute("aria-label", "Question text"); desc.setAttribute("aria-label", "Question description");
         input.value = card.draftText ?? card.text; desc.value = card.draftDescription ?? card.description;
@@ -148,10 +187,10 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         const descriptionLabel=document.createElement("label"); descriptionLabel.textContent="Description"; descriptionLabel.append(desc); editor.append(questionLabel,descriptionLabel);
         const save = document.createElement("button"); save.textContent = "Save change";
         save.disabled = !!card.saving;
-        save.onclick = () => { card.saving = true; card.statusMessage = "Saving…"; save.disabled = true; status.textContent = card.statusMessage; api.postMessage({ type: "routeCardProposal", gen: generation(), token: snapshot.token, key: card.id, fields: { questionText: card.draftText ?? card.text, questionDescription: card.draftDescription ?? card.description } }); };
+        save.onclick = () => { card.saving = true; card.statusMessage = "Saving…"; save.disabled = true; status.textContent = card.statusMessage; api.postMessage({ type: "routeCardSave", gen: generation(), token: snapshot.token, key: card.id, fields: { questionText: card.draftText ?? card.text, questionDescription: card.draftDescription ?? card.description } }); };
         const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.onclick = () => { card.editing = false; delete card.draftText; delete card.draftDescription; sendDraft(card); render(); };
         editor.append(save, cancel); form.append(editor);
-        edit.onclick = () => { card.editing = true; card.editingOwner=standalone?undefined:ownerKey; sendDraft(card); render(); root.querySelector<HTMLTextAreaElement>('[data-card-id="'+card.id+'"] .route-card-editor:not([hidden]) textarea')?.focus(); };
+        edit.onclick = () => { delete card.answerDraft; card.editing = true; card.editingOwner=standalone?undefined:ownerKey; sendDraft(card); render(); root.querySelector<HTMLTextAreaElement>('[data-card-id="'+card.id+'"] .route-card-editor:not([hidden]) textarea')?.focus(); };
         editor.hidden = !card.editing || (!standalone && card.editingOwner!==ownerKey);
       }
       form.addEventListener("click", e => e.stopPropagation()); form.addEventListener("keydown", e => e.stopPropagation());
@@ -352,7 +391,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const verdict=svgEl('g',{class:'route-verdict-badge review-verdict-icon',role:'button',tabindex:0});
       verdict.append(svgEl('title',{}),svgEl('circle',{cx,cy,r:8}),svgEl('path',{d:`M${cx-4} ${cy} l2.6 2.9 l5 -5.6`}));
       verdict.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();verdictFocusToken=snapshot.token;if(pinned){set(pinned,'tabindex','-1');pinned.focus({preventScroll:true});}api.postMessage({type:'routeVerdictMenu',gen:generation(),token:snapshot.token});});
-      layer!.append(verdict);paintVerdict();
+      layer!.append(verdict);
       const navigation=snapshot.navigation;
       const count=navigation?.current>0 && navigation.current<=navigation.total ? `${navigation.current} of ${navigation.total}` : '';
       const navCenter=pinBox.x+pinBox.width/2+(count?count.length*6+8:0)/2;
@@ -360,7 +399,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const navLabel=svgEl('text',{class:'route-leaf-nav-label',x:navCenter,y:pinBox.y-15,'text-anchor':'middle'});navLabel.textContent='Next';layer!.append(navLabel);
       for (const [direction,enabled,offset] of [['previous',snapshot.navigation?.previous,-56],['next',snapshot.navigation?.next,32]] as const) {
         const x=navCenter+offset,y=pinBox.y-30;
-        const button=svgEl('g',{class:'route-branch-nav',role:'button',tabindex:enabled?0:-1,'aria-label':direction==='previous'?'Previous traversal':'Next traversal','aria-disabled':String(!enabled)});
+        const button=svgEl('g',{class:'route-branch-nav','data-direction':direction,role:'button',tabindex:enabled?0:-1,'aria-label':direction==='previous'?'Previous traversal':'Next traversal','aria-disabled':String(!enabled)});
         button.append(svgEl('rect',{x,y,width:24,height:22,rx:4}));
         const title=svgEl('title',{});title.textContent=direction==='previous'?'Previous traversal':'Next traversal';button.append(title);
         button.append(svgEl('path',{d:direction==='previous'?`M${x+15} ${y+5} l-6 6 l6 6`:`M${x+9} ${y+5} l6 6 l-6 6`}));
@@ -369,6 +408,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         button.addEventListener('keydown',e=>{const k=e as KeyboardEvent;if(!k.altKey&&!k.ctrlKey&&!k.metaKey&&!k.shiftKey&&(k.key==='Enter'||k.key===' ')){e.preventDefault();e.stopPropagation();go();}});
         layer!.append(button);
       }
+      paintVerdict();
       const x=pinBox.x+pinBox.width+6,y=pinBox.y+10;
       const label=external?"Close Result Questionnaire":"Open Result Questionnaire";
       const toggle=svgEl("g",{class:"route-layout-toggle",role:"button",tabindex:0,"aria-label":label,"aria-pressed":String(external)});
@@ -388,7 +428,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     show(value: any) { if(snapshot?.token !== value.token)selectedWording.clear(); if(value.showQuestions && snapshot?.token !== value.token) questionsVisible = true; if (snapshot?.token === value.token) for (const card of value.cards) {
       const previous = snapshot.cards.find((c: any) => c.id === card.id);
       if(previous)Object.assign(card,{descriptionOpen:previous.descriptionOpen,choicesOpen:previous.choicesOpen,saving:previous.saving,statusMessage:previous.statusMessage});
-      if (previous && !value.authoritativeDrafts) Object.assign(card, { editing: previous.editing, editingOwner: previous.editingOwner, draftText: previous.draftText, draftDescription: previous.draftDescription, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen, choicesOpen: previous.choicesOpen });
+      if (previous && !value.authoritativeDrafts) Object.assign(card, { editing: previous.editing, editingOwner: previous.editingOwner, draftText: previous.draftText, draftDescription: previous.draftDescription, answerDraft:previous.answerDraft, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen, choicesOpen: previous.choicesOpen });
     } snapshot = value; render(); },
     token() { return snapshot?.token; },
     isExternal() { return external; },
@@ -413,33 +453,35 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         }
       });
     },
-    draft(message: any) { if (!snapshot || snapshot.token!==message.token) return; const card=snapshot.cards.find((c:any)=>c.id===message.key);if(!card)return;for(const key of ['editing','editingOwner','draftText','draftDescription']){const value=message.fields[key];if(value===null)delete card[key];else card[key]=value;} },
+    draft(message: any) { if (!snapshot || snapshot.token!==message.token) return; const card=snapshot.cards.find((c:any)=>c.id===message.key);if(!card)return;for(const key of ['editing','editingOwner','draftText','draftDescription','answerDraft']){const value=message.fields[key];if(value===null)delete card[key];else if(value!==undefined)card[key]=value;} },
     rebind() { restore = []; originalBox = null; layer = undefined; toolbar?.remove(); render(); },
     result(message: any) { if (!snapshot || message.token !== snapshot.token) return; const card = snapshot.cards.find((c: any) => c.id === message.key); if (!card) return;
-      card.proposal = message.ok; card.saving=false;card.statusMessage=message.message; if (message.ok) card.editing = false; render(); },
+      card.proposal = message.ok; card.saving=false;card.statusMessage=message.message; if(message.caseImpact && card.answerDraft){card.answerDraft.caseImpact=message.caseImpact;card.answerDraft.caseImpactToken=message.caseImpactToken;} if (message.ok) {card.editing = false;delete card.answerDraft;} render(); },
   };
 }
 
 export const ROUTE_CARD_STYLE = `
 ${VERDICT_ICON_STYLE}
+.route-editor input,.route-editor select{display:block;box-sizing:border-box;width:100%;color:var(--vscode-input-foreground,#ddd);background:var(--vscode-input-background,#333);border:1px solid var(--vscode-input-border,#555);padding:4px}.route-answer-description{white-space:pre-wrap;font-size:11px;opacity:.9;margin:3px 0}.route-answer-readonly,.route-answer-impact{font-size:11px;color:var(--vscode-descriptionForeground,#aaa)}.route-editor{border-top:1px solid var(--vscode-panel-border,#555);margin-top:6px;padding-top:4px}.route-editor-title{margin:4px 0}.route-answer-impact summary{cursor:pointer}.route-answer-case-impact{white-space:pre-wrap;color:var(--vscode-errorForeground,#f99)}
+.route-verdict-badge.route-workflow-cue,.route-branch-nav.route-workflow-cue[aria-disabled=false]{filter:drop-shadow(0 0 3px #ffd54f) drop-shadow(0 0 6px #ffd54f)}
 .route-card{user-select:text}
 .route-wording-label{display:block;margin-top:8px}.route-wording-select{max-width:100%;color:inherit;background:var(--vscode-dropdown-background,#333)}
 .flow-row.flow-pinned.leaf-allpass>.flow-allpass-badge{display:none}
 .route-card { position:relative; box-sizing:border-box; padding:5px 25px 5px 2px; border:0; border-radius:3px; background:rgba(180,180,180,.15); color:var(--vscode-editor-foreground,#ddd); font:12px/1.35 var(--vscode-font-family,sans-serif); overflow-wrap:anywhere; }
 .route-card-caption { display:inline-block; vertical-align:baseline; margin:0 6px 0 0; padding:0 4px; font-size:10px; line-height:1.1; border:1px solid var(--vscode-panel-border,#555); border-radius:3px; background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-descriptionForeground,#aaa); }
 .route-card-question { display:inline; font-weight:600; white-space:pre-wrap; }
-.route-card .route-choices-toggle {display:block;margin-top:5px;} .route-answer-choices {margin:6px 0 0;padding-left:16px;white-space:pre-wrap;} .route-answer-choices li {margin:5px 0;} .route-choice-selected {display:inline-block;margin-left:6px;font-size:10px;font-weight:600;color:var(--vscode-textLink-foreground,#75beff);}
+.route-answer-section{margin-top:8px;padding:6px;border:1px solid var(--vscode-panel-border,#555);border-radius:3px;background:rgba(0,0,0,.1)}.route-choice-heading{display:flex;align-items:center;gap:6px}.route-card button.route-choices-toggle {display:block;font:inherit;background:transparent;border-color:transparent;padding:2px 0;text-align:left}.route-choices-toggle[aria-expanded=false]::before{content:"▸ ";font-size:10px}.route-choices-toggle[aria-expanded=true]::before{content:"▾ ";font-size:10px}.route-answer-line{display:flex;align-items:flex-start;gap:6px}.route-answer-label{flex:1;min-width:0}.route-answer-actions{display:inline-flex;flex-shrink:0;gap:2px} .route-answer-choices {list-style:none;margin:4px 0 0;padding:0;white-space:pre-wrap;} .route-answer-choices li {margin:0;padding:6px 0;border-top:1px solid var(--vscode-panel-border,#555);} .route-choice-selected {display:inline-block;margin-left:6px;font-size:10px;font-weight:600;color:var(--vscode-textLink-foreground,#75beff);}
 .route-card-description { margin:5px 0; white-space:pre-wrap; opacity:.9; } .route-card-value { display:inline-block; box-sizing:border-box; max-width:100%; margin:2px 0 0 6px; padding:1px 5px; border:1px solid var(--vscode-focusBorder,#3794ff); border-radius:3px; background:var(--vscode-editor-selectionBackground,#264f78); color:var(--vscode-editor-foreground,#ddd); vertical-align:baseline; white-space:pre-wrap; }
 .route-card-status { font-size:11px; color:var(--vscode-editorWarning-foreground,#cca700); }
 .route-card button { cursor:pointer; padding:2px 5px; border:1px solid var(--vscode-button-border,transparent); background:var(--vscode-button-secondaryBackground,#333); color:var(--vscode-button-secondaryForeground,#eee); border-radius:3px; }
-.route-card button.route-card-edit { position:absolute; top:4px;right:3px; background:transparent; padding:3px;display:flex; }
+.route-card button.route-icon-button{background:transparent;border-color:transparent;padding:3px;display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:22px;vertical-align:middle}.route-card button.route-icon-button:hover,.route-card button.route-icon-button:focus-visible{background:var(--vscode-toolbar-hoverBackground,#444)}.route-card button.route-icon-button:disabled{opacity:.35;cursor:default}.route-card button.route-card-edit {position:absolute;top:4px;right:3px}
 .route-description-toggle { display:block; margin-top:4px; font-size:10px; } .route-description-toggle[aria-expanded=false]::before { content:'▸ '; } .route-description-toggle[aria-expanded=true]::before { content:'▾ '; }
 .route-questionnaire .route-card { padding:5px 28px 5px 8px; }
 .route-questionnaire { box-sizing:border-box; width:480px; border:3px solid var(--vscode-focusBorder,#3794ff); border-radius:6px; padding:8px; background:transparent; }
 .route-questionnaire .route-card + .route-card { margin-top:8px; }
 .route-card-note { flex-basis:100%; color:var(--vscode-editorWarning-foreground,#cca700); }
 .route-card-toolbar {display:flex;align-items:center;gap:8px;margin:6px 0;} .route-questions-toggle {cursor:pointer;background:var(--vscode-button-secondaryBackground,#333);color:var(--vscode-button-secondaryForeground,#eee);border:1px solid transparent;border-radius:3px;padding:3px 7px;} .route-questions-toggle[aria-pressed=true] {border-color:var(--vscode-focusBorder,#3794ff);}
-.route-card label { display:block; margin:6px 0; } .route-card textarea { display:block;box-sizing:border-box; width:100%; min-height:64px; resize:none; background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
+.route-card label { display:block; margin:6px 0; } .route-card textarea { display:block;box-sizing:border-box; width:100%; min-height:64px; resize:none; padding:4px;border:1px solid var(--vscode-input-border,#555); background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
 .route-leaf-nav-label,.route-leaf-nav-count{fill:var(--vscode-foreground,#ddd);font:12px var(--vscode-font-family,sans-serif);pointer-events:none}.route-branch-nav{cursor:pointer}.route-branch-nav[aria-disabled=true]{opacity:.3;cursor:default}.route-branch-nav rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.route-branch-nav path{fill:none;stroke:var(--vscode-foreground,#ddd);stroke-width:2}.route-branch-nav:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff)}.route-layout-toggle {cursor:pointer;} .route-layout-toggle rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);} .route-layout-toggle path {fill:none;stroke:var(--vscode-foreground,#ddd);stroke-width:1.5;pointer-events:none;} .route-layout-toggle[aria-pressed=true] rect {stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2;}
 .route-question-badge { pointer-events:none; } .route-question-badge rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-focusBorder,#3794ff);stroke-width:1;} .route-question-badge text {fill:var(--vscode-foreground,#ddd);font:11px sans-serif;}
 `;

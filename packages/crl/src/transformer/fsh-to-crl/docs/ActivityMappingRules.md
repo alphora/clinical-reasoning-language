@@ -21,13 +21,13 @@ Note: `terminology` must be unique across the file, by `identifier`.
 Like `when` clauses, when a terminology is encountered that has the same `identifier` as a previous terminology, but the `body` of the terminology clauses differ, then the identifier of the new terminology should be suffixed with  `_<count>`.  If the `identifier` and the `body` are the same, then do skip.
 */
 else
-  // create a CPGCommunicationRequest Activity
+  // create a CPGTaskRequest Activity
   // set do reference to the current action's condition expression
   - decision.when.do < plandef-condition-expression
   //create a activity
   - activity.identifier < plandef-condition-expression
-  - activity.request < CPGCommunicationRequest
-    // only add a message to CPGCommunicationRequest
+  - activity.request < CPGTaskRequest
+    // only add a message to CPGTaskRequest
   - activity.request.of < plandef-action-description
 // create an optional rationale
 - activity.because < plandef-rationale

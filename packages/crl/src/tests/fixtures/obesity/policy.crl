@@ -53,11 +53,11 @@ concept "Weight":
   - coded from "Weight VS".
 
 activity "Approve Bariatric Surgery":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 
 activity "Deny Bariatric Surgery":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT APPROVED`.
 
 decision "Bariatric Surgery Coverage":

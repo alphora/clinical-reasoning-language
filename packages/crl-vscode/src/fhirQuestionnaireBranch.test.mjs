@@ -87,7 +87,8 @@ describe("fhirQuestionnaire webview branch", () => {
 
   it("shows the case header on both the success and failure paths", () => {
     // Mirrors the CRL Questionnaire pane's header so the two panes read as the same case side by side.
-    const heads = branch.match(/head\('Case - '\+m\.label\)/g) ?? [];
+    assert.match(branch,/const addHeader=\(\)=>\{if\(m\.label\)host\.appendChild\(head\('Case - '\+m\.label\)\)/);
+    const heads = branch.match(/addHeader\(\)/g) ?? [];
     assert.ok(heads.length >= 2, `case header should appear on failure AND success paths, found ${heads.length}`);
   });
 

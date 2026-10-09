@@ -22,7 +22,7 @@ export interface FlagActionField {
 export interface FlagActionView {
   /** the human "Type" — `displayName` when the tag has one, else the raw tag id (extraction/legacy tags have none). */
   typeLabel: string;
-  /** Current workflow (`extraction` | `validation`); accepted KE findings belong to MV. */
+  /** Current workflow (`extraction` | `validation`); KE findings retain extraction ownership. */
   category: string;
   status: "open" | "resolved";
   /** the target's SHORT label (the header) + its FULL self-describing label (the anchor's retained `label`). */
@@ -53,7 +53,7 @@ export interface FlagActionView {
    *  gets a DESCRIPTION-ONLY form (a human may add/fix the description; the Type/summary/fields stay the AI's, so no silent
    *  retype). `descriptionOnly` drives the button label + the edit-form mode. */
   descriptionOnly: boolean;
-  /** KE content is read-only until accepted into MV; reject closes it without conversion. */
+  /** KE content is read-only in MV; Answer creates an MV flag and Ignore resolves KE. */
   readOnly?: boolean;
 }
 
@@ -64,7 +64,7 @@ function row(key: string, valueHtml: string, pre = false): string {
 }
 
 /** Render the read-only flag-action drawer: a header (target + ✕), the flag's full content as labelled rows, and the action
- *  actions: KE Accept/Reject or Reopen, MV Resolve/Reopen and edit/delete, and linked issues.
+ *  actions: KE Answer/Ignore or Reopen, MV Resolve/Reopen and edit/delete, and linked issues.
  *  Carries `data-flag-action-drawer`. */
 export function renderFlagActionDrawer(v: FlagActionView): string {
   const em = `<span class="fa-em">—</span>`;
@@ -99,8 +99,8 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
 
   const authoring = v.category === "extraction";
   const toggle = authoring && v.status === "open"
-    ? `<button type="button" class="fa-btn fa-primary" data-flag-action-accept>Accept flag</button>` +
-      `<button type="button" class="fa-btn" data-flag-action-reject>Reject flag</button>`
+    ? `<button type="button" class="fa-btn fa-primary" data-flag-action-answer>Answer Flag</button>` +
+      `<button type="button" class="fa-btn" data-flag-action-ignore>Ignore Flag</button>`
     : v.status === "resolved"
       ? `<button type="button" class="fa-btn fa-toggle" data-flag-action-toggle>↻ Reopen flag</button>`
       : `<button type="button" class="fa-btn fa-toggle fa-primary" data-flag-action-toggle>✓ Resolve flag</button>`;

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded (#320, plan595): retirement cannot succeed through an alternate entry point.
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
@@ -328,10 +329,10 @@ concept "Old BMI":
       ).toBe("20ffb0f9cdab6a1dbc558d6dfc5aaf2e8d42fbe0eabb5760ce11a185a0e589cf");
       const policy = `library "Kit BMI".\n${terms}\n${concepts}
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 decision "D":
 first:

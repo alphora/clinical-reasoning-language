@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -691,7 +692,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — language-level shape rules", 
       const src =
         `library "T".\n` +
         `concept "BMI":\n- value type is Quantity.\n- code is \`b\`.\n` +
-        `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+        `activity "Do It":\n- request CPGTaskRequest.\n` +
         `decision "D":\n- when "BMI" then recommend activity "Do It".\n`;
       const errs = mismatches(src, "decision-guard-nonboolean");
       expect(errs).toHaveLength(1);
@@ -702,14 +703,14 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — language-level shape rules", 
       const boolean =
         `library "T".\n` +
         `concept "Eligible":\n- value type is boolean.\n- code is \`e\`.\n` +
-        `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+        `activity "Do It":\n- request CPGTaskRequest.\n` +
         `decision "D":\n- when "Eligible" then recommend activity "Do It".\n`;
       expect(mismatches(boolean)).toHaveLength(0);
       expect(mismatchWarnings(boolean, "decision-guard-record-shaped")).toHaveLength(0); // Scalar boolean → no shape warning
       const untyped =
         `library "T".\n` +
         `concept "Eligible":\n- code is \`e\`.\n` + // untyped presence concept — the norm today
-        `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+        `activity "Do It":\n- request CPGTaskRequest.\n` +
         `decision "D":\n- when "Eligible" then recommend activity "Do It".\n`;
       expect(mismatches(untyped)).toHaveLength(0);
       expect(untypedWarnings(untyped)).toHaveLength(0); // guards are NOT untyped-warned (noise)
@@ -728,8 +729,8 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — language-level shape rules", 
         `library "T".\n` +
         `concept "BMI":\n- value type is Quantity.\n- code is \`b\`.\n` +
         `concept "Gate":\n- code is \`g\`.\n` + // untyped outer guard -> silent, isolates the action guard
-        `activity "A":\n- request CPGCommunicationRequest.\n` +
-        `activity "B":\n- request CPGCommunicationRequest.\n` +
+        `activity "A":\n- request CPGTaskRequest.\n` +
+        `activity "B":\n- request CPGTaskRequest.\n` +
         `decision "D":\n- when "Gate" then:\n  any:\n  - recommend activity "A" unless "BMI".\n  - recommend activity "B".\n  end.\n`;
       expect(mismatches(src, "decision-guard-nonboolean")).toHaveLength(1);
     });
@@ -1046,7 +1047,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
   const guardSrc = (def: string) =>
     `library "T".\n` +
     `concept "Obs Flags":\n${def}` +
-    `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+    `activity "Do It":\n- request CPGTaskRequest.\n` +
     `decision "D":\n- when "Obs Flags" then recommend activity "Do It".\n`;
 
   it("WARNS on a boolean-DATUM RecordSet guard operand — a SET is not a truth", () => {
@@ -1083,7 +1084,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
     const src =
       `library "T".\n` +
       `concept "Obs Set":\n- shape is RecordSet.\n- type is Observation.\n- value type is Quantity.\n- code is \`o\`.\n` +
-      `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+      `activity "Do It":\n- request CPGTaskRequest.\n` +
       `decision "D":\n- when "Obs Set" then recommend activity "Do It".\n`;
     const errs = mismatches(src, "decision-guard-nonboolean");
     expect(errs).toHaveLength(1);
@@ -1097,7 +1098,7 @@ describe("UseSiteTypeValidator (Todo 2 rule B) — #189 IMPL 2b: record-shaped r
     const src =
       `library "T".\n` +
       `concept "BMI":\n- value type is Quantity.\n- code is \`b\`.\n` +
-      `activity "Do It":\n- request CPGCommunicationRequest.\n` +
+      `activity "Do It":\n- request CPGTaskRequest.\n` +
       `decision "D":\n- when "BMI" then recommend activity "Do It".\n`;
     const errs = mismatches(src, "decision-guard-nonboolean");
     expect(errs).toHaveLength(1);

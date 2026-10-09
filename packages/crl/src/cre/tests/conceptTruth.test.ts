@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Tests for CaseRun.conceptTruth (#187 Todo 2) — the CRE's per-concept case answer that lets the Medical-Validation
 // panes show a case-derived answer for an OFF-path (preempted) concept `:first` never evaluated. Covers: an off-path
 // inferred sibling gets a truth row (both false AND the corpus-faithful true), ISOLATION (eager-eval never pollutes the
@@ -54,10 +55,10 @@ concept "Leaf":
 - type is Condition.
 - code is \`lf\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:
@@ -154,7 +155,7 @@ concept "X":
 - type is Condition.
 - code is \`x\`.
 activity "Z":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`z\`.
 decision "A":
 first:

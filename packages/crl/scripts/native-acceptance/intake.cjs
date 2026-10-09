@@ -136,7 +136,7 @@ async function main() {
       "presence-control",
       presentationSource.replace(
         'decision "Intake":',
-        'activity "Missing": - request CPGCommunicationRequest. - with `MISSING`.\ndecision "Intake":',
+        'activity "Missing": - request CPGTaskRequest. - with `MISSING`.\ndecision "Intake":',
       ).replace(
         '- otherwise then recommend activity "Human Review".',
         '- otherwise then recommend activity "Missing".',
@@ -297,7 +297,7 @@ async function main() {
     }
     // These are synthetic source controls, not additional ADMIN policy requirements.
     const activity =
-      'activity "Human Review": - request CPGCommunicationRequest. - with `HUMAN_REVIEW`.\n';
+      'activity "Human Review": - request CPGTaskRequest. - with `HUMAN_REVIEW`.\n';
     const branchSource =
       INTAKE_CRL.slice(0, INTAKE_CRL.indexOf('decision "Intake"')) +
       intakeAnswer("Category", "CodeableConcept", "category") +
@@ -483,7 +483,7 @@ async function main() {
       'terminology "Answers": - system is `urn:answers`. - code is `unknown` display is `Unknown`. - code is `na` display is `N/A`.\n' +
       intakePresence("Has Choice", '"Choice"') +
       activity +
-      'activity "Missing": - request CPGCommunicationRequest. - with `MISSING`.\n' +
+      'activity "Missing": - request CPGTaskRequest. - with `MISSING`.\n' +
       'decision "Intake": first: - when "Has Choice" then recommend activity "Human Review". - otherwise then recommend activity "Missing".';
     if (!temporalOnly) for (const value of ["unknown", "na"]) {
       const cel = `library "Cases". covers "Intake". fact "Patient": - defined by "Patient". fact "Answer": - defined by "Intake"."Choice". - value is "${value}". case "Answered": - subject is "Patient". - fact is "Answer". - result is "Intake" is "Human Review".`;
@@ -513,7 +513,7 @@ async function main() {
     const temporalSource = 'library "Intake".\n' +
       DATETIME_ANSWER +
       intakePresence("Has Treatment Start", '"Treatment Start"') + activity +
-      'activity "Missing": - request CPGCommunicationRequest. - with `MISSING`.\n' +
+      'activity "Missing": - request CPGTaskRequest. - with `MISSING`.\n' +
       'decision "Intake": first: - when "Has Treatment Start" then recommend activity "Human Review". - otherwise then recommend activity "Missing".';
     const temporalCel = `library "Cases". covers "Intake".
       fact "Patient": - defined by "Patient".

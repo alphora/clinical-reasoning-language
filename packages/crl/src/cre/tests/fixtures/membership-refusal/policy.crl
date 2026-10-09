@@ -28,11 +28,11 @@ concept "Requested Service Is Covered":
 - definition is "Requested Service" in "Covered Services".
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVED`.
 
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT APPROVED`.
 
 decision "Membership Refusal Decision":

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
 import { emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
+import type { DefinitionPublicationOptions } from '@smile-digital-health/crl';
 import type { ApplySessionRequestV1, ApplySessionResult, ApplySessionOptions } from "@smile-digital-health/crl/session";
 
 export type Fhir = { resourceType?: string; [key: string]: any };
@@ -91,12 +92,12 @@ export function discoverInitialStates(projectRoot: string): InitialState[] {
     });
 }
 
-export function prepareInteractivePolicy(celPath: string) {
+export function prepareInteractivePolicy(celPath: string, definitionOptions: DefinitionPublicationOptions = {}) {
   const selected = resolveCelSuite(celPath);
   if (!selected.ok) throw new Error(selected.diagnostics.map(d => d.message).join("; "));
   if (!selected.suite.policyPath) throw new Error("The selected MV policy has no CRL root.");
   const initialStates = discoverInitialStates(selected.suite.projectRoot);
-  const emitted = emitCrlBundle(selected.suite.policyPath);
+  const emitted = emitCrlBundle(selected.suite.policyPath, definitionOptions);
   if (!emitted.success) throw new Error("Cannot prepare policy definitions: " + JSON.stringify(emitted.diagnostics));
   const roots = emitted.bundle.entry.map(e => e.resource).filter((r: Fhir) => r.resourceType === "PlanDefinition" &&
     r.type?.coding?.some((c: any) => c.code === "workflow-definition"));
@@ -152,7 +153,7 @@ export function interactiveRequest(definitions: Fhir, planId: string, initial: I
 export type NativeApply = (request: ApplySessionRequestV1, options: ApplySessionOptions) => Promise<ApplySessionResult>;
 export function nativeInteractiveRunner(apply: NativeApply, scratchRoot = tmpdir()) {
   let quarantined = false;
-  return async (request: ApplySessionRequestV1, signal: AbortSignal): Promise<InteractiveResult> => {
+  const run = async (request: ApplySessionRequestV1, signal: AbortSignal): Promise<InteractiveResult> => {
     if (quarantined) throw new Error("Native process cleanup was not confirmed. Reopen the panel after checking the reported process failure.");
     const dir = mkdtempSync(join(resolve(scratchRoot), "crl-interactive-"));
     let cleanup = false;
@@ -169,6 +170,7 @@ export function nativeInteractiveRunner(apply: NativeApply, scratchRoot = tmpdir
       if (cleanup) rmSync(dir, { recursive: true, force: true });
     }
   };
+  return Object.assign(run, { cleanupSafe: () => !quarantined });
 }
 
 /** Request ownership only: no extracted data or previous answer states are retained. */
@@ -181,6 +183,7 @@ export class InteractiveSession {
   constructor(private definitions: Fhir, private planId: string,
     private run: (r: ApplySessionRequestV1, signal: AbortSignal) => Promise<InteractiveResult>) {}
   cancel() { ++this.epoch; this.abort?.abort(); }
+  async cancelAndWait(): Promise<void> { this.cancel(); await this.work.catch(() => {}); }
   reset(initial: InitialState) { this.cancel(); this.initial = initial; this.result = undefined; }
   async evaluate(response?: Fhir, retainedQuestionnaire?: Fhir): Promise<InteractiveResult | undefined> {
     if (!this.initial) throw new Error("Select an initial state.");

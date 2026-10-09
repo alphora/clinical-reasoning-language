@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -273,7 +274,7 @@ first:
   it("allows a valid include beside a covered publication", () => {
     const policy = POLICY.replace('library "Publication".', 'library "Publication".\ninclude "Shared".');
     const { run } = evaluate(fact("False", "false"), ["False"], DECISION, "", "Deny", "", {
-      policy, siblings: ['library "Shared".\nactivity "Unused":\n- request CPGCommunicationRequest.\n- with `UNUSED`.'],
+      policy, siblings: ['library "Shared".\nactivity "Unused":\n- request CPGTaskRequest.\n- with `UNUSED`.'],
     });
     expect(run.status).toBe("pass");
     expect(run.produced.map(p=>p.recommendation)).toEqual(["Deny"]);
@@ -595,10 +596,10 @@ concept "Answer":
 - definition is "Procedure" in qualifying.
 - shape reduction is most recent.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 
 

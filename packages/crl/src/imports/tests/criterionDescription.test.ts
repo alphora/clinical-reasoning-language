@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import * as path from "path";
@@ -21,8 +22,8 @@ ${described ? '- description is "Inner supporting explanation.".' : ''}
 criterion "Group":
 ${described ? '- description is \`' + wording + '\`.' : ''}
 - when ("Inner").
-activity "Proceed": - request CPGCommunicationRequest. - with \`ok\`.
-activity "Stop": - request CPGCommunicationRequest. - with \`no\`.
+activity "Proceed": - request CPGTaskRequest. - with \`ok\`.
+activity "Stop": - request CPGTaskRequest. - with \`no\`.
 decision "D": first:
 - when ${guard} then recommend activity "Proceed".
 - otherwise then recommend activity "Stop".`;

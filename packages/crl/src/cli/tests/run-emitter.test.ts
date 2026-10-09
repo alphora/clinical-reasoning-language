@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * CLI dispatch matrix integration test (Todo 4 of #73, round-5 gpt55).
  *
@@ -215,11 +216,11 @@ it("writes admitted unmatched FHIR output and returns its semantic warning", () 
   const {outDir,cleanup}=makeOutDir("unmatched-output");
   try {
     writeFileSync(join(outDir,"package.json"),JSON.stringify({name:"warning-policy",version:"1.0.0",crl:{canonicalBase:"http://example.org/warning",date:"2026-09-17"}}));
-    const source='library "Warning".\nterminology "Review Codes":\n- valueset is `http://example.org/review`.\nactivity "Human Review":\n- request CPGCommunicationRequest.\n- with "Review Codes".\n';
+    const source='library "Warning".\nterminology "Review Codes":\n- valueset is `http://example.org/review`.\nactivity "Human Review":\n- request CPGTaskRequest.\n- with "Review Codes".\n';
     const input=join(outDir,"policy.crl");writeFileSync(input,source);
     const result=runCli(["--path",input,"--target","fhir-def","--out-dir",outDir]);
     expect(result.exitCode,result.stderr).toBe(2);
-    expect(result.stderr).toContain("unsupported-communication-with-terminology");
+    expect(result.stderr).toContain("unsupported-task-with-terminology");
     expect(result.stderr).not.toContain("Failed to write");
     expect(existsSync(join(outDir,"src/fhir/ActivityDefinition/warning-policy-human-review.json"))).toBe(true);
   } finally {cleanup();}
@@ -230,7 +231,7 @@ it("two independent roots refuse before replacing either existing generated lane
   const { outDir, cleanup } = makeOutDir("ambiguous-roots");
   try {
     writeFileSync(join(outDir,"package.json"),JSON.stringify({name:"two-roots",version:"1.0.0",crl:{canonicalBase:"https://example.org/two",date:"2026-09-17"}}));
-    const source = 'library "Two". concept "A": - type is Observation. - code is `a`. activity "Review": - request CPGCommunicationRequest. - with `REVIEW`. decision "One": first: - when "A" then recommend activity "Review". decision "Two": first: - when "A" then recommend activity "Review".';
+    const source = 'library "Two". concept "A": - type is Observation. - code is `a`. activity "Review": - request CPGTaskRequest. - with `REVIEW`. decision "One": first: - when "A" then recommend activity "Review". decision "Two": first: - when "A" then recommend activity "Review".';
     const input = join(outDir,"policy.crl");writeFileSync(input,source);
     for (const lane of ["cql","fhir"]) { mkdirSync(join(outDir,"src",lane),{recursive:true});writeFileSync(join(outDir,"src",lane,"keep.txt"),lane+" prior bytes"); }
     const result=runCli(["--path",input,"--target","fhir-def","--out-dir",outDir]);

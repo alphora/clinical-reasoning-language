@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { createPresentationCatalog, type PresentationDiagnostic } from "../emit/presentation";
 import { CRL } from "../ast/types";
 import type { LibraryDeclaration } from "../ast/types";
@@ -263,7 +264,7 @@ export interface DispositionNotConfiguredError extends ValidationErrorBase {
   kind: "disposition-not-configured";
   activityName: string;
 }
-// A configured determination activity whose `request` type is not `CPGCommunicationRequest` (a determination is
+// A configured determination activity whose `request` type is not `CPGTaskRequest` (a determination is
 // COMMUNICATED, not ordered — meaning enforced by validation, not grammar).
 export interface DispositionRequestTypeError extends ValidationErrorBase {
   kind: "disposition-request-type";

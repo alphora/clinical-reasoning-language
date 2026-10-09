@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { tmpdir } from "node:os";
 // REFACTOR:grounded (#320, plan595): BMI retirement and catalog/version consistency.
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
@@ -371,13 +372,13 @@ describe("closureOrchestrator — malformed crl.dispositions (C2 regression)", (
 
     // (c) NO emitted ActivityDefinition carries a determination outcome: the config
     // was withheld, so there is no `reasonCode` dynamicValue and no
-    // `payload.contentString` carrying the disposition LABEL ("Deny"). (A plain
-    // CommunicationRequest activity may still route its `with` narrative to
-    // `payload.contentString` — that narrative is "Denied.", NOT the "Deny" label —
+    // `description` carrying the disposition LABEL ("Deny"). (A plain
+    // TaskRequest activity may still route its `with` narrative to
+    // `description` — that narrative is "Denied.", NOT the "Deny" label —
     // so we assert against the determination markers specifically.)
     const activityDefs = result.resources.filter((r) => r.resourceType === "ActivityDefinition");
     // Non-vacuity: the determination activity IS emitted (as a plain
-    // CommunicationRequest, config withheld) — so the loop below actually runs.
+    // TaskRequest, config withheld) — so the loop below actually runs.
     expect(activityDefs.length).toBeGreaterThanOrEqual(1);
     for (const ad of activityDefs) {
       const dvs =
@@ -387,11 +388,11 @@ describe("closureOrchestrator — malformed crl.dispositions (C2 regression)", (
       expect(dvs.some((dv) => dv.path === "reasonCode")).toBe(false);
       expect(dvs.some((dv) => dv.path === "note.text")).toBe(false);
       expect(
-        dvs.some((dv) => dv.path === "payload.contentString" && dv.expression?.expression === "'Deny'"),
+        dvs.some((dv) => dv.path === "description" && dv.expression?.expression === "'Deny'"),
       ).toBe(false);
     }
-    // Round-2 (gpt55) hardening: pin the EXACT plain-CommunicationRequest shape of the withheld determination —
-    // its ONLY dynamicValue is the `with` narrative → `payload.contentString = 'Denied.'` (NOT the label, no
+    // Round-2 (gpt55) hardening: pin the EXACT plain-TaskRequest shape of the withheld determination —
+    // its ONLY dynamicValue is the `with` narrative → `description = 'Denied.'` (NOT the label, no
     // note, no reasonCode). Had the malformed config NOT been withheld, this AD would instead carry
     // payload='Deny' (label) + note.text + reasonCode.
     const denyAd = activityDefs.find(
@@ -399,7 +400,7 @@ describe("closureOrchestrator — malformed crl.dispositions (C2 regression)", (
     );
     expect(denyAd).toBeDefined();
     expect((denyAd!.resource as { dynamicValue?: unknown }).dynamicValue).toEqual([
-      { path: "payload.contentString", expression: { language: "text/cql-expression", expression: "'Denied.'" } },
+      { path: "description", expression: { language: "text/cql-expression", expression: "'Denied.'" } },
     ]);
   });
 });
@@ -1683,7 +1684,7 @@ it("refuses ambiguous policy roots through the full closure emitter", () => {
   try {
     writeFileSync(join(root,"package.json"),JSON.stringify({name:"policy",version:"1.0.0",crl:{canonicalBase:"http://example.org/policy"}}));
     const file=join(root,"policy.crl");
-    writeFileSync(file,'library "Policy".\nactivity "Done": - request CPGCommunicationRequest.\nconcept "C": - type is Observation. - value type is boolean. - definition is documented.\ndecision "One": first: - when "C" then recommend activity "Done". - otherwise then recommend activity "Done".\ndecision "Two": first: - when "C" then recommend activity "Done". - otherwise then recommend activity "Done".');
+    writeFileSync(file,'library "Policy".\nactivity "Done": - request CPGTaskRequest.\nconcept "C": - type is Observation. - value type is boolean. - definition is documented.\ndecision "One": first: - when "C" then recommend activity "Done". - otherwise then recommend activity "Done".\ndecision "Two": first: - when "C" then recommend activity "Done". - otherwise then recommend activity "Done".');
     const result=emitFhirDefFromPath(file);
     expect(result.success).toBe(false);
     expect(result.resources).toEqual([]);

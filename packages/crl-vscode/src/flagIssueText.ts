@@ -1,8 +1,8 @@
-// Compose the GitHub issue TITLE + BODY for a flag's "born-together" issue so the issue is self-describing on GitHub's
+// Compose the GitHub issue TITLE + BODY for a flag's linked issue so the issue is self-describing on GitHub's
 // side. Background: the flag links OUT to its issue (`; ref #N`), but the issue itself never named the artifact/target it
 // came from — orphaned from GitHub's perspective. Reviewers had been hand-prefixing titles with "<artifact id> - " to get
 // scannability back; this makes that automatic AND adds a body header so the issue names its artifact + flagged target.
-// Pure + node-testable; the effectful POST lives in githubIssue.ts, the cockpit threads policyId/target/summary/stub here.
+// Pure utility for separately authored linked issues; MV flag creation does not call it.
 
 /** The flagged declaration, as the body header needs to name it. `label` is the drawer's full human wording
  *  (e.g. `decision "Meets criteria"`); `kind`/`name` are the fallback when there's no label. */
@@ -12,8 +12,7 @@ export interface FlagIssueTarget {
   label?: string;
 }
 
-/** GitHub rejects an issue title longer than 256 chars with a 422 — which would write the flag WITHOUT its born-together
- *  issue (the exact orphaning this feature fixes). The prefix WIDENS the title, so clamp here. */
+/** GitHub rejects issue titles longer than 256 chars; clamp the prefixed utility title. */
 const TITLE_MAX = 256;
 
 /** The issue TITLE: `<policyId> - <summary>` (the reviewers' hand-prefix, now automatic), or the bare summary when the

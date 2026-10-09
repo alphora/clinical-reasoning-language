@@ -94,55 +94,55 @@ decision "IMMZ.DT.Immunization Strategy":
 done
 
 activity "Client Age Less Than 6 Months"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
 
 activity "Provide Measles Vaccine"
     request CPGMedicationRequest of "Measles vaccines".
 
 activity "MCV0 Dose Administered"
-    request CPGCommunicationRequest of `MCV0 was administered. Check measles routine immunization schedule.`.
+    request CPGTaskRequest of `MCV0 was administered. Check measles routine immunization schedule.`.
 
 activity "Client Age Less Than 12 Months"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
 
 activity "Last Live Vaccine Administered Within 4 Weeks_2"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`.
 
 activity "Client Age Less Than 15 Months"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
 
 activity "Last Live Vaccine Administered Within 4 Weeks_3"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
 
 activity "Measles primary series is complete."
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`
     because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
 
 activity "Client Age Less Than 9 Months"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
 
 activity "Measles primary series is complete"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`
     because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
 
 activity "Last Live Vaccine Administered Within 4 Weeks_4"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`.
 
 activity "Supplementary Dose Administered"
-    request CPGCommunicationRequest
+    request CPGTaskRequest
     of `Measles immunization schedule is complete. Measles supplementary dose was administered.`.
 
 activity "Check Contraindication for Measles Immunization"

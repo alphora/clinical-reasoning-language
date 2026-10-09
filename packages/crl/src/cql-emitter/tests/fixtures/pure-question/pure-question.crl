@@ -17,10 +17,10 @@ concept "Has EDS Evidence":
 - definition is exists this.
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `approve`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `deny`.
 
 decision "D":

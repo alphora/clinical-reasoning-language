@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 import { buildCRL } from "../../index";
 import { lowerLocalCodes } from "../lowerLocalCodes";
@@ -43,7 +44,7 @@ const DECISION = `decision "D":
 first:
 - when "Gate" then recommend activity "a.A".
 activity "a.A":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.`;
 
 // A same-layer (Inferences) NON-total boolean: a `defined as` truth-set composition over local `code is` booleans.

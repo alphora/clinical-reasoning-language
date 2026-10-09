@@ -30,11 +30,11 @@ first:
 - otherwise then recommend activity "approve".
 
 activity "deny.skull":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Excluded: skull or vertebral fracture.`.
 
 activity "deny.tumor":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Excluded: tumor-related fracture.`.
 
 activity "approve":

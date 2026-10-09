@@ -1,6 +1,7 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Pure teaching inputs shared with the owning CRE tests; no test-runner dependency.
 const question = (name: string, text: string) => `concept "${name}":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is \`${name.toLowerCase().replace(/ /g, "-")}\`.\n- shape reduction is most recent.\npresentation for "${name}":\n- question text is \`${text}\`.\n`;
-const activities = 'activity "Met":\n- request CPGCommunicationRequest.\n- with `Met`.\nactivity "Unmet":\n- request CPGCommunicationRequest.\n- with `Unmet`.\n';
+const activities = 'activity "Met":\n- request CPGTaskRequest.\n- with `Met`.\nactivity "Unmet":\n- request CPGTaskRequest.\n- with `Unmet`.\n';
 
 /** The scaling fixture and small reference have exactly the same source structure. */
 export function sharedDecisionSource(depth: number): string {

@@ -3,5 +3,5 @@ library "SharedA".
 
 // Defines an activity named `Deny`. SharedB defines one of the SAME name.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied by A.`.

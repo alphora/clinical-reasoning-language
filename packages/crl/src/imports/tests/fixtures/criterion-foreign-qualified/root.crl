@@ -3,10 +3,10 @@ library "Root".
 include "Lib".
 
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `ok`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `no`.
 
 decision "D":

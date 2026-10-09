@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { readFileSync } from "fs";
 import * as path from "path";
 
@@ -343,10 +344,10 @@ concept "Both":
 - value type is boolean.
 - defined as ( "Has Present" and "Has Also" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:
@@ -454,10 +455,10 @@ concept "Both":
 - value type is boolean.
 - defined as ${bothBody}.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:

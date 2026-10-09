@@ -1,0 +1,29 @@
+library "Task Request Cases".
+covers "Task Request Fixture".
+fact "Patient":
+- name is "Synthetic Patient".
+- defined by "Patient".
+fact "Ready":
+- value is true.
+- defined by "Task Request Fixture"."Ready".
+fact "Not ready":
+- value is false.
+- defined by "Task Request Fixture"."Ready".
+fact "Notification":
+- code is "urn:task-request|notify".
+- defined by "Task Request Fixture"."Notify".
+fact "Prohibited notification":
+- code is "urn:task-request|do-not-notify".
+- defined by "Task Request Fixture"."Do not notify".
+case "Approve":
+- subject is "Patient".
+- fact is "Ready".
+- fact is "Notification".
+- result is "Review" is "certify.Approve".
+case "Deny":
+- subject is "Patient".
+- fact is "Not ready".
+- fact is "Prohibited notification".
+- result is "Review" is "not-certify.Deny".
+case "Pause":
+- subject is "Patient".

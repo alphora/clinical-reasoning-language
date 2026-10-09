@@ -100,7 +100,7 @@ test("submitFlagTool: files directly — requires target_id + summary; carries v
   assert.equal(t.name, SUBMIT_FLAG);
   assert.deepEqual(t.inputSchema.required, ["target_id", "summary"]);
   assert.deepEqual(t.inputSchema.properties.validation_kind.enum, ["underspecified", "narrative-error"]);
-  assert.ok(t.inputSchema.properties.description, "carries a description property (→ the issue body)");
+  assert.ok(t.inputSchema.properties.description, "carries a local flag description property");
 });
 
 test("openFlagDrawerTool: the review-first default — only target_id required; OMITS validation_kind (the human drawer hides kind)", () => {

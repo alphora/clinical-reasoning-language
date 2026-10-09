@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { buildCRL, parseCRL } from "../../index";
 import { CRLError } from "../../types/errors";
 import {
@@ -23,7 +24,7 @@ import type { BranchConditionAnd, BranchConditionOr } from "../types";
 
 describe("positive AST fixture parsing", () => {
   it("rejects parser recovery instead of certifying the recovered AST", () => {
-    expect(() => parseInput('library "T".\nactivity "A":\n- request CPGCommunicationRequest'))
+    expect(() => parseInput('library "T".\nactivity "A":\n- request CPGTaskRequest'))
       .toThrow("CRL syntax errors");
   });
   it("rejects lexical diagnostics instead of certifying the remaining AST", () => {

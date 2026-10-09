@@ -336,16 +336,10 @@ class AgentChat implements vscode.WebviewViewProvider {
         if (name === SUBMIT_FLAG) {
           const res = await cockpitAgentBridge.submitFlag(args);
           if (!res.ok) {
-            // If a GitHub issue was ALREADY created but the flag write then failed, do NOT let the model retry — a retry
-            // would POST a duplicate issue. Arm `acted` + return a non-recoverable error (Claude [important]).
-            if (res.issued) {
-              acted = true;
-              return { content: `${res.reason} — do NOT retry (the issue already exists; the validator must add the flag manually)`, isError: true };
-            }
             return recoverable(res.reason);
           }
           acted = true;
-          return { content: res.message }; // the human outcome (issue #N created / no issue: reason) — the agent relays it
+          return { content: res.message }; // local persistence outcome — the agent relays it
         }
         // #210 (disc 239) — a BLOCKING elicitation: begin (sync guard). On an error, recoverable (no banner). On success,
         // arm `acted` (shown-once counts, even if the human later cancels) + await the drawer while the static banner shows;

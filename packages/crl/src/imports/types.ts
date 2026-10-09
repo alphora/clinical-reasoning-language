@@ -175,6 +175,7 @@ export function emptyNamespace(): Namespace {
 // === Top-level ===
 
 export interface ResolvedGraph {
+  packageSnapshot?: import("./packageSnapshot").PackageSnapshot;
   rootPath: string;
   // The project root directory (the one containing package.json). Absent
   // when project-root-not-found.

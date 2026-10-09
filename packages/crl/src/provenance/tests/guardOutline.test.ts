@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, expect, it } from "vitest";
 
 import { buildCriterionTable } from "../../ast/criterionExpansion";
@@ -55,7 +56,7 @@ concept "A": - type is Observation. - code is \`a\`.
 concept "B": - type is Observation. - code is \`b\`.
 criterion "Child": ${description ? '- description is "' + description + '".' : ''} - when (${operand}).
 criterion "Parent": - when ("Child" and "Child").
-activity "X": - request CPGCommunicationRequest. - with \`x\`.
+activity "X": - request CPGTaskRequest. - with \`x\`.
 decision "D": first:
 - when "Child" then recommend activity "X".
 - when "Parent" then recommend activity "X".
@@ -115,7 +116,7 @@ concept "C":
 criterion "Elig":
 - when ( "Inf" and "C" ).
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -201,7 +202,7 @@ concept "A":
 - type is Observation.
 - code is \`a\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "C1":
 - when ("C2").
@@ -232,7 +233,7 @@ first:
   it("#233: a SINGLE cyclic criterion → a NAMED `criterion` expr + derived sole identity (topCriterion) with `elided:true`", () => {
     const cyc = `library "T".
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "C1":
 - when ("C2").
@@ -262,7 +263,7 @@ concept "Cc":
 - type is Observation.
 - code is \`c\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "CritC":
 - when ("Cc").
@@ -291,7 +292,7 @@ concept "Leaf1":
 - type is Observation.
 - code is \`l1\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "Inner":
 - when ("Leaf1").
@@ -322,7 +323,7 @@ concept "L":
 - type is Observation.
 - code is \`l\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "Shared":
 - when ("L").
@@ -362,7 +363,7 @@ first:
     // materialize ~20^4 nodes (hop cap 4). WITH it, C3 elides immediately. The test COMPLETING is the boundedness proof.
     const group10 = (ref: string): string => `( ${Array.from({ length: 10 }, () => `"${ref}"`).join(" and ")} )`;
     const wideBody = (prev: string): string => `( ${group10(prev)} and ${group10(prev)} )`; // 20 refs, width-cap-defeating
-    let crl = `library "T".\nconcept "L0":\n- type is Observation.\n- code is \`l0\`.\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\n`;
+    let crl = `library "T".\nconcept "L0":\n- type is Observation.\n- code is \`l0\`.\nactivity "X":\n- request CPGTaskRequest.\n- with \`x\`.\n`;
     for (let k = 1; k <= 3; k++) crl += `criterion "C${k}":\n- when ${wideBody(`C${k - 1}`).replace(/"C0"/g, '"L0"')}.\n`;
     crl += `decision "D":\nfirst:\n- when "C3" then recommend activity "X".\n- otherwise then recommend activity "X".`;
     const graph = graphFrom(crl, CEL);
@@ -390,7 +391,7 @@ concept "L":
 - type is Observation.
 - code is \`l\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "C1":
 - when ("C2").
@@ -424,7 +425,7 @@ first:
     // Outer → Inner → (L1 | L2). Two graphs differ ONLY in Inner's body. Outer's canonical body embeds Inner's OPERAND
     // (the blank-nested-token rule blanks Inner's hash TOKEN but keeps its expanded CONTENT), so the change is detected.
     const mk = (innerRef: string, unrelatedRef: string, order: "inner-first" | "outer-first"): string => {
-      const decls = `concept "L1":\n- type is Observation.\n- code is \`l1\`.\nconcept "L2":\n- type is Observation.\n- code is \`l2\`.\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\n`;
+      const decls = `concept "L1":\n- type is Observation.\n- code is \`l1\`.\nconcept "L2":\n- type is Observation.\n- code is \`l2\`.\nactivity "X":\n- request CPGTaskRequest.\n- with \`x\`.\n`;
       const inner = `criterion "Inner":\n- when ("${innerRef}").\n`;
       const outer = `criterion "Outer":\n- when ("Inner").\n`;
       const unrelated = `criterion "Unrelated":\n- when ("${unrelatedRef}").\n`;
@@ -531,7 +532,7 @@ concept "B":
 - type is Observation.
 - code is \`b\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "Used":
 - when ("A").
@@ -559,7 +560,7 @@ concept "A":
 - type is Observation.
 - code is \`a\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "Inner":
 - when ("A").
@@ -593,7 +594,7 @@ concept "Inf":
   const POL = (whens: string, concepts = CONCEPTS) => `library "T".
 ${concepts}
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -747,7 +748,7 @@ ${whens}
       extraDecls,
     ].join("\n");
     const guard = [...Array.from({ length: 100 }, (_, i) => `"A${i}"`), ...tailGuardParts].join(" and ");
-    const src = `library "T".\n${decls}\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\ndecision "D":\nfirst:\n- when ( ${guard} ) then recommend activity "X".\n- otherwise then recommend activity "X".`;
+    const src = `library "T".\n${decls}\nactivity "X":\n- request CPGTaskRequest.\n- with \`x\`.\ndecision "D":\nfirst:\n- when ( ${guard} ) then recommend activity "X".\n- otherwise then recommend activity "X".`;
     const graph = graphFrom(src, CEL);
     const defIndex = defIndexOf(graph);
     const identities = buildCriterionIdentities(graph, defIndex);
@@ -803,7 +804,7 @@ ${whens}
       `concept "C":\n- type is Observation.\n- code is \`cc\`.`,
       `criterion "Special":\n- when ( "C" ).`,
     ].join("\n");
-    const src = `library "T".\n${decls}\nactivity "X":\n- request CPGCommunicationRequest.\n- with \`x\`.\ndecision "D":\nfirst:\n- when ( ${guardParts.join(" and ")} ) then recommend activity "X".\n- otherwise then recommend activity "X".`;
+    const src = `library "T".\n${decls}\nactivity "X":\n- request CPGTaskRequest.\n- with \`x\`.\ndecision "D":\nfirst:\n- when ( ${guardParts.join(" and ")} ) then recommend activity "X".\n- otherwise then recommend activity "X".`;
     const graph = graphFrom(src, CEL);
     const defIndex = defIndexOf(graph);
     const expr = buildGuardOutlines(graph, defIndex).get(nodeKey(decisionSubNodeRef("T", "D", "when[0]")))!.expr;

@@ -24,7 +24,7 @@ const ALIASES: Record<string, string[]> = {
   "chaining-necessity": ["shared continuation", "internal helper", "remaining interview", "use decision"],
   "guards": ["guard", "only if"],
   "branch-guards": ["pause", "unknown", "null", "missing answer", "explicit false"],
-  "review-flags": ["narrative completeness", "source fidelity", "narrative coverage", "renamed concept", "stable ID", "flag placement", "orphaned flag", "flag description", "short flag title", "accept KE flag", "reject KE flag"],
+  "review-flags": ["narrative completeness", "source fidelity", "narrative coverage", "renamed concept", "stable ID", "flag placement", "orphaned flag", "flag description", "short flag title", "answer KE flag", "ignore KE flag", "accept KE flag", "reject KE flag"],
   "pa-disposition-set": ["authorization determination", "coverage determination", "recommendation", "approve deny", "PA without configuration"],
   "configure-dispositions": ["crl.dispositions", "missing configuration", "empty vocabulary"],
   "terminology-forms": ["codes", "terminology", "code system", "valueset is", "external ValueSet"],

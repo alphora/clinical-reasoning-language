@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { planConditionBody } from "../../fhir-emitter/tests/planConditionTestHelpers";
 // REFACTOR:grounded - Elements names the generated retrieval layer; query semantics are unchanged.
 // #224 ii.1c — end-to-end CQL emit through the PUBLIC entry (`emitCQLImports`) over a
@@ -28,7 +29,7 @@ const ACTIVITIES = `activity "Act":
 - request CPGServiceRequest.
 - with \`ok\`.
 activity "No":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.`;
 
 // A decision-bearing `code is` policy (→ the layered split path, which runs interfaceSurface)

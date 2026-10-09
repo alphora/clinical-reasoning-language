@@ -50,8 +50,8 @@ first:
 - otherwise then recommend activity "not-certify.Deny".
 
 activity "certify.Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Eligibility: APPROVE.`.
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Eligibility: DENY.`.

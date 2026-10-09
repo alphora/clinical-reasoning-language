@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * #175 todo-0 — the chain fixture (≥3-boundary same-library `use decision` closure), mirroring SUR716.011's shape.
  *
@@ -28,7 +29,7 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "Sub3":
 - when "Indic" then recommend activity "Final".

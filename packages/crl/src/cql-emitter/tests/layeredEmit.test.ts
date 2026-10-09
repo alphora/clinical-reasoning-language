@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { buildCRL } from "../../index";
 import {
   buildConceptShapeMap,
@@ -143,7 +144,7 @@ activity "Approve":
 - request CPGServiceRequest.
 - with \`approve\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`deny\`.
 decision "D":
 first:
@@ -1113,7 +1114,7 @@ decision "D":
 first:
 - when "Adult" then recommend activity "Approve".
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 `);
     const options = { canonicalBase: TEST_CB, policyId: "age-order" };
     const lowered = lowerLocalCodes(raw, options);

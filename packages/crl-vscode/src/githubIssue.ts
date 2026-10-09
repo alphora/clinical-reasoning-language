@@ -1,7 +1,6 @@
-// #211 create-flag drawer — create a GitHub issue STUB via the REST API. The ONE effectful helper for the drawer's
-// "born together" flow (a flag + its issue). Kept OUT of issueLink.ts (that module is the pure security core) and OUT of
-// the cockpit (no `vscode` import) so it's node-testable via an injected `fetchImpl`. Any non-2xx / network error throws
-// an `IssueCreateError` — the cockpit catches it and writes the flag WITHOUT a `; ref` (never strand a live MV meeting).
+// Standalone GitHub REST helpers; MV flag creation has no issue-creation caller.
+// Existing linked-issue maintenance remains supported. No vscode import; fetch is injected in tests.
+// Creation errors carry the HTTP status for the utility caller.
 
 /** A GitHub issue-create failure carrying the HTTP status (0 = network/transport error) so the caller can label it. */
 export class IssueCreateError extends Error {

@@ -1,8 +1,9 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /** Shared executable input for the kit and namedAnswerClosure behavior tests. */
 export const ANSWER_EXAMPLE_BASE = "https://example.org/answers";
 export const ANSWER_EXAMPLE_TERMS = `terminology "Choices":
 - system is \`${ANSWER_EXAMPLE_BASE}/CodeSystem/p-complaint-answer-codes\`.
-- code is \`none\` display is \`None\`.
+- code is \`none\` display is \`None\` description is \`No documented qualifying complaint.\`.
 - system is \`urn:standard\`.
 - code is \`symptom\` display is \`Symptom\`.
 `;
@@ -25,8 +26,8 @@ concept "Qualifies":
 - shape reduction is most recent.
 - value type is boolean.
 - definition is "${name}" in qualifying.
-activity "Met": - request CPGCommunicationRequest. - with \`MET\`.
-activity "Unmet": - request CPGCommunicationRequest. - with \`UNMET\`.
+activity "Met": - request CPGTaskRequest. - with \`MET\`.
+activity "Unmet": - request CPGTaskRequest. - with \`UNMET\`.
 decision "D": first:
 - when "Qualifies" then recommend activity "Met".
 - otherwise then recommend activity "Unmet".

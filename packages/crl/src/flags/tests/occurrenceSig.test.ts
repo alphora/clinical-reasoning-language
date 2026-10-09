@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 
 import { parseInput } from "../../ast/tests/parseInput";
@@ -55,7 +56,7 @@ concept "Adult":
 - type is Condition.
 - code is \`adult\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -73,7 +74,7 @@ concept "Severe":
 - type is Condition.
 - code is \`severe\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -103,7 +104,7 @@ concept "C":
 - type is Condition.
 - code is \`x4\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:

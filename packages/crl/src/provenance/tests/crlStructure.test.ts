@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded (#320, review 563): owner-normalized aliases produce one provenance
 // key/edge, while foreign owners and distinct dependency paths remain separate.
 import { parseInput } from "../../ast/tests/parseInput";
@@ -22,13 +23,13 @@ concept "G":
 - type is Condition.
 - code is \`g\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 activity "Y":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`y\`.
 activity "Z":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`z\`.
 decision "Sub":
 first:
@@ -61,7 +62,7 @@ concept "Q":
 - type is Condition.
 - code is \`q\`.
 activity "W":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`w\`.
 decision "Unused":
 first:
@@ -192,7 +193,7 @@ concept "Leaf B":
 - type is Condition.
 - code is \`b\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 criterion "Eligible":
 - when ( "Leaf A" and "Leaf B" ).
@@ -262,10 +263,10 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 activity "Y":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`y\`.
 decision "Nest":
 first:
@@ -295,7 +296,7 @@ concept "D":
 - type is Condition.
 - code is \`d\`.
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -414,7 +415,7 @@ first:
     const Q = `# QT
 library "QT".
 activity "X":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "D":
 first:
@@ -435,7 +436,7 @@ concept "Z":
 - type is Condition.
 - code is \`z\`.
 activity "Z":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`z\`.
 decision "Z":
 first:

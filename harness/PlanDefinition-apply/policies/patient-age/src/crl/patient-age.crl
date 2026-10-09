@@ -20,8 +20,8 @@ first:
 - otherwise then recommend activity "not-certify.Deny".
 
 activity "certify.Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Eligibility: APPROVE / adult.`.
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Eligibility: DENY / not an adult.`.

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import * as mod from "@smile-digital-health/crl/language-services";
 
 test("concepts — top-level checks", () => {
-const { scanDeclarations, declarationsByName, findNarrativeDeclaration } = mod.default ?? mod;
+const { scanDeclarations, declarationsByName, findNarrativeDeclaration } = ({...mod.default, ...mod});
 
 // --- terminology header + body ---
 {

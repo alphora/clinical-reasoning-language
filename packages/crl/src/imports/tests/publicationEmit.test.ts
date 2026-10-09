@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import * as path from "path";
@@ -48,7 +49,7 @@ const membership = (operand: string) => `concept "Result":
 describe("direct coded guard routing", () => {
   it.each(['"Answers"."Choice"', 'not "Answers"."Choice"', '("Answers"."Choice" or "Other")', '"Qualified"'])("emits %s through the whole publication condition", guard => {
     const directory = project({
-      'root.crl': `library "Consumer".\n${publication("Other", "other")}\ncriterion "Qualified": - when ("Answers"."Choice").\nactivity "Proceed": - request CPGCommunicationRequest. - with \`OK\`.\ndecision "D": first:\n- when ${guard} then recommend activity "Proceed".\n- otherwise then recommend activity "Proceed".`,
+      'root.crl': `library "Consumer".\n${publication("Other", "other")}\ncriterion "Qualified": - when ("Answers"."Choice").\nactivity "Proceed": - request CPGTaskRequest. - with \`OK\`.\ndecision "D": first:\n- when ${guard} then recommend activity "Proceed".\n- otherwise then recommend activity "Proceed".`,
       'answers.crl': 'library "Answers".\n'+choice,
     });
     const entry = path.join(directory, 'root.crl');

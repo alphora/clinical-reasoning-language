@@ -95,11 +95,11 @@ activity "Lifestyle Referral":
 - because `Lifestyle counselling is the first-line intervention for stage-1 hypertension`.
 
 activity "Confirm Continued Control":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Confirm BP control remains adequate; no escalation needed this visit`.
 
 activity "Document Provisional Hypertension":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Single hypertensive reading without prior diagnosis — document provisional status and rescreen`.
 - because `Quality measure requires confirmation across encounters before a hypertension diagnosis is durable`.
 

@@ -103,7 +103,7 @@ export function resolveImports(
     origin: "root",
   };
 
-  const { registry, diagnostics: registryDiags } = buildRegistry(projectRoot, overlays);
+  const { registry, diagnostics: registryDiags, packageSnapshot } = buildRegistry(projectRoot, overlays);
 
   // The root file is also seen by the local scan. Replace the scan's entry
   // (same path) with the canonical root entry so cycle detection and topo
@@ -148,6 +148,7 @@ export function resolveImports(
   return {
     rootPath: canonicalRoot,
     projectRoot,
+    packageSnapshot,
     resolvedLibraries,
     localLibraries,
     registry,

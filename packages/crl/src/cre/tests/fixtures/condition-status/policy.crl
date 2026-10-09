@@ -19,10 +19,10 @@ concept "Finding Exists":
 - value type is boolean.
 - defined as exists ( "Verified Findings" ).
 activity "Eligible":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `ELIGIBLE`.
 activity "Not Eligible":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `NOT_ELIGIBLE`.
 decision "D":
 first:

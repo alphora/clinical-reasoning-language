@@ -80,10 +80,10 @@ concept "Supplied Alternative Qualifies":
 - definition is any available value of "A" and "B" in "Affirmative" using validity of "A".
 - shape reduction is most recent.
 activity "Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Met`.
 activity "Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Unmet`.
 decision "Assess":
 first:

@@ -2,5 +2,5 @@
 library "Shared".
 
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied.`.

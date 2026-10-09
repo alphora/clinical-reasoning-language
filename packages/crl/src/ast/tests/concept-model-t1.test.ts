@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { describe, it, expect } from "vitest";
 
 import { buildCEL } from "../../cel";
@@ -321,10 +322,10 @@ concept "Has Present":
 - value type is boolean.
 - defined as exists ( "Present" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:
@@ -387,10 +388,10 @@ concept "Enough Trials":
 - value type is boolean.
 - definition is count "Trial Records" at least 2.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:
@@ -447,10 +448,10 @@ concept "Has Present":
 - value type is boolean.
 - defined as exists ( "Present" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:
@@ -488,10 +489,10 @@ concept "Has Trials":
 - value type is boolean.
 - definition is exists "Trial Records".
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:

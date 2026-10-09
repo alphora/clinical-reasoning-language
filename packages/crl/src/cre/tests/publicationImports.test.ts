@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -123,10 +124,10 @@ concept "Answer":
 - code is \`package-answer\`.
 - shape reduction is most recent.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 decision "D":
 first:
@@ -146,10 +147,10 @@ concept "Trigger":
 - code is \`trigger\`.
 - shape reduction is most recent.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 decision "D":
 first:
@@ -215,12 +216,12 @@ concept "Trigger":
 - value type is boolean.
 - code is \`trigger\`.
 - shape reduction is most recent.
-${kind === "activity" ? 'activity "X":\n- request CPGCommunicationRequest.\n- with `X`.' : ''}
+${kind === "activity" ? 'activity "X":\n- request CPGTaskRequest.\n- with `X`.' : ''}
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`APPROVED\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`DENIED\`.
 decision "D":
 first:

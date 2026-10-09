@@ -16,7 +16,7 @@ concept "Severe Crohns":
 - coded from "Severe Crohns VS".
 
 activity "Shared Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied.`.
 
 decision "Sub Triage":

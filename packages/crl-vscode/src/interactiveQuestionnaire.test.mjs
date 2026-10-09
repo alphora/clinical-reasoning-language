@@ -1,9 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { discoverInitialStates, validateInitialBundle, interactiveRequest, readInteractiveResult, InteractiveSession } from "./interactiveQuestionnaire.ts";
+import { join, resolve } from "node:path";
+import { discoverInitialStates, validateInitialBundle, interactiveRequest, readInteractiveResult, InteractiveSession, prepareInteractivePolicy } from "./interactiveQuestionnaire.ts";
 import { pruneInteractiveResponse, questionnaireWithoutDefaults } from "./interactiveQuestionnaireResponse.ts";
+import { vi } from 'vitest';
+
+it('interactive Restart prepares definitions with the same explicit MV date despite inherited environment',()=>{
+ vi.stubEnv('SOURCE_DATE_EPOCH','946684800');
+ try{
+  const prepared=prepareInteractivePolicy(resolve(import.meta.dirname,'../../../examples/bleph-medical-validation/src/cel/mv/medical-validation.cel'),{date:'2026-10-08',capability:'publishable'});
+  const dated=prepared.definitions.entry.map(e=>e.resource).filter(r=>r.date);
+  expect(dated.length).toBeGreaterThan(0);expect(dated.every(r=>String(r.date).startsWith('2026-10-08'))).toBe(true);
+  expect(process.env.SOURCE_DATE_EPOCH).toBe('946684800');
+ }finally{vi.unstubAllEnvs();}
+});
 
 const bundle = () => ({ resourceType: "Bundle", type: "collection", entry: [
   { resource: { resourceType: "Patient", id: "p" } },

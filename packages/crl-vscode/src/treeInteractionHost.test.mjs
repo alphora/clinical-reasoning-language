@@ -38,7 +38,7 @@ test('terminal traversal opens only its criteria before repaint, keeping selecti
 test('pin reveals actual question INPUT before marking and sends cards against the replacement generation',()=>{
  const calls=[],sv={case:{name:'Case'},tree:[],conceptTruth:[]},route={terminalId:'result',nodeIds:['n'],nodeKeys:['root','leaf']};
  const tree={gen:1,leafConcepts:{old:true},panel:{webview:{postMessage:m=>calls.push(['post',m])}}},cards=[{id:'q'}];
- const c=vm.createContext({views:new Map([['tree',tree]]),scenarioByCaseId:new Map([['case',sv]]),routesForCase:()=>[route],mode:'medical-validation',
+ const c=vm.createContext({currentCel:undefined,views:new Map([['tree',tree]]),scenarioByCaseId:new Map([['case',sv]]),routesForCase:()=>[route],mode:'medical-validation',
   clearTreeFocus:()=>calls.push(['clear']),whenKeyResolver:()=>id=>id,buildRouteQuestionnaire:()=>({questions:[]}),buildResolveValueTypes:()=>{},buildConceptShapeResolver:()=>{},buildDefExprResolver:()=>{},
   treeTraversalEntries:()=>[{caseId:'case',route}],treeTraversalSignature:()=> 'traversal',treeFocusPaint:()=>({nodeKeys:['root','leaf'],groupKeys:['group']}),expandTraversalCriteria:current=>current,
   buildRouteCards:()=>({cards,targets:new Map()}),definitionValueInputs:()=>{},conceptLayer:[],crlMaps:{conceptByKey:new Map()},wordingSources:new Map(),crlStructure:[],guardOutlines:new Map(),

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Unit tests for the QUESTIONNAIRE pane RENDERER (#177 slice 3). Like questionnaireModel.test.mjs we write a tiny
 // CRL+CEL project to a temp dir, run `renderScenario` in-process to get a REAL `ScenarioViewModel`, then assert the
 // `renderQuestionnairePane` HTML projection (questions/answers/outcome/terminal-message + the placeholder + data-q
@@ -69,10 +70,10 @@ concept "Y":
 - type is Condition.
 - code is \`y\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "FallThrough":
 first:
@@ -124,7 +125,7 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Nest":
 - when "A" then:
@@ -175,7 +176,7 @@ concept "A":
 - value type is Quantity.
 - code is \`a\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Quant":
 - when "A" then recommend activity "Approve".`;
@@ -210,7 +211,7 @@ concept "Dx":
 - type is Condition.
 - code is \`dx\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Gap":
 - when "Dx" then recommend activity "Approve".`;
@@ -364,10 +365,10 @@ concept "Y":
 - type is Condition.
 - code is \`y\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "FallThrough":
 first:
@@ -412,7 +413,7 @@ concept "X<script>":
 - type is Condition.
 - code is \`x\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Evil":
 - when "X<script>" then recommend activity "Approve".`;
@@ -458,7 +459,7 @@ concept "Shared":
 - type is Condition.
 - code is \`shared-b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Sub":
 - when "Shared" then recommend activity "Approve".`;
@@ -531,10 +532,10 @@ concept "Y":
 - type is Condition.
 - code is \`y\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "FallThrough":
 first:
@@ -595,7 +596,7 @@ check("slice 5: a 0-question questionnaire (empty/terminal-only) renders NO nav 
   const crl = `# Z
 library "Bare".
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "Bare":
 - otherwise then recommend activity "Approve".`;
@@ -650,10 +651,10 @@ concept "Other":
 - type is Condition.
 - code is \`o\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "V":
 first:
@@ -712,7 +713,7 @@ concept "Root":
 - type is Condition.
 - code is \`c\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "V":
 - when "Root" then recommend activity "Approve".`;
@@ -759,7 +760,7 @@ concept "BMI Qualifies":
 - type is Condition.
 - code is \`bmi\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "V":
 - when "BMI Qualifies" then recommend activity "Approve".`;
@@ -810,7 +811,7 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 decision "V":
 first:
@@ -853,10 +854,10 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "G":
 first:
@@ -902,10 +903,10 @@ concept "C":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:
@@ -955,10 +956,10 @@ concept "B":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 all:
@@ -1006,10 +1007,10 @@ criterion "Inner":
 criterion "Outer":
 - when ( "C" and "Inner" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:
@@ -1051,10 +1052,10 @@ concept "B":
 criterion "Eligible":
 - when ( "A" and "B" ).
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "D":
 first:

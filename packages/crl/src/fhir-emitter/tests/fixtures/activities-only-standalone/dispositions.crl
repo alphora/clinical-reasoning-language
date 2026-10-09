@@ -6,5 +6,5 @@ library "Dispositions".
 // behavior): it keeps its own CQL + FHIR Library, self-bound. No rebind is recorded.
 
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied.`.

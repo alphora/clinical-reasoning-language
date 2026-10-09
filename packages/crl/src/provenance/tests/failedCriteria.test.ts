@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * #173 T2 — unit tests for the two PURE failed-criteria selectors (failedCriteria.ts): `allUnsatisfiedCriteria` ("All"
  * mode) and `failedCriterionFrontier` ("Blocking" mode, default). Disc 158 §"WHICH criteria" / §"Trigger" / §"Slice T2".
@@ -628,10 +629,10 @@ concept "Late":
 - type is Condition.
 - code is \`late\`.
 activity "Quick":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`q\`.
 activity "Slow":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`s\`.
 decision "Main":
 first:
@@ -663,10 +664,10 @@ concept "Contra":
 - type is Condition.
 - code is \`contra\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "Main":
 first:
@@ -696,10 +697,10 @@ concept "B":
 - type is Condition.
 - code is \`b\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ok\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`no\`.
 decision "Main":
 first:
@@ -729,7 +730,7 @@ concept "Gate":
 - type is Condition.
 - code is \`gate\`.
 activity "Final":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`f\`.
 decision "Sub3":
 - when "Gate" then recommend activity "Final".
@@ -768,7 +769,7 @@ concept "Contra":
 - type is Condition.
 - code is \`contra\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "Sub":
 - otherwise then recommend activity "Approve".

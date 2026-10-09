@@ -1,3 +1,5 @@
+import { criterionReviewMembership, projectCriterionReview } from '../src/criterionReviewProjection';
+import { criterionGateIdentities } from '@smile-digital-health/crl/provenance';
 // Production model and renderer; browser bridge uses their paint without an extension host.
 import { resolveCelSuite, buildSuiteExecutionModel, nodeKey, conceptDeclRef, caseViewKey } from '@smile-digital-health/crl';
 import { renderFlowPane, toggleCriterionExpansion, expandTraversalCriteria, expandQuestionInputs, FLOW_STYLE } from '../src/flowPaneHtml';
@@ -94,6 +96,23 @@ export function fixture(cel: string) {
     const e:any={caseId:'synthetic-'+suffix,route:{nodeKeys:keys},operands:[],conditions:[{key:'group-'+suffix,result:'true'}],guards:[]};
     return {keys,paint:treeFocusPaint([e],keys.at(-1)!,groups.focusNodes),negativePaint:treeFocusPaint([{...e,conditions:[{key:'group-'+suffix,result:'false'}]}],keys.at(-1)!,groups.focusNodes),unknownPaint:treeFocusPaint([{...e,conditions:[{key:'group-'+suffix,result:'unknown'}]}],keys.at(-1)!,groups.focusNodes)};
   });
-  return {html: rendered.html+nested.html, manualHtml, collapsedHtml:renderFlowPane(model.crlStructure,opts).html, auto, style: FLOW_STYLE, nodes: {...rendered.focusNodes,...nested.focusNodes}, choices, prefixes, pinnedRows, terminalOrder:terminals,
+  const reviewExpanded = new Set([...expanded, ...pinnedRows.flatMap(r => r.opened)]);
+  const reviewRendered = renderFlowPane(model.crlStructure, {...opts, expandedGuardWhens: reviewExpanded});
+  const reviewCases = model.scenarios.scenarios.map(sc => ({caseId:model.duplicateScenarioNames.has(caseViewKey(sc.case))?undefined:model.caseIdByName[caseViewKey(sc.case)],status:sc.status,state:'pass' as const,
+    nodeKeys:executionRoutes(sc,model.crlStructure).flatMap(r=>r.nodeKeys)}));
+  const reviewInput = {nodes:reviewRendered.focusNodes,occurrences:reviewRendered.criterionOccurrences,
+    membership:criterionReviewMembership(model.guardOutlines),live:criterionGateIdentities(model.guardOutlines,model.criterionIdentities),stored:{},cases:reviewCases,current:true};
+  const reviewStep = (label:string,input:any) => {
+    const p=projectCriterionReview(input),ids=(keys:Set<string>)=>[...keys].flatMap(k=>reviewRendered.anchors[k]?.segmentIds??[]);
+    return {label,pass:ids(p.pass),states:p.states,allGids:reviewRendered.criterionOccurrences.map(o=>o.gid),
+      byState:Object.fromEntries(['pass','fail','pending','stale'].map(s=>[s,Object.entries(p.states).filter(([,v])=>v===s).map(([gid])=>gid)]))};
+  };
+  const explicitStored=Object.fromEntries([...model.criterionIdentities].map(([k,v])=>[k,{state:'pass',bodyHash:v.bodyHash}]));
+  const reviewSteps=[reviewStep('all approved paths',reviewInput),reviewStep('all To do',{...reviewInput,cases:reviewCases.map(c=>({...c,state:'unreviewed'}))}),
+    reviewStep('explicit criterion Pass without cases',{...reviewInput,stored:explicitStored,cases:[]}),
+    reviewStep('definitions checking',{...reviewInput,current:false}),reviewStep('passing verdict on errored case',{...reviewInput,cases:reviewCases.map(c=>({...c,status:'error'}))})];
+  const reviewFixture={html:reviewRendered.html,nodes:reviewRendered.focusNodes,steps:reviewSteps,
+    inputs:Object.entries(reviewRendered.focusNodes).filter(([k,n])=>n.outline&&!n.choice&&!n.logic&&k.includes('inputs')).map(([k])=>k)};
+  return {reviewFixture,html: rendered.html+nested.html, manualHtml, collapsedHtml:renderFlowPane(model.crlStructure,opts).html, auto, style: FLOW_STYLE, nodes: {...rendered.focusNodes,...nested.focusNodes}, choices, prefixes, pinnedRows, terminalOrder:terminals,
     groupFixture:{html:groups.html,nodes:groups.focusNodes,routes:groupRoutes}};
 }

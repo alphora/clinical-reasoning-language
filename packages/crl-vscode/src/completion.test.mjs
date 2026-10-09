@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 
 import * as cdMod from "@smile-digital-health/crl/language-services";
-const { detectQualifiedRefQualifier, isInsideOpenQuote } = cdMod.default ?? cdMod;
+const { detectQualifiedRefQualifier, isInsideOpenQuote } = ({...cdMod.default, ...cdMod});
 
 import * as mod from "@smile-digital-health/crl/language-services";
 
@@ -21,7 +21,7 @@ const {
   isUnquotedTypeSlotPrefix,
   applyNarrativePrecedence,
   findByConceptFirstPrecedence,
-} = mod.default ?? mod;
+} = ({...mod.default, ...mod});
 
 // --- isTypeCompletionPrefix ---
 assert.equal(isTypeCompletionPrefix("- type is "), true);

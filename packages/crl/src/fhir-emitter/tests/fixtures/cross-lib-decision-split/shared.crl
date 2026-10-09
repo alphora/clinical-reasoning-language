@@ -15,7 +15,7 @@ concept "Active Severe Crohns":
 - definition is exists this.
 
 activity "Shared Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `Denied.`.
 
 decision "Sub Triage":

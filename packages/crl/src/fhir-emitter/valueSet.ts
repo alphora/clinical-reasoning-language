@@ -264,11 +264,11 @@ export function emitValueSet(
   // before, so existing byte output is untouched.
   const expansionContains = compose.include.flatMap((inc) => {
     const system = (inc as { system?: string }).system;
-    const concepts = (inc as { concept?: Array<{ code: string; display?: string }> }).concept;
+    const concepts = (inc as { concept?: Array<{ code: string; display?: string; extension?: {url:string; valueString:string}[] }> }).concept;
     if (system === undefined || concepts === undefined) return [];
     // Conditional spread, not `display: c.display` — an explicit `undefined` key would change the emitted
     // JSON shape for every existing value set and break every golden for no behavioural gain.
-    return concepts.map((c) => ({ system, code: c.code, ...(c.display === undefined ? {} : { display: c.display }) }));
+    return concepts.map((c) => ({ system, code: c.code, ...(c.display === undefined ? {} : { display: c.display }), ...(c.extension ? {extension:c.extension} : {}) }));
   });
 
   const resource: Record<string, unknown> = {
@@ -368,7 +368,7 @@ function buildCompose(
       last.concept = last.concept ?? [];
       // #313 — carry the AUTHORED display when there is one. ⚠ Only when authored: absent stays absent, and
       // is never derived from the code. `expansionContains` below mirrors whatever lands here.
-      last.concept.push({ code: line.code, ...(line.display === undefined ? {} : { display: line.display }) });
+      last.concept.push({ code: line.code, ...(line.display === undefined ? {} : { display: line.display }), ...(line.description === undefined ? {} : { extension: [{url:"http://hl7.org/fhir/StructureDefinition/valueset-concept-definition",valueString:line.description}] }) });
     }
   }
 

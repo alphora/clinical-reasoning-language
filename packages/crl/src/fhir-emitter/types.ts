@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * CRL → FHIR Definition emitter types.
  *
@@ -393,7 +394,7 @@ export interface UnmatchedReference {
     // longer produces an `unsupported-with-text` UnmatchedReference (that kind was
     // removed). It carries no machine signal, so routing it to `unmatched` would
     // wrongly pin `success:false`.
-    | "unsupported-communication-with-terminology"
+    | "unsupported-task-with-terminology"
     | "unsupported-questionnaire-with";
   text: string;
   line?: number;
@@ -430,7 +431,7 @@ export interface EmitOptions {
   /**
    * The resolved PA disposition config (feature: configurable PA leaves). Threaded in by `emitFhirDefFromPath`
    * (which has the project root → `resolveDispositionConfig`). When present + `configured`, a determination
-   * activity named `<category>.<key>` emits a `dynamicValue` setting the produced `CommunicationRequest.reasonCode`
+   * activity named `<category>.<key>` emits a `dynamicValue` setting the produced `Task.reasonCode`
    * to the PAS review-action Coding (+ the option's reason code). Absent → today's behavior (no coded outcome).
    *
    * ⚠ CONTRACT (round-2 C2): pass ONLY a config from a resolution with NO error-severity errors. `emitFhirDefFromPath`

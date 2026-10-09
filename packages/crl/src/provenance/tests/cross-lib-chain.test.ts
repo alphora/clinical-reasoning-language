@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 /**
  * #172 todo-3 (FULL) — the provenance/cockpit round-trip for a CROSS-LIBRARY chained `use decision`, now COMPLETE.
  *
@@ -53,10 +54,10 @@ concept "Crit":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Sub":
 first:

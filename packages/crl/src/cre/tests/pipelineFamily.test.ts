@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -23,10 +24,10 @@ import { runCel } from "../run";
  */
 
 const POLICY_TAIL = `activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`ap\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`dn\`.
 decision "D":
 first:

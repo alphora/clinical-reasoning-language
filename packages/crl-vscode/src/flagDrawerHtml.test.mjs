@@ -135,7 +135,7 @@ test("renderFlagDrawer edit: 'Edit flag —' heading, distinct data-flag-edit-{s
   // the create-only intents must be ABSENT (dead in edit mode)
   assert.ok(!/data-flag-insert/.test(h), "no create Insert intent");
   assert.ok(!/data-flag-close(?!-)/.test(h) && !/data-flag-cancel(?!-)/.test(h), "no create close/cancel intents");
-  assert.ok(!/becomes the GitHub issue body/.test(h), "the create-only placebo is dropped on edit");
+  assert.doesNotMatch(h, /issue/i, "local flag copy");
   // the selected tag is prefilled + its field group visible (reuses the create field machinery)
   assert.match(h, /<option value="tooling-bug" selected>/);
 });
@@ -143,6 +143,8 @@ test("renderFlagDrawer create (default): keeps the create intents; no edit marke
   const h = renderFlagDrawer({ targetLabel: "x", tags: TAGS });
   assert.match(h, /Add flag — x/);
   assert.match(h, /data-flag-insert/);
+  assert.match(h, />Save flag</);
+  assert.doesNotMatch(h, /issue/i);
   assert.ok(!/data-flag-edit-/.test(h) && !/flag-edit-drawer/.test(h), "no edit markers on the create form");
 });
 

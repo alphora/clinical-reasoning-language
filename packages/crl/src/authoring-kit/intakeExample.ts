@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // REFACTOR:grounded (#322): synthetic intake, not a clinical eligibility policy.
 export const INTAKE_BASE = "https://example.org/intake";
 export const intakeAnswer = (name: string, type: string, code: string) => `concept "${name}":
@@ -29,7 +30,7 @@ presentation for "Treatment Begun":
 presentation for "Additional Information":
 - question text is "What additional information should the reviewer consider?".
 activity "Human Review":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`HUMAN_REVIEW\`.
 decision "Intake":
 first:

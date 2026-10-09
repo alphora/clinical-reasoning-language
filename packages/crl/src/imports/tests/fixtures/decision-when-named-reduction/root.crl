@@ -22,8 +22,8 @@ first:
 - otherwise then recommend activity "not-certify.Deny".
 
 activity "certify.Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `APPROVE`.
 activity "not-certify.Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `DENY`.

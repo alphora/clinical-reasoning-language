@@ -272,6 +272,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // file is opened. ProjectIndex is the shared multi-file scope source.
   const index = new ProjectIndex();
   context.subscriptions.push(
+    vscode.commands.registerCommand("crl.invalidateProjectCache", () => index.invalidateAll()),
     vscode.commands.registerCommand("crl.refreshProjectCache", () => {
       index.invalidateAll();
       vscode.window.showInformationMessage("CRL: project cache refreshed.");

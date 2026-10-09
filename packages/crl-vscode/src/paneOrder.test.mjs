@@ -45,7 +45,7 @@ check("a NON-array (unset / malformed type) falls back to the spec's canonical s
 check("MV's fallback is the operator's three-pane set, NOT every pane", () => {
   // Defaulting to all seven was tried and reverted: seven retainContextWhenHidden webviews side by side on a
   // browser-only clinician's screen, including the 1.85 MB LForms shell, for panes most never open.
-  assert.deepEqual(mv(undefined), ["source", "fhirQuestionnaire", "tree"]);
+  assert.deepEqual(mv(undefined), ["source", "tree", "fhirQuestionnaire"]);
 });
 
 // ── repair rules that survive unchanged ──

@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { createHash } from "crypto";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import * as os from "os";
@@ -25,7 +26,7 @@ concept "Orphan":
 - type is Condition.
 - code is \`o\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 decision "Dec":
 first:

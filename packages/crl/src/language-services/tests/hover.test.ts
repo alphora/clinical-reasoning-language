@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 // Unit tests for the headless hover logic (#132 step 3). The extension's golden oracle
 // proves byte-for-byte behavior-preservation against the old providers; these tests give
 // core its own coverage of the compute* branches, testable with plain inputs (no catalog,
@@ -48,7 +49,7 @@ describe("computeTypeValuetypeHover (#132 step 3)", () => {
     conceptTypes: ["Observation", "Condition"],
     valueTypes: ["Quantity", "boolean"],
     paramTypes: ["Patient", "Period"],
-    activityTypes: ["CPGServiceRequest", "CPGCommunicationRequest"],
+    activityTypes: ["CPGServiceRequest", "CPGTaskRequest"],
   };
 
   it("hovers a valid `- type is X.` token", () => {
@@ -94,7 +95,7 @@ describe("computeTypeValuetypeHover (#132 step 3)", () => {
   it("warns on an unrecognized request type, listing the valid set", () => {
     const h = computeTypeValuetypeHover("- request Nope.", { line: 0, character: 12 }, allow);
     expect(h?.markdown).toBe(
-      "**Nope** — CPG activity type\n\n⚠ Not in the recognized activity type set. Valid: CPGServiceRequest, CPGCommunicationRequest.",
+      "**Nope** — CPG activity type\n\n⚠ Not in the recognized activity type set. Valid: CPGServiceRequest, CPGTaskRequest.",
     );
   });
 

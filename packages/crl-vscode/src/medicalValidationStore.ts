@@ -76,6 +76,41 @@ export interface MedicalValidationSidecar {
    *  schemaVersion 2 (an older reader ignores it, this reader tolerates its absence — the same discipline as `notesByCaseId`).
    *  Omitted when empty (a criterion-verdict-free policy stays byte-identical). */
   criterionVerdictsByKey?: Record<string, PersistedCriterionVerdict>;
+  /** Advisory attribution; pass demotion and independent definition/result checks enforce correctness. */
+  definitionRevision?: MedicalReviewDefinitionRevision;
+}
+
+export interface MedicalReviewDefinitionRevision {
+  id: string; definitionClosureSha256: string; editedAt: string; receiptPath: string;
+  demotedCaseIds: string[]; demotedCriterionKeys: string[];
+}
+
+function coerceDefinitionRevision(value: unknown): MedicalReviewDefinitionRevision | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const v = value as Record<string, unknown>;
+  if (typeof v.id !== 'string' || !/^[a-f0-9-]{36}$/.test(v.id) ||
+    typeof v.definitionClosureSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(v.definitionClosureSha256) ||
+    typeof v.editedAt !== 'string' || !Number.isFinite(Date.parse(v.editedAt)) ||
+    v.receiptPath !== `src/medical-validation/direct-edits/${v.id}.json` ||
+    !Array.isArray(v.demotedCaseIds) || v.demotedCaseIds.some(x => typeof x !== 'string') ||
+    !Array.isArray(v.demotedCriterionKeys) || v.demotedCriterionKeys.some(x => typeof x !== 'string')) return undefined;
+  return { id: v.id, definitionClosureSha256: v.definitionClosureSha256, editedAt: v.editedAt,
+    receiptPath: v.receiptPath as string, demotedCaseIds: [...new Set(v.demotedCaseIds)], demotedCriterionKeys: [...new Set(v.demotedCriterionKeys)] };
+}
+
+/** New wording invalidates prior approvals. Failed judgments and every note remain visible. */
+export function demotePassedReviews(sidecar: MedicalValidationSidecar,
+  revision: Omit<MedicalReviewDefinitionRevision, 'demotedCaseIds' | 'demotedCriterionKeys'>): MedicalValidationSidecar {
+  const next = structuredClone(sidecar), cases = new Set(sidecar.definitionRevision?.demotedCaseIds ?? []),
+    criteria = new Set(sidecar.definitionRevision?.demotedCriterionKeys ?? []);
+  for (const [id, state] of Object.entries(next.byCaseId)) if (state === 'pass') { next.byCaseId[id] = 'pending'; cases.add(id); }
+  for (const [key, verdict] of Object.entries(next.criterionVerdictsByKey ?? {})) if (verdict.state === 'pass') {
+    verdict.state = 'pending'; criteria.add(key);
+  }
+  next.definitionRevision = { ...revision, demotedCaseIds: [...cases].filter(id => next.byCaseId[id] === 'pending').sort(),
+    demotedCriterionKeys: [...criteria].filter(key => next.criterionVerdictsByKey?.[key]?.state === 'pending').sort() };
+  if (!coerceDefinitionRevision(next.definitionRevision)) throw new Error('Invalid Medical Review definition revision.');
+  return next;
 }
 
 /** A persisted CRITERION verdict — the reviewer's judgment on whether a criterion is correctly encoded, plus the
@@ -100,10 +135,17 @@ export function composeSidecar(
   byCaseId: Record<string, PersistedReviewState>,
   notesByCaseId: Record<string, Note[]>,
   criterionVerdictsByKey: Record<string, PersistedCriterionVerdict> = {},
+  definitionRevision?: MedicalReviewDefinitionRevision,
 ): MedicalValidationSidecar {
   const sidecar: MedicalValidationSidecar = { schemaVersion: 2, byCaseId };
   if (Object.keys(notesByCaseId).length > 0) sidecar.notesByCaseId = notesByCaseId;
   if (Object.keys(criterionVerdictsByKey).length > 0) sidecar.criterionVerdictsByKey = criterionVerdictsByKey;
+  if (definitionRevision) {
+    const valid = coerceDefinitionRevision(definitionRevision);
+    if (!valid) throw new Error('Invalid Medical Review definition revision.');
+    sidecar.definitionRevision = { ...valid, demotedCaseIds: valid.demotedCaseIds.filter(id => byCaseId[id] === 'pending'),
+      demotedCriterionKeys: valid.demotedCriterionKeys.filter(key => criterionVerdictsByKey[key]?.state === 'pending') };
+  }
   return sidecar;
 }
 
@@ -201,13 +243,18 @@ function coerceSidecar(parsed: unknown): CoerceResult {
   }
   const notesByCaseId = coerceNotes(obj.notesByCaseId); // carried THROUGH the load (else a load→save round-trip loses notes)
   const criterionVerdictsByKey = coerceCriterionVerdicts(obj.criterionVerdictsByKey); // likewise carried through
-  const warning =
+  let warning =
     obj.schemaVersion !== 1 && obj.schemaVersion !== 2
       ? `sidecar schemaVersion ${JSON.stringify(obj.schemaVersion)} is not 1 or 2; loaded the known states best-effort`
       : undefined;
   const sidecar: MedicalValidationSidecar = { schemaVersion: 2, byCaseId };
   if (notesByCaseId) sidecar.notesByCaseId = notesByCaseId;
   if (criterionVerdictsByKey) sidecar.criterionVerdictsByKey = criterionVerdictsByKey;
+  if (obj.definitionRevision !== undefined) {
+    const revision = coerceDefinitionRevision(obj.definitionRevision);
+    if (revision) sidecar.definitionRevision = revision;
+    else warning = [warning, 'invalid definition revision; review states retained but edit attribution unavailable'].filter(Boolean).join('; ');
+  }
   return { sidecar, warning };
 }
 

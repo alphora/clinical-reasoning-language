@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import * as path from "node:path";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -80,7 +81,7 @@ function emitRaw(opts: { terminology: string[]; valueFrom: string | null; concep
         '- defined as exists ("Requested Service").',
         "",
         'activity "Approve":',
-        "- request CPGCommunicationRequest.",
+        "- request CPGTaskRequest.",
         "- with `APPROVED`.",
         "",
         'decision "D":',

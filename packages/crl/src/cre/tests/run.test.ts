@@ -1,3 +1,4 @@
+// REFACTOR:grounded (MR10): authored activities use CPGTaskRequest and produce FHIR Task.
 import { join } from "path";
 
 import { collectDecisionArmsTransitive } from "../../ast/decisionArms";
@@ -102,10 +103,10 @@ concept "Indic":
 - type is Condition.
 - code is \`indic\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "D":
 first:
@@ -156,10 +157,10 @@ concept "Contra":
 - type is Condition.
 - code is \`contra\`.
 activity "Referral":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`r\`.
 activity "Med":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`m\`.
 decision "D":
 - when "Indic" then:
@@ -256,10 +257,10 @@ concept "NeedsLabs":
 - type is Condition.
 - code is \`lab\`.
 activity "OrderImaging":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`i\`.
 activity "OrderLabs":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`l\`.
 decision "D":
 all:
@@ -314,10 +315,10 @@ concept "SpecEligible":
 - type is Condition.
 - code is \`espec\`.
 activity "Imaging":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`i\`.
 activity "Specialist":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`s\`.
 decision "D":
 - when "Indic" then:
@@ -390,10 +391,10 @@ concept "Severe":
 - type is Condition.
 - code is \`sev\`.
 activity "Escalate":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`e\`.
 activity "Routine":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`r\`.
 decision "Sub":
 first:
@@ -546,10 +547,10 @@ concept "Crit":
 - type is Condition.
 - code is \`crit\`.
 activity "Approve":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`a\`.
 activity "Deny":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`d\`.
 decision "Sub":
 first:
@@ -727,10 +728,10 @@ concept "Severe":
 - type is Condition.
 - code is \`sev\`.
 activity "Escalate":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`e\`.
 activity "Routine":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`r\`.
 decision "Sub":
 first:
@@ -826,7 +827,7 @@ concept "P":
 - type is Condition.
 - code is \`p\`.
 activity "Done":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with \`x\`.
 decision "Sub":
 first:

@@ -168,15 +168,15 @@ test("description row: ALWAYS shown (operator — human-editable on authoring-ta
   assert.ok(!/>Ref</.test(noRef), "no Ref row when ref absent");
 });
 
-test('Open KE flags offer Accept and Reject, while closed KE flags offer Reopen',()=>{
+test('Open KE flags offer Answer and Ignore, while closed KE flags offer Reopen',()=>{
  for(const status of ['open','resolved']){
   const html=renderFlagActionDrawer({...OPEN_VIEW,category:'extraction',status,readOnly:true,issueNo:42});
   assert.match(html,/KE flag · Content read only/);assert.doesNotMatch(html,/data-flag-action-(edit|delete)/);
   if(status==='open'){
-   assert.match(html,/data-flag-action-accept>Accept flag/);assert.match(html,/data-flag-action-reject>Reject flag/);
+   assert.match(html,/data-flag-action-answer>Answer Flag/);assert.match(html,/data-flag-action-ignore>Ignore Flag/);
    assert.doesNotMatch(html,/data-flag-action-toggle|Resolve flag/);
   }else{
-   assert.match(html,/Reopen flag/);assert.doesNotMatch(html,/data-flag-action-(accept|reject)/);
+   assert.match(html,/Reopen flag/);assert.doesNotMatch(html,/data-flag-action-(answer|ignore)/);
   }
   assert.match(html,/data-flag-action-issue/);assert.match(html,/data-flag-action-close/);
  }

@@ -4,9 +4,9 @@ library "Medical Policy Determination".
 // Communicated results for the individual procedure assessed in the L34194 example.
 
 activity "certify.Met":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `The assessed procedure meets the functional-surgery criteria represented in this example.`.
 
 activity "not-certify.Unmet":
-- request CPGCommunicationRequest.
+- request CPGTaskRequest.
 - with `The assessed procedure does not meet the functional-surgery criteria represented in this example.`.

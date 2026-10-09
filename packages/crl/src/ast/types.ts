@@ -404,6 +404,8 @@ export interface TerminologyCode extends ASTNode {
    *  its own REQUIRED display. It is optional here because an external code's display belongs to its code
    *  system (CPT, SNOMED), and forcing a retype invites drift from the authority. */
   display?: string;
+  /** Authored meaning/help for this vocabulary member. */
+  description?: string;
   location: Location;
 }
 

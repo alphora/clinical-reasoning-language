@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "celLibrary": "mv",
   "useCase": "prior-auth",
-  "generatedAt": "2026-10-07T06:51:14.447Z",
+  "generatedAt": "2026-10-09T03:15:37.774Z",
   "provenance": {
-    "crlVersion": "6.4.34",
+    "crlVersion": "6.4.36",
     "producerJarSha256": "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
-    "inputClock": "2026-10-07T06:51:10.944Z",
-    "runtimeSha256": "b603bc64313273e786819a194c1493a11c14f1c434f71153fd91cf2ffd92d93b",
-    "definitionClosureSha256": "2757125c1ac3b5533722ebeb688411a404ec7d2e647be00ddc1dcba23cea4270"
+    "inputClock": "2026-10-09T03:15:35.493Z",
+    "runtimeSha256": "101ad0f778a9c4b7b7a647376bdd50d6d3b3129ebc8a1b4e7e1d3fdee49ab8ee",
+    "definitionClosureSha256": "66f1c47a2162cde2fe19189a2afd67bc1ec7385fbb7b5e57672e1ce6bd4c6cb6"
   },
   "cases": [
     {
@@ -32,7 +32,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-pseudo-mrd-met",
       "inputSha256": "022fd280dd095e3880096d775e984218a0cce33816c4a516f6fc3e566e32f86c",
-      "producedAt": "2026-10-07T06:51:14.453Z"
+      "producedAt": "2026-10-09T03:15:37.777Z"
     },
     {
       "caseName": "Upper blepharoplasty — side-gaze obstruction",
@@ -55,7 +55,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-side-gaze-met",
       "inputSha256": "db71294c56a51f8ec143725c2ffde5839e9a51a454556ebd94d8560c11dd3816",
-      "producedAt": "2026-10-07T06:51:29.290Z"
+      "producedAt": "2026-10-09T03:15:49.470Z"
     },
     {
       "caseName": "Upper blepharoplasty — another affected daily activity",
@@ -78,7 +78,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-other-activity-met",
       "inputSha256": "2c9ce65aea086286abf38d5e7d830d08d8413b940808dc611d9b188172f55394",
-      "producedAt": "2026-10-07T06:51:47.210Z"
+      "producedAt": "2026-10-09T03:16:01.731Z"
     },
     {
       "caseName": "Ptosis repair — actual-margin MRD 2.0 mm or less",
@@ -101,7 +101,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-mrd-met",
       "inputSha256": "9e1c4ff6e88b56c1fcfcda485ed565a67723b19ed8f56ae2c497051b9871ee8b",
-      "producedAt": "2026-10-07T06:52:10.341Z"
+      "producedAt": "2026-10-09T03:16:16.738Z"
     },
     {
       "caseName": "Ptosis repair — visual interference with driving",
@@ -124,7 +124,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-driving-met",
       "inputSha256": "a15649c7946baf0ce79cac1df944825e9b278549990713c23dbb671ff2a54067",
-      "producedAt": "2026-10-07T06:52:25.298Z"
+      "producedAt": "2026-10-09T03:16:35.383Z"
     },
     {
       "caseName": "Ptosis repair — another affected daily activity",
@@ -147,7 +147,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-other-activity-met",
       "inputSha256": "0111cae288e7cb272ef5f11b5ee8eeab1b99457bd137f8a35e1975fec4681b79",
-      "producedAt": "2026-10-07T06:52:40.764Z"
+      "producedAt": "2026-10-09T03:16:53.209Z"
     },
     {
       "caseName": "upper procedure — solely cosmetic",
@@ -170,7 +170,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-cosmetic-unmet",
       "inputSha256": "2ba96a255f25832b9c297e5bbffe64d436d88b9d9351394fa74312e0f245462d",
-      "producedAt": "2026-10-07T06:52:56.205Z"
+      "producedAt": "2026-10-09T03:17:08.442Z"
     },
     {
       "caseName": "upper procedure — no documented functional complaint",
@@ -193,7 +193,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-complaint-unmet",
       "inputSha256": "a5d0edf951cdf966c9873664d3a3698433bb97d496def0d231ed244b7c58ffba",
-      "producedAt": "2026-10-07T06:53:11.979Z"
+      "producedAt": "2026-10-09T03:17:24.798Z"
     },
     {
       "caseName": "upper procedure — individual necessity not established",
@@ -216,7 +216,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-necessity-unmet",
       "inputSha256": "b1e99a71a150c0679f11acb9eba433eae6fe40538c7e2e662e29ee8bebfd07d6",
-      "producedAt": "2026-10-07T06:53:33.843Z"
+      "producedAt": "2026-10-09T03:17:38.566Z"
     },
     {
       "caseName": "ptosis procedure — solely cosmetic",
@@ -239,7 +239,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-cosmetic-unmet",
       "inputSha256": "192be69baf163d9eaeedddaf34b4a8cb211933b66871664aa0cb9500d9f5031f",
-      "producedAt": "2026-10-07T06:54:00.385Z"
+      "producedAt": "2026-10-09T03:17:51.948Z"
     },
     {
       "caseName": "ptosis procedure — no documented functional complaint",
@@ -262,7 +262,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-complaint-unmet",
       "inputSha256": "5d5b140ab6777bbf6f507f108542dc708f2267972c4385cfe15f278378b6a301",
-      "producedAt": "2026-10-07T06:54:28.621Z"
+      "producedAt": "2026-10-09T03:18:05.966Z"
     },
     {
       "caseName": "ptosis procedure — individual necessity not established",
@@ -285,7 +285,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-necessity-unmet",
       "inputSha256": "eaa455c423f8ebc2a082b7fb46ce14fa237b64d020d2784014dd2ab45a48299d",
-      "producedAt": "2026-10-07T06:54:52.988Z"
+      "producedAt": "2026-10-09T03:18:19.951Z"
     },
     {
       "caseName": "Upper blepharoplasty — neither qualifying skin finding",
@@ -308,7 +308,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-skin-unmet",
       "inputSha256": "da0f43a48510d62a31eb7efbf532c002ef76326759069ce11021447326ecb36a",
-      "producedAt": "2026-10-07T06:55:22.677Z"
+      "producedAt": "2026-10-09T03:18:33.564Z"
     },
     {
       "caseName": "Upper blepharoplasty — required photographs not documented",
@@ -331,7 +331,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "upper-photos-unmet",
       "inputSha256": "3a2c069e6beb45ff016818d7346fa9a5893d2fb38e89affe9863a85a26f4911d",
-      "producedAt": "2026-10-07T06:55:45.628Z"
+      "producedAt": "2026-10-09T03:18:47.807Z"
     },
     {
       "caseName": "Ptosis repair — actual-margin MRD exceeds 2.0 mm",
@@ -354,7 +354,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-mrd-unmet",
       "inputSha256": "8794729ece1cb6bc6876df4c24fd82215bd525ed0cebee0797f77adf247bab99",
-      "producedAt": "2026-10-07T06:56:11.030Z"
+      "producedAt": "2026-10-09T03:19:01.551Z"
     },
     {
       "caseName": "Ptosis repair — required photographs not documented",
@@ -377,7 +377,7 @@
       "sourceFile": "src/cel/mv/medical-validation.cel",
       "caseId": "ptosis-photos-unmet",
       "inputSha256": "2ce24d4029783bbf431d74791020a4a7317ff76b437925708ba3450b9f8685f3",
-      "producedAt": "2026-10-07T06:56:36.409Z"
+      "producedAt": "2026-10-09T03:19:15.766Z"
     }
   ]
 }

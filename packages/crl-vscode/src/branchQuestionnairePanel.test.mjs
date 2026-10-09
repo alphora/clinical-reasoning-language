@@ -25,14 +25,14 @@ test('pane handshake replays newest branch and stale panels cannot write or clos
  assert.match(old.title,/Result Questionnaire/);assert.equal(old.column.viewColumn,-2);assert.equal(old.options.retainContextWhenHidden,true);
  pane.update({token:'two',cards:[{id:'new'}]});assert.equal(old.posts.length,0);
  old.receive({type:'ready',gen:1});assert.equal(old.posts.at(-1).token,'two');
- old.receive({type:'routeCardProposal',token:'one',gen:1});assert.equal(messages.length,0);
+ old.receive({type:'routeCardSave',token:'one',gen:1});assert.equal(messages.length,0);
  old.receive({type:'routeCardDraft',token:'two',gen:1});assert.equal(messages.length,1);
  pane.close();assert.equal(closes,1);assert.equal(pane.isOpen,false);
  pane.open({token:'two',cards:[]});const current=vscode.__panels.at(-1);
- old.receive({type:'ready',gen:1});old.receive({type:'routeCardProposal',token:'two',gen:1});old.didDispose();
+ old.receive({type:'ready',gen:1});old.receive({type:'routeCardSave',token:'two',gen:1});old.didDispose();
  assert.equal(messages.length,1);assert.equal(closes,1);assert.equal(pane.isOpen,true);
  current.receive({type:'ready',gen:2});assert.equal(current.posts.length,1);
- pane.post({type:'routeCardProposalResult',token:'two',key:'a'});assert.equal(current.posts.at(-1).gen,2);
+ pane.post({type:'routeCardSaveResult',token:'two',key:'a'});assert.equal(current.posts.at(-1).gen,2);
  current.dispose();assert.equal(closes,2);assert.equal(pane.isOpen,false);
- current.receive({type:'routeCardProposal',token:'two',gen:2});assert.equal(messages.length,1);
+ current.receive({type:'routeCardSave',token:'two',gen:2});assert.equal(messages.length,1);
 });
