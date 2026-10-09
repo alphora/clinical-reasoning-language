@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "602bcfc8c6af0fe2e187d85bb00706fc658738e4",
-  "auditedSchemaVersion": "2.33",
-  "auditedContentHash": "2560908e70c401e8d963470a1a30df67b984ef8d9bdd6248c1faec12ee8cff1e",
-  "scope": "Reviewed schema 2.33 Knowledge Engineer app and local Q/A disk workflow through 602bcfc8c6af0fe2e187d85bb00706fc658738e4. Windows path corrections, changed claims/tests/fixtures, review dispositions and bounded source/native/render evidence are recorded in coverage.md. CRL does not observe KELP locks or write MV flags/status. Release installation and customer deployment remain separately qualified.",
+  "auditedRevision": "a670ed2127a9aa4deceae25e538cc990d75a9228",
+  "auditedSchemaVersion": "2.34",
+  "auditedContentHash": "c702d3adde3a92bf23d6b978c7141cef89e24fab9cd9821b8458f65fe5f68cd3",
+  "scope": "Reviewed schema 2.34 scoped publication decision delegation through a670ed2127a9aa4deceae25e538cc990d75a9228. Source/owner, trace, native root/child and KE static checks are bounded in coverage.md. Independent-root and included-seed domain constraints remain separate. Source audit does not certify installed release or customer deployment.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
