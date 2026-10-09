@@ -96,6 +96,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
     ["Question Edit", "rule:mv-wording-patches"],
     ["Answer CRUD", "rule:mv-wording-patches"],
     ["KE Updates", "rule:mv-wording-patches"],
+    ["Knowledge Engineer", "rule:mv-wording-patches"],
+    ["crl.knowledgeEngineering.show", "rule:mv-wording-patches"],
     ["preview_presentation_edit", "rule:shared-wording-editing"],
     ["KE handoff", "rule:mv-wording-patches"],
     ["coded answers", "rule:named-answer-options"],

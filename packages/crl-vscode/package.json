@@ -87,6 +87,11 @@
     ],
     "commands": [
       {
+        "command": "crl.knowledgeEngineering.show",
+        "title": "CRL: Show Knowledge Engineer",
+        "icon": "$(tools)"
+      },
+      {
         "command": "crl.editQuestionWording",
         "title": "CRL: Edit Question Wording"
       },

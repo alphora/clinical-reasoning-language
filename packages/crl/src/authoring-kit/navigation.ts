@@ -32,7 +32,7 @@ const ALIASES: Record<string, string[]> = {
   "cel-cases": ["test cases", "CEL", "data", "expected activity", "multiple results", "multiple assertions", "cre-multiple-result-assertions"],
   "mv-case-authoring": ["MV CEL", "medical validation cases", "off path data", "regression suite", "Result Questionnaire", "selected route"],
   "shared-wording-editing": ["edit source wording", "preview_presentation_edit", "apply_presentation_edit", "revert_presentation_edit", "Edit Question Wording", "shared default", "undo wording", "wording conflict"],
-  "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change", "Question Edit", "Answer CRUD", "Pending fix", "Fixed", "Approved", "KE Updates", "revert answer", "static questionnaire"],
+  "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change", "Question Edit", "Answer CRUD", "Pending fix", "Fixed", "Approved", "KE Updates", "Knowledge Engineer", "crl.knowledgeEngineering.show", "preview Q/A edits", "run Q/A edits", "revert answer", "static questionnaire"],
   "produce-results": ["retryFailed", "retry failed cases", "caseTimeoutMs", "native timeout", "retry-from", "emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
   "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine", "active Condition", "verified Condition", "record filters", "preview discrepancy", "RecordSet existence"],
 };

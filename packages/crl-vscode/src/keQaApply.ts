@@ -130,7 +130,7 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
     for(const transaction of incomplete)transaction.recover();
     return {ok:true,schemaVersion:1,state:'recovered',requiredScopes:scopes,changedPaths};
   }
-  if(incomplete.length || recovery.errors.length)throw Error('An interrupted KE update needs recovery. Lock the KE scopes and invoke recover before applying another update.');
+  if(incomplete.length || recovery.errors.length)throw Error('An interrupted KE update needs recovery. Invoke recover before applying another update.');
   const selected=selectedRequests(root,input.requests),suite=resolveCelSuite(root);if(!suite.ok || !suite.suite.policyPath)throw Error('The artifact has no unique policy and MV case suite.');
   const policy=suite.suite.policyPath,publication=mvPublicationOptions(root);assertSingleLocalPolicy(root,policy,publication);
   mkdirSync(services.storageRoot,{recursive:true});
@@ -145,7 +145,19 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
     const units:EditUnit[]=sourceFiles.map(file=>({path:join(root,file),after:readEditTree(join(stage,file))}));
     for(const lane of ['cql','fhir'])units.push({path:join(root,'src',lane),after:preservePlaceholders(readEditTree(join(root,'src',lane)),readEditTree(join(stage,'src',lane)))});
     const changed=()=>units.filter(u=>!equal(editTreeIdentity(readEditTree(u.path)),editTreeIdentity(u.after)));
-    if(input.operation==='preview')return {ok:true,schemaVersion:1,state:'preview',requiredScopes:scopes,requests:input.requests,changes:sourcePlan.changes,clearedCases:cleared,changedPaths:changed().map(u=>relative(root,u.path).replace(/\\/g,'/'))};
+    if(input.operation==='preview'){
+      const changes=changed();
+      const sourceChanges=changes.filter(u=>/^(?:src[\\/]crl|src[\\/]cel)[\\/]/.test(relative(root,u.path))).map(u=>({
+        file:relative(root,u.path).replace(/\\/g,'/'),before:readFileSync(u.path,'utf8'),after:u.after.kind==='file'?Buffer.from(u.after.bytes).toString('utf8'):''
+      }));
+      const basis=createHash('sha256').update(canonicalMvValue({
+        inputs:['package.json','src/crl','src/cel'].map(file=>({file,identity:editTreeIdentity(readEditTree(join(root,file)))})),
+        units:units.map(u=>({file:relative(root,u.path).replace(/\\/g,'/'),before:editTreeIdentity(readEditTree(u.path)),after:editTreeIdentity(u.after)}))
+      })).digest('hex');
+      return {ok:true,schemaVersion:1,state:'preview',requiredScopes:scopes,requests:input.requests,changes:sourceChanges,clearedCases:cleared,
+        changedPaths:changes.map(u=>relative(root,u.path).replace(/\\/g,'/')),basis,
+        refreshedFolders:['tests/results',...(cleared.length?['tests/data/fhir']:[])]};
+    }
     if(!changed().length && nativeResultsCurrent(root,digest,pd,services.crlVersion)){
       readEditTree(join(root,'tests/results'));cpSync(join(root,'tests/results'),join(stage,'tests/results'),{recursive:true});
       const manifestPath=join(stage,'tests/results/questionnaire-manifest-mv.json'),manifest=JSON.parse(readFileSync(manifestPath,'utf8'));
