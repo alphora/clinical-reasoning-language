@@ -4416,7 +4416,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       }
       if(isQaEditFlag(current))return fail("Use the pinned Question and Answer controls to edit this request.");
       if (isAuthoringFlag(current)) return fail("Authoring flags are read only in Medical Validation");
-      // Todo 3.5: the DESCRIPTION-ONLY save (a mutable legacy flag) — write ONLY the description; PRESERVE tag/gist/fields/status verbatim.
+      // Description-only payload preserves tag/gist/fields; a meaningful edit renews MV review as Pending.
       // No `validateFlagFields` (nothing to validate), no field-ownership merge, no eligibility re-gate (a legacy flag is expected to
       // be non-MV), no relabel (the Type didn't change). The description is free text — the store holds newlines fine.
       if (draft.descriptionOnly) {

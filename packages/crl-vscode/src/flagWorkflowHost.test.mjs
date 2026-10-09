@@ -9,7 +9,7 @@ import {performKeFlagAction,keFlagRevision,isKeAnswerSavedError} from './flagWor
 import {summarizeFlagBadges} from './flagPlacement.ts';
 import {renderFlagActionDrawer} from './flagActionDrawerHtml.ts';
 import {flagCloseEligibility} from './flagCloseEligibility.ts';
-import {HOST_FLAG_CORRELATION_FIELDS, flagDisplayNameOf, flagFieldRulesOf, validateFlagFields} from '@smile-digital-health/crl';
+import {HOST_FLAG_CORRELATION_FIELDS, flagDisplayNameOf, flagFieldRulesOf, validateFlagFields, isQaEditFlag, mvReviewStatus, transitionMvFlag, renewMvFlag} from '@smile-digital-health/crl';
 
 // Execute the actual private host handlers with controlled disk reads and modal completion.
 // VS Code refuses native modal dialogs in extension-test hosts.
@@ -63,7 +63,7 @@ function harness(category,confirm,options={}){
  let current={schemaVersion:1,id:'f',category,tag:'customer-confirmable',gist:'Flag',description:'Full description',status:'open',fields:{assumption:'Preserve this',ref:'docs/source.md'},dedupKey:'source-hash',anchor:{scope:'concept',library:'L',name:'Q',label:'Q',entityId:'q-id'},createdAt:'2026-09-12'};
  const captured=structuredClone(current),warnings=[],counts={save:0,remove:0,confirm:0},notes=[],answers=[],opened=[],edited=[];
  const noop=()=>{};
- const context=vm.createContext({mvEditBusy:!!options.busy,mvRecoveryBlock:options.recovery,HOST_FLAG_CORRELATION_FIELDS,Error,isAuthoringFlag,keFlagRevision,isKeAnswerSavedError,flagCloseEligibility,indexVersion:1,currentCel:'policy.cel',mode:'medical-validation',flagActionBusy:false,flagStoreWarning:!!options.warning,
+ const context=vm.createContext({mvEditBusy:!!options.busy,mvRecoveryBlock:options.recovery,HOST_FLAG_CORRELATION_FIELDS,Error,isAuthoringFlag,isQaEditFlag,mvReviewStatus,transitionMvFlag,renewMvFlag,keFlagRevision,isKeAnswerSavedError,flagCloseEligibility,indexVersion:1,currentCel:'policy.cel',mode:'medical-validation',flagActionBusy:false,flagStoreWarning:!!options.warning,
   flagActionView:{flag:captured,ver:1,cel:'policy.cel'},flagEditDraft:{flag:captured,cel:'policy.cel',descriptionOnly:true},flagsList:[captured],flagEditDirty:false,
   flagStoreDir:()=>'/memory',loadStoredFlags:()=>({flags:current?[structuredClone(current)]:[],warning:options.warning}),
   applyKeFlagAction:(_dir,flag,action)=>performKeFlagAction({load:()=>({flags:current?[structuredClone(current),...answers]:[],warning:options.warning}),create:answer=>{if(options.createError)throw Error('create failed');answers.push(answer);},save:updated=>{if(options.writeError)throw Error('disk full');counts.save++;current=updated;}},flag,action),
@@ -177,9 +177,12 @@ test('fresh record category protects edits and delete confirmation races',async(
  const edit=harness('validation');edit.setCategory('extraction');await edit.context.saveFlagEdit({stub:'Must not save'});assert.equal(edit.counts.save,0);
  const del=harness('validation',change=>change());await del.context.deleteFlagFromDrawer();assert.deepEqual(del.counts,{save:0,remove:0,confirm:1});assert.equal(del.get().category,'extraction');
 });
-test('validation records still accept status, description editing and confirmed deletion',async()=>{
- const status=harness('validation');await status.context.writeFlagStatus(status.get(),'resolved',1,'policy.cel');assert.equal(status.get().status,'resolved');
- const edit=harness('validation');await edit.context.saveFlagEdit({stub:'Updated description'});assert.equal(edit.get().description,'Updated description');
+// @kit review-flags:manual-mv-review
+test('validation records require manual Fixed then Approved and meaningful description edits renew Pending',async()=>{
+ const status=harness('validation');await status.context.writeFlagStatus(status.get(),'resolved',1,'policy.cel');assert.equal(status.get().status,'open');assert.equal(status.counts.save,0);
+ await status.context.writeFlagStatus(status.get(),'fixed',1,'policy.cel');assert.equal(status.get().status,'fixed');
+ await status.context.writeFlagStatus(status.get(),'approved',1,'policy.cel');assert.equal(status.get().status,'approved');
+ const edit=harness('validation');edit.set({...edit.get(),status:'approved'});await edit.context.saveFlagEdit({stub:'Updated description'});assert.equal(edit.get().description,'Updated description');assert.equal(edit.get().status,'open');
  const del=harness('validation');await del.context.deleteFlagFromDrawer();assert.deepEqual(del.counts,{save:0,remove:1,confirm:1});
 });
 

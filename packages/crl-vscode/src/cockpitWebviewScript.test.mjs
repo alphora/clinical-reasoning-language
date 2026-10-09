@@ -964,7 +964,7 @@ check("#212 S3: writeFlagStatus is STORE-ONLY (no origin dispatch) — read-modi
   assert.match(m[1], /const loaded = loadStoredFlags\(dir\)/);
   assert.match(m[1], /if \(loaded\.warning\) return stale\(/); // a partially-unknown store must not be written into (MCP parity)
   assert.match(m[1], /loaded\.flags\.find\(\(f\) => f\.id === flag\.id\)/); // re-read the current record by id
-  assert.match(m[1], /saveFlag\(dir, \{ \.\.\.current, status: next, editedAt: new Date\(\)\.toISOString\(\) \}\)/); // merge onto CURRENT
+  assert.match(m[1], /saveFlag\(dir, current\.category === "validation" \? transitionMvFlag\(current,next\)/); // manual MV lifecycle uses the CURRENT record
 });
 // (design 354) `revealFlag` DELETED — "Reveal in source" only re-opened the `.cel` (near-useless); the non-modal action drawer
 // + the anchor signature it renders are the legibility replacement. Its removal is locked by the "'Reveal in source' is GONE" test.
@@ -1442,7 +1442,7 @@ check("flag-action drawer: Resolve/Reopen is single-flight, writes via writeFlag
   assert.ok(m, "flagActionToggle body");
   assert.match(m[1], /if \(!view \|\| flagActionBusy\) return;/, "single-flight guard");
   assert.match(m[1], /flagActionBusy = true;/);
-  assert.match(m[1], /await writeFlagStatus\(view\.flag,[^\n]*view\.ver, view\.cel\);/);
+  assert.match(m[1], /await writeFlagStatus\(view\.flag,\s*next,\s*view\.ver,\s*view\.cel\);/);
   assert.match(m[1], /applyKeFlagAction\(dir, view\.flag, decision\)/);
   assert.match(m[1], /refreshFlagActionDrawer\(\);/, "reconcile AFTER the write so the button flips off fresh status");
 });
@@ -1628,14 +1628,14 @@ check("edit: openFlagEditDraft rejects authoring flags and captures mutable MV d
   assert.match(m[1], /settleDrawer\(\{ status: "cancelled", reason: "replaced" \}\)/);
   assert.match(m[1], /flagEditDraft = \{ flag: view\.flag, cel: view\.cel, descriptionOnly \};/); // no ver — survives a rebuild
 });
-check("edit: saveFlagEdit descriptionOnly branch — writes ONLY the description, preserves everything else, PAYLOAD-ISOLATED, no validate/relabel", () => {
+check("edit: saveFlagEdit descriptionOnly branch — description payload is isolated; MV review renews without retyping/relabeling", () => {
   const m = COCKPIT_SRC.match(/async function saveFlagEdit\([\s\S]*?\n  \}\n\n  \/\*\* Todo 3 — re-sync/);
   assert.ok(m, "saveFlagEdit body");
   const b = m[0];
   // the type/summary guards apply to the FULL edit only (mode is host state, not the payload)
   assert.match(b, /if \(!draft\.descriptionOnly\) \{\s*\n\s*if \(rawTag === ""\) return fail/);
-  // the descriptionOnly write: preserve the RE-READ record, set only description + editedAt, return BEFORE the full path
-  assert.match(b, /if \(draft\.descriptionOnly\) \{[\s\S]*?const updated: MvFlag = \{ \.\.\.current, editedAt: [\s\S]*?\};[\s\S]*?saveFlag\(dir, updated\);[\s\S]*?openFlagActionView\([\s\S]*?return;\s*\n\s*\}/);
+  // Preserve the re-read fields, renew review for a meaningful description edit, and return before full editing.
+  assert.match(b, /if \(draft\.descriptionOnly\) \{[\s\S]*?let updated: MvFlag = \{ \.\.\.current \};[\s\S]*?renewMvFlag\(current,\{description:updated\.description\}\);[\s\S]*?saveFlag\(dir, updated\);[\s\S]*?openFlagActionView\([\s\S]*?return;\s*\n\s*\}/);
   // PAYLOAD ISOLATION (impl-review gpt56 #2 — the load-bearing "an AI flag can't be retyped" property): the branch body reads
   // ONLY `stub`; it must NOT touch the untrusted `rawTag`/`summary`/`payloadFields` nor the full-path `val`/`validateFlagFields`.
   const branch = b.match(/if \(draft\.descriptionOnly\) \{([\s\S]*?)\n {8}return;\n {6}\}/);
@@ -1681,7 +1681,7 @@ check("edit: saveFlagEdit — cel+mode guard (NOT ver), single-flight, clean re-
   // field ownership: form owns only the NEW tag's visible discriminators; validateFlagFields; preserve host/hidden + unknown-to-both
   assert.match(b, /const newRuleKeys = new Set\(flagFieldRulesOf\(rawTag\)\.map\(\(r\) => r\.key\)\);/);
   assert.match(b, /if \(newRuleKeys\.has\(k\) && !EDIT_PRESERVED_FIELDS\.has\(k\)\) formFields\[k\] = v;/);
-  assert.match(b, /validateFlagFields\(\{ tag: rawTag, gist: summary, status: current\.status, fields: formFields \}\)/);
+  assert.match(b, /validateFlagFields\(\{ tag: rawTag, gist: summary, status: "open", fields: formFields \}\)/);
   assert.match(b, /if \(EDIT_PRESERVED_FIELDS\.has\(k\) \|\| \(!oldRuleKeys\.has\(k\) && !newRuleKeys\.has\(k\)\)\) preserved\[k\] = v;/);
   assert.match(b, /const mergedFields = \{ \.\.\.preserved, \.\.\.val\.fields \};/);
   // local save FIRST, then reload/badges/return-to-view; relabel is INSIDE the busy try (impl-review gpt56 #1: no overlapping relabel)
