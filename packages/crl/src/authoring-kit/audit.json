@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "b127c1e2768c4ecaed6f920ce96c33301918086a",
-  "auditedSchemaVersion": "2.30",
-  "auditedContentHash": "4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea",
-  "scope": "Unchanged kit schema 2.30/content hash maintenance from862e53ad79f82517f5a2049baf828faf7c90ae0e through reviewed content b127c1e2768c4ecaed6f920ce96c33301918086a. Exact .gitkeep scaffolding excluded from generated-definition drift and preserved in CQL/FHIR publication; no CRL/CEL/emitter/activity/runtime/KELP semantics changed. Full delta and3new owning tests dispositioned in coverage.md. Ordered builds/types, fullsource core5508/skip32, extension1583 plus actualMCP integration passed. Native impl1030 plan Important1 accepted;1031 code Important1 accepted fault injection correction, final0C0I0N including ledgeraddendum; external unavailable. Installed scaffolded UI and explicit native/Linux runtime/output retention are separate release gates. No customer deployment, clinical approval or liveKELP guarantee. MR11 Automate Request deferred.",
+  "auditedRevision": "77d7351fa71ed6e4ed581f57de51a6208a7842f0",
+  "auditedSchemaVersion": "2.31",
+  "auditedContentHash": "713344a161486ea034ec04d45fe5a465a79d8ec35da6293a9a1cc030ea9f8495",
+  "scope": "Reviewed Quantity intake schema 2.31 from b127c1e2768c4ecaed6f920ce96c33301918086a through 77d7351fa71ed6e4ed581f57de51a6208a7842f0. Selected Quantity has-value checks numeric presence, including zero, for required result gates and optional count/rate evidence. Existing Quantity and selection errors preserved; ordinary validation shares bounded authored-threshold diagnostics; native whitespace-only unit mismatch corrected. Complete changed-file/test/claim dispositions in coverage.md. Kit/reference gates, owning source tests, ordered core/extension builds/typechecks and both actual MCP entry points passed. Native13 workflow controls, four fresh unit boundary controls and actual LForms43.1 entry/export/clear passed; no installed-extension or customer-policy approval claim. Native CRL plan1032 Accept2 and code1033 Accept1, final0C0I0N converged; external unavailable. No arbitrary UCUM conversion/lexical validation or null-pause claim. Release remains6.4.38/kit2.30; MR11 deferred.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
