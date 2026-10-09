@@ -2111,7 +2111,7 @@ Completion delivery owner in this interval: `packages/crl-vscode/test/oracle/gol
 
 ## Medical Review scaffolding maintenance — release 6.4.38
 
-Baseline `862e53ad79f82517f5a2049baf828faf7c90ae0e` (schema2.30, hash `4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea`). Target: pending reviewed content commit, finalized in the separate metadata stamp. Kit content/schema are unchanged.
+Baseline `862e53ad79f82517f5a2049baf828faf7c90ae0e` (schema2.30, hash `4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea`). Target: `b127c1e2768c4ecaed6f920ce96c33301918086a`; unchanged schema2.30/content hash `4a3a5aeac2e0731dacaaceb5083944d2e20f80eca7e6255e8b453a4adf573bea`, finalized in the separate metadata stamp. Kit content/schema are unchanged.
 
 Complete baseline delta before this slice: inspected `authoring-kit/audit.json` and final literal-target/validation additions in this ledger, metadata of the completed637 audit. New changed-file inventory: root/core/extension `package.json`, `package-lock.json`, `crl-vscode/src/mvDirectEdit.ts`, `mvDirectEdit.test.mjs`, `answerEditing.test.mjs`, this ledger and subsequent metadata-only `authoring-kit/audit.json`. No dependency, grammar, emitter, activity, engine, session/driver, KELP or clinical-policy change. No owning tag changes; three new untagged test cases are dispositioned below.
 
@@ -2124,3 +2124,5 @@ Complete baseline delta before this slice: inspected `authoring-kit/audit.json` 
 | Versions/lock/coverage/audit stamp | Not author-facing semantics: lockstep patch version, no dependency changes, inspect literal reviewed target separately. |
 
 Review: native impl1030 plan0C1I0N Accept1 adds load freshness coverage;1031 code0C1I0N Accept1 corrects fault injection wiring, final0C0I0N converged. External unavailable; no whole-panel claim. Original blocker reproduced before production fix (38pass3fail); corrected owning41pass. Full release source/installed gates recorded separately. No new kit content/example/claim/tag, native execution or clinical-fidelity claim. Native/Linux evidence may be retained only after explicit unchanged runtime/output comparisons; actual installed scaffolded editor qualification is separate.
+
+Source validation: core5508passed/32skip, actualMCP passed, extension1583passed/3expected-failure controls; exact fullsource log and installed release receipts recorded separately.
