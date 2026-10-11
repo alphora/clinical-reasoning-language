@@ -225,6 +225,13 @@ repository merging. Height edits do not renew Weight's authored validity or an e
 a later Weight edit can make the calculation newer because Weight is the explicit validity anchor.
 A BMI clear contributes a newer unknown and can pause the decision. It does not mean removing the
 override to restore calculation. See the [bounded BMI session probe](../packages/crl/test/acceptance/bmi/README.md).
+The MV interactive client now retains successful native singleton answer resources
+and submits intentional edits/clears rather than renewing untouched defaults. Its
+returned display remains native; explicit browser branch pruning withdraws associated
+session answers. Native form omission alone does not withdraw patient input. Unique
+non-repeating independently extracted profile bindings define this bounded client
+contract; repeated or ambiguous extraction is not certified. This does not redefine
+stateless full-QR reassertion or certify the separate coded-BMI full-response target.
 CRE can evaluate imported publications in the prepared emit closure, including transitive BMI
 operands and direct publication guards. Prepared source identity owns each operand; competing
 participating prepared source owners sharing a library/concept cache key are explicitly refused.

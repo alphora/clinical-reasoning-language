@@ -91,7 +91,8 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
           const result = await active.evaluate(message.type === "continue" ? message.response : undefined,
             message.type === "continue" ? message.questionnaire : undefined);
           if (current !== panel || mine !== token || !result) return;
-          post({ type: "result", ...result, subject: selected.subject, unsupported: inspectQuestionnaire(result.questionnaire) });
+          const { nativeData: _data, ...display } = result;
+          post({ type: "result", ...display, subject: selected.subject, unsupported: inspectQuestionnaire(result.questionnaire) });
         } catch (e) { if (current === panel && mine === token) post({ type: "error", message: String(e) }); }
         finally { if (current === panel && mine === token) busy = false; }
       });

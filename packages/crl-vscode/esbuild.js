@@ -65,6 +65,8 @@ async function build() {
     format: "cjs",
     target: "node18",
     external: ["vscode"],
+    // REFACTOR:grounded: the response helper now runs in the host; its parser needs static module imports.
+    alias: { "jsonc-parser": require.resolve("jsonc-parser/lib/esm/main.js") },
     sourcemap: true,
   });
 

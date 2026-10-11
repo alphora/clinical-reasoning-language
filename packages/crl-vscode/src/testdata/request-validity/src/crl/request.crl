@@ -1,0 +1,66 @@
+library "Synthetic Request Validity".
+
+// REFACTOR:grounded: synthetic transport fixture; no clinical-policy assertion.
+terminology "Local Request":
+- system is `http://example.org/fhir/CodeSystem/synthetic-request`.
+- code is `synthetic-service` display is `Synthetic service`.
+terminology "Yes No":
+- system is `http://example.org/fhir/CodeSystem/synthetic-answers`.
+- code is `yes` display is `Yes`.
+- code is `no` display is `No`.
+
+concept "Requested Service":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `requested-service`.
+- value domain is answer options.
+- value from is "Local Request".
+- shape reduction is most recent.
+- source representation:
+  - type is ServiceRequest.
+  - coded from "Local Request".
+
+concept "Condition A":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `condition-a`.
+- value domain is answer options.
+- value from is "Yes No":
+  - not qualifying is `no`.
+- shape reduction is most recent.
+concept "Condition B":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `condition-b`.
+- value domain is answer options.
+- value from is "Yes No":
+  - not qualifying is `no`.
+- shape reduction is most recent.
+
+presentation for "Requested Service":
+- question text is "Requested service".
+presentation for "Condition A":
+- question text is "Is condition A present?".
+presentation for "Condition B":
+- question text is "Is condition B present?".
+
+activity "certify.Met":
+- request CPGTaskRequest.
+- with `Met`.
+activity "not-certify.Unmet":
+- request CPGTaskRequest.
+- with `Unmet`.
+
+decision "Synthetic Determination":
+- when "Requested Service" then:
+    first:
+    - when "Condition A" then:
+        first:
+        - when "Condition B" then recommend activity "certify.Met".
+        - otherwise then recommend activity "not-certify.Unmet".
+        end.
+    - otherwise then recommend activity "not-certify.Unmet".
+    end.

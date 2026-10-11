@@ -1,0 +1,13 @@
+{
+  "name": "synthetic-request-validity",
+  "version": "0.0.0",
+  "private": true,
+  "crl": {
+    "canonicalBase": "http://example.org/fhir/synthetic/",
+    "status": "draft",
+    "experimental": true,
+    "date": "2025-01-01T00:00:00.000Z",
+    "libraries": ["src/crl/request.crl"],
+    "dispositions": {"mode":"embedded","options":{"certify":{"Met":{"label":"Met"}},"not-certify":{"Unmet":{"label":"Unmet"}}}}
+  }
+}

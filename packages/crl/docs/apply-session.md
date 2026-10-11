@@ -64,6 +64,15 @@ The required `mode` states what the request asserts:
 - `edits-only` includes edited items and their necessary ancestors/bindings. Untouched answers are omitted, so extraction does not renew their timestamps. Retain earlier extracted resources explicitly in the next request if they should remain available.
 - `full` preserves the response's supplied contents, including untouched answers. Resubmitting them asserts them at the supplied `authored` time; this can change recency and selection.
 
+A populated answer is not automatically excluded in `full` mode. For example, echoing
+a requested-service answer populated from a date-only `ServiceRequest.authoredOn`
+creates a local Observation at the response's authored instant. Overlapping date
+precision can then produce `publication-incomparable-validity`, even when the codings
+agree. Use `edits-only` when intending to change only a later question, keeping the
+source and successful earlier extracted answer resources in the request data.
+The MV interactive client handles that bounded singleton session state; this
+stateless API does not retain it for other callers.
+
 Edits-only operations under repeating groups are refused because pruning array positions does not establish native extraction identity. Edits nested under another answer are also refused in this mode because carrying that answer would reassert it. Full mode preserves supplied repeat structure, but does not establish persistence/replacement identity. These are explicit limitations, not a claim of native repeated-resource reconciliation.
 
 Replacing an answer array on a parent that already has answer child items is refused: the helper cannot infer which new answer owns those children. Edit the child directly in full mode or construct an explicitly reconciled complete response. An explicit parent clear removes its answers and their children.

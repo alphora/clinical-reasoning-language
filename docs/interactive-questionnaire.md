@@ -4,13 +4,22 @@ Open **Interactive FHIR Questionnaire** from the MV tree toolbar. This opens a l
 
 Each successful `$apply` response supplies the current Questionnaire and
 QuestionnaireResponse. The client displays that returned pair without adding
-questions or answers from an earlier form. Necessary answer retention, correction
-access and current-path applicability must be represented on the wire by the
-content and runtime; a client merge cannot establish portable content behavior.
-Verify progression by resubmitting only the returned pair with the initial data.
-A result that loses a still-needed answer is a runtime/content defect, even if its
-first disposition was correct. No-form completion stays no-form; Reset starts a
-new assessment. A failed evaluation keeps the current edited form available.
+questions or answers from an earlier form. For independently extracted, non-repeating
+case-feature answers, the client submits intentional changes and retains successful
+native answer resources as session data. Untouched defaults and unanswered fields
+are not new assertions; earlier answers keep their original validity. A changed
+answer replaces its own session contribution; a clear contributes an unknown value.
+Native extraction owns the resource contents and timestamps. Initial source data
+remains unchanged. Verify progression, correction access and current-path applicability
+through the returned form and actual native results. No-form completion stays no-form;
+Reset starts a new assessment. Failed or cancelled evaluations retain the previous
+successful answer data and leave the edited form available.
+
+The tracked mode requires unique profile-bound singleton questions without extraction
+on a containing group or nested answer children. Forms without those bindings retain
+the existing full-response handling. A tracked session cannot silently transition to
+ambiguous extraction: it retains its successful data and asks for Reset. Repeated
+resource reconciliation remains a separate limitation.
 
 Put each initial state in the policy's own project, alongside its `src` folder:
 
@@ -49,7 +58,7 @@ The patient-field and code-field mappings follow the FHIR R4 definitions for [Nu
 
 One state is selected automatically. Multiple states appear in a selector labelled with their request number and available request codes, references, or resource types. **Start** applies the policy to the selected state. Answer the form and select **Continue / Re-evaluate** to submit the current QuestionnaireResponse to `$apply`. Returned activities appear in the **Result** area below the refreshed form. Definition and evaluation warnings appear in a separate **Warnings** section, collapsed initially; errors remain visible in the status area. A form without activities is not automatically a final policy disposition.
 
-Editing or clearing an answer keeps its sibling questions and their answers, including later unanswered siblings. Question order alone does not establish a dependency. Editing a parent question removes its nested follow-up questions and answers from the current Q/QR pair. Flat downstream questions are also removed when the complete emitted PlanDefinition proves that every use depends on the edited input; grouped peers and independently used inputs remain. Incomplete delegation, ambiguous identities, repeats and unsafe enablement dependencies defer this optional pruning to native evaluation; changing it back does not restore them. **Continue / Re-evaluate** submits the current pair and lets `$apply` determine the applicable questions again. **Reset** or selecting another initial state discards the current form. Nothing is saved as answer history or written into `tests/results`. A failed evaluation leaves the current form available for correction or retry; **Cancel** stops the pending evaluation.
+Editing or clearing an answer keeps its sibling questions and their answers, including later unanswered siblings. Question order alone does not establish a dependency. Editing a parent question removes its nested follow-up questions and answers from the current Q/QR pair. Flat downstream questions are also removed when the complete emitted PlanDefinition proves that every use depends on the edited input; grouped peers and independently used inputs remain. Incomplete delegation, ambiguous identities, repeats and unsafe enablement dependencies defer this optional pruning to native evaluation; changing it back does not restore them. Explicitly pruned singleton answers are withdrawn from session data after successful evaluation. A question omitted by the engine does not by itself withdraw its previously supplied answer. **Continue / Re-evaluate** lets `$apply` determine the applicable questions again. **Reset** or selecting another initial state discards the current form and session answers. Nothing is persisted as answer history or written into `tests/results`. A failed evaluation leaves the current form available for correction or retry; **Cancel** stops the pending evaluation.
 
 If trimming would remove a question referenced by a retained question's `enableWhen`, the edit cannot be submitted. Undo that edit or Reset to recover. This check covers literal `enableWhen.question` references only; dependencies inside FHIRPath expressions (including enablement, calculated, or initial expressions) are not analyzed or validated after trimming.
 
@@ -59,7 +68,13 @@ The native engine performs extraction internally as part of `$apply`. The extens
 
 For available-value checks, the emitter includes conditional standard PlanDefinition inputs that retain currently supplied answer slots after its preceding route is established, including when the consumer itself remains unresolved. Missing slots are not gathered through the passive check. A definitively excluded parent route removes its downstream state. The synthetic native acceptance resubmits only returned Q/QR pairs, including supplied-later qualification, both uncertainty directions, an unused retained uncertain alternative, explicit clear and route exclusion. The maintained Bleph browser check verifies immediate client pruning and the same native outcome from an unpruned submission. These checks use the pinned engine; they do not certify every third-party client's rendering or every alternative engine.
 
-The native returned metadata, question identities, answers and canonical binding are preserved. The client does not renumber, restore or merge omitted items. Local edit preparation operates on the current pair only; it does not infer decision dependencies from flat item order.
+The displayed native metadata, question identities, answers and canonical binding are preserved. The client does not restore or merge omitted display items. Changed-only submissions use a fresh response id so native extraction produces distinct resource identities; retained resources keep their native ids and validity. Local edit preparation does not infer decision dependencies from flat item order.
+
+This differs from the stateless `buildSessionResponse` API's explicit `full` mode,
+which intentionally reasserts every supplied answer at the response authored time.
+Echoing a date-only source default in that mode can create overlapping validity and
+fail selection. `edits-only` omits passive defaults; its caller must retain successful
+earlier answer resources when needed. See [native apply sessions](../packages/crl/docs/apply-session.md).
 
 The loader accepts the five request types above as input data. The compiler currently supports natural CodeableConcept source projections from ServiceRequest and MedicationRequest for active orders with inline system/code codings. Loading another request type does not establish support for every CRL projection from it; unsupported projections still report compiler errors.
 

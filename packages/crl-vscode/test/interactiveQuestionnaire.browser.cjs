@@ -21,7 +21,7 @@ const load = (entry) => {
     }
     return installedRuntime;
   }
-  const js = esbuild.buildSync({entryPoints:[entry],bundle:true,alias:{vscode:path.resolve('packages/crl-vscode/test/oracle/vscode-stub.ts')},platform:'node',format:'cjs',write:false}).outputFiles[0].text;
+  const js = esbuild.buildSync({entryPoints:[entry],bundle:true,alias:{vscode:path.resolve('packages/crl-vscode/test/oracle/vscode-stub.ts'),'jsonc-parser':require.resolve('jsonc-parser/lib/esm/main.js')},platform:'node',format:'cjs',write:false}).outputFiles[0].text;
   const m={exports:{}};new Function('require','module','exports','__dirname',js)(require,m,m.exports,path.resolve('packages/crl-vscode/dist'));return m.exports;
 };
 const {interactiveQuestionnaireHtml}=load('packages/crl-vscode/src/interactiveQuestionnaireHtml.ts');
@@ -245,6 +245,9 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
   if(process.env.CRL_IQ_NATIVE){
     const native=load('packages/crl-vscode/src/interactiveQuestionnaire.ts');
     const {applySession}=require(installed?path.join(installed,'dist/apply-session.js'):path.resolve('packages/crl-vscode/dist/apply-session.js'));
+    if(process.env.CRL_IQ_REQUEST_VALIDITY_ONLY){
+      await require('./requestValidity.browser.cjs')({native,applySession,root,post,mounted,evaluate,rpc,delay});
+    } else {
     if(!process.env.CRL_IQ_BLEPH_ONLY){
     const prepared=native.prepareInteractivePolicy(path.resolve('packages/crl-vscode/src/testdata/interactive-questionnaire/src/cel/mv/cases.cel'));
     const initial=prepared.initialStates[0];
@@ -325,6 +328,6 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
     assert.ok(flatten(reopened.response.item).slice(1).every(i=>!i.answer?.length),'downstream answers restart blank');
     fs.writeFileSync(path.join(root,'bleph-pruning.json'),JSON.stringify({pruned,pr,unprunedResult:ur,reopened,dependencies},null,2));
     console.log('Maintained Bleph: immediate Q/QR pruning, unpruned native equivalence, blank reopening: passed');
-
+    }
   }
 })().catch(async e=>{console.error(e);if(ws)try{console.error(await evaluate(`({text:document.body.innerText,html:document.getElementById('form').innerHTML.slice(0,1200),sent:window.sent})`));}catch{}process.exitCode=1}).finally(async()=>{if(ws)try{await rpc('Browser.close')}catch{};ws?.close();child?.kill();server?.close();});

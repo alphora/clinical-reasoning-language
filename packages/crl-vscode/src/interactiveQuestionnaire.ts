@@ -3,6 +3,7 @@ import { join, relative, isAbsolute, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
+import { singletonAnswerBindings, prepareSingletonAnswers, adoptSingletonAnswers } from './interactiveQuestionnaireAnswers';
 import { emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
 import type { DefinitionPublicationOptions } from '@smile-digital-health/crl';
 import type { ApplySessionRequestV1, ApplySessionResult, ApplySessionOptions } from "@smile-digital-health/crl/session";
@@ -109,7 +110,7 @@ export function prepareInteractivePolicy(celPath: string, definitionOptions: Def
     }) };
 }
 
-export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; warnings?: string[] }
+export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; warnings?: string[]; nativeData?: Fhir }
 export function readInteractiveResult(native: Fhir): InteractiveResult {
   const resources: Fhir[] = [];
   const visit = (v: any) => {
@@ -140,13 +141,13 @@ export function readInteractiveResult(native: Fhir): InteractiveResult {
   return { questionnaire, response, activities };
 }
 
-export function interactiveRequest(definitions: Fhir, planId: string, initial: InitialState, questionnaire?: Fhir, response?: Fhir): ApplySessionRequestV1 {
+export function interactiveRequest(definitions: Fhir, planId: string, initial: InitialState, questionnaire?: Fhir, response?: Fhir, answers: Fhir[] = []): ApplySessionRequestV1 {
   if (response && !questionnaire) throw new Error("A response needs its returned Questionnaire.");
   return {
     schemaVersion: 1, requestId: randomUUID(), caseId: initial.id, stepId: randomUUID(),
     planDefinitionId: planId, subjectReference: initial.subject,
     repositoryJson: JSON.stringify({ ...definitions, entry: [...definitions.entry, ...(questionnaire ? [{ resource: questionnaire }] : [])] }),
-    requestDataJson: JSON.stringify({ ...initial.bundle, entry: [...initial.bundle.entry, ...(response ? [{ resource: response }] : [])] }),
+    requestDataJson: JSON.stringify({ ...initial.bundle, entry: [...initial.bundle.entry, ...answers.map(resource => ({ resource })), ...(response ? [{ resource: response }] : [])] }),
   };
 }
 
@@ -164,7 +165,10 @@ export function nativeInteractiveRunner(apply: NativeApply, scratchRoot = tmpdir
       if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}${cleanup ? "" : ` (native files retained at ${dir})`}`);
       const artifact = result.artifacts["native-result.json"];
       if (!artifact || artifact.bytes > 32 * 1024 * 1024) throw new Error("Native result is missing or too large.");
-      return { ...readInteractiveResult(JSON.parse(readFileSync(artifact.path, "utf8"))), warnings: result.diagnostics.filter(d => d.severity === "warning").map(d => d.message) };
+      const data = result.artifacts['native-data.json'];
+      if (!data || data.bytes > 32 * 1024 * 1024) throw new Error('Native extracted data is missing or too large.');
+      return { ...readInteractiveResult(JSON.parse(readFileSync(artifact.path, "utf8"))), nativeData: JSON.parse(readFileSync(data.path, 'utf8')),
+        warnings: result.diagnostics.filter(d => d.severity === "warning").map(d => d.message) };
     } finally {
       // dir is our absolute mkdtemp child of the chosen scratch root, never a supplied project path.
       if (cleanup) rmSync(dir, { recursive: true, force: true });
@@ -173,18 +177,20 @@ export function nativeInteractiveRunner(apply: NativeApply, scratchRoot = tmpdir
   return Object.assign(run, { cleanupSafe: () => !quarantined });
 }
 
-/** Request ownership only: no extracted data or previous answer states are retained. */
+/** REFACTOR:grounded: retain successful native singleton contributions, never reconstruct a returned form. */
 export class InteractiveSession {
   private epoch = 0;
   private abort?: AbortController;
   private work: Promise<unknown> = Promise.resolve();
+  private answers = new Map<string, Fhir>();
+  private trackSingletons = false;
   result?: InteractiveResult;
   initial?: InitialState;
   constructor(private definitions: Fhir, private planId: string,
     private run: (r: ApplySessionRequestV1, signal: AbortSignal) => Promise<InteractiveResult>) {}
   cancel() { ++this.epoch; this.abort?.abort(); }
   async cancelAndWait(): Promise<void> { this.cancel(); await this.work.catch(() => {}); }
-  reset(initial: InitialState) { this.cancel(); this.initial = initial; this.result = undefined; }
+  reset(initial: InitialState) { this.cancel(); this.initial = initial; this.result = undefined; this.answers.clear(); this.trackSingletons = false; }
   async evaluate(response?: Fhir, retainedQuestionnaire?: Fhir): Promise<InteractiveResult | undefined> {
     if (!this.initial) throw new Error("Select an initial state.");
     let questionnaire = this.result?.questionnaire;
@@ -209,7 +215,11 @@ export class InteractiveSession {
     }
     this.cancel();
     const epoch = this.epoch, abort = this.abort = new AbortController();
-    const request = interactiveRequest(this.definitions, this.planId, this.initial, questionnaire, response);
+    const prepared = this.trackSingletons && response && questionnaire && this.result?.questionnaire && this.result.response
+      ? prepareSingletonAnswers(questionnaire, this.result.questionnaire, this.result.response, response, this.answers) : undefined;
+    if (response && !prepared && this.answers.size) throw new Error('This form no longer has independent singleton answer bindings. Previous answers are retained. Reset to start a new assessment.');
+    const request = interactiveRequest(this.definitions, this.planId, this.initial, questionnaire,
+      prepared ? prepared.response : response, prepared ? [...prepared.retained.values()] : []);
     const previous = this.work;
     const work = (async () => {
       await previous.catch(() => {});
@@ -217,6 +227,13 @@ export class InteractiveSession {
       try {
         const native = await this.run(request, abort.signal);
         if (epoch !== this.epoch) return;
+        if (prepared) {
+          if (!native.nativeData) throw new Error('Native extracted data is required to preserve edited answers. Previous answers were retained.');
+          this.answers = adoptSingletonAnswers(prepared, native.nativeData, this.initial!.subject);
+        }
+        // Legacy sessions never acquire singleton replacement semantics halfway through an interview.
+        if (!this.result) this.trackSingletons = !!native.questionnaire && !!singletonAnswerBindings(native.questionnaire);
+        else if (response && !prepared) this.trackSingletons = false;
         // The returned pair owns assessment state. Reconstructing omitted questions here
         // hides runtime state loss and can resurrect an inapplicable answered branch.
         this.result = native;
