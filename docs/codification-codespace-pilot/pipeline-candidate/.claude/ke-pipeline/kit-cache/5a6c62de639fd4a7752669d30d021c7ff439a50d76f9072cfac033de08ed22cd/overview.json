@@ -1,0 +1,1766 @@
+{
+  "view": "overview",
+  "complete": false,
+  "schemaVersion": "2.35",
+  "fullContentHash": "5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd",
+  "audit": {
+    "auditedRevision": "6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9",
+    "auditedSchemaVersion": "2.35",
+    "auditedContentHash": "5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd",
+    "scope": "Reviewed schema 2.35 interactive singleton answer validity and scoped pause-correspondence regression evidence through 6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9. Native extraction identities, retained dates, explicit edits/clears, failure/cancel, same-day rendered source defaults and CRE provenance paths are bounded in coverage.md. Explicit stateless full reassertion, repeated/aggregate extraction and general native BMI/full-response limits remain separate. Source audit does not certify installed release or customer deployment.",
+    "evidence": "packages/crl/src/authoring-kit/tests/coverage.md",
+    "contentMatchesAudit": true
+  },
+  "introduction": {
+    "goal": "Help the KE create a comprehensive and correct computable representation of source material at L1 (narrative), L2 (semi-structured recommendations), or both, using CRL and emitted CQL/FHIR. L2 organizes clinical scenarios, decisions and actions; it is not a required pre-existing intermediate step. Preserve criteria, alternatives, exceptions and outcomes, and validate source coverage separately from execution. Knowledge levels: Boxwala et al. (2011), https://pmc.ncbi.nlm.nih.gov/articles/PMC3241169/. Kit format is a means to this goal, not a language requirement.",
+    "reading": "Read applicability before applying guidance. The index is complete and unfiltered. Search results are discovery summaries, not complete instructions; retrieve their entry IDs and read the force clauses before acting. Entry includes prerequisites. Rule ref fields are human-readable source notes (documents, issues, validator names), not retrieval IDs; use index IDs and requires for tool navigation. Read counterexamples as warnings, never positive templates. Introductory coverage and verification evidence are separate axes.",
+    "navigation": "authoring_kit({view:\"entry\",id:\"rule:named-answer-options\"}); authoring_kit({view:\"full\"}) exports everything.",
+    "auditMeaning": "contentMatchesAudit compares content only. auditedRevision is the last reviewed source revision, not the build revision or proof that subsequent implementation changes were audited. Development retrieval remains available with contentMatchesAudit:false; release acceptance requires matching audited content.",
+    "summary": "Local decision support: express clinical intent through coded answers, supported source representations and explicit computed publications. Author decision/criterion structure for distinct criteria, named terminology for coded answer choices, and presentations for question wording. Validate and compare CRE predictions with emitted CQL/FHIR and native $apply. Supported age, request, qualification, threshold and finite-code BMI forms are in scope; broader #320 limitations are listed separately.",
+    "forceLevels": [
+      {
+        "level": "validator-enforced",
+        "meaning": "The grammar/validator reports the stated condition within its documented scope and preconditions. An error rejects the input; an explicitly described warning leaves it legal. A warning is not a rejection; absence of a diagnostic outside the checked scope is not proof of correctness."
+      },
+      {
+        "level": "invariant",
+        "meaning": "An obligation that applies regardless of author: either source fidelity (avoid an ADD or HOLLOW against the source) or per-policy verification and artifact integrity. Every invariant carries a `test` that RESOLVES to a real check — never \"looks wrong,\" and never a dangling/typo'd anchor (a `test` pointing at nothing IS the K4 fake-green this guards against; the force-model test asserts every invariant's `test` resolves). The anchor names the adjudication MODE: a `judgeLens.composition:<check>` (a §2/§3 source-fidelity judge call with no mechanical home), or a `verifyLoop:<id>` methodology requirement (a structural check the KE applies per policy, §4)."
+      },
+      {
+        "level": "default",
+        "meaning": "Blank-slate generative guidance. A FAITHFUL override STANDS. The review/judge gate checks faithfulness-to-source, NEVER conformance-to-this-default; so a faithful structure is never reverted toward the default, and the agent need not know whether a human or an agent authored it."
+      }
+    ],
+    "governingPrinciple": "Do not prefer the agent's default over a faithful human structure; do not prefer the human's structure over the source. A human refactor is protected ONLY when faithful — an unfaithful one (invents a determination boundary, hides distinct criteria, drops a criterion, fakes green) is flagged even if deliberate. Authoring agents editing an existing artifact must NOT re-normalize faithful surrounding structure to their defaults.",
+    "verificationLegend": [
+      {
+        "tier": "fhir-emit",
+        "means": "This exact CRL artifact and its declared dependency/configuration context emit successfully in the kit suite with no hard errors. Decision examples must produce case-feature StructureDefinitions; the named terminology dependency must produce its ValueSet.",
+        "doesNotProve": "CQL translation, engine execution, questionnaire population/extraction, clinical correctness, or emission of its CEL companion."
+      },
+      {
+        "tier": "cre-run",
+        "means": "The artifact — a `.crl` + `.cel` PAIR — is executed through the CRE (the engine behind `run_decision`) by the kit's OWN test suite every build (a `.cel`'s tier names the pair it proves). For each supplied case, checks activity membership or the asserted whole-decision pause prediction, according to its CEL result assertion.",
+        "doesNotProve": "Activity assertions prove membership, not exact output, absence of other guarded items, or path identity. Pause assertions prove the CRE prediction, not native `$apply` pausing. Neither proves clinical `code is` correctness, engine retrieval, FHIR emit, or `$apply`. CRE code-membership execution is not a clinical terminology review."
+      }
+    ]
+  },
+  "index": [
+    {
+      "id": "section:introduction",
+      "title": "Purpose and how to use this reference",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:schemaVersion",
+      "title": "Kit content version",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:summary",
+      "title": "Start here",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:forceModel",
+      "title": "How strongly rules bind",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:conceptLayerModel",
+      "title": "Concept forms and introductory coverage",
+      "topics": [
+        "concepts"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": [
+        "rule:concept-form",
+        "rule:value-type",
+        "rule:publication-selection"
+      ]
+    },
+    {
+      "id": "section:rules",
+      "title": "All authoring rules",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": [],
+      "members": [
+        "rule:patient-gender-projection",
+        "rule:text-answers",
+        "rule:concept-form",
+        "rule:request-code-sources",
+        "rule:selected-answer-aggregate",
+        "rule:interactive-questionnaire",
+        "rule:value-type",
+        "rule:publication-selection",
+        "rule:named-answer-options",
+        "rule:concept-presentation",
+        "rule:bmi-publication",
+        "rule:patient-age-projection",
+        "rule:interface-concept-naming",
+        "rule:decision-qualifiers",
+        "rule:decision-composition",
+        "rule:chaining-necessity",
+        "rule:guards",
+        "rule:branch-guards",
+        "rule:criterion",
+        "rule:guard-or-vs-sibling-or",
+        "rule:dispositions",
+        "rule:pa-answers-not-records",
+        "rule:pa-disposition-set",
+        "rule:configure-dispositions",
+        "rule:disposition-mode",
+        "rule:minimalism",
+        "rule:library-scoping",
+        "rule:cel-cases",
+        "rule:mv-case-authoring",
+        "rule:shared-wording-editing",
+        "rule:mv-wording-patches",
+        "rule:cel-identity",
+        "rule:cel-quantity",
+        "rule:emit-output-root",
+        "rule:written-equals-executed",
+        "rule:terminology-forms",
+        "rule:verify-loop",
+        "rule:emitted-trees-are-ours",
+        "rule:fhir-packaging",
+        "rule:native-apply-session",
+        "rule:produce-results",
+        "rule:review-flags"
+      ]
+    },
+    {
+      "id": "section:typeAllowlist",
+      "title": "Types: grammar vocabulary and recommended publications",
+      "topics": [
+        "concepts"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:referenceArtifacts",
+      "title": "Complete executable examples and prerequisites",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": [],
+      "members": [
+        "artifact:patient-gender-reference.crl",
+        "artifact:uncertainty-reference.crl",
+        "artifact:uncertainty-reference.cel",
+        "artifact:numeric-intake-reference.crl",
+        "artifact:numeric-intake-reference.cel",
+        "artifact:intake-reference.crl",
+        "artifact:intake-reference.cel",
+        "artifact:selection-reference.crl",
+        "artifact:selection-reference.cel",
+        "artifact:named-answer-reference.crl",
+        "artifact:named-answer-terms.crl",
+        "artifact:named-answer-reference.cel",
+        "artifact:pa-determination-reference.crl",
+        "artifact:pa-determination-reference.cel",
+        "artifact:reused-condition-reference.crl",
+        "artifact:reused-condition-reference.cel",
+        "artifact:shared-continuation-reference.crl",
+        "artifact:shared-continuation-reference.cel",
+        "artifact:source-delegated-decision-reference.crl",
+        "artifact:source-delegated-decision-reference.cel",
+        "artifact:disposition-arbitration-reference.crl",
+        "artifact:disposition-arbitration-reference.cel",
+        "artifact:patient-age-both-rep-reference.crl",
+        "artifact:publication-reference.crl"
+      ]
+    },
+    {
+      "id": "section:verificationLegend",
+      "title": "What each proof method establishes",
+      "topics": [
+        "testing"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:examples",
+      "title": "Short examples and counterexamples",
+      "topics": [
+        "orientation"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": [],
+      "members": [
+        "example:datetime-answer",
+        "example:source-field-order",
+        "example:coded-observation-source",
+        "example:quantity-declaration",
+        "example:quantity-answer",
+        "example:terminology-displays",
+        "example:local-answer",
+        "example:decision-alternatives",
+        "example:vacuity-trap",
+        "example:menu-less-guard",
+        "example:any-when",
+        "example:compound-guard",
+        "example:criterion-reuse",
+        "example:open-fork-flag",
+        "example:fidelity-defect-flag",
+        "example:gap-filed",
+        "example:library-flag"
+      ]
+    },
+    {
+      "id": "section:verifyLoop",
+      "title": "Validation and native acceptance workflow",
+      "topics": [
+        "testing"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:judgeLens",
+      "title": "Narrative fidelity and waiver review",
+      "topics": [
+        "review"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:feedbackUrl",
+      "title": "Report a language or tooling gap",
+      "topics": [
+        "review"
+      ],
+      "status": "current",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:boundary",
+      "title": "Known coverage and implementation limits",
+      "topics": [
+        "limitations"
+      ],
+      "status": "limitation",
+      "applicability": "All CRL authoring; check each member's applicability",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "section:dispositionModel",
+      "title": "Authorization and coverage determination configuration",
+      "topics": [
+        "dispositions"
+      ],
+      "status": "current",
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "aliases": [],
+      "requires": [
+        "rule:configure-dispositions",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "rule:patient-gender-projection",
+      "title": "patient gender projection",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Supplying an answer from Patient administrative gender",
+      "status": "current",
+      "aliases": [
+        "Patient.gender",
+        "administrative gender",
+        "gender source",
+        "female",
+        "male",
+        "Patient demographics"
+      ],
+      "requires": [
+        "rule:concept-form",
+        "rule:named-answer-options",
+        "rule:publication-selection"
+      ]
+    },
+    {
+      "id": "rule:text-answers",
+      "title": "text answers",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Authoring typed intake questions",
+      "status": "current",
+      "aliases": [
+        "text",
+        "string",
+        "has a value",
+        "answered",
+        "intake",
+        "free text",
+        "primary diagnosis",
+        "dateTime",
+        "date",
+        "temporal",
+        "Treatment Start",
+        "Quantity",
+        "Number",
+        "count",
+        "sessions",
+        "rate",
+        "d/wk",
+        "h/d"
+      ],
+      "requires": [
+        "rule:concept-form",
+        "rule:publication-selection",
+        "rule:concept-presentation"
+      ]
+    },
+    {
+      "id": "rule:concept-form",
+      "title": "concept form",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "concept",
+        "case feature",
+        "Scalar",
+        "remove scalar",
+        "Observation",
+        "code is",
+        "absence",
+        "completeness",
+        "evidence completeness"
+      ],
+      "requires": [
+        "rule:publication-selection"
+      ]
+    },
+    {
+      "id": "rule:request-code-sources",
+      "title": "request code sources",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Selected request-code publications",
+      "status": "current",
+      "aliases": [
+        "ServiceRequest code",
+        "MedicationRequest",
+        "source-only request",
+        "requested service"
+      ],
+      "requires": [
+        "rule:concept-form",
+        "rule:publication-selection"
+      ]
+    },
+    {
+      "id": "rule:selected-answer-aggregate",
+      "title": "selected answer aggregate",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Boolean computations over explicitly selected coded answers",
+      "status": "current",
+      "aliases": [
+        "any of",
+        "any available value of",
+        "terminal uncertainty",
+        "available answers",
+        "uncertainty check",
+        "computed guard",
+        "uncertain assume yes",
+        "uncertain assume no"
+      ],
+      "requires": [
+        "rule:named-answer-options",
+        "rule:publication-selection",
+        "rule:branch-guards",
+        "artifact:uncertainty-reference.crl"
+      ]
+    },
+    {
+      "id": "rule:interactive-questionnaire",
+      "title": "interactive questionnaire",
+      "topics": [
+        "review"
+      ],
+      "applicability": "VS Code policy testing with native adaptive forms",
+      "status": "current",
+      "aliases": [
+        "interactive testing",
+        "request-bundle.json",
+        "Start Continue Reset",
+        "prune answers"
+      ],
+      "requires": [
+        "rule:produce-results",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "rule:value-type",
+      "title": "value type",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "value type is",
+        "boolean",
+        "Quantity",
+        "CodeableConcept"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:publication-selection",
+      "title": "publication selection",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "shape reduction is",
+        "most recent",
+        "override",
+        "local external inferred",
+        "recency"
+      ],
+      "requires": [
+        "artifact:selection-reference.crl"
+      ]
+    },
+    {
+      "id": "rule:named-answer-options",
+      "title": "named answer options",
+      "topics": [
+        "answers",
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "dropdown with a none answer",
+        "coded answers",
+        "answer options",
+        "value from",
+        "ValueSet answers",
+        "not qualifying is",
+        "in qualifying",
+        "none of the above"
+      ],
+      "requires": [
+        "rule:concept-form",
+        "rule:terminology-forms",
+        "rule:concept-presentation",
+        "artifact:named-answer-reference.crl"
+      ]
+    },
+    {
+      "id": "rule:concept-presentation",
+      "title": "concept presentation",
+      "topics": [
+        "questions",
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "question wording",
+        "presentation",
+        "question text",
+        "question description",
+        "label",
+        "questionnaire"
+      ],
+      "requires": [
+        "rule:concept-form"
+      ]
+    },
+    {
+      "id": "rule:bmi-publication",
+      "title": "bmi publication",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "BMI",
+        "height weight calculation",
+        "body mass index"
+      ],
+      "requires": [
+        "rule:publication-selection",
+        "artifact:publication-reference.crl"
+      ]
+    },
+    {
+      "id": "rule:patient-age-projection",
+      "title": "patient age projection",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "Patient age",
+        "age today",
+        "birth date",
+        "same day override"
+      ],
+      "requires": [
+        "rule:publication-selection",
+        "artifact:patient-age-both-rep-reference.crl"
+      ]
+    },
+    {
+      "id": "rule:interface-concept-naming",
+      "title": "interface concept naming",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:decision-qualifiers",
+      "title": "decision qualifiers",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:decision-composition",
+      "title": "decision composition",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "decision tree",
+        "Concept Criterion Decision",
+        "vertical AND",
+        "horizontal AND",
+        "sem-or",
+        "sem-and",
+        "defined as",
+        "alternatives"
+      ],
+      "requires": [
+        "rule:criterion",
+        "rule:guards",
+        "rule:branch-guards",
+        "rule:chaining-necessity",
+        "rule:guard-or-vs-sibling-or"
+      ]
+    },
+    {
+      "id": "rule:chaining-necessity",
+      "title": "chaining necessity",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "shared continuation",
+        "internal helper",
+        "remaining interview",
+        "use decision"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:guards",
+      "title": "guards",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "guard",
+        "only if"
+      ],
+      "requires": [
+        "rule:branch-guards",
+        "rule:decision-composition"
+      ]
+    },
+    {
+      "id": "rule:branch-guards",
+      "title": "branch guards",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "pause",
+        "unknown",
+        "null",
+        "missing answer",
+        "explicit false"
+      ],
+      "requires": [
+        "rule:publication-selection",
+        "rule:cel-cases"
+      ]
+    },
+    {
+      "id": "rule:criterion",
+      "title": "criterion",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "criterion",
+        "reusable condition",
+        "one use condition",
+        "criterion description",
+        "description is"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:guard-or-vs-sibling-or",
+      "title": "guard or vs sibling or",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:branch-guards"
+      ]
+    },
+    {
+      "id": "rule:dispositions",
+      "title": "dispositions",
+      "topics": [
+        "dispositions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "section:dispositionModel"
+      ]
+    },
+    {
+      "id": "rule:pa-answers-not-records",
+      "title": "pa answers not records",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:named-answer-options"
+      ]
+    },
+    {
+      "id": "rule:pa-disposition-set",
+      "title": "pa disposition set",
+      "topics": [
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [
+        "authorization determination",
+        "coverage determination",
+        "recommendation",
+        "approve deny",
+        "PA without configuration"
+      ],
+      "requires": [
+        "rule:configure-dispositions",
+        "rule:disposition-mode",
+        "rule:dispositions",
+        "rule:pa-answers-not-records",
+        "section:dispositionModel",
+        "artifact:pa-determination-reference.crl"
+      ]
+    },
+    {
+      "id": "rule:configure-dispositions",
+      "title": "configure dispositions",
+      "topics": [
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [
+        "crl.dispositions",
+        "missing configuration",
+        "empty vocabulary"
+      ],
+      "requires": [
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "rule:disposition-mode",
+      "title": "disposition mode",
+      "topics": [
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "rule:minimalism",
+      "title": "minimalism",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:library-scoping",
+      "title": "library scoping",
+      "topics": [
+        "libraries"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "import",
+        "include library",
+        "qualified reference"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:cel-cases",
+      "title": "cel cases",
+      "topics": [
+        "testing",
+        "answers"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "test cases",
+        "CEL",
+        "data",
+        "expected activity",
+        "multiple results",
+        "multiple assertions",
+        "cre-multiple-result-assertions"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:mv-case-authoring",
+      "title": "mv case authoring",
+      "topics": [
+        "testing"
+      ],
+      "applicability": "Preparing cases for clinician Medical Validation",
+      "status": "current",
+      "aliases": [
+        "MV CEL",
+        "medical validation cases",
+        "off path data",
+        "regression suite",
+        "Result Questionnaire",
+        "selected route"
+      ],
+      "requires": [
+        "rule:cel-cases",
+        "rule:verify-loop",
+        "rule:produce-results",
+        "rule:emit-output-root"
+      ]
+    },
+    {
+      "id": "rule:shared-wording-editing",
+      "title": "shared wording editing",
+      "topics": [
+        "review"
+      ],
+      "applicability": "Editing locally owned CRL question wording",
+      "status": "current",
+      "aliases": [
+        "edit source wording",
+        "preview_presentation_edit",
+        "apply_presentation_edit",
+        "revert_presentation_edit",
+        "Edit Question Wording",
+        "shared default",
+        "undo wording",
+        "wording conflict"
+      ],
+      "requires": [
+        "rule:concept-presentation",
+        "rule:mv-wording-patches",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "rule:mv-wording-patches",
+      "title": "mv wording patches",
+      "topics": [
+        "review"
+      ],
+      "applicability": "Question and answer changes requested during Medical Review",
+      "status": "current",
+      "aliases": [
+        "edit question",
+        "pencil",
+        "wording patch",
+        "CRL patch",
+        "MV scope",
+        "KE handoff",
+        "Save change",
+        "Question Edit",
+        "Answer CRUD",
+        "Pending fix",
+        "Fixed",
+        "Approved",
+        "KE Updates",
+        "Knowledge Engineer",
+        "crl.knowledgeEngineering.show",
+        "preview Q/A edits",
+        "run Q/A edits",
+        "revert answer",
+        "static questionnaire"
+      ],
+      "requires": [
+        "rule:concept-presentation",
+        "rule:mv-case-authoring",
+        "rule:produce-results",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "rule:cel-identity",
+      "title": "cel identity",
+      "topics": [
+        "testing"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:cel-quantity",
+      "title": "cel quantity",
+      "topics": [
+        "testing"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:emit-output-root",
+      "title": "emit output root",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:written-equals-executed",
+      "title": "written equals executed",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:terminology-forms",
+      "title": "terminology forms",
+      "topics": [
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "codes",
+        "terminology",
+        "code system",
+        "valueset is",
+        "external ValueSet"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:verify-loop",
+      "title": "verify loop",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "verify",
+        "run_decision",
+        "CRE",
+        "acceptance",
+        "native engine",
+        "active Condition",
+        "verified Condition",
+        "record filters",
+        "preview discrepancy",
+        "RecordSet existence"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:emitted-trees-are-ours",
+      "title": "emitted trees are ours",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": []
+    },
+    {
+      "id": "rule:fhir-packaging",
+      "title": "fhir packaging",
+      "topics": [
+        "review"
+      ],
+      "applicability": "Distributing existing FHIR definitions as an NPM package",
+      "status": "current",
+      "aliases": [
+        "FHIR npm package",
+        "emit_crl_bundle",
+        "emitCrlBundle",
+        "definitions-only Bundle",
+        "CRMI package",
+        "package_fhir",
+        "crl-package-fhir",
+        "ImplementationGuide",
+        "package manifest",
+        "packageId",
+        "fhirDependencies"
+      ],
+      "requires": [
+        "rule:verify-loop",
+        "rule:emitted-trees-are-ours"
+      ]
+    },
+    {
+      "id": "rule:native-apply-session",
+      "title": "native apply session",
+      "topics": [
+        "review"
+      ],
+      "applicability": "Applications submitting successive native QuestionnaireResponse edits",
+      "status": "current",
+      "aliases": [
+        "applySession",
+        "crl-apply-session",
+        "buildSessionResponse",
+        "edits-only",
+        "clear answer",
+        "session API"
+      ],
+      "requires": [
+        "rule:produce-results",
+        "rule:text-answers",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "rule:produce-results",
+      "title": "produce results",
+      "topics": [
+        "testing",
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "retryFailed",
+        "retry failed cases",
+        "caseTimeoutMs",
+        "native timeout",
+        "retry-from",
+        "emit_results",
+        "$apply",
+        "QuestionnaireResponse",
+        "MV",
+        "medical validation"
+      ],
+      "requires": []
+    },
+    {
+      "id": "rule:review-flags",
+      "title": "review flags",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [
+        "narrative completeness",
+        "source fidelity",
+        "narrative coverage",
+        "renamed concept",
+        "stable ID",
+        "flag placement",
+        "orphaned flag",
+        "flag description",
+        "short flag title",
+        "answer KE flag",
+        "ignore KE flag",
+        "accept KE flag",
+        "reject KE flag"
+      ],
+      "requires": []
+    },
+    {
+      "id": "example:datetime-answer",
+      "title": "Date/time answer",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Authoring typed intake questions",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:text-answers",
+        "rule:value-type",
+        "rule:concept-form"
+      ]
+    },
+    {
+      "id": "example:source-field-order",
+      "title": "source-field-order",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:concept-form"
+      ]
+    },
+    {
+      "id": "example:coded-observation-source",
+      "title": "Selected coded Observation source",
+      "topics": [
+        "concepts",
+        "answers",
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:concept-form",
+        "rule:publication-selection",
+        "rule:named-answer-options"
+      ]
+    },
+    {
+      "id": "example:quantity-declaration",
+      "title": "quantity-declaration",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:value-type",
+        "rule:concept-form"
+      ]
+    },
+    {
+      "id": "example:quantity-answer",
+      "title": "quantity-answer",
+      "topics": [
+        "testing",
+        "answers"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:cel-cases",
+        "rule:cel-quantity"
+      ]
+    },
+    {
+      "id": "example:terminology-displays",
+      "title": "Instantiated terminology with authored displays",
+      "topics": [
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:terminology-forms"
+      ]
+    },
+    {
+      "id": "example:local-answer",
+      "title": "Local case-feature concept (asserted, in scope)",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:concept-form"
+      ]
+    },
+    {
+      "id": "example:decision-alternatives",
+      "title": "A policy's ALTERNATIVES are joined in the DECISION layer, not by `defined as`",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:decision-composition"
+      ]
+    },
+    {
+      "id": "example:vacuity-trap",
+      "title": "THE VACUITY TRAP — the label supplying \"the one fact\"",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "counterexample",
+      "aliases": [],
+      "requires": [
+        "rule:decision-composition"
+      ]
+    },
+    {
+      "id": "example:menu-less-guard",
+      "title": "DON'T: a guard on a single menu-less action",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "counterexample",
+      "aliases": [
+        "guard-on-single-action"
+      ],
+      "requires": [
+        "rule:guards"
+      ]
+    },
+    {
+      "id": "example:any-when",
+      "title": "DON'T: `any:` over when-branches",
+      "topics": [
+        "decisions"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "counterexample",
+      "aliases": [
+        "any-over-branches"
+      ],
+      "requires": [
+        "rule:decision-qualifiers"
+      ]
+    },
+    {
+      "id": "example:compound-guard",
+      "title": "Compound branch guard — distinct criteria as `when ( A and B )` (#224)",
+      "topics": [
+        "decisions",
+        "dispositions"
+      ],
+      "applicability": "General decision syntax illustrated with configured authorization dispositions. Example context: Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:branch-guards",
+        "rule:decision-composition",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "example:criterion-reuse",
+      "title": "`criterion` — a named, reusable branch guard (#224)",
+      "topics": [
+        "decisions",
+        "dispositions"
+      ],
+      "applicability": "General decision syntax illustrated with configured authorization dispositions. Example context: Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:criterion",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "example:open-fork-flag",
+      "title": "Review flag: an @open-fork on the concept it concerns (via create_flag — short title, detail in Description)",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:review-flags"
+      ]
+    },
+    {
+      "id": "example:fidelity-defect-flag",
+      "title": "Review flag: an @fidelity-defect on a DECISION (required `direction` field)",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:review-flags"
+      ]
+    },
+    {
+      "id": "example:gap-filed",
+      "title": "@gap-filed is NOT a flag — it stays a `.crl` meta tag (required `; ref`), ships fine, does not gate",
+      "topics": [
+        "review"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:review-flags"
+      ]
+    },
+    {
+      "id": "example:library-flag",
+      "title": "Review flag at LIBRARY scope: an @internal-inconsistency spanning the whole policy (via create_flag)",
+      "topics": [
+        "review",
+        "libraries"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:review-flags",
+        "rule:library-scoping"
+      ]
+    },
+    {
+      "id": "artifact:patient-gender-reference.crl",
+      "title": "patient-gender-reference.crl",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "Supplying a coded answer from Patient administrative gender",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:patient-gender-projection"
+      ]
+    },
+    {
+      "id": "artifact:uncertainty-reference.crl",
+      "title": "uncertainty-reference.crl",
+      "topics": [
+        "concepts",
+        "answers",
+        "terminology",
+        "decisions",
+        "testing",
+        "review"
+      ],
+      "applicability": "Teaching a terminal check over currently supplied four-choice answers",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:uncertainty-reference.cel",
+        "rule:selected-answer-aggregate",
+        "rule:named-answer-options",
+        "rule:branch-guards",
+        "rule:cel-cases",
+        "rule:native-apply-session"
+      ]
+    },
+    {
+      "id": "artifact:uncertainty-reference.cel",
+      "title": "uncertainty-reference.cel",
+      "topics": [
+        "concepts",
+        "answers",
+        "terminology",
+        "decisions",
+        "testing",
+        "review"
+      ],
+      "applicability": "Controls for the synthetic uncertainty teaching slice",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:uncertainty-reference.crl",
+        "rule:selected-answer-aggregate",
+        "rule:named-answer-options",
+        "rule:branch-guards",
+        "rule:cel-cases",
+        "rule:native-apply-session"
+      ]
+    },
+    {
+      "id": "artifact:numeric-intake-reference.crl",
+      "title": "numeric-intake-reference.crl",
+      "topics": [
+        "concepts",
+        "testing",
+        "answers",
+        "review"
+      ],
+      "applicability": "Authoring numeric intake questions",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:numeric-intake-reference.cel",
+        "rule:text-answers",
+        "rule:cel-quantity",
+        "rule:cel-cases",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "artifact:numeric-intake-reference.cel",
+      "title": "numeric-intake-reference.cel",
+      "topics": [
+        "concepts",
+        "testing",
+        "answers",
+        "review"
+      ],
+      "applicability": "Authoring numeric intake questions",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:numeric-intake-reference.crl",
+        "rule:text-answers",
+        "rule:cel-quantity",
+        "rule:cel-cases",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "artifact:intake-reference.crl",
+      "title": "intake-reference.crl",
+      "topics": [
+        "concepts",
+        "testing",
+        "answers",
+        "review"
+      ],
+      "applicability": "Authoring typed intake questions",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:intake-reference.cel",
+        "rule:text-answers",
+        "rule:cel-cases",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "artifact:intake-reference.cel",
+      "title": "intake-reference.cel",
+      "topics": [
+        "concepts",
+        "testing",
+        "answers",
+        "review"
+      ],
+      "applicability": "Authoring typed intake questions",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:intake-reference.crl",
+        "rule:text-answers",
+        "rule:cel-cases",
+        "rule:verify-loop"
+      ]
+    },
+    {
+      "id": "artifact:selection-reference.crl",
+      "title": "selection-reference.crl",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:selection-reference.cel",
+        "rule:publication-selection"
+      ]
+    },
+    {
+      "id": "artifact:selection-reference.cel",
+      "title": "selection-reference.cel",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:selection-reference.crl",
+        "rule:publication-selection"
+      ]
+    },
+    {
+      "id": "artifact:named-answer-reference.crl",
+      "title": "named-answer-reference.crl",
+      "topics": [
+        "answers",
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:named-answer-reference.cel",
+        "artifact:named-answer-terms.crl",
+        "rule:named-answer-options"
+      ]
+    },
+    {
+      "id": "artifact:named-answer-terms.crl",
+      "title": "named-answer-terms.crl",
+      "topics": [
+        "answers",
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:named-answer-options",
+        "rule:terminology-forms"
+      ]
+    },
+    {
+      "id": "artifact:named-answer-reference.cel",
+      "title": "named-answer-reference.cel",
+      "topics": [
+        "answers",
+        "terminology"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:named-answer-reference.crl",
+        "artifact:named-answer-terms.crl",
+        "rule:named-answer-options"
+      ]
+    },
+    {
+      "id": "artifact:pa-determination-reference.crl",
+      "title": "pa-determination-reference.crl",
+      "topics": [
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:pa-determination-reference.cel",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "artifact:pa-determination-reference.cel",
+      "title": "pa-determination-reference.cel",
+      "topics": [
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:pa-determination-reference.crl",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "artifact:reused-condition-reference.crl",
+      "title": "reused-condition-reference.crl",
+      "topics": [
+        "decisions",
+        "testing",
+        "answers"
+      ],
+      "applicability": "Learning reusable conditions and source-ordered continuations",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:reused-condition-reference.cel",
+        "rule:criterion",
+        "rule:decision-composition",
+        "rule:branch-guards",
+        "rule:guard-or-vs-sibling-or",
+        "rule:cel-cases",
+        "rule:mv-case-authoring"
+      ]
+    },
+    {
+      "id": "artifact:reused-condition-reference.cel",
+      "title": "reused-condition-reference.cel",
+      "topics": [
+        "decisions",
+        "testing",
+        "answers"
+      ],
+      "applicability": "Learning reusable conditions and source-ordered continuations",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:reused-condition-reference.crl",
+        "rule:criterion",
+        "rule:decision-composition",
+        "rule:branch-guards",
+        "rule:guard-or-vs-sibling-or",
+        "rule:cel-cases",
+        "rule:mv-case-authoring"
+      ]
+    },
+    {
+      "id": "artifact:shared-continuation-reference.crl",
+      "title": "shared-continuation-reference.crl",
+      "topics": [
+        "decisions",
+        "testing",
+        "answers"
+      ],
+      "applicability": "Learning reusable conditions and source-ordered continuations",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:shared-continuation-reference.cel",
+        "rule:chaining-necessity",
+        "rule:branch-guards",
+        "rule:guard-or-vs-sibling-or",
+        "rule:cel-cases",
+        "rule:mv-case-authoring"
+      ]
+    },
+    {
+      "id": "artifact:shared-continuation-reference.cel",
+      "title": "shared-continuation-reference.cel",
+      "topics": [
+        "decisions",
+        "testing",
+        "answers"
+      ],
+      "applicability": "Learning reusable conditions and source-ordered continuations",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:shared-continuation-reference.crl",
+        "rule:chaining-necessity",
+        "rule:branch-guards",
+        "rule:guard-or-vs-sibling-or",
+        "rule:cel-cases",
+        "rule:mv-case-authoring"
+      ]
+    },
+    {
+      "id": "artifact:source-delegated-decision-reference.crl",
+      "title": "source-delegated-decision-reference.crl",
+      "topics": [
+        "decisions",
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:source-delegated-decision-reference.cel",
+        "rule:chaining-necessity",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "artifact:source-delegated-decision-reference.cel",
+      "title": "source-delegated-decision-reference.cel",
+      "topics": [
+        "decisions",
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:source-delegated-decision-reference.crl",
+        "rule:chaining-necessity",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "artifact:disposition-arbitration-reference.crl",
+      "title": "disposition-arbitration-reference.crl",
+      "topics": [
+        "decisions",
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:disposition-arbitration-reference.cel",
+        "rule:decision-composition",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "artifact:disposition-arbitration-reference.cel",
+      "title": "disposition-arbitration-reference.cel",
+      "topics": [
+        "decisions",
+        "dispositions"
+      ],
+      "applicability": "Authoring authorization or coverage determinations, including before project configuration exists",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "artifact:disposition-arbitration-reference.crl",
+        "rule:decision-composition",
+        "rule:pa-disposition-set"
+      ]
+    },
+    {
+      "id": "artifact:patient-age-both-rep-reference.crl",
+      "title": "patient-age-both-rep-reference.crl",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:patient-age-projection"
+      ]
+    },
+    {
+      "id": "artifact:publication-reference.crl",
+      "title": "publication-reference.crl",
+      "topics": [
+        "concepts"
+      ],
+      "applicability": "All CRL authoring",
+      "status": "current",
+      "aliases": [],
+      "requires": [
+        "rule:bmi-publication",
+        "rule:concept-form"
+      ]
+    }
+  ],
+  "exports": {
+    "json": {
+      "view": "full",
+      "format": "json"
+    },
+    "markdown": {
+      "view": "full",
+      "format": "markdown"
+    }
+  }
+}

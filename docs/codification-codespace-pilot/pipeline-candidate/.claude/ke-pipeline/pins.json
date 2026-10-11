@@ -1,0 +1,23 @@
+{
+  "crlVersion": "6.4.41",
+  "kitSchema": "2.35",
+  "kitHash": "5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd",
+  "server": {
+    "path": "BIND_LOCAL_RUNTIME",
+    "sha256": "47b8b838db227790de1bf477f1a21caeaa8a8d77243b873084f7749421b4257d"
+  },
+  "driver": {
+    "path": "BIND_LOCAL_RUNTIME",
+    "sha256": "84392646979904f48fe2d4aa37e90f78efc81f62308e2a4d9e36c698216b76cf"
+  },
+  "engine": {
+    "path": "BIND_LOCAL_RUNTIME",
+    "sha256": "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
+    "fileName": "cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
+    "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-security-20261002/cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar"
+  },
+  "node": "BIND_LOCAL_RUNTIME",
+  "mcpSdk": "BIND_LOCAL_RUNTIME",
+  "javaHome": "BIND_LOCAL_RUNTIME",
+  "source": "CRL 6.4.41 release and kit 2.35 audited distribution; selected by the Smile pilot assignment"
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "project": "smile-demo-codification",
+  "acceptedMethod": {
+    "id": "medical-policy-ke-method",
+    "version": "0.1.1",
+    "manifestSha256": "69e2ed9dbb4e3fbfce9d98929b20c3a73de4e7f61712489f83f2ef05395f14e0",
+    "location": ".claude/ke-pipeline/method/0.1.1"
+  },
+  "profiles": [
+    {"role": "customer and output binding", "path": ".claude/ke-pipeline/customer-binding.json"},
+    {"role": "kit 2.35 reassessment of the accepted method map", "path": ".claude/ke-pipeline/kit-235-reassessment.md"},
+    {"role": "narrative initial modeling", "path": ".claude/skills/crl-initial-implementation-ke/SKILL.md"},
+    {"role": "lead workflow", "path": ".claude/ke-pipeline/briefs/policy-task.md"},
+    {"role": "independent review", "path": ".vibe-tools/protocols/ke-review-process.md"}
+  ]
+}

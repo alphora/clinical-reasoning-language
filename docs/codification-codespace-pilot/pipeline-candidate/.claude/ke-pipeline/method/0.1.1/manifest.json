@@ -1,0 +1,10 @@
+{
+    "schemaVersion":  1,
+    "id":  "medical-policy-ke-method",
+    "version":  "0.1.1",
+    "files":  {
+                  "SKILL.md":  "95dcd3ca7b5262665c38ab4695b5203662be77916ba532ced26aaa3a0f3c9260",
+                  "references/method.md":  "669bf1a2dad1a39d330bc9c3259bcfff0b5c70648b10d2fcadc867ae71249e75",
+                  "references/crl-contract-map.md":  "ac135cf165d308009629c39d51bad4bec1bb6e2c6c6ab4384eefe01fd8e03b5c"
+              }
+}

@@ -1,0 +1,25 @@
+# Supervised create-new narrative pipeline contract
+
+Status: candidate for the Smile auto-bleph pilot, not an accepted customer installation.
+
+## Authority and scope
+
+Read the bundled kit-235-reassessment.md with the accepted method's older CRL contract map. For this pinned kit, the reassessment's corrected determination-resource reading takes precedence over the map's stale CPGCommunicationRequest-only example. The original map remains immutable as release 0.1.1 history.
+
+The accepted neutral medical-policy KE method is bundled at method/0.1.1 and declared in ke-method.binding.json. The artifact's committed original/refined source owns policy meaning. Approved customer-binding.json and its selected customer-decisions own local outcome, answer-domain and determination conventions. This package intentionally carries no policy-specific ruling, encoded example, prior artifact, or imported customer rule. A missing or unapproved binding blocks scaffold/preflight. The active task and assignment must name the artifact and exact source bytes before work begins.
+
+The authoring Codespace has one checkout on the content artifact branch. The installed package lives at repository-root .claude/ke-pipeline and the model skill at .claude/skills/crl-initial-implementation-ke. The review prompts/protocol live at repository-root .vibe-tools. Root tmp/run is disposable scratch. KELP owns the artifact entities; the human owns Lock/Unlock. The lead uses KELP Save only after current lock and source reconciliation and exact candidate verification. Run evidence needs a verified pushed ref before Codespace deletion. Codespace creation and lifecycle search/card transitions belong to Nautilus/KELP, not this package.
+
+## Source and authoring sequence
+
+Read complete source and approved refinements. For HTML plus text, validate UTF-8/NFC, preserve the text bytes, and verify visible-HTML correspondence with anchor-text.py. Exceptions require exact line hashes and source-specific reasons stored with the artifact's refinement. Identify distinct concepts first, create a source-language tree, translate to CRL skeleton, then flesh out concepts, vocabulary, activities and presentation. The supplied Request is first; source-authorized EIU may be grouped in a meaningful Criterion; main eligibility normally uses depth-oriented Decisions. The source/customer binding determines uncertainty, output labels and answer choices. Freeze expectations before model predictions.
+
+Build a concise clinician MV CEL suite, a broader structural regression suite and an interactive Patient+Request starting bundle. Execute validate, CRE, emit, native, ids, provenance FINAL, independent executor, decision review and source-only questionnaire review. Check native answer change/clear and rendered client separately. A requested check that cannot run is unverified, not passed. Record direct, actionable flags for the nurse informaticist.
+
+## Tooling and acceptance boundary
+
+pins.json selects CRL 6.4.41 and kit 2.35 identities. bind-runtime.py verifies actual installed server, driver and engine bytes and writes only a local tmp/runtime/pins.local.json. The image must supply Node, Java and the MCP SDK. The actual image, Vibe Tools arms, KELP CLI/extension, Claude Code chat and remote evidence mechanism still require installed smoke tests. kit-cache.mjs verify checks the cache's declared structure/identity, not a recomputed full semantic content hash. The shared method's old kit-2.4 map requires the targeted kit-2.35 reassessment recorded beside this candidate. This package's local tests do not certify the future Codespace or clinical artifact.
+
+The customer-binding.json is deliberately incomplete until the Smile authority owner approves canonicalBase, outcome keys/labels, output resource, answer-domain policy and selected customer decisions. No source-specific exception file is shipped. Install only after those bindings and the artifact branch exist, then hash the installed file inventory into Nautilus's assignment revision. A successful source-only dry run can establish package preparation; it does not establish authoring, KELP delivery, independent review or Medical Validation.
+
+The approved binding also selects standalone or embedded disposition mode. Its answerDomain has defaultBinaryChoices (null for source-defined choices, otherwise two labels) and uncertainty {mode, choices}; mode is none, source-defined or customer-defined, with choices populated only for customer-defined. This is an explicit customer contract, not a default answer set. Scaffold and preflight reject missing fields, invalid resource types and duplicate activity mappings.

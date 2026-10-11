@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "customer": "smile-demo",
+  "status": "needs-owner-binding",
+  "canonicalBase": null,
+  "outcomes": null,
+  "dispositionMode": null,
+  "x12ByActivity": {},
+  "determinationResourceType": null,
+  "answerDomain": null,
+  "authority": []
+}
