@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "a670ed2127a9aa4deceae25e538cc990d75a9228",
-  "auditedSchemaVersion": "2.34",
-  "auditedContentHash": "c702d3adde3a92bf23d6b978c7141cef89e24fab9cd9821b8458f65fe5f68cd3",
-  "scope": "Reviewed schema 2.34 scoped publication decision delegation through a670ed2127a9aa4deceae25e538cc990d75a9228. Source/owner, trace, native root/child and KE static checks are bounded in coverage.md. Independent-root and included-seed domain constraints remain separate. Source audit does not certify installed release or customer deployment.",
+  "auditedRevision": "8f8e812017f8c60e64aa9595ce5abb099f81cdbe",
+  "auditedSchemaVersion": "2.35",
+  "auditedContentHash": "5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd",
+  "scope": "Reviewed schema 2.35 interactive singleton answer validity through 8f8e812017f8c60e64aa9595ce5abb099f81cdbe. Native extraction identities, retained dates, explicit edits/clears, failure/cancel and same-day rendered source defaults are bounded in coverage.md. Explicit stateless full reassertion, repeated/aggregate extraction and general native BMI/full-response limits remain separate. Source audit does not certify installed release or customer deployment.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
