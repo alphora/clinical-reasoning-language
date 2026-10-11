@@ -72,11 +72,15 @@ test("all retains multiple pause frontiers and mixed production plus pause witho
   expect(partial.label).toContain("Met");expect(partial.label).toContain("Awaiting input");
   expect(checkCockpitCorrespondence(f.model())).toEqual([]);
 });
+// REFACTOR:grounded: failed delegation admission cannot be certified as a partial pause.
 test("an unresolved sibling cannot hide behind a valid pause or a produced action",()=>{
   const f=fixture(prelude+'decision "D": all: - when "A" then use decision "Missing". - when "B" then recommend activity "Met".',
     facts+'case "Broken": - id is "broken". - subject is "Patient". - fact is "A yes". - result is "D" is pause.');
-  expect(checkCockpitCorrespondence(f.model())).toContainEqual(expect.objectContaining({kind:"unchecked",reason:"unresolved-decision"}));
-  expect(f.diagnostics).toContainEqual(expect.objectContaining({kind:"deferred-disposition-path",reason:"unresolved-decision"}));
+  expect(f.model().scenarios.scenarios[0].status).toBe("error");
+  expect(f.model().scenarios.scenarios[0].diagnostics.join(" ")).toContain("publication-unresolved-decision");
+  expect(checkCockpitCorrespondence(f.model())).toContainEqual(expect.objectContaining({kind:"unchecked",reason:"run-error"}));
+  expect(f.diagnostics).toContainEqual(expect.objectContaining({kind:"deferred-disposition-path",reason:"render-failed"}));
+  expect(f.artifact.clusters.filter(c=>c.cel.length)).toEqual([]);
 });
 test("pause paths still reject extra lighting, missing lighting and missing structure rows",()=>{
   const f=fixture();
@@ -103,19 +107,27 @@ test("empty no-action execution is not a pause; failures and unreached unknowns 
 });
 
 
-test("unsupported selected-publication cross-library delegation stays an error, never an admitted pause",()=>{
+// @kit chaining-necessity:provenance-cross-library-pause
+// REFACTOR:grounded: accepted prepared delegation preserves source-owned provenance pause paths.
+test("selected-publication cross-library delegation preserves actual pause correspondence",()=>{
   const policy=POLICY.slice(0,POLICY.lastIndexOf('decision "Sub"')).replace('use decision "Sub"','use decision "Shared"."Sub"');
-  const shared=prelude.replace('library "P"','library "Shared"')+POLICY.slice(POLICY.lastIndexOf('decision "Sub"'));
+  const shared=(prelude.replace('library "P"','library "Shared"')+POLICY.slice(POLICY.lastIndexOf('decision "Sub"')))
+    .replaceAll('"Met"','"Child Met"').replaceAll('"Unmet"','"Child Unmet"');
   const cases=CASES.slice(0,CASES.indexOf('case "Complete"'));
   const f=fixture(policy,cases,{shared});
   expect(f.model().scenarios.scenarios).toHaveLength(2);
   for(const scenario of f.model().scenarios.scenarios) {
-    expect(scenario.status).toBe("error");
-    expect(scenario.diagnostics.join(" ")).toContain("publication-unsupported-scope");
+    expect(scenario.status).toBe("pass");
+    expect(scenario.diagnostics).toEqual([]);
   }
-  expect(checkCockpitCorrespondence(f.model())).toHaveLength(2);
-  expect(checkCockpitCorrespondence(f.model()).every(r=>r.kind==="unchecked" && r.reason==="run-error")).toBe(true);
-  expect(f.artifact.clusters.filter(c=>c.cel.length)).toEqual([]);
+  expect(checkCockpitCorrespondence(f.model())).toEqual([]);
+  expect(f.artifact.clusters.filter(c=>c.cel.length)).toHaveLength(2);
+  const sub=run(f.model(),"Sub pause");expect(sub.kind).toBe("comparable");
+  if(sub.kind==="comparable")expect(sub.paths[0].refs).toEqual([
+    {lib:"P",decision:"D",nodeId:"when[0]"},
+    {lib:"P",decision:"D",nodeId:"when[0]/action[0]"},
+    {lib:"Shared",decision:"Sub",nodeId:"when[0]"},
+  ]);
 });
 test("unknown operands in a settled compound guard are not pause endpoints",()=>{
   const policy=prelude+'decision "D": first: - when ( "A" or "B" ) then recommend activity "Met". - otherwise then recommend activity "Unmet".';
