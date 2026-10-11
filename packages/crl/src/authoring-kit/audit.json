@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "8f8e812017f8c60e64aa9595ce5abb099f81cdbe",
+  "auditedRevision": "6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9",
   "auditedSchemaVersion": "2.35",
   "auditedContentHash": "5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd",
-  "scope": "Reviewed schema 2.35 interactive singleton answer validity through 8f8e812017f8c60e64aa9595ce5abb099f81cdbe. Native extraction identities, retained dates, explicit edits/clears, failure/cancel and same-day rendered source defaults are bounded in coverage.md. Explicit stateless full reassertion, repeated/aggregate extraction and general native BMI/full-response limits remain separate. Source audit does not certify installed release or customer deployment.",
+  "scope": "Reviewed schema 2.35 interactive singleton answer validity and scoped pause-correspondence regression evidence through 6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9. Native extraction identities, retained dates, explicit edits/clears, failure/cancel, same-day rendered source defaults and CRE provenance paths are bounded in coverage.md. Explicit stateless full reassertion, repeated/aggregate extraction and general native BMI/full-response limits remain separate. Source audit does not certify installed release or customer deployment.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
