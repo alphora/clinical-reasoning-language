@@ -36,8 +36,10 @@ filter. A codifier may also choose direct Codify from that state without
 Nautilus; this skill governs only the assisted route. Initial preparation
 normally begins from that state after the source snapshot is complete. For
 rework, the operator may explicitly start a new Nautilus assignment from the
-current Project status after reconciling prior work; KELP does not need a
-predecessor-status rule. Resolve the canonical artifact Project item and
+current Project status after reconciling prior work. Nautilus may update the
+displayed Project Status but must not edit KELP's retained lifecycle stage;
+KELP uses that stage to recognize earlier-card rework after preparation.
+Resolve the canonical artifact Project item and
 current assignment, then write **Nautilus in progress** to that item's Status
 field. Re-read the item after writing. A failed
 or uncertain transition must be reconciled before further effects. This is
@@ -69,17 +71,21 @@ Report the artifact, canonical and prepared branches, source/assignment
 identity, pipeline/profile, both image identities, exact Codify scopes,
 preparation state and next action. A separate codifier finds **Nautilus
 staged** in KELP, then Locks the Codify scopes **on the canonical artifact**
-from its Codify card. That sets the Project item to **Codify in progress**; the card
-opens Nautilus in the initiating KELP workspace. Nautilus launches or
+from its Codify card. On the normal path, KELP sets the parent Project item to
+**Codify in progress**. If Codify is earlier than the parent's retained KELP stage,
+KELP instead opens or reuses a Codify rework subtask and leaves the parent
+unchanged. The card opens Nautilus in the initiating KELP workspace. Nautilus launches or
 reconnects a distinct authoring Codespace on the exact prepared branch under
 the codifier's GitHub identity, verifies the effective authoring image, and
 guides the human-supervised agent. It does not re-Lock in the authoring
 checkout or require a separate KELP lock-status read. KELP's initiating card
 owns the Lock and invokes Nautilus after it succeeds; local status on the
 prepared branch is not canonical lifecycle proof.
-After an ordinary Unlock, the same Codify work may be re-Locked to
-resume, subject to KELP's existing owner/base and competing-lock checks;
-it does not return to Nautilus staged or require another preparation run.
+Unlock releases the card's locks and completes any matching rework subtask
+once those locks are released. A separate Complete action performs the
+configured handoff. A later Lock remains subject to KELP's ordinary
+owner/base and competing-lock checks; it does not require another Nautilus
+preparation run unless the operator starts a new assisted assignment.
 
 Nautilus SaveCodify in the authoring Codespace reviews saved dirty files,
 commits/pushes selected prepared-branch work, and transfers only the exact
