@@ -1,39 +1,98 @@
 ---
 name: nautilus-orchestrator
-description: Prepare or resume human-supervised medical-policy codification batches in Nautilus from existing KELP source artifacts. Use when an operator asks the Nautilus orchestrator to bind a pipeline and prepare an artifact branch for user-owned Codespace launch; not for authoring the policy inside a Codespace.
+description: Prepare or resume a human-supervised Codify batch from an existing KELP source artifact; the author works later in a separate Nautilus Codespace.
 ---
 
-# Prepare a codification batch
+# Prepare a Codify batch
 
-Work with the Nautilus operator to prepare an existing KELP source artifact for a supervised KE run. The authoring Codespace has one checkout: the content repository's artifact branch. The operator prepares that branch with the selected pipeline under `.claude/`, outside KELP-managed artifact entities. The codifier works at that checkout root through VS Code's Claude Code chat, using `tmp/` for transient work. This preparation skill does not encode the policy or launch the chat.
+This is an integration candidate. Follow the [project flow](../WORKFLOW.md)
+and the selected medical-policy KE method/project binding. Do not claim that a
+batch is launchable because a branch or handoff file exists; the provider,
+image, pipeline and KELP transitions must be qualified. This skill prepares
+the batch. It does not encode a policy or start a Codespace.
 
-This skill is an **integration candidate** until Nautilus installs it and proves preparation, interrupted preparation/resume, and human launch against its real interfaces. Use actual installed tools and record their results. If a required Nautilus, KELP, GitHub, pipeline, or image capability is absent, report the specific gap; do not invent a command or mark the batch ready.
+## Bind the assignment
 
-## Bind the work
+Identify the explicit content repository, canonical KELP artifact branch,
+committed source and authorized refinements, customer/demo profile, lifecycle
+binding, Codify scopes, intended determination, authoring mode and selected
+pipeline. Verify actual source-file hashes and complete intake. For a new
+unbound project, establish bindings from authorized inputs before customer
+authoring. Do not infer a customer from a directory or import a previous
+artifact's encoding as unstated source.
 
-For each requested artifact, identify the explicit content repository, KELP artifact and branch, committed source files, authorized refinements, assigned KELP scopes, and intended determination. The eventual codifier may be a different user who discovers the ready artifact in KELP; do not require or preselect that person's GitHub identity during batch preparation. Read the project's accepted medical-policy KE method binding and its customer, source, and lifecycle profiles. If the project is new and unbound, establish those bindings from authorized inputs before choosing a pipeline; do not infer customer rules from a directory or another artifact.
+Freeze a run/assignment revision with the accepted method, pipeline/profile
+manifest, source hashes, output-file allowlist, reviewer/runtime/image pins,
+canonical preparation commit and exact branch pair. The prepared branch is
+derived, never chosen freely: `<canonical artifact branch>-nautilus`. A
+changed source, binding, pin or output scope needs an explicit revision and
+recheck of affected work. Reconcile any existing prepared branch and run
+record before creating another; never reset authored work on a retry.
 
-Confirm KELP Add and source intake are complete and that the committed source snapshot and `kelp.project.json` are readable. Select the accepted create-new pipeline and source mode that fit the artifact (for example, narrative or form source), then bind its upstream Git revision and the exact manifest/hash of pipeline/profile files installed under `.claude/` on this artifact branch, plus method, CRL/kit, reviewer, **KELP initiating image and Codify/Nautilus authoring image** identities. Keep the installed pipeline free of unrelated customer history. Treat a prior encoding or run as evidence only when explicitly authorized, never as an unstated source. Keep policy-specific meaning in that artifact's source/refinement files. The reusable pipeline and this skill may contain general medical-policy and customer rules through their declared profiles, but no policy-specific coaching.
+## Prepare and stage
 
-Verify that Nautilus's launch provider is installed and callable in the **initiating KELP-image Codespace**, where its artifact card is opened before the authoring Codespace exists. The separate **Nautilus-image Codespace** carries the authoring entrypoint. Installing the provider only in the authoring image cannot perform the first launch.
+KELP Add puts a new artifact in **Ready to codify**, the **Codify** preparation
+filter. A codifier may also choose direct Codify from that state without
+Nautilus; this skill governs only the assisted route. The Nautilus orchestrator may begin only from that state after the
+source snapshot is complete. Use KELP's named, configured batch-start
+workflow action to enter **Nautilus in progress**. This changes workflow
+tracking, not KELP Lock/Save/Release ownership records. A failed or uncertain
+transition must be reconciled before further effects.
+KELP checks its generic source-loaded/produced fact and the pass, predecessor
+state and assignment revision; the orchestrator checks source completeness.
 
-## Prepare each artifact
+From the published canonical branch, create and push exactly the suffixed
+prepared branch. Install the selected `.claude/` pipeline and `.vibe-tools/`
+reviewer material there, commit the root `tmp/` scratch skeleton and durable
+run record, and bind the selected Nautilus-image devcontainer configuration.
+The canonical branch retains source and KELP lifecycle records, with no
+pipeline or scratch ancestry. Verify every installed file against the frozen
+manifest from the pushed commit. Preparation does not select the eventual
+codifier or create a Codespace.
 
-1. Reconcile any existing Nautilus assignment and launch record before preparing another. Keep a durable per-artifact record with the assignment revision, source-file hashes, KELP graph identity, selected pipeline/profile, both image/configuration identities, preparation state, acting codifier once one has locked, any Codespace name/URL observed after launch, blocker, and next action. A resumed batch continues from these records; one blocked artifact does not erase the others.
-2. Freeze an assignment revision that identifies the source bytes, accepted bindings, intended scopes, and supervised author/reviewer workflow. A changed source, binding, or pin needs a new revision with affected evidence marked for recheck. Do not use artifact-branch HEAD alone as the source identity.
-3. Prepare the artifact branch with the selected `.claude/` pipeline, its file manifest/hash, and selectable devcontainer configurations for the KELP/MV initiating image and the Codify/Nautilus authoring image; verify both before any user launch. Bind the authoring configuration path and image to the assignment. The pilot repo's deny-root `.gitignore` must allow every payload path in the manifest, including `!/.claude/` and the selected `!/.vibe-tools/` reviewer prompts/protocols; keep `.vibe-tools/discussions/`, `/.claude/settings.local.json` and root `tmp/` ignored. Commit and push the complete payload and Git controls as ordinary Git work before KELP lifecycle actions; KELP Save does not stage them. Verify each manifest path and SHA-256 from the pushed commit, not merely the local working tree. KELP confirmed root `.claude/` and `tmp/` sit outside entity discovery and scoped Save, but exercise this in the staged Codespace. Configure the launch target as the repository and artifact branch, with preferred authoring Codespace display name `<artifact-id>-assisted-codify`. The batch pre-step prepares the assignment and branch; **it does not create a Codespace**.
-4. When preparation is complete, use the KELP handoff command to put the artifact in **Ready for codify**. A different user can then find it with KELP's **Ready for codify** search filter. This command and filter are required for the intended workflow; record them as unimplemented until KELP demonstrates them. Do not mark an artifact ready merely because the assignment file exists.
-5. Configure Nautilus launch for the user who Locks the codification scopes through KELP's **Codify card**. That Lock puts the artifact in **Codify in progress** and binds the acting codifier. The initiating KELP-image Codespace remains available after the separate authoring Codespace is deleted so the user can return to the card and Unlock. Nautilus first reopens any authoring Codespace already recorded for this batch; when searching other candidates, exclude the initiating Codespace's `CODESPACE_NAME` so it cannot select itself merely because user, repository and branch match. If no run-associated authoring Codespace exists, Nautilus creates one under the codifier's authenticated account **with `.devcontainer/nautilus/devcontainer.json` explicitly selected**, or gives the user the GitHub creation steps including that configuration and records the result. Verify the new Codespace's effective image before authoring. The display name is a helpful label, not a required match, because the user-facing creation fallback may not set it. If several candidates remain, present them for user resolution. Record GitHub's actual name and URL. Do not use an operator or service identity to create a Codespace for a different user.
-6. Keep the batch's per-artifact states explicit: in the batch-preparation queue, prepared but not yet marked ready, Ready for codify, Codify in progress, blocked with a concrete reason, or saved and awaiting codification completion. On retry, reconcile the stored assignment, KELP state, branch, and any observed Codespace before mutating anything. Do not create another Codespace merely because a prior launch call timed out.
+After the branch, package, source and image identities are verified, call the
+named batch-complete workflow action to enter **Nautilus staged**, visible in
+the **Nautilus** execution filter. A delayed completion for an old assignment
+cannot overwrite a newer pass. If preparation fails, retain its durable run
+record and **Nautilus in progress** state; the operator resumes or explicitly
+reassigns it by artifact ID/run link, not by silently returning it to a
+ready-work filter. Report a concrete blocker instead of inventing a readiness
+receipt.
 
-Spaces may help build or maintain the Nautilus image. It is not contacted to create a batch, provision a Codespace, or launch a run. The image maintainer can change without changing this runtime workflow.
+## Operator handoff
 
-## Hand off to the user and Codespace entrypoint
+Report the artifact, canonical and prepared branches, source/assignment
+identity, pipeline/profile, both image identities, exact Codify scopes,
+preparation state and next action. A separate codifier finds **Nautilus
+staged** in KELP, then Locks the Codify scopes **on the canonical artifact**
+from its Codify card. That moves the pass to **Codify in progress**; the card
+opens Nautilus in the initiating KELP workspace. Nautilus launches or
+reconnects a distinct authoring Codespace on the exact prepared branch under
+the codifier's GitHub identity, verifies the effective authoring image, and
+guides the human-supervised agent. It does not re-Lock in the authoring
+checkout. The codifier's Git author email must match the canonical Lock
+owner. Where a fresh canonical Lock snapshot is required, use the qualified
+KELP read contract; local status on the prepared branch is not proof.
+After an ordinary Unlock, the same active Codify pass may be re-Locked to
+resume, subject to KELP's existing owner/base and competing-lock checks;
+it does not return to Nautilus staged or require another preparation run.
 
-Give the operator a compact per-artifact preparation handoff: artifact and branch, source/assignment identity, selected pipeline and profile, both image/configuration identities, scopes to Lock, preferred authoring Codespace display name, readiness state, and any action that remains. Include the actual Codespace URL only if one already exists from a prior launch. After the KELP handoff marks **Ready for codify**, a codifier discovers the artifact through that filter, uses the KELP **Codify card** in the KELP-image Codespace to Lock the assigned scopes, and uses the card to open Nautilus. Nautilus guides the codifier through opening or creating a separate Nautilus-image Codespace and running the preconfigured batch. The launch control does not create the batch.
+Nautilus SaveCodify in the authoring Codespace reviews saved dirty files,
+commits/pushes selected prepared-branch work, and transfers only the exact
+reviewed Codify output paths into a canonical-only-parent commit. It does
+not merge the prepared branch or call KELP Save. Require current canonical
+source/assignment/lock checks, conflict detection, conditional push and a
+durable delivery/evidence receipt. Resolve intended edits excluded from
+delivery and preserve run evidence before deleting the authoring Codespace.
+The initiating KELP checkout refreshes to the delivered commit; the codifier
+then Unlocks and separately selects **Complete codify** to enter **Codify in
+review**. Unlock alone is not completion, and an authorized unchanged-output
+attestation need not fabricate a changed commit.
 
-On the successful route, the codifier uses KELP Save, verifies its push reached the remote, and confirms no intended artifact work remains uncommitted or unpushed. Preserve selected `tmp/` checkpoints, amendments, identities, review findings/dispositions and handback in a pushed remote run ref (provisionally `refs/heads/codify-runs/<run-id>`) independent of published content. Record its ref, evidence commit, run/assignment ID and saved artifact commit; verify the remote evidence before deleting the authoring Codespace. Nautilus owns the ref-writing mechanism and must not require a second checkout or worktree. The codifier resumes the initiating KELP workspace if it idled, fetches and fast-forwards the artifact branch to include the Save, refreshes the Codify card, and uses Unlock to release ownership. **Complete codify** is a separate KELP action that advances the saved artifact to codification review. A KE reviewer then uses the existing CRL KE card to Lock, review, Save, Unlock and **Complete KE** before the artifact becomes **Ready to Medical Review**. Unlock alone never asserts completion or advances a stage. KELP owns those transitions, while Nautilus supplies codification evidence. Before **Publish**, require KELP to prove it carries only intended artifact entities and required lifecycle metadata into `main`, with no new `.claude/` or run-evidence paths or ancestry; a prior delete commit is insufficient. Current `kelp release` is Unlock and may proceed, but current `kelp publish` does not satisfy this boundary. Do not delete a Codespace after a failed Save or before required evidence is preserved.
-
-Prepare the Codespace startup instructions and identify their consumer: the Nautilus entrypoint in that Codespace. After KELP Lock, that entrypoint must fetch and reconcile the content artifact branch so the pushed lock is visible, confirm the acting codifier's Git author email matches the lock owner, verify installed image/runtime and assignment identities, verify the committed `.claude/` pipeline/profile bytes against the assignment (including dirty-file detection), load the accepted method/profile/task, and check that Claude Code chat, CRL and KELP commands, and required independent reviewers are callable **before authoring**. The lead starts in Claude Code chat at the content checkout root; the entrypoint records the instructions and hooks actually loaded there. Require a startup receipt reporting those checks. These are entrypoint duties; the outside orchestrator records and evaluates the receipt but does not assume it is still running inside the Codespace.
-
-Report preparation separately from authoring, independent review, KELP delivery, and human Medical Validation. A ready batch means only that its source, assignment, and artifact branch are prepared for the user's Lock and launch. It does not imply a Codespace already exists. Never describe it as an authored or validated policy.
+The KE reviewer subsequently Locks, reviews, KELP Saves changed canonical
+review work and verifies the remote result (or records an authorized
+unchanged-review attestation), Unlocks and selects **Complete KE** to enter
+**Ready for MV**. Human Medical
+Validation remains separate. The proposed MV/Publish continuation and any
+explicit rework route are in the project flow; they do not override current
+KELP publication and human-approval gates.

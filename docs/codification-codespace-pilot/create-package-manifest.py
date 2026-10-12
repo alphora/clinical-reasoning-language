@@ -38,12 +38,12 @@ def main():
     if args.action == "write":
         payload = {
             "schema": "ke-pipeline-package/1",
-            "installationRoot": "content artifact branch root",
+            "installationRoot": "prepared <artifact branch>-nautilus checkout root",
             "upstreamSeed": "iehp-ke-batch-clean@4c8fb7e62a78e4d254b89b3053619a759c45e8b1",
             "status": "candidate-needs-approved-smile-binding-and-codespace-qualification",
             "files": inventory,
         }
-        MANIFEST.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        MANIFEST.write_bytes((json.dumps(payload, indent=2) + "\n").encode("utf-8"))
     else:
         payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
         if payload.get("schema") != "ke-pipeline-package/1" or payload.get("files") != inventory:
