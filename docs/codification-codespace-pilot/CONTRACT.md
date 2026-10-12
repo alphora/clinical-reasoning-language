@@ -39,9 +39,13 @@ ready item.
 
 The pilot repository and byte-exact source-only `auto-bleph` artifact now exist. Spaces must stage and qualify the initiating KELP image and separate Nautilus authoring image on the existing repository. Batch preparation occurs on the exact suffixed branch; the canonical artifact is the only KELP Lock target. Verify source, branch, image, provider and permission identities during the moderated test.
 
+Spaces' Project readback found zero items and Issues disabled on the pilot repository. Spaces will configure the first-path Status options named in [WORKFLOW.md](WORKFLOW.md), preserving existing option IDs, and enable Issues through its operator-approved repository change. KELP owns idempotent enrollment of the existing `auto-bleph` artifact into its parent issue and Project item; do not rerun Add or create a parallel issue manually. The target KELP Codify filter selects Ready to codify, Nautilus's filter selects Nautilus staged, KE review selects Codify in review, and MV selects Ready for MV. Additional GitHub Project views are not required for this pilot.
+
 The first pilot's prepared branch was created before Project enrollment and Nautilus's Project `start` existed. Enroll the existing canonical artifact, then reconcile that prepared branch and its candidate run record into the Project flow; do not recreate or reset it. The prepared branch currently lacks `.devcontainer/`, while Spaces' two configurations are on `staging`. Propagate the final verified configs to the branch used by Codespaces and record the resulting commit and exact devcontainer path before Launch.
 
 Spaces reports a registry gap: it currently pins one image per target, while this repository needs a different digest for each devcontainer configuration. Its interim authoring image without Nautilus may prove layout, receipts and lifecycle; the full pilot requires the KELP image with Nautilus's launcher and the separate Codify image with the complete Nautilus pipeline and reviewers. Neither interim image evidence nor a devcontainer path alone proves the effective authoring image. Verify the in-Codespace image manifest and startup receipt before authoring.
+
+Keep the rebuilt interim images on `staging` for focused checks. Promote to pilot `main` and converge the two artifact branches after the full selected images pass staging qualification; avoid two branch-convergence rounds while KELP Project/Complete and callable reviewers are absent. Spaces' converge must change only the two devcontainer files, preserve existing artifact/pipeline bytes, and report the new branch heads. No batch may run during that converge.
 
 ## Launch, readiness and evidence
 
