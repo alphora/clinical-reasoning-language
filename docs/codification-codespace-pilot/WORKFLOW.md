@@ -27,14 +27,17 @@ card labels, display order, or shared entity scopes.
 **Ready to codify is the preparation queue.** Add enters it immediately, even
 if companion source files still need intake. Nautilus batch start must verify
 the complete authorized source snapshot and explicit assignment before doing
-pipeline work. KELP checks that source is loaded/produced and that the pass,
-state match for its own card actions; Nautilus owns the batch predecessor,
-source-content and assignment-revision checks.
-The Codify card may be viewed in Ready to codify for direct work, or in
-Nautilus staged for the prepared Nautilus route. A Nautilus-assisted pass
-requires the staged assignment; direct Codify does not. Nautilus in progress
-is reserved for batch preparation; cancelling or returning that pass is
-explicit before taking another route. Re-Lock to resume the same active pass
+pipeline work. Nautilus owns the batch predecessor, source-content and
+assignment-revision checks. A successful KELP Codify-card Lock sets that
+card's configured Project target status on the canonical artifact item;
+KELP does not inspect the predecessor Project status or Nautilus batch to
+decide Lock admission. Its ordinary entity lock and permission checks still
+apply.
+In the normal flow, direct Codify begins from Ready to codify, while a
+prepared Nautilus run is discovered in Nautilus staged. Nautilus launch
+requires a prepared assignment; direct Codify does not. Nautilus in progress
+records batch preparation; cancelling or returning that preparation is
+explicit. Re-Lock to resume the same active work
 after an ordinary Unlock remains allowed from Codify in progress, subject to
 the existing owner/base and competing-lock checks. A second batch start or stale batch
 completion must not overwrite a newer pass or an active codification.
