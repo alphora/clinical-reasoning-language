@@ -6,7 +6,7 @@ the proposed MV/Publish continuation. KELP and Nautilus have not implemented
 or qualified this complete sequence. The table shows the normal pilot path.
 KELP reads card order and status targets from configuration, not card labels,
 display order, or shared entity scopes. `Lock from=card` takes the ordinary
-entity locks. If the card is earlier than the parent's retained KELP stage, KELP
+entity locks. If the card is earlier than the parent's current configured stage, KELP
 creates or reuses its open rework subtask and leaves the parent unchanged;
 otherwise it moves the parent to the card's configured in-progress status.
 `Unlock from=card` releases the locks and completes that rework subtask once
@@ -26,8 +26,7 @@ to the card's configured `Ready for <next>` status.
 | KE reviewer KELP Saves any changed canonical review work (or records an authorized unchanged-review attestation), verifies it remotely, Unlocks, and selects **Complete KE** | KE review in progress | **Ready for MV** | MV |
 | Earlier Codify card is Locked for rework after the parent reached Ready for MV | Ready for MV | **Ready for MV**; open Codify rework subtask | MV parent; rework discoverable |
 | Rework Codify card is Unlocked after its locks are released | Ready for MV | **Ready for MV**; matching subtask complete | MV parent |
-| Human selects **Complete codify** after rework handback | Ready for MV | **Codify in review** | KE review |
-| Nautilus prepares assisted Codify rework after Ready for MV, then Codify card Locks | Ready for MV → Nautilus staged | **Nautilus staged** parent display; open Codify rework subtask | rework discoverable |
+| Human selects **Complete codify** after rework handback | Ready for MV | **Codify in review** (Codify card's configured next-ready stage) | KE review |
 | MV reviewer Locks | Ready for MV | **MV in progress** | none |
 | Human MV saves/attests the validation, Unlocks, and selects **Complete validation** | MV in progress | **Ready to publish** | Publish |
 | Qualified KELP Publish | Ready to publish | **Published** | published/archive |
@@ -47,30 +46,25 @@ explicit. Re-Lock to resume the same active work
 after an ordinary Unlock remains allowed from Codify in progress, subject to
 the existing owner/base and competing-lock checks. A second batch start or stale
 batch completion must not overwrite a newer Nautilus run or active codification.
-Nautilus's preparation statuses may replace the displayed Project Status, but
-must not replace the parent's retained KELP stage used to compare card order.
 
-**Nautilus staged is the execution queue.** The orchestrator publishes the
+**Nautilus staged is the execution queue for initial preparation.** The orchestrator publishes the
 prepared `<artifact branch>-nautilus` branch and its run record before marking
-the batch complete. Nautilus writes the two preparation statuses, **Nautilus in
-progress** and **Nautilus staged**, directly to the canonical artifact's GitHub
-Project item and supplies the Nautilus filter. KELP does not need a batch API or
+the batch complete. On the initial path, Nautilus writes the two preparation
+statuses, **Nautilus in progress** and **Nautilus staged**, to the canonical
+artifact's GitHub Project item and supplies the Nautilus filter. KELP does not need a batch API or
 knowledge of the prepared branch. KELP writes statuses for its own Add,
 card-context Lock and Complete actions, and built-in Package/Publish actions.
-The two owners use the same canonical artifact Project item and Status field.
-Nautilus retains its own run/assignment revision; KELP uses card context for
-its actions and retains its last lifecycle stage independently of the displayed
-Status, so an assisted rework run remains recognizable after Nautilus stages
-it. Nautilus does not edit that KELP stage. A shared cross-system pass ID is
-not needed for this pilot. An
+The two owners use the same canonical artifact Project item and Status field
+on the initial path. Nautilus retains its own run/assignment revision; KELP
+uses card context for its actions. A shared cross-system pass ID is not needed
+for this pilot. An
 ordinary KELP refresh must preserve a Nautilus-written status; a later KELP
 action may replace it only for the corresponding lifecycle transition.
 
 **Active work remains findable.** Nautilus in progress, Codify in progress,
 KE review in progress, and MV in progress remain findable by artifact-ID
 search and a durable active-run/card link after reload. Earlier-card rework is
-findable through its open subtask while the parent's retained KELP stage stays
-unchanged, even if Nautilus displays a preparation status.
+findable through its open subtask while the parent stays at its current stage.
 An interruption leaves the parent and subtask as they are until another
 explicit action. Unlock closes the matching rework subtask after its card's
 locks are released, but does not perform the configured next-stage handoff;
@@ -100,10 +94,17 @@ corresponding handback at completion.
 
 The KE review card owns its subsequent work. Findings that need earlier-card
 work use the card's rework subtask while leaving the parent unchanged at Lock.
-Nautilus preparation is used only if the operator chooses another assisted
-run. Unlock closes the matching subtask when its card locks are released;
-Complete then performs the configured handoff. The same rule applies to MV
-findings needing KE or codifier rework.
+Unlock closes the matching subtask when its card locks are released; Complete
+then performs the configured handoff. The same rule applies to MV findings
+needing KE or codifier rework.
+
+**Earlier-stage assisted rework still needs one placement decision.** If the
+parent has reached Ready for MV, Nautilus must not replace that parent's
+Status with Nautilus in progress/staged before KELP compares the Codify card
+to the parent. The proposed minimal placement is linked rework work with its
+own Nautilus preparation status; the parent stays Ready for MV until explicit
+Complete codify moves it to Codify in review. Placement of Nautilus's
+preparation statuses on linked work is not yet approved or implemented.
 
 The first workflow implementation target runs through **Ready for MV**. The
 MV/Publish rows are the proposed continuation, not a claim of released status
