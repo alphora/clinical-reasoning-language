@@ -55,6 +55,16 @@ Nautilus's preparation tracking, not a KELP Lock/Save/Release action. The
 orchestrator checks source completeness and the assignment revision; KELP does
 not inspect the batch.
 
+During initialization, verify that the canonical branch has a root
+`.devcontainer/devcontainer.json` selecting the KELP image, so GitHub's ordinary
+quick-create opens the initiating KELP Codespace without a manual configuration
+choice. Keep the authoring image at the named
+`.devcontainer/nautilus/devcontainer.json` path; Nautilus Launch must select
+that path explicitly. Coordinate missing image configuration through Spaces
+before handing a new batch to the operator. A branch with only named
+devcontainer files can silently start GitHub's universal image. This is an
+initialization check, not a request for the operator to repair a Codespace.
+
 From the published canonical branch, create and push exactly the suffixed
 prepared branch. Install the selected `.claude/` pipeline and `.vibe-tools/`
 reviewer material there, commit the root `tmp/` scratch skeleton and durable
