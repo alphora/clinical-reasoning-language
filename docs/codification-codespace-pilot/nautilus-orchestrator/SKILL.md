@@ -33,10 +33,13 @@ record before creating another; never reset authored work on a retry.
 
 KELP Add puts a new artifact in **Ready to codify**, the **Codify** preparation
 filter. A codifier may also choose direct Codify from that state without
-Nautilus; this skill governs only the assisted route. The Nautilus orchestrator
-may begin only from that state after the source snapshot is complete. Resolve
-the canonical artifact Project item and current pass, then write **Nautilus in
-progress** to that item's Status field. Re-read the item after writing. A failed
+Nautilus; this skill governs only the assisted route. Initial preparation
+normally begins from that state after the source snapshot is complete. For
+rework, the operator may explicitly start a new Nautilus assignment from the
+current Project status after reconciling prior work; KELP does not need a
+predecessor-status rule. Resolve the canonical artifact Project item and
+current assignment, then write **Nautilus in progress** to that item's Status
+field. Re-read the item after writing. A failed
 or uncertain transition must be reconciled before further effects. This is
 Nautilus's preparation tracking, not a KELP Lock/Save/Release action. The
 orchestrator checks source completeness and the assignment revision; KELP does
@@ -52,9 +55,9 @@ manifest from the pushed commit. Preparation does not select the eventual
 codifier or create a Codespace.
 
 After the branch, package, source and image identities are verified, re-read
-the canonical Project item and pass, then write **Nautilus staged** to the same
+the canonical Project item and assignment, then write **Nautilus staged** to the same
 item. It appears in Nautilus's execution filter. A delayed completion for an
-old assignment cannot overwrite a newer pass. If preparation fails, retain its
+old assignment cannot overwrite newer work. If preparation fails, retain its
 durable run record and **Nautilus in progress** state; the operator resumes or
 explicitly reassigns it by artifact ID/run link, not by silently returning it
 to a ready-work filter. Report a concrete blocker instead of inventing a
@@ -66,7 +69,7 @@ Report the artifact, canonical and prepared branches, source/assignment
 identity, pipeline/profile, both image identities, exact Codify scopes,
 preparation state and next action. A separate codifier finds **Nautilus
 staged** in KELP, then Locks the Codify scopes **on the canonical artifact**
-from its Codify card. That moves the pass to **Codify in progress**; the card
+from its Codify card. That sets the Project item to **Codify in progress**; the card
 opens Nautilus in the initiating KELP workspace. Nautilus launches or
 reconnects a distinct authoring Codespace on the exact prepared branch under
 the codifier's GitHub identity, verifies the effective authoring image, and
@@ -74,7 +77,7 @@ guides the human-supervised agent. It does not re-Lock in the authoring
 checkout or require a separate KELP lock-status read. KELP's initiating card
 owns the Lock and invokes Nautilus after it succeeds; local status on the
 prepared branch is not canonical lifecycle proof.
-After an ordinary Unlock, the same active Codify pass may be re-Locked to
+After an ordinary Unlock, the same Codify work may be re-Locked to
 resume, subject to KELP's existing owner/base and competing-lock checks;
 it does not return to Nautilus staged or require another preparation run.
 

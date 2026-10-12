@@ -39,8 +39,8 @@ requires a prepared assignment; direct Codify does not. Nautilus in progress
 records batch preparation; cancelling or returning that preparation is
 explicit. Re-Lock to resume the same active work
 after an ordinary Unlock remains allowed from Codify in progress, subject to
-the existing owner/base and competing-lock checks. A second batch start or stale batch
-completion must not overwrite a newer pass or an active codification.
+the existing owner/base and competing-lock checks. A second batch start or stale
+batch completion must not overwrite a newer Nautilus run or active codification.
 
 **Nautilus staged is the execution queue.** The orchestrator publishes the
 prepared `<artifact branch>-nautilus` branch and its run record before marking
@@ -58,11 +58,11 @@ action may replace it only for the corresponding lifecycle transition.
 **Active work stays out of ready-work filters.** Nautilus in progress, Codify
 in progress, KE review in progress, and MV in progress remain findable by
 artifact-ID search and a durable active-run/card link after reload. An
-interruption keeps the active pass in its state. Resumption or reassignment is
-explicit; Unlock by itself neither completes nor requeues work. A cancelled or
-returned pass has an explicit destination, while the parent artifact retains
-its furthest attained stage for history. Ready-work filters and allowed actions
-derive from the current active pass, never from that historical stage.
+interruption keeps the current Status until another explicit action changes it.
+Unlock by itself neither completes nor requeues work. A successful card-origin
+Lock sets that card's configured in-progress Status even when earlier work is
+being reopened; the Status field describes current work, not the furthest stage
+ever attained. The issue and run records retain history.
 
 **Codify completion is a separate human action.** On the Nautilus route,
 SaveCodify reviews
@@ -75,28 +75,22 @@ Codespace, the codifier resolves any intended local edits excluded from
 delivery and verifies the run evidence is durable. The initiating KELP checkout
 refreshes to the delivered canonical commit, then the codifier Unlocks.
 **Complete codify** checks KELP's own lifecycle facts and no remaining relevant
-locks; the human confirms the selected route's handback. KELP identifies the
-card that initiated Lock or Complete and records the selected route/pass without
-adding a separate entity-lock system. KELP does not certify the provider's
-clinical work or require a changed output commit when an authorized
-unchanged-output attestation applies.
+locks; the human confirms the handback. KELP uses the invoked card's configured
+Complete target and does not need to know whether Nautilus supplied the work.
+KELP does not certify the provider's clinical work or require a changed output
+commit when an authorized unchanged-output attestation applies.
 
 On a direct Codify route without Nautilus, the codifier uses the applicable
 KELP Save and remote verification for changed canonical entity work, then
 Unlocks and selects Complete codify. No prepared branch, Nautilus Codespace
-or SaveCodify receipt is required for that route. The selected route is
-workflow-pass metadata, not a second KELP entity lock/session; the human
-checks the corresponding handback at completion.
+or SaveCodify receipt is required for that route. The human checks the
+corresponding handback at completion.
 
-The KE review card owns its subsequent review pass. Findings requiring new
-codification return through an explicit new/revised pass according to its
-selected route: direct Codify returns to Ready to codify without Nautilus;
-assisted Codify returns to Nautilus staged only if the prepared assignment
-remains valid, otherwise to Ready to codify for new preparation. Record the
-route on the returned pass. Previous completion and review evidence stays
-historical; the returned pass must not masquerade as completed. The same
-principle applies to MV findings that need KE or codifier rework. The exact
-return controls are part of KELP's later workflow design.
+The KE review card owns its subsequent work. Findings that need another Codify
+pass are recorded in the issue and run history. A new Codify-card Lock again
+sets Codify in progress; Nautilus preparation is used only if the operator
+chooses another assisted run. The same applies to later MV findings needing
+KE or codifier rework. The detailed rework controls are later workflow work.
 
 The first workflow implementation target runs through **Ready for MV**. The
 MV/Publish rows are the proposed continuation, not a claim of released status
