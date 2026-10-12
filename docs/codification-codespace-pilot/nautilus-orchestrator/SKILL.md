@@ -97,9 +97,14 @@ readiness receipt.
 
 Report the artifact, canonical and prepared branches, source/assignment
 identity, pipeline/profile, both image identities, exact Codify scopes,
-preparation state and next action. A separate codifier finds **Nautilus
-staged** in KELP, then Locks the Codify scopes **on the canonical artifact**
-from its Codify card. On the normal path, KELP sets the parent Project item to
+preparation state and next action. A separate codifier may use KELP's **Nautilus
+staged** queue or, when Project-backed queues are unavailable, **All artifacts**
+to load the canonical artifact. The codifier Locks the Codify scopes **on the
+canonical artifact** from its Codify card. A successful Git Lock with a
+Project-tracking warning remains a held lock; record the warning for later
+tracking repair and do not replay Lock. Open in Nautilus can proceed for a
+qualified prepared run. Project-backed Complete requires Project access.
+On the normal path, KELP sets the parent Project item to
 **Codify in progress**. If Codify is earlier than the parent's current configured stage,
 KELP instead opens or reuses a Codify rework subtask and leaves the parent
 unchanged. The card opens Nautilus in the initiating KELP workspace. Nautilus launches or

@@ -32,7 +32,7 @@ to the card's configured `Ready for <next>` status.
 | Human MV saves/attests the validation, Unlocks, and selects **Complete validation** | MV in progress | **Ready to publish** | Publish |
 | Qualified KELP Publish | Ready to publish | **Published** | published/archive |
 
-The ready-work filters are **KELP Work queues chips** in the KELP sidebar, not GitHub Project saved views. In KELP 0.13.1, the **Ready to codify** chip corresponds to the Codify preparation queue and **Nautilus staged** to the Nautilus execution queue. Refresh KELP after an external Project status change; the **All artifacts** chip and artifact-ID search can also find the item.
+The ready-work filters are **KELP Work queues chips** in the KELP sidebar, not GitHub Project saved views. **Ready to codify** corresponds to the Codify preparation queue and **Nautilus staged** to the Nautilus execution queue. Refresh KELP after an external Project status change. These filters are navigation aids, not a prerequisite for a prepared run: if Project-backed queues are unavailable, use **All artifacts** or artifact-ID search to load the canonical artifact, then its Codify card. A successful Git Lock can report a separate Project-tracking warning; preserve that warning for repair and continue to Nautilus Launch. Do not repeat Lock to repair tracking. Project-backed Complete waits for Project access.
 
 **Ready to codify is the preparation queue.** Add enters it immediately, even
 if companion source files still need intake. Nautilus batch start must verify
