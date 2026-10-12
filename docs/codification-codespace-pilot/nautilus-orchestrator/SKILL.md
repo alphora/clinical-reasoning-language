@@ -33,13 +33,14 @@ record before creating another; never reset authored work on a retry.
 
 KELP Add puts a new artifact in **Ready to codify**, the **Codify** preparation
 filter. A codifier may also choose direct Codify from that state without
-Nautilus; this skill governs only the assisted route. The Nautilus orchestrator may begin only from that state after the
-source snapshot is complete. Use KELP's named, configured batch-start
-workflow action to enter **Nautilus in progress**. This changes workflow
-tracking, not KELP Lock/Save/Release ownership records. A failed or uncertain
-transition must be reconciled before further effects.
-KELP checks its generic source-loaded/produced fact and the pass, predecessor
-state and assignment revision; the orchestrator checks source completeness.
+Nautilus; this skill governs only the assisted route. The Nautilus orchestrator
+may begin only from that state after the source snapshot is complete. Resolve
+the canonical artifact Project item and current pass, then write **Nautilus in
+progress** to that item's Status field. Re-read the item after writing. A failed
+or uncertain transition must be reconciled before further effects. This is
+Nautilus's preparation tracking, not a KELP Lock/Save/Release action. The
+orchestrator checks source completeness and the assignment revision; KELP does
+not inspect the batch.
 
 From the published canonical branch, create and push exactly the suffixed
 prepared branch. Install the selected `.claude/` pipeline and `.vibe-tools/`
@@ -50,14 +51,14 @@ pipeline or scratch ancestry. Verify every installed file against the frozen
 manifest from the pushed commit. Preparation does not select the eventual
 codifier or create a Codespace.
 
-After the branch, package, source and image identities are verified, call the
-named batch-complete workflow action to enter **Nautilus staged**, visible in
-the **Nautilus** execution filter. A delayed completion for an old assignment
-cannot overwrite a newer pass. If preparation fails, retain its durable run
-record and **Nautilus in progress** state; the operator resumes or explicitly
-reassigns it by artifact ID/run link, not by silently returning it to a
-ready-work filter. Report a concrete blocker instead of inventing a readiness
-receipt.
+After the branch, package, source and image identities are verified, re-read
+the canonical Project item and pass, then write **Nautilus staged** to the same
+item. It appears in Nautilus's execution filter. A delayed completion for an
+old assignment cannot overwrite a newer pass. If preparation fails, retain its
+durable run record and **Nautilus in progress** state; the operator resumes or
+explicitly reassigns it by artifact ID/run link, not by silently returning it
+to a ready-work filter. Report a concrete blocker instead of inventing a
+readiness receipt.
 
 ## Operator handoff
 

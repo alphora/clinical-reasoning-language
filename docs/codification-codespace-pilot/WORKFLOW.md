@@ -3,7 +3,11 @@
 Status: target workflow, 2026-10-11. The first four transitions below are the
 operator's explicit decision. Later rows are the agreed Codify/KE handoff and
 the proposed MV/Publish continuation. KELP and Nautilus have not implemented
-or qualified this complete sequence.
+or qualified this complete sequence. The table is this pilot's mapping:
+successful Lock from a configured card moves to that card's configured
+in-progress status, and explicit Complete moves to its configured next-ready
+status. KELP must read those mappings from configuration, not derive them from
+card labels, display order, or shared entity scopes.
 
 | Action | From | To | Ready-work filter |
 | --- | --- | --- | --- |
@@ -24,7 +28,8 @@ or qualified this complete sequence.
 if companion source files still need intake. Nautilus batch start must verify
 the complete authorized source snapshot and explicit assignment before doing
 pipeline work. KELP checks that source is loaded/produced and that the pass,
-state and assignment revision match; Nautilus owns the source-content check.
+state match for its own card actions; Nautilus owns the batch predecessor,
+source-content and assignment-revision checks.
 The Codify card may be viewed in Ready to codify for direct work, or in
 Nautilus staged for the prepared Nautilus route. A Nautilus-assisted pass
 requires the staged assignment; direct Codify does not. Nautilus in progress
@@ -36,10 +41,16 @@ completion must not overwrite a newer pass or an active codification.
 
 **Nautilus staged is the execution queue.** The orchestrator publishes the
 prepared `<artifact branch>-nautilus` branch and its run record before marking
-the batch complete. KELP owns the configured workflow state, Project-item write
-and filter. Nautilus uses named, assignment-bound batch-start/batch-complete
-actions, without writing Project fields directly; this does not
-grant it KELP Lock/Unlock/Release or require KELP to parse batch contents.
+the batch complete. Nautilus writes the two preparation statuses, **Nautilus in
+progress** and **Nautilus staged**, directly to the canonical artifact's GitHub
+Project item and supplies the Nautilus filter. KELP does not need a batch API or
+knowledge of the prepared branch. KELP writes statuses for its own Add,
+card-context Lock and Complete actions, and built-in Package/Publish actions.
+The two owners use the same canonical artifact Project item and Status field.
+Nautilus retains its own run/assignment revision; KELP uses card context for
+its actions. A shared cross-system pass ID is not needed for this pilot. An
+ordinary KELP refresh must preserve a Nautilus-written status; a later KELP
+action may replace it only for the corresponding lifecycle transition.
 
 **Active work stays out of ready-work filters.** Nautilus in progress, Codify
 in progress, KE review in progress, and MV in progress remain findable by
@@ -61,8 +72,10 @@ Codespace, the codifier resolves any intended local edits excluded from
 delivery and verifies the run evidence is durable. The initiating KELP checkout
 refreshes to the delivered canonical commit, then the codifier Unlocks.
 **Complete codify** checks KELP's own lifecycle facts and no remaining relevant
-locks; the human confirms the selected route's handback. KELP does not certify the
-provider's clinical work or require a changed output commit when an authorized
+locks; the human confirms the selected route's handback. KELP identifies the
+card that initiated Lock or Complete and records the selected route/pass without
+adding a separate entity-lock system. KELP does not certify the provider's
+clinical work or require a changed output commit when an authorized
 unchanged-output attestation applies.
 
 On a direct Codify route without Nautilus, the codifier uses the applicable
