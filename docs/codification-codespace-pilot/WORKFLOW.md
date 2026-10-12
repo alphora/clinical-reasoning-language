@@ -36,8 +36,9 @@ completion must not overwrite a newer pass or an active codification.
 
 **Nautilus staged is the execution queue.** The orchestrator publishes the
 prepared `<artifact branch>-nautilus` branch and its run record before marking
-the batch complete. KELP owns the configured workflow state and filter. Nautilus
-uses named, assignment-bound batch-start/batch-complete actions; this does not
+the batch complete. KELP owns the configured workflow state, Project-item write
+and filter. Nautilus uses named, assignment-bound batch-start/batch-complete
+actions, without writing Project fields directly; this does not
 grant it KELP Lock/Unlock/Release or require KELP to parse batch contents.
 
 **Active work stays out of ready-work filters.** Nautilus in progress, Codify
