@@ -26,7 +26,7 @@ to the card's configured `Ready for <next>` status.
 | KE reviewer KELP Saves any changed canonical review work (or records an authorized unchanged-review attestation), verifies it remotely, Unlocks, and selects **Complete KE** | KE review in progress | **Ready for MV** | MV |
 | Earlier Codify card is Locked for rework after the parent reached Ready for MV | Ready for MV | **Ready for MV**; open Codify rework subtask | MV parent; rework discoverable |
 | Rework Codify card is Unlocked after its locks are released | Ready for MV | **Ready for MV**; matching subtask complete | MV parent |
-| Human selects **Complete codify** after rework handback | Ready for MV | **Codify in review** (Codify card's configured next-ready stage) | KE review |
+| Human selects **Complete codify** after rework handback | Ready for MV | Configured next-ready handoff; which Project item receives it is unresolved | KE review work |
 | MV reviewer Locks | Ready for MV | **MV in progress** | none |
 | Human MV saves/attests the validation, Unlocks, and selects **Complete validation** | MV in progress | **Ready to publish** | Publish |
 | Qualified KELP Publish | Ready to publish | **Published** | published/archive |
@@ -102,9 +102,11 @@ needing KE or codifier rework.
 parent has reached Ready for MV, Nautilus must not replace that parent's
 Status with Nautilus in progress/staged before KELP compares the Codify card
 to the parent. The proposed minimal placement is linked rework work with its
-own Nautilus preparation status; the parent stays Ready for MV until explicit
-Complete codify moves it to Codify in review. Placement of Nautilus's
-preparation statuses on linked work is not yet approved or implemented.
+own Nautilus preparation status; the parent stays Ready for MV during Lock and
+Unlock. Whether Complete moves that parent to Codify in review or creates
+linked KE-review work while leaving it at Ready for MV is unresolved. Placement
+of Nautilus's preparation statuses on linked work is also not yet approved or
+implemented.
 
 The first workflow implementation target runs through **Ready for MV**. The
 MV/Publish rows are the proposed continuation, not a claim of released status

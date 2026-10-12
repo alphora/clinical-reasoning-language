@@ -98,9 +98,10 @@ durable delivery/evidence receipt. Resolve intended edits excluded from
 delivery and preserve run evidence before deleting the authoring Codespace.
 The initiating KELP checkout refreshes to the delivered commit; the codifier
 then Unlocks and separately selects **Complete codify**. On the normal path,
-that enters **Codify in review**. After earlier-stage Codify rework, the same
-explicit Complete moves the parent to the Codify card's configured next-ready
-stage. Unlock alone is not completion, and an authorized unchanged-output
+that enters **Codify in review**. After earlier-stage Codify rework, Complete
+performs the Codify card's configured next-ready handoff, but its Project-item
+target remains unresolved. Do not assume it moves the advanced parent backward.
+Unlock alone is not completion, and an authorized unchanged-output
 attestation need not fabricate a changed commit.
 
 The KE reviewer subsequently Locks, reviews, KELP Saves changed canonical
