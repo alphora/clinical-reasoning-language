@@ -64,6 +64,9 @@ that path explicitly. Coordinate missing image configuration through Spaces
 before handing a new batch to the operator. A branch with only named
 devcontainer files can silently start GitHub's universal image. This is an
 initialization check, not a request for the operator to repair a Codespace.
+If an older named KELP configuration remains, keep it synchronized with the
+root default during image refresh; removing it is not required to make
+quick-create select KELP.
 
 From the published canonical branch, create and push exactly the suffixed
 prepared branch. Install the selected `.claude/` pipeline and `.vibe-tools/`
