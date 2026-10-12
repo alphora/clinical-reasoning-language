@@ -72,9 +72,10 @@ locks are released, but does not perform the configured next-stage handoff;
 that requires Complete.
 
 **Codify completion is a separate human action.** On the Nautilus route,
-SaveCodify reviews
-saved dirty files, pushes the prepared branch, and transfers only reviewed
-Codify output paths to a canonical-only-parent commit. It checks the current
+SaveCodify reviews the complete undelivered Codify output delta, including
+prepared-branch commits and uncommitted changes, pushes the prepared branch,
+and transfers only selected additions, modifications and deletions to a
+canonical-only-parent commit. It checks the current
 canonical source and assignment, detects output conflicts, conditionally
 pushes, and records a durable delivery/evidence receipt. It never merges the
 prepared branch wholesale or calls KELP Save. Before deleting the authoring

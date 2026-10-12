@@ -22,9 +22,13 @@ authoring. Do not infer a customer from a directory or import a previous
 artifact's encoding as unstated source.
 
 Freeze a run/assignment revision with the accepted method, pipeline/profile
-manifest, source hashes, output-file allowlist, reviewer/runtime/image pins,
-canonical preparation commit and exact branch pair. The prepared branch is
-derived, never chosen freely: `<canonical artifact branch>-nautilus`. A
+manifest, source hashes, the eight configured Codify output scopes as
+artifact-qualified directory roots, reviewer/runtime/image pins, canonical
+preparation commit and exact branch pair. The assignment cannot widen the
+configured roots. The files the author will create are not known at batch
+preparation. SaveCodify later presents the complete undelivered output delta
+within those roots for operator review. The prepared branch is derived, never
+chosen freely: `<canonical artifact branch>-nautilus`. A
 changed source, binding, pin or output scope needs an explicit revision and
 recheck of affected work. Reconcile any existing prepared branch and run
 record before creating another; never reset authored work on a retry.
@@ -89,13 +93,21 @@ configured handoff. A later Lock remains subject to KELP's ordinary
 owner/base and competing-lock checks; it does not require another Nautilus
 preparation run unless the operator starts a new assisted assignment.
 
-Nautilus SaveCodify in the authoring Codespace reviews saved dirty files,
-commits/pushes selected prepared-branch work, and transfers only the exact
-reviewed Codify output paths into a canonical-only-parent commit. It does
-not merge the prepared branch or call KELP Save. Require current canonical
-source/assignment checks, conflict detection, conditional push and a
-durable delivery/evidence receipt. Resolve intended edits excluded from
-delivery and preserve run evidence before deleting the authoring Codespace.
+Nautilus SaveCodify in the authoring Codespace compares the prepared branch
+with the recorded canonical baseline or last successful delivery. It includes
+committed but undelivered output, staged changes, working-tree edits and
+untracked files under the frozen artifact-qualified directory roots. It
+rejects traversal, escaping symlinks and paths outside their exact boundaries.
+The operator selects actual additions, modifications and deletions. A rename
+is a deletion plus an addition. SaveCodify records delivered hashes for
+additions/modifications and expected prior identities for deletions, commits
+and pushes selected prepared-branch work, then transfers only those changes
+into a canonical-only-parent commit. It does not merge the prepared branch or
+call KELP Save. Recheck selected bytes against the review snapshot and
+reconcile current canonical source, assignment and output conflicts before a
+conditional push. Keep a durable delivery/evidence receipt. Resolve intended
+edits excluded from delivery and preserve run evidence before deleting the
+authoring Codespace.
 The initiating KELP checkout refreshes to the delivered commit; the codifier
 then Unlocks and separately selects **Complete codify**. On the normal path,
 that enters **Codify in review**. After earlier-stage Codify rework, Complete
