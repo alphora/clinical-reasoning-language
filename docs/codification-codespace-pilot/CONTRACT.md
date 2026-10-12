@@ -39,6 +39,8 @@ ready item.
 
 The pilot repository and byte-exact source-only `auto-bleph` artifact now exist. Spaces must stage and qualify the initiating KELP image and separate Nautilus authoring image on the existing repository. Batch preparation occurs on the exact suffixed branch; the canonical artifact is the only KELP Lock target. Verify source, branch, image, provider and permission identities during the moderated test.
 
+The first pilot's prepared branch was created before Project enrollment and Nautilus's Project `start` existed. Enroll the existing canonical artifact, then reconcile that prepared branch and its candidate run record into the Project flow; do not recreate or reset it. The prepared branch currently lacks `.devcontainer/`, while Spaces' two configurations are on `staging`. Propagate the final verified configs to the branch used by Codespaces and record the resulting commit and exact devcontainer path before Launch.
+
 Spaces reports a registry gap: it currently pins one image per target, while this repository needs a different digest for each devcontainer configuration. Its interim authoring image without Nautilus may prove layout, receipts and lifecycle; the full pilot requires the KELP image with Nautilus's launcher and the separate Codify image with the complete Nautilus pipeline and reviewers. Neither interim image evidence nor a devcontainer path alone proves the effective authoring image. Verify the in-Codespace image manifest and startup receipt before authoring.
 
 ## Launch, readiness and evidence
