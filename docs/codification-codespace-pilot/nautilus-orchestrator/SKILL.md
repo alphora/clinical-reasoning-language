@@ -67,6 +67,12 @@ initialization check, not a request for the operator to repair a Codespace.
 If an older named KELP configuration remains, keep it synchronized with the
 root default during image refresh; removing it is not required to make
 quick-create select KELP.
+The KELP image must also contain the `gh` CLI required by the selected KELP
+version's Project integration. On first open, check Project read access using
+the codifier's actual Codespace credential context before treating any
+Project-backed Work queue as usable. A repository-only Codespaces token can
+list artifacts while leaving every queue unavailable; surface the missing
+Project credential as a concrete setup action, without recording its value.
 
 From the published canonical branch, create and push exactly the suffixed
 prepared branch. Install the selected `.claude/` pipeline and `.vibe-tools/`
