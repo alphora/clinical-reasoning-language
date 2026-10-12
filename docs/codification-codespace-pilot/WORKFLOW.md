@@ -26,7 +26,8 @@ to the card's configured `Ready for <next>` status.
 | KE reviewer KELP Saves any changed canonical review work (or records an authorized unchanged-review attestation), verifies it remotely, Unlocks, and selects **Complete KE** | KE review in progress | **Ready for MV** | MV |
 | Earlier Codify card is Locked for rework after the parent reached Ready for MV | Ready for MV | **Ready for MV**; open Codify rework subtask | MV parent; rework discoverable |
 | Rework Codify card is Unlocked after its locks are released | Ready for MV | **Ready for MV**; matching subtask complete | MV parent |
-| Human selects **Complete codify** after rework handback | Ready for MV | Configured next-ready handoff; which Project item receives it is unresolved | KE review work |
+| Human selects **Complete codify** after rework handback | Ready for MV | **Ready for MV** parent; linked **Ready for KE review** work created or reused | KE review work |
+| KE reviewer completes that linked review | Ready for MV parent; linked KE review work | **Ready for MV** parent; linked review work complete | MV parent |
 | MV reviewer Locks | Ready for MV | **MV in progress** | none |
 | Human MV saves/attests the validation, Unlocks, and selects **Complete validation** | MV in progress | **Ready to publish** | Publish |
 | Qualified KELP Publish | Ready to publish | **Published** | published/archive |
@@ -98,15 +99,17 @@ Unlock closes the matching subtask when its card locks are released; Complete
 then performs the configured handoff. The same rule applies to MV findings
 needing KE or codifier rework.
 
-**Earlier-stage assisted rework still needs one placement decision.** If the
-parent has reached Ready for MV, Nautilus must not replace that parent's
-Status with Nautilus in progress/staged before KELP compares the Codify card
-to the parent. The proposed minimal placement is linked rework work with its
-own Nautilus preparation status; the parent stays Ready for MV during Lock and
-Unlock. Whether Complete moves that parent to Codify in review or creates
-linked KE-review work while leaving it at Ready for MV is unresolved. Placement
-of Nautilus's preparation statuses on linked work is also not yet approved or
-implemented.
+**Earlier-stage assisted rework preserves the parent.** If the parent has
+reached Ready for MV, Nautilus records its in-progress/staged preparation on
+linked rework work, not on the parent's Status. The parent stays Ready for MV
+through Codify Lock, Unlock, and Complete. After rework handback, Complete
+codify creates or reuses linked Ready for KE review work in the KE queue.
+When that linked KE review is completed, its next-ready stage is the parent's
+current Ready for MV stage, so the handoff rejoins that existing parent rather
+than creating a duplicate MV item.
+The exact association of an assisted preparation run with KELP's rework work
+still needs implementation and qualification; neither owner has claimed that
+path is released.
 
 The first workflow implementation target runs through **Ready for MV**. The
 MV/Publish rows are the proposed continuation, not a claim of released status

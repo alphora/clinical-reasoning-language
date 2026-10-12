@@ -37,10 +37,10 @@ Nautilus; this skill governs only the assisted route. Initial preparation
 normally begins from that state after the source snapshot is complete. For
 rework, the operator may explicitly start a new Nautilus assignment after
 reconciling prior work. Do not overwrite an advanced parent Project Status
-with Nautilus preparation status; placement on linked rework work remains an
-open first-release integration decision. Stop an assisted rework run before
-any Project status write or launch-ready claim until that placement is
-resolved. For initial preparation, resolve the canonical
+with Nautilus preparation status; earlier assisted preparation belongs on
+linked rework work. Stop an assisted rework run before any Project status
+write or launch-ready claim until that run's linked-work association is
+implemented and verified. For initial preparation, resolve the canonical
 artifact Project item and current assignment, then write **Nautilus in
 progress** to that item's Status field. Re-read the item after writing. A failed
 or uncertain transition must be reconciled before further effects. This is
@@ -99,8 +99,8 @@ delivery and preserve run evidence before deleting the authoring Codespace.
 The initiating KELP checkout refreshes to the delivered commit; the codifier
 then Unlocks and separately selects **Complete codify**. On the normal path,
 that enters **Codify in review**. After earlier-stage Codify rework, Complete
-performs the Codify card's configured next-ready handoff, but its Project-item
-target remains unresolved. Do not assume it moves the advanced parent backward.
+creates or reuses linked Ready for KE review work while leaving the parent at
+its advanced stage.
 Unlock alone is not completion, and an authorized unchanged-output
 attestation need not fabricate a changed commit.
 
