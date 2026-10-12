@@ -21,11 +21,14 @@ unbound project, establish bindings from authorized inputs before customer
 authoring. Do not infer a customer from a directory or import a previous
 artifact's encoding as unstated source.
 
-Freeze a run/assignment revision with the accepted method, pipeline/profile
-manifest, source hashes, the eight configured Codify output scopes as
-artifact-qualified directory roots, reviewer/runtime/image pins, canonical
-preparation commit and exact branch pair. The assignment cannot widen the
-configured roots. The files the author will create are not known at batch
+Read canonical `kelp.project.json` and resolve the Codify card's configured
+entity keys through `project.structure.entities` to their `folder` values.
+Qualify those folders under `artifacts/<artifactId>/`; do not keep a separate
+Nautilus folder list. Freeze a run/assignment revision with the accepted
+method, pipeline/profile manifest, source hashes, canonical KELP config
+identity and resolved Codify directory roots, reviewer/runtime/image pins,
+canonical preparation commit and exact branch pair. The assignment cannot
+widen the canonical card's scope. The files the author will create are not known at batch
 preparation. SaveCodify later presents the complete undelivered output delta
 within those roots for operator review. The prepared branch is derived, never
 chosen freely: `<canonical artifact branch>-nautilus`. A
@@ -96,7 +99,9 @@ preparation run unless the operator starts a new assisted assignment.
 Nautilus SaveCodify in the authoring Codespace compares the prepared branch
 with the recorded canonical baseline or last successful delivery. It includes
 committed but undelivered output, staged changes, working-tree edits and
-untracked files under the frozen artifact-qualified directory roots. It
+untracked files under the artifact-qualified directory roots resolved from
+the canonical KELP Codify card. Re-read its config at save and reconcile any
+change before selecting files. It
 rejects traversal, escaping symlinks and paths outside their exact boundaries.
 The operator selects actual additions, modifications and deletions. A rename
 is a deletion plus an addition. SaveCodify records delivered hashes for
