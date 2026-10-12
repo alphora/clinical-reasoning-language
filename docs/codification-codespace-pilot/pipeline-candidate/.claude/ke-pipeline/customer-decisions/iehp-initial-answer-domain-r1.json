@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "iehp-initial-answer-domain",
+  "revision": 1,
+  "customerContext": "iehp",
+  "kind": "workflow-preference",
+  "status": "approved",
+  "statement": "For IEHP fresh initial authoring, do not add a default Uncertain - assume Yes or Uncertain - assume No answer choice, and do not add a terminal current-answer uncertainty guard. Use the answer domain authorized by the policy source and applicable IEHP guidance. For an otherwise binary question with no different source-defined choices, use Yes and No. A missing answer remains unanswered and may pause a reached guard; it is never a clinical No. If the source itself specifies an uncertainty answer, identify the exact source/customer conflict for adjudication rather than silently deleting that source choice.",
+  "scope": {
+    "domains": ["*"],
+    "policyIds": ["*"],
+    "stages": ["authoring", "questionnaire-presentation", "verification", "review"]
+  },
+  "authority": {
+    "source": "Explicit IEHP operator direction in this conversation",
+    "evidence": "2026-10-08 operator: IEHP should use the new initial pipeline minus the customer-specific uncertainty customization; IEHP does not want uncertainty.",
+    "date": "2026-10-08",
+    "approvedBy": "IEHP operator Rob Reynolds"
+  },
+  "effectiveFrom": "2026-10-08",
+  "effectiveUntil": null,
+  "supersedes": [],
+  "rationale": "The four-choice uncertainty and terminal Met-to-Unmet guard are HCSC customer choices, not universal CRL or medical-policy requirements. IEHP authoring must not inherit them through copied guidance or tests.",
+  "verification": "Inspect authored answer vocabularies and every otherwise-Met route for unauthorized uncertainty choices or guards; verify ordinary Yes/No answers and a reached missing-answer pause in native evidence. Cite this record and the policy source's actual answer domain."
+}

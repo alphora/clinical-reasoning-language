@@ -40,7 +40,7 @@ def main():
             "schema": "ke-pipeline-package/1",
             "installationRoot": "prepared <artifact branch>-nautilus checkout root",
             "upstreamSeed": "iehp-ke-batch-clean@4c8fb7e62a78e4d254b89b3053619a759c45e8b1",
-            "status": "candidate-needs-approved-smile-binding-and-codespace-qualification",
+            "status": "iehp-bound-candidate-needs-canonical-config-and-codespace-qualification",
             "files": inventory,
         }
         MANIFEST.write_bytes((json.dumps(payload, indent=2) + "\n").encode("utf-8"))

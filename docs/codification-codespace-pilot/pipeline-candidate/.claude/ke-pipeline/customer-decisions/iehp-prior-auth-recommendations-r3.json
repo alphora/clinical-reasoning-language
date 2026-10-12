@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "iehp-prior-auth-recommendations",
+  "revision": 3,
+  "customerContext": "iehp",
+  "kind": "workflow-preference",
+  "status": "approved",
+  "statement": "Always consider the prior-authorization deployment contract when authoring medical policies: upstream CRD context, CPG content executed via $apply supporting DTR $questionnaire-package and PAS. Met recommends SUCCESSFUL; Unmet recommends PEND, never DENIED. Only the customer's UM system makes DENIED determinations. Explicitly insufficient or missing required documentation yields Unmet, with the documentation answer preserved in the QuestionnaireResponse for UM. There is no Incomplete-request-more-information outcome. Use established Unmet or EIU according to approved meaning; new Unmet variants need substantial justification and explicit customer approval. Unanswered evidence remains unknown rather than an explicit insufficient-documentation answer. The operator explicitly confirms PEND is not-certify.Unmet. Retain embedded certify.Met and not-certify.Unmet; do not rename Unmet to pended.Unmet based on standalone category terminology. Scope clarification: pending is our not-certify and pass is our certify. The consumer creates the appropriate final PAS/X12 adjudication response; downstream response construction and mapping are outside KE content scope and are not authoring or handoff gates.",
+  "scope": {
+    "domains": [
+      "*"
+    ],
+    "policyIds": [
+      "*"
+    ],
+    "stages": [
+      "*"
+    ]
+  },
+  "authority": {
+    "source": "Explicit operator direction in this conversation on 2026-09-14",
+    "evidence": "docs/customer-guidance/iehp/prior-auth-consumer-boundary-2026-09-14.md; prior authority records retained.",
+    "date": "2026-09-14",
+    "approvedBy": "Operator directing the prior-authorization deployment and authoring process; no separate clinician approval asserted"
+  },
+  "effectiveFrom": "2026-09-14",
+  "effectiveUntil": null,
+  "supersedes": [
+    "iehp-prior-auth-recommendations@2"
+  ],
+  "rationale": "The customer's UM system owns final determinations. Content supplies recommendations and questionnaire evidence, including documentation insufficiency, without inventing denial authority or additional outcome categories. This governs authoring work from this date, not a retroactive change to clinical policy effective dates. Revision 2 records the explicit activity identity clarification without changing the recommendation meaning. Revision 3 records the operator clarification that final wire-response construction is outside KE scope.",
+  "verification": "Verify source-faithful content, configured certify.Met and not-certify.Unmet recommendations, explicit documentation insufficiency versus unanswered evidence, and relevant QR evidence. Do not require final PAS/X12 adapter response validation for content authoring or handoff: the consumer owns that response. Do not rename categories based on inferred external mapping. Cite registered revision/hash."
+}

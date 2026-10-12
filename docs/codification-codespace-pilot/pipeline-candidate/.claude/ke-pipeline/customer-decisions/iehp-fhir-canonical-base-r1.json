@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "iehp-fhir-canonical-base",
+  "revision": 1,
+  "customerContext": "iehp",
+  "kind": "workflow-preference",
+  "status": "approved",
+  "statement": "Use http://iehp.com/fhir/priorauth as the base canonical for IEHP-authored FHIR prior-authorization content. Apply it to resource canonical URLs and corresponding internal references through the supported CRL generator configuration. Do not rewrite external standards or externally owned terminology URLs.",
+  "scope": {
+    "domains": [
+      "*"
+    ],
+    "policyIds": [
+      "*"
+    ],
+    "stages": [
+      "authoring",
+      "generation",
+      "verification",
+      "migration",
+      "handoff"
+    ]
+  },
+  "authority": {
+    "source": "Explicit operator direction in the IEHP KE conversation",
+    "evidence": "Conversation 01a07318-4115-7673-a2f3-223ce77176dd, 2026-09-17: FWIW your base canonical should be: http://iehp.com/fhir/priorauth",
+    "date": "2026-09-17",
+    "approvedBy": "IEHP operator Rob Reynolds"
+  },
+  "effectiveFrom": "2026-09-17",
+  "effectiveUntil": null,
+  "supersedes": [],
+  "rationale": "The operator supplied the customer-owned canonical namespace. This affects artifact identity and reference closure, not clinical policy meaning.",
+  "verification": "Inspect supported package CRL base configuration, regenerate affected CQL/FHIR and normal MV artifacts, verify canonical/reference closure and run affected native checks. Preserve prior evidence with its actual configuration identity; do not relabel old runs. Save affected content and package configuration through KELP."
+}

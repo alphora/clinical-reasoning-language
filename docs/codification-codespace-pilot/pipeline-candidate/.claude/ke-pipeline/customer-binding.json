@@ -1,12 +1,24 @@
 {
   "schemaVersion": 1,
-  "customer": "smile-demo",
-  "status": "needs-owner-binding",
-  "canonicalBase": null,
-  "outcomes": null,
-  "dispositionMode": null,
+  "customer": "iehp",
+  "status": "approved",
+  "canonicalBase": "http://iehp.com/fhir/priorauth/",
+  "outcomes": {
+    "Met": "certify.Met",
+    "Unmet": "not-certify.Unmet",
+    "EIU": "not-certify.EIU"
+  },
+  "dispositionMode": "embedded",
   "x12ByActivity": {},
-  "determinationResourceType": null,
-  "answerDomain": null,
-  "authority": []
+  "determinationResourceType": "Task",
+  "answerDomain": {
+    "defaultBinaryChoices": ["Yes", "No"],
+    "uncertainty": {"mode": "none", "choices": []}
+  },
+  "authority": [
+    ".claude/ke-pipeline/customer-decisions/iehp-prior-auth-recommendations-r3.json",
+    ".claude/ke-pipeline/customer-decisions/iehp-initial-answer-domain-r1.json",
+    ".claude/ke-pipeline/customer-decisions/iehp-determination-activity-task-r1.json",
+    ".claude/ke-pipeline/customer-decisions/iehp-fhir-canonical-base-r1.json"
+  ]
 }

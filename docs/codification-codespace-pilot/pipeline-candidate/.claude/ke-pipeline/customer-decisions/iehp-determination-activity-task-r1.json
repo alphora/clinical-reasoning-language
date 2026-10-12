@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "iehp-determination-activity-task",
+  "revision": 1,
+  "customerContext": "iehp",
+  "kind": "workflow-preference",
+  "status": "approved",
+  "statement": "For IEHP prior-authorization determination activities (certify.Met, not-certify.Unmet, not-certify.EIU), author the activity request as a Task (CPGTaskRequest), not a CommunicationRequest. The CommunicationRequest application in the accepted method 0.1.1 contract map reflects kit 2.4 and is stale for the pinned kit 2.31. The determination remains a communicated coverage recommendation, not a service order; outcome keys and meanings are unchanged.",
+  "scope": {
+    "domains": ["*"],
+    "policyIds": ["*"],
+    "stages": ["authoring", "generation", "verification", "review", "handoff"]
+  },
+  "authority": {
+    "source": "Explicit IEHP operator direction in this conversation",
+    "evidence": "2026-10-09 operator, replying to the lead's report that the method contract map names CPGCommunicationRequest while kit 2.31 says new coverage examples use Task: \"those are stale notes. it is now Task.\"",
+    "date": "2026-10-09",
+    "approvedBy": "IEHP operator Rob Reynolds"
+  },
+  "effectiveFrom": "2026-10-09",
+  "effectiveUntil": null,
+  "supersedes": [],
+  "rationale": "Kit 2.31 rule:pa-disposition-set authors the request type independently and uses Task for new coverage examples. The operator confirmed Task for IEHP so authors and reviewers do not follow the stale contract-map application.",
+  "verification": "Inspect each determination activity's request type in CRL and emitted FHIR; confirm Task, exact configured activity identity, and exactly one determination on completion with none during a needed-unknown pause. Cite this record."
+}

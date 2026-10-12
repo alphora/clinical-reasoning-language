@@ -1,0 +1,9 @@
+# Auto-bleph pilot pipeline binding
+
+The operator selected the **IEHP fresh narrative pipeline binding** for this supervised demonstration in `smile-demo-codification`. IEHP supplies the authoring and output conventions; `artifacts/auto-bleph/src/source/` supplies the clinical policy. This is a demonstration artifact, not an IEHP clinical policy or a claim of IEHP approval of the LCD.
+
+The selected seed is `iehp-ke-batch-clean@4c8fb7e62a78e4d254b89b3053619a759c45e8b1`. The adapted package carries byte-identical approved IEHP decisions for prior-authorization recommendations r3, initial answer domain r1, Task determinations r1, and FHIR canonical base r1. Its binding sets `customer=iehp`, `canonicalBase=http://iehp.com/fhir/priorauth/`, embedded Met/Unmet/EIU options (`certify.Met`, `not-certify.Unmet`, `not-certify.EIU`), Task output, and ordinary Yes/No questions without added uncertainty. Source-defined choices still govern. EIU is available in the vocabulary only where the auto-bleph source supports it. No X12 mapping is imported.
+
+The IEHP customer decisions govern output and answer conventions; they do not supply bleph clinical conditions or let the author inspect an earlier bleph encoding. The prepared-branch pipeline, profile, decision bytes, source hashes, runtime, reviewer and image identities must be frozen in the Nautilus run revision before launch.
+
+The canonical `artifact/auto-bleph` package currently has no `crl` configuration. Before delivered CRL/FHIR can be accepted, configure its package canonical and dispositions to match the selected binding through the appropriate KELP lifecycle operation. SaveCodify's eight Codify output scopes do not include `package.json`; do not expand its transfer set implicitly. Until that configuration and the KELP, Spaces and Nautilus checks pass, the prepared run remains `launchEligible=false`.
