@@ -70,9 +70,9 @@ opens Nautilus in the initiating KELP workspace. Nautilus launches or
 reconnects a distinct authoring Codespace on the exact prepared branch under
 the codifier's GitHub identity, verifies the effective authoring image, and
 guides the human-supervised agent. It does not re-Lock in the authoring
-checkout. The codifier's Git author email must match the canonical Lock
-owner. Where a fresh canonical Lock snapshot is required, use the qualified
-KELP read contract; local status on the prepared branch is not proof.
+checkout or require a separate KELP lock-status read. KELP's initiating card
+owns the Lock and invokes Nautilus after it succeeds; local status on the
+prepared branch is not canonical lifecycle proof.
 After an ordinary Unlock, the same active Codify pass may be re-Locked to
 resume, subject to KELP's existing owner/base and competing-lock checks;
 it does not return to Nautilus staged or require another preparation run.
@@ -81,7 +81,7 @@ Nautilus SaveCodify in the authoring Codespace reviews saved dirty files,
 commits/pushes selected prepared-branch work, and transfers only the exact
 reviewed Codify output paths into a canonical-only-parent commit. It does
 not merge the prepared branch or call KELP Save. Require current canonical
-source/assignment/lock checks, conflict detection, conditional push and a
+source/assignment checks, conflict detection, conditional push and a
 durable delivery/evidence receipt. Resolve intended edits excluded from
 delivery and preserve run evidence before deleting the authoring Codespace.
 The initiating KELP checkout refreshes to the delivered commit; the codifier

@@ -54,7 +54,7 @@ derive from the current active pass, never from that historical stage.
 SaveCodify reviews
 saved dirty files, pushes the prepared branch, and transfers only reviewed
 Codify output paths to a canonical-only-parent commit. It checks the current
-canonical source, assignment and locks, detects output conflicts, conditionally
+canonical source and assignment, detects output conflicts, conditionally
 pushes, and records a durable delivery/evidence receipt. It never merges the
 prepared branch wholesale or calls KELP Save. Before deleting the authoring
 Codespace, the codifier resolves any intended local edits excluded from
