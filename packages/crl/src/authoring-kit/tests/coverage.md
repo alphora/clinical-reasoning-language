@@ -1,12 +1,12 @@
 ## Presentation choice groups - schema 2.36 maintenance review
 
 Accepted audit baseline `6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9`, schema2.35/hash
-`5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd`. Implementation
-base `da7bc56753e1936f3171e3d38ff39a0e908f5839`; target is the current **uncommitted
-working tree**, including the new files below. No audited target SHA is claimed.
-The prior audit stamp remains unchanged; development retrieval reports
-contentMatchesAudit:false. File export/release acceptance remains gated on a
-completed audit at a real reviewed commit. The single content bump is2.36.
+`5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd`. Reviewed
+content target `414dc98ba6070ca706d6d7637ffea06e7da3720e`, schema2.36/hash
+`4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99`, bound in this
+separate metadata-only stamp. The complete delta and evidence dispositions below
+cover the held feature and release completion interval. Explicit export, actual MCP
+and installed/public release acceptance remain separate checks.
 
 Operator intent: ordinary independent Boolean concepts can share a presentation
 choice group and responsive checkbox/Boolean layout. The accepted design explicitly
@@ -2344,7 +2344,7 @@ Evidence:38owning tests pass with actual tar7.5.22;170kit/query tests pass; actu
 
 ## Release6.4.42 completion interval - schema2.36
 
-Baseline6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9 (schema2.35/hash5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd); working base9b3fdbe0135d9e21b3106a65ffc6956c3934c60f. Target remains pending reviewed content commit until separate audit metadata binds the literal SHA. Single schema increment2.36 covers held groups, rootpackageId placement, runtime availability and search aliases; current canonical hash4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99.
+Baseline6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9 (schema2.35/hash5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd); working base9b3fdbe0135d9e21b3106a65ffc6956c3934c60f. Reviewed content target `414dc98ba6070ca706d6d7637ffea06e7da3720e` is bound in this separate metadata-only stamp, schema2.36/hash4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99. Single schema increment2.36 covers held groups, rootpackageId placement, runtime availability and search aliases; current canonical hash4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99.
 
 Complete committed baseline-to-base inventory comprises74paths:68docs/codification-codespace-pilot paths (pipeline templates/provisioning, frozen2.35cache and reviewed customer-binding examples), root/2package versions+lock, prior audit.json and coverage finalization. No language/compiler/test runtime source changed in those committed74paths. The68pipeline paths are not current language teaching: they preserve intentionally pinned6.4.41/kit2.35 pilot execution contexts; no deployment or customer-authority migration is inferred. Prior release versions/lock are package metadata; prior audit delta is inspected metadata finalizing the saved baseline. Complete exact inventory retained in release evidence (audit-committed-delta.nul) and code review packet; no whole runtime/test file is excluded.
 
