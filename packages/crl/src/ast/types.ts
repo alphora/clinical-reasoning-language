@@ -26,6 +26,7 @@ export interface CRL extends ASTNode {
   includes: Include[];
   statements: Statement[];
   presentations?: Presentation[];
+  presentationGroups?: PresentationGroup[];
   location: Location;
 }
 
@@ -36,6 +37,17 @@ export interface Presentation extends ASTNode {
   contexts: { kind: "decision" | "criterion"; ref: ReferenceName; location: Location }[];
   questionText?: string;
   questionDescription?: string;
+  choiceGroup?: string;
+}
+
+/** A presentation annotation; its members retain independent clinical values. */
+export interface PresentationGroup extends ASTNode {
+  type: "PresentationGroup";
+  name: string;
+  questionText?: string;
+  questionDescription?: string;
+  columns?: number;
+  control?: "checkbox" | "radio";
 }
 
 // Union type for all possible statements. v2.2: parameter declarations

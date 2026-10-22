@@ -251,10 +251,10 @@ describe.skipIf(!engineJar)("publication selector against pinned CRL engine $app
     const sha = (bytes: string | Buffer): string =>
       createHash("sha256").update(bytes).digest("hex");
     expect(sha(readFileSync(engineJar))).toBe(
-      "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
+      "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
     );
     expect(sha(readFileSync(path.join(loaderPath, "ApplyDriver.class")))).toBe(
-      "84392646979904f48fe2d4aa37e90f78efc81f62308e2a4d9e36c698216b76cf",
+      "e57cffa2335cdb7a7e11ff62fd96c01775f478704b40c5c208abe2aa9cae9f94",
     );
     const workParent = process.env.CRL_PUBLICATION_CQL_WORK_DIR ?? tmpdir();
     mkdirSync(workParent, { recursive: true });

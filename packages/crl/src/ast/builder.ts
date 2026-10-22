@@ -4,6 +4,7 @@ import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor
 import {
   CrlContext,
   PresentationStatementContext,
+  PresentationGroupStatementContext,
   DecisionStatementContext,
   CriterionStatementContext,
   DecisionBodyContext,
@@ -140,6 +141,7 @@ import {
 import type {
   CRL,
   Presentation,
+  PresentationGroup,
   LibraryDeclaration,
   Include,
   ReferenceName,
@@ -311,8 +313,9 @@ export class CRLAstBuilder
       .includeStatement()
       .map((i) => this.visitIncludeStatement(i));
 
-    const statements = ctx.statement().filter((s) => !s.presentationStatement()).map((s) => this.visit(s) as Statement);
+    const statements = ctx.statement().filter((s) => !s.presentationStatement() && !s.presentationGroupStatement()).map((s) => this.visit(s) as Statement);
     const presentations = ctx.statement().flatMap((s) => s.presentationStatement() ? [this.visitPresentationStatement(s.presentationStatement()!)] : []);
+    const presentationGroups = ctx.statement().flatMap((s) => s.presentationGroupStatement() ? [this.visitPresentationGroupStatement(s.presentationGroupStatement()!)] : []);
     return {
       type: "CRL",
       ...(header ? { header } : {}),
@@ -320,6 +323,7 @@ export class CRLAstBuilder
       includes,
       statements,
       ...(presentations.length ? { presentations } : {}),
+      ...(presentationGroups.length ? { presentationGroups } : {}),
       location: getLocation(ctx),
     };
   }
@@ -370,7 +374,7 @@ export class CRLAstBuilder
           ref: line.decisionReference() ? refFromRefContext(line.decisionReference()!) : refFromQualifiable(line.qualifiableReference()!),
           location: getLocation(line) });
       } else {
-        const key = line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
+        const key = line.CHOICE_GROUP_IS() ? "choiceGroup" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
         const value = (line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
         if (node[key] !== undefined || !value.trim()) this.reportError("AstError", line,
           { message: `Presentation ${key} must be nonempty and declared only once.` });
@@ -379,6 +383,35 @@ export class CRLAstBuilder
     }
     if (!node.questionText?.trim()) this.reportError("AstError", ctx,
       { message: "Presentation requires nonempty question text." });
+    return node;
+  }
+
+  // REFACTOR:grounded: presentation groups are annotations, never computational statements.
+  visitPresentationGroupStatement(ctx: PresentationGroupStatementContext): PresentationGroup {
+    const node: PresentationGroup = { type: "PresentationGroup", name: unquote(ctx.identifier().text), location: getLocation(ctx) };
+    const seen = new Set<string>();
+    for (const line of ctx.presentationGroupLine()) {
+      const key = line.COLUMNS_IS() ? "columns" : line.CONTROL_IS() ? "control" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
+      if (seen.has(key)) {
+        this.reportError("AstError", line, { message: `Presentation group ${key} must be declared only once.` });
+        continue;
+      }
+      seen.add(key);
+      if (key === "columns") {
+        const value = Number(line.NUMBER()!.text);
+        if (!Number.isInteger(value) || value < 1 || value > 2147483647) this.reportError("AstError", line, { message: "Presentation group columns must be a positive integer." });
+        else node.columns = value;
+      } else if (key === "control") {
+        const value = line.NARRATIVE_WORD()!.text;
+        if (value !== "checkbox" && value !== "radio") this.reportError("AstError", line, { message: "Presentation group control must be checkbox or radio." });
+        else node.control = value;
+      } else {
+        const value = (line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
+        if (!value.trim()) this.reportError("AstError", line, { message: `Presentation group ${key} must be nonempty.` });
+        else node[key] = value;
+      }
+    }
+    if (!node.name.trim() || !node.questionText?.trim()) this.reportError("AstError", ctx, { message: "Presentation group requires a nonempty name and question text." });
     return node;
   }
 

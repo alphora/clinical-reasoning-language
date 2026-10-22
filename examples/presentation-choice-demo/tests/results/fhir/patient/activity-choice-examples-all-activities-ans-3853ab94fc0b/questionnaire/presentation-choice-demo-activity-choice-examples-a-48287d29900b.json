@@ -1,0 +1,553 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "presentation-choice-demo-activity-choice-examples-a-48287d29900b",
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-library",
+      "valueCanonical": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInterface"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+      "extension": [
+        {
+          "url": "name",
+          "valueCoding": {
+            "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+            "code": "patient",
+            "display": "Patient"
+          }
+        },
+        {
+          "url": "type",
+          "valueCode": "Patient"
+        }
+      ]
+    }
+  ],
+  "url": "http://example.org/crl/presentation-choice-demo/Questionnaire/presentation-choice-demo-activity-choice-examples-all-activities-ans-3853ab94fc0b",
+  "version": "0.0.0-activity-choice-examples-all-activities-ans-3853ab94fc0b",
+  "status": "active",
+  "item": [
+    {
+      "extension": [
+        {
+          "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+          "extension": [
+            {
+              "url": "protocol",
+              "valueInteger": 1
+            },
+            {
+              "url": "id",
+              "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+            },
+            {
+              "url": "name",
+              "valueString": "Activities"
+            },
+            {
+              "url": "text",
+              "valueString": "Which activities do you enjoy? Select all that apply."
+            },
+            {
+              "url": "description",
+              "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+            },
+            {
+              "url": "columns",
+              "valueInteger": 3
+            },
+            {
+              "url": "control",
+              "valueCode": "checkbox"
+            },
+            {
+              "url": "member",
+              "extension": [
+                {
+                  "url": "profile",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                },
+                {
+                  "url": "text",
+                  "valueString": "Read a Book"
+                }
+              ]
+            },
+            {
+              "url": "member",
+              "extension": [
+                {
+                  "url": "profile",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                },
+                {
+                  "url": "text",
+                  "valueString": "Take a Walk"
+                }
+              ]
+            },
+            {
+              "url": "member",
+              "extension": [
+                {
+                  "url": "profile",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                },
+                {
+                  "url": "text",
+                  "valueString": "Listen to Music"
+                }
+              ]
+            },
+            {
+              "url": "member",
+              "extension": [
+                {
+                  "url": "profile",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                },
+                {
+                  "url": "text",
+                  "valueString": "Draw a Picture"
+                }
+              ]
+            },
+            {
+              "url": "member",
+              "extension": [
+                {
+                  "url": "profile",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                },
+                {
+                  "url": "text",
+                  "valueString": "Play a Game"
+                }
+              ]
+            },
+            {
+              "url": "member",
+              "extension": [
+                {
+                  "url": "profile",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                },
+                {
+                  "url": "text",
+                  "valueString": "Watch a Film"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          "valueCodeableConcept": {
+            "coding": [
+              {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "list"
+              }
+            ]
+          }
+        }
+      ],
+      "linkId": "crl-choice-group-ccc2a98f9a6e3b53ba1976b2036e4b8d416778238b84fa7a60b42ccd309f736c",
+      "text": "Which activities do you enjoy? Select all that apply.",
+      "type": "group",
+      "repeats": false,
+      "item": [
+        {
+          "linkId": "crl-choice-group-ccc2a98f9a6e3b53ba1976b2036e4b8d416778238b84fa7a60b42ccd309f736c-help",
+          "text": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered.",
+          "type": "display"
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.subject"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book#Observation.effective[x]"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.authored"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book|0.0.0"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "name": "ReadABook",
+                    "language": "text/cql-identifier",
+                    "expression": "Read a Book",
+                    "reference": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences"
+                  }
+                }
+              ]
+            }
+          ],
+          "linkId": "1",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book#Observation.value[x]",
+          "text": "Read a Book",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.subject"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk#Observation.effective[x]"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.authored"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk|0.0.0"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "name": "TakeAWalk",
+                    "language": "text/cql-identifier",
+                    "expression": "Take a Walk",
+                    "reference": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences"
+                  }
+                }
+              ]
+            }
+          ],
+          "linkId": "2",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk#Observation.value[x]",
+          "text": "Take a Walk",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.subject"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music#Observation.effective[x]"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.authored"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music|0.0.0"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "name": "ListenToMusic",
+                    "language": "text/cql-identifier",
+                    "expression": "Listen to Music",
+                    "reference": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences"
+                  }
+                }
+              ]
+            }
+          ],
+          "linkId": "3",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music#Observation.value[x]",
+          "text": "Listen to Music",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.subject"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture#Observation.effective[x]"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.authored"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture|0.0.0"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "name": "DrawAPicture",
+                    "language": "text/cql-identifier",
+                    "expression": "Draw a Picture",
+                    "reference": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences"
+                  }
+                }
+              ]
+            }
+          ],
+          "linkId": "4",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture#Observation.value[x]",
+          "text": "Draw a Picture",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.subject"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game#Observation.effective[x]"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.authored"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game|0.0.0"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "name": "PlayAGame",
+                    "language": "text/cql-identifier",
+                    "expression": "Play a Game",
+                    "reference": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences"
+                  }
+                }
+              ]
+            }
+          ],
+          "linkId": "5",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game#Observation.value[x]",
+          "text": "Play a Game",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract",
+              "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film#Observation.subject"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.subject"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film#Observation.effective[x]"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "language": "text/fhirpath",
+                    "expression": "%resource.authored"
+                  }
+                }
+              ]
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-definitionPopulationContext",
+              "extension": [
+                {
+                  "url": "definition",
+                  "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film|0.0.0"
+                },
+                {
+                  "url": "expression",
+                  "valueExpression": {
+                    "name": "WatchAFilm",
+                    "language": "text/cql-identifier",
+                    "expression": "Watch a Film",
+                    "reference": "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences"
+                  }
+                }
+              ]
+            }
+          ],
+          "linkId": "6",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film#Observation.value[x]",
+          "text": "Watch a Film",
+          "type": "boolean",
+          "required": false,
+          "repeats": false
+        }
+      ]
+    }
+  ]
+}

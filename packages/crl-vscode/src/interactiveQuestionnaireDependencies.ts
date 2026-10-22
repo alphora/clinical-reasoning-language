@@ -7,12 +7,19 @@ export function interactiveQuestionnaireDependencies(definitions: any, planId: s
   if (root.length !== 1) return {};
   let complete = true;
   const uses = new Map<string, Set<string>[]>();
-  const inputs = (a: any): string[] => (a.input ?? []).flatMap((i: any) => i.profile ?? []);
+  const inputs = (a: any): string[] => (a.input ?? []).flatMap((i: any) => {
+    const group = i.extension?.find((e: any) => e.url === 'http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group')?.extension;
+    return group?.some((e: any) => e.url === 'protocol' && e.valueInteger === 1)
+      ? group.filter((e: any) => e.url === 'member').flatMap((e: any) => e.extension?.filter((f: any) => f.url === 'profile').map((f: any) => f.valueCanonical) ?? [])
+      : i.profile ?? [];
+  });
   const walk = (actions: any[], parents: Set<string>, ordered: boolean, stack: Set<any>) => {
     const prior = new Set<string>();
     for (const a of actions ?? []) {
-      const own = inputs(a), dependencies = new Set([...parents, ...(ordered ? prior : [])]);
-      for (const profile of own) {
+      const own = (a.input ?? []).flatMap((i: any) => i.profile ?? []) as string[];
+      const dependencies = new Set([...parents, ...(ordered ? prior : [])]);
+      // Presentation membership widens collection, never clinical dependencies.
+      for (const profile of inputs(a)) {
         const set = new Set(dependencies); set.delete(profile);
         const occurrences = uses.get(profile) ?? []; occurrences.push(set); uses.set(profile, occurrences);
       }

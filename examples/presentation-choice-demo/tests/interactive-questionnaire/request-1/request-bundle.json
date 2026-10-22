@@ -1,0 +1,25 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "demo-patient",
+        "name": [{ "text": "Demo Person" }],
+        "birthDate": "1980-01-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "id": "demo-request",
+        "status": "active",
+        "intent": "order",
+        "subject": { "reference": "Patient/demo-patient" },
+        "code": { "text": "Blank multi-select demo" },
+        "authoredOn": "2026-10-22T09:00:00Z"
+      }
+    }
+  ]
+}

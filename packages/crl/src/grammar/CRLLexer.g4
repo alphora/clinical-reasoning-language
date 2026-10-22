@@ -2,6 +2,10 @@ lexer grammar CRLLexer;
 
 // === Multi-word phrase tokens ===
 PRESENTATION_FOR : 'presentation for';
+PRESENTATION_GROUP : 'presentation group';
+CHOICE_GROUP_IS : 'choice group is';
+COLUMNS_IS : 'columns is';
+CONTROL_IS : 'control is';
 PRESENTATION_DECISION : 'in decision';
 PRESENTATION_CRITERION : 'in criterion';
 QUESTION_TEXT_IS : 'question text is';

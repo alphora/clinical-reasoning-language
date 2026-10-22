@@ -1,9 +1,11 @@
 import { pruneInteractiveResponse, questionnaireWithoutDefaults, retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
 import { installBooleanAnswerClearControls } from "./lformsBooleanControls";
+import { installPresentationChoiceGroups } from "./lformsPresentationGroups";
 
 // Self-contained browser function; passed explicit dependencies so the tested functions are the shipped ones.
 export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveResponse, withoutDefaults: typeof questionnaireWithoutDefaults,
-  retain: typeof retainInteractiveQuestionnaire, inspect: (q: unknown) => string[], booleanControls: typeof installBooleanAnswerClearControls) {
+  retain: typeof retainInteractiveQuestionnaire, inspect: (q: unknown) => string[], booleanControls: typeof installBooleanAnswerClearControls,
+  presentationGroups?: typeof installPresentationChoiceGroups) {
   const w = globalThis as any, doc = w.document, api = w.acquireVsCodeApi();
   const select = doc.getElementById("codeset"), start = doc.getElementById("start"), next = doc.getElementById("continue");
   const restart = doc.getElementById("restart");
@@ -23,6 +25,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   let transitioning = false, hasResult = false;
   let observing = false, editError = false;
   let dependencies: Record<string, string[]> = {};
+  let groupDispose: (() => void) | undefined;
   const send = (type: string, extra = {}) => api.postMessage({ type, token, ...extra });
   const controls = () => {
     start.disabled = busy || !select.value || hasResult; next.disabled = busy || !ready || !q || blocked || editError;
@@ -42,6 +45,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   const mountForm = async (suppressDefaults: boolean, focus?: { id: string; start: number | null; end: number | null; direction: string }) => {
     const mine = ++render;
     ready = false; observing = false; controls();
+    groupDispose?.(); groupDispose = undefined;
     mount.replaceChildren();
     if (!q) { controls(); return; }
     try {
@@ -53,6 +57,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
           new Promise((_, reject) => { timeout = w.setTimeout(() => reject(new Error("The form did not finish rendering. Reset to retry.")), 15000); })]);
       } finally { w.clearTimeout(timeout); }
       if (render !== mine) return;
+      groupDispose = presentationGroups?.(mount, q, observe);
       snapshot = exported();
       // Keep intentional empty items that the renderer omits in its export.
       response = { ...response, ...snapshot, item: response?.item ?? snapshot.item };
@@ -173,5 +178,5 @@ nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}button,select{padding
 <button id="restart" hidden>Restart with current definitions</button><button id="start">Start</button><button id="continue" disabled>Continue / Re-evaluate</button><button id="reset">Reset</button><button id="cancel" disabled>Cancel</button>
 </nav><p id="status" role="status">Loading initial states…</p><details id="warnings" hidden><summary id="warning-summary">Warnings</summary><ul id="warning-list"></ul></details><div id="form"></div><section id="results" aria-labelledby="result-heading" aria-live="polite" hidden><h2 id="result-heading">Result</h2><div id="outcomes"></div></section>
 <script nonce="${nonce}" src="${asset("zone.min.js")}"></script><script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script><script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>
-<script nonce="${nonce}">(${installInteractiveQuestionnaire.toString()})(${pruneInteractiveResponse.toString()},${questionnaireWithoutDefaults.toString()},${retainInteractiveQuestionnaire.toString()},${inspect.toString()},${installBooleanAnswerClearControls.toString()});</script></body></html>`;
+<script nonce="${nonce}">(${installInteractiveQuestionnaire.toString()})(${pruneInteractiveResponse.toString()},${questionnaireWithoutDefaults.toString()},${retainInteractiveQuestionnaire.toString()},${inspect.toString()},${installBooleanAnswerClearControls.toString()},${installPresentationChoiceGroups.toString()});</script></body></html>`;
 }

@@ -10,7 +10,7 @@ import { packageFhir } from "./index";
 
 const roots: string[] = [];
 const base = "https://example.org/fhir";
-const metadata = () => ({ name: "example-policy", version: "1.2.3", description: "Synthetic package test", author: "Test Author", license: "Apache-2.0", crl: { canonicalBase: base, packageId: "org.example.policy" } });
+const metadata = () => ({ name: "example-policy", version: "1.2.3", packageId: "org.example.policy", description: "Synthetic package test", author: "Test Author", license: "Apache-2.0", crl: { canonicalBase: base } });
 const definition = (resourceType = "PlanDefinition", id = "example-policy") => ({ resourceType, id, url: `${base}/${resourceType}/${id}`, version: "1.2.3", status: "draft" });
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "crl-fhir-package-")); roots.push(root);
@@ -70,8 +70,8 @@ test("actual archive has matching manifest, IG inventory and string-only v2 inde
 
 // @kit fhir-packaging:metadata-refusals
 test.each([
-  ["package ID", (m: any) => { m.crl.packageId = "example-policy"; }, /package ID/],
-  ["long package ID", (m: any) => { m.crl.packageId = "org." + "a".repeat(61); }, /64/],
+  ["package ID", (m: any) => { m.packageId = "example-policy"; }, /package ID/],
+  ["long package ID", (m: any) => { m.packageId = "org." + "a".repeat(61); }, /64/],
   ["version", (m: any) => { m.version = "1.2"; }, /SemVer/],
   ["leading zero prerelease", (m: any) => { m.version = "1.2.3-01"; }, /SemVer/],
   ["author", (m: any) => { delete m.author; }, /author/],
@@ -89,12 +89,42 @@ test.each([
 });
 
 test("explicit package ID overrides metadata and absent license remains absent", async () => {
-  const root = await fixture(); const m: any = metadata(); delete m.crl.packageId; delete m.license;
+  const root = await fixture(); const m: any = metadata(); delete m.packageId; delete m.license;
   await writeFile(join(root, "package.json"), JSON.stringify(m));
   expect((await packageFhir({ projectRoot: root, packageId: "org.example.override" })).success).toBe(true);
   const archive = await unpack(root);
   expect(archive["package.json"].name).toBe("org.example.override");
   expect(archive["ImplementationGuide-example-policy.json"].license).toBeUndefined();
+});
+
+// @kit fhir-packaging:package-id-placement
+test("legacy crl.packageId produces the same archive as root packageId", async () => {
+  const root = await fixture();
+  const expected = await packageFhir({ projectRoot: root });
+  const m: any = metadata(); m.crl.packageId = m.packageId; delete m.packageId;
+  await writeFile(join(root, "package.json"), JSON.stringify(m));
+  expect(await packageFhir({ projectRoot: root })).toEqual(expected);
+});
+
+// @kit fhir-packaging:package-id-placement
+test("root packageId precedes legacy metadata and an explicit override precedes both", async () => {
+  const root = await fixture();
+  const m = { ...metadata(), crl: { ...metadata().crl, packageId: "org.example.legacy" } };
+  await writeFile(join(root, "package.json"), JSON.stringify(m));
+  expect((await packageFhir({ projectRoot: root })).success).toBe(true);
+  expect((await unpack(root))["package.json"].name).toBe("org.example.policy");
+  expect((await packageFhir({ projectRoot: root, packageId: "org.example.override" })).success).toBe(true);
+  expect((await unpack(root))["package.json"].name).toBe("org.example.override");
+});
+
+// @kit fhir-packaging:package-id-placement
+test.each([null, "", "invalid-id", 42])("invalid root packageId %s does not fall back to a valid legacy ID", async packageId => {
+  const root = await fixture();
+  const m = { ...metadata(), packageId, crl: { ...metadata().crl, packageId: "org.example.legacy" } };
+  await writeFile(join(root, "package.json"), JSON.stringify(m));
+  await mkdir(join(root, "output")); await writeFile(join(root, "output", "package.tgz"), "old archive");
+  await failure(root, /root package.json packageId/);
+  expect(await readFile(join(root, "output", "package.tgz"), "utf8")).toBe("old archive");
 });
 
 test.each([

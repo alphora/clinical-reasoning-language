@@ -7,6 +7,14 @@ export function installBooleanAnswerClearControls(mount: HTMLElement, onClear?: 
   const controls = new Map<HTMLElement, { button: HTMLButtonElement; empty: HTMLElement; oldStyle: string | null;
     oldHidden: boolean; oldAria: string | null; input: HTMLInputElement; oldTab: string | null }>();
   let stopped = false, pending = false;
+  const release = (node: HTMLElement) => {
+    const control = controls.get(node); if (!control) return;
+    control.button.remove(); control.empty.hidden = control.oldHidden;
+    if (control.oldStyle === null) control.empty.removeAttribute('style'); else control.empty.setAttribute('style', control.oldStyle);
+    if (control.oldAria === null) control.empty.removeAttribute('aria-hidden'); else control.empty.setAttribute('aria-hidden', control.oldAria);
+    if (control.oldTab === null) control.input.removeAttribute('tabindex'); else control.input.setAttribute('tabindex', control.oldTab);
+    controls.delete(node);
+  };
   const refresh = () => {
     pending = false;
     if (stopped) return;
@@ -14,6 +22,7 @@ export function installBooleanAnswerClearControls(mount: HTMLElement, onClear?: 
       control.button.remove(); controls.delete(node);
     }
     for (const node of Array.from(mount.querySelectorAll<HTMLElement>('lhc-item-boolean'))) {
+      if (node.hasAttribute('data-crl-choice-proxy')) { release(node); continue; }
       const group = node.querySelector<HTMLElement>('nz-radio-group');
       const yesLabel = group?.querySelector<HTMLElement>('label[id$="|true"]');
       const noLabel = group?.querySelector<HTMLElement>('label[id$="|false"]');
@@ -66,13 +75,15 @@ export function installBooleanAnswerClearControls(mount: HTMLElement, onClear?: 
     event.preventDefault(); event.stopPropagation(); next.click(); schedule();
   };
   const observer = new win.MutationObserver(schedule);
-  observer.observe(mount, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'inert', 'class'] });
+  observer.observe(mount, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'inert', 'class', 'data-crl-choice-proxy'] });
+  mount.addEventListener('crl-boolean-ownership', refresh);
   mount.addEventListener('input', schedule); mount.addEventListener('change', schedule);
   mount.addEventListener('click', schedule, true); // ng-zorro cancels bubbling clicks and native change.
   mount.addEventListener('keydown', navigate, true);
   refresh();
   return () => {
     stopped = true; observer.disconnect(); mount.removeEventListener('input', schedule); mount.removeEventListener('change', schedule); mount.removeEventListener('click', schedule, true);
+    mount.removeEventListener('crl-boolean-ownership', refresh);
     mount.removeEventListener('keydown', navigate, true);
     for (const control of controls.values()) {
       control.button.remove(); control.empty.hidden = control.oldHidden;

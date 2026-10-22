@@ -64,6 +64,7 @@ statement
     | parameterStatement
     | criterionStatement
     | presentationStatement
+    | presentationGroupStatement
     ;
 
 // Presentation is an authored annotation, separate from computational declarations.
@@ -74,7 +75,18 @@ presentationLine
     : DASH (PRESENTATION_DECISION decisionReference
            | PRESENTATION_CRITERION qualifiableReference
            | QUESTION_TEXT_IS (QUOTED_STRING | backtickString)
-           | QUESTION_DESCRIPTION_IS (QUOTED_STRING | backtickString)) DOT
+           | QUESTION_DESCRIPTION_IS (QUOTED_STRING | backtickString)
+           | CHOICE_GROUP_IS QUOTED_STRING) DOT
+    ;
+
+presentationGroupStatement
+    : PRESENTATION_GROUP identifier COLON presentationGroupLine+
+    ;
+presentationGroupLine
+    : DASH (QUESTION_TEXT_IS (QUOTED_STRING | backtickString)
+           | QUESTION_DESCRIPTION_IS (QUOTED_STRING | backtickString)
+           | COLUMNS_IS NUMBER
+           | CONTROL_IS NARRATIVE_WORD) DOT
     ;
 
 // ============================
@@ -703,7 +715,7 @@ narrativeElement
     // ⚠ QUALIFYING and DISPLAY_IS are admitted here because the membership predicate is NARRATIVE:
     //   `- definition is "Patient Complaint" in qualifying.`
     // Without this the keyword would eat its own use site and the predicate could not parse.
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_GROUP | CHOICE_GROUP_IS | COLUMNS_IS | CONTROL_IS | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

@@ -16,7 +16,7 @@ const ALIASES: Record<string, string[]> = {
   "value-type": ["value type is", "boolean", "Quantity", "CodeableConcept"],
   "publication-selection": ["shape reduction is", "most recent", "override", "local external inferred", "recency"],
   "named-answer-options": ["dropdown with a none answer", "coded answers", "answer options", "value from", "ValueSet answers", "not qualifying is", "in qualifying", "none of the above"],
-  "concept-presentation": ["question wording", "presentation", "question text", "question description", "label", "questionnaire"],
+  "concept-presentation": ["multi-select", "select all that apply", "checkbox", "choice group", "presentation group", "question wording", "presentation", "question text", "question description", "label", "questionnaire"],
   "bmi-publication": ["BMI", "height weight calculation", "body mass index"],
   "patient-age-projection": ["Patient age", "age today", "birth date", "same day override"],
   "decision-composition": ["decision tree", "Concept Criterion Decision", "vertical AND", "horizontal AND", "sem-or", "sem-and", "defined as", "alternatives"],

@@ -2,13 +2,52 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "prepare-multiselect-demo",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "examples/presentation-choice-demo/prepare-debug.cjs"
+      ],
+      "dependsOn": "compile-multiselect-demo",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "HOME": "${workspaceFolder}/tmp/presentation-choice-debug/runtime-home"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "compile-multiselect-demo",
+      "type": "shell",
+      "command": "npm run compile -w crl-language-support",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "TEMP": "${workspaceFolder}/tmp/temp",
+          "TMP": "${workspaceFolder}/tmp/temp",
+          "npm_config_cache": "${workspaceFolder}/tmp/npm-cache"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      }
+    },
+    {
       "label": "compile-crl-ext",
       "type": "shell",
       "command": "npm run compile -w crl-language-support",
-      "options": { "cwd": "${workspaceFolder}" },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "group": "build",
       "problemMatcher": [],
-      "presentation": { "reveal": "silent", "clear": true }
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      }
     }
   ]
 }

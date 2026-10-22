@@ -1,0 +1,21 @@
+{
+  "resourceType": "Patient",
+  "id": "activity-choice-examples-two-activities-sel-da0e18e7b8c6",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient"
+    ]
+  },
+  "identifier": [
+    {
+      "system": "http://example.org/crl/presentation-choice-demo/identifier/cel-test-patient",
+      "value": "activity-choice-examples-two-activities-sel-da0e18e7b8c6"
+    }
+  ],
+  "name": [
+    {
+      "text": "Demo Person"
+    }
+  ],
+  "birthDate": "1980-01-01"
+}

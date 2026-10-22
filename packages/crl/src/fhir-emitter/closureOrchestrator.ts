@@ -1929,7 +1929,30 @@ export function emitFhirDefClosure(
         gatheredPublications.set(descriptor.identity.key, descriptor);
       }
       const publicationInputs = publicationCaseFeatures(prepared.publications, lib.filePath, ref, "questions").flatMap((descriptor) => {
-        return descriptor.profileUrl === undefined ? [] : [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType, presentationOwner: presentationCatalogs.get(descriptor.identity.sourceIdentity) }];
+        if (descriptor.profileUrl === undefined) return [];
+        const presentationOwner = presentationCatalogs.get(descriptor.identity.sourceIdentity);
+        const group = presentationOwner?.groupFor(descriptor.title);
+        const groupFields = group === undefined ? undefined : (() => {
+          const target = publicationTargets.get(descriptor.identity.key);
+          const entry = target && cqlByLibrary.find(candidate => candidate.libraryName === target.libraryName);
+          if (!entry) {
+            errors.push({ type: "Validation", kind: "presentation-group-invalid", message: `Choice group "${group.name}" lacks its emitted owning Library.` });
+            return undefined;
+          }
+          const members = group.members.flatMap(name => {
+            const hit = prepared.publications.lookup(descriptor.identity.sourceIdentity, name);
+            if (hit.kind !== "publication" || !hit.descriptor.profileUrl || !hasLocalPublicationContribution(hit.descriptor)) {
+              errors.push({ type: "Validation", kind: "presentation-group-invalid", message: `Choice group "${group.name}" member "${name}" lacks its prepared Boolean question profile.` });
+              return [];
+            }
+            // Definition dependencies only: membership never becomes a clinical operand.
+            for (const dependency of publicationCaseFeatures(prepared.publications, descriptor.identity.sourceIdentity, name, "definitions")) gatheredPublications.set(dependency.identity.key, dependency);
+            return [{ name, profile: hit.descriptor.profileUrl }];
+          });
+          return { ...group, members, id: JSON.stringify([libraryCanonicalUrl(metadata, entry.libraryName), metadata.version ?? null, group.name]) };
+        })();
+        return [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType, presentationOwner,
+          ...(groupFields === undefined ? {} : { presentationGroup: groupFields }) }];
       });
       const normalized = normalizeLocalRef(ref, lib.libraryName);
       const legacy = (isQualifiedRef(normalized) ? [] : caseFeatures.inputsByCondition.get(normalized) ?? []).flatMap((c) => {

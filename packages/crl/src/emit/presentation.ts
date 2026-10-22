@@ -5,7 +5,7 @@ export interface PresentationText { questionText?: string; questionDescription?:
 export interface PresentationDiagnostic {
   filePath?: string;
   libraryName?: string;
-  kind: "presentation-reference" | "presentation-overlap" | "presentation-empty" | "presentation-override-unsupported" | "presentation-target-not-question-enabled" | "presentation-question-text-missing";
+  kind: "presentation-reference" | "presentation-overlap" | "presentation-empty" | "presentation-override-unsupported" | "presentation-target-not-question-enabled" | "presentation-question-text-missing" | "presentation-group-invalid";
   severity: "error" | "warning";
   message: string;
   location: Location;
@@ -55,6 +55,33 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
       contexts.add(key);
     }
   }
+  // REFACTOR:grounded: grouping collects independent selected Boolean questions;
+  // it does not create a computational symbol, operand or answer vocabulary.
+  const groups = new Map<string, { name: string; questionText: string; questionDescription?: string; columns: number; control: "checkbox" | "radio"; members: string[] }>();
+  const membership = new Map<string, string>();
+  for (const group of ast.presentationGroups ?? []) {
+    if (groups.has(group.name)) fail("presentation-group-invalid", `Duplicate presentation group "${group.name}".`, group.location);
+    if (!group.name.trim() || !group.questionText?.trim() || !Number.isInteger(group.columns ?? 1) || (group.columns ?? 1) < 1 || (group.columns ?? 1) > 2147483647 || !["checkbox", "radio"].includes(group.control ?? "radio")) {
+      fail("presentation-group-invalid", `Presentation group "${group.name}" requires question text, positive integer columns and checkbox or radio control.`, group.location);
+    }
+    groups.set(group.name, { name: group.name, questionText: group.questionText ?? "", ...(group.questionDescription !== undefined ? { questionDescription: group.questionDescription } : {}), columns: group.columns ?? 1, control: group.control ?? "radio", members: [] });
+  }
+  for (const p of declarations) if (p.choiceGroup !== undefined) {
+    const name = getRefName(p.target), group = groups.get(p.choiceGroup), concept = concepts.get(name);
+    if (!local(p.target) || p.contexts.length) {
+      fail("presentation-group-invalid", `Choice group membership for "${name}" must be a default presentation in its owning library.`, p.location);
+      continue;
+    }
+    if (!group) { fail("presentation-group-invalid", `Unknown presentation group "${p.choiceGroup}" for "${name}".`, p.location); continue; }
+    if (membership.has(name)) { fail("presentation-group-invalid", `Concept "${name}" has multiple choice group memberships.`, p.location); continue; }
+    if (!concept || concept.shape !== "Record" || concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || concept.valueTypes[0] !== "boolean" || !concept.code || !concept.shapeReduction) {
+      fail("presentation-group-invalid", `Choice group member "${name}" must be a local coded Record Observation with boolean value and most recent shape reduction.`, p.location);
+      continue;
+    }
+    membership.set(name, group.name);
+    group.members.push(name);
+  }
+  for (const group of ast.presentationGroups ?? []) if (!groups.get(group.name)?.members.length) fail("presentation-group-invalid", `Presentation group "${group.name}" has no valid members.`, group.location);
   for (const concept of ast.statements) {
     if (concept.type === "Concept" && concept.code && !byTarget.has(concept.name)) diagnostics.push({
       kind: "presentation-question-text-missing", severity: "warning",
@@ -144,6 +171,7 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
     walk(decision.body.statements);
   }
   return { diagnostics, resolve, resolveOccurrence, criteriaFor, contextsForInput,
+    groupFor: (name: string) => groups.get(membership.get(name) ?? ""),
     hasDeclaration: (name: string) => byTarget.has(name), libraryName: ast.library.name };
 }
 

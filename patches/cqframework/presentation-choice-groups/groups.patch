@@ -1,0 +1,357 @@
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java
+index 92742cc44..d9946f980 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyRequest.java
+@@ -357,7 +357,7 @@ public class ApplyRequest implements ICpgRequest {
+     }
+ 
+     public boolean questionnaireItemExistsForProfile(IPrimitiveType<String> profile) {
+-        return questionnaireDefinitions.contains(profile.getValueAsString());
++        return questionnaireAdapter.getAllItemDefinitions().contains(profile.getValueAsString());
+     }
+ 
+     public ApplyRequest setQuestionnaire(IBaseResource questionnaire) {
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
+index 4dc367e01..a86ccf0dc 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
+@@ -110,9 +110,12 @@ public class ProcessAction {
+     @SuppressWarnings("unchecked")
+     protected void addQuestionnaireItemForInput(ApplyRequest request, IPlanDefinitionActionAdapter action) {
+         try {
+-            for (var input : action.getInputDataRequirement().stream()
+-                    .filter(IDataRequirementAdapter::hasProfile)
+-                    .toList()) {
++            for (var input : action.getInputDataRequirement()) {
++                if (input.hasExtension(PresentationChoiceGroupProcessor.URL)) {
++                    PresentationChoiceGroupProcessor.process(request, input, repository, generateProcessor);
++                    continue;
++                }
++                if (!input.hasProfile()) continue;
+                 for (var profileUrl : input.getProfile()) {
+                     if (!request.questionnaireItemExistsForProfile(profileUrl)) {
+                         var profile = searchRepositoryByCanonical(repository, profileUrl);
+@@ -136,6 +139,9 @@ public class ProcessAction {
+                 }
+             }
+         } catch (Exception e) {
++            if (action.getInputDataRequirement().stream().anyMatch(input -> input.hasExtension(PresentationChoiceGroupProcessor.URL))) {
++                throw new IllegalArgumentException("CRL presentation choice group generation failed", e);
++            }
+             var message = "An error occurred while generating Questionnaire items for action input: %s"
+                     .formatted(e.getMessage());
+             request.logException(message);
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/generate/ItemGenerator.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/generate/ItemGenerator.java
+index adc424d57..a20b113b9 100644
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/generate/ItemGenerator.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/questionnaire/generate/ItemGenerator.java
+@@ -39,6 +39,25 @@ public class ItemGenerator {
+     protected static final String ITEM_CREATION_ERROR = "An error occurred during item creation: %s";
+     protected static final String CHILD_LINK_ID_FORMAT = "%s.%s";
+ 
++    // Root-count allocation is unsafe once presentation wrappers nest existing roots.
++    public static String nextRootLinkId(List<IQuestionnaireItemComponentAdapter> items) {
++        var used = new java.util.HashSet<String>();
++        collectLinkIds(items, used);
++        int candidate = items.size() + 1;
++        while (true) {
++            var prefix = String.valueOf(candidate);
++            if (used.stream().noneMatch(id -> id.equals(prefix) || id.startsWith(prefix + "."))) return prefix;
++            candidate++;
++        }
++    }
++
++    private static void collectLinkIds(List<? extends org.opencds.cqf.fhir.utility.adapter.IItemComponentAdapter> items, java.util.Set<String> used) {
++        for (var item : items) {
++            used.add(item.getLinkId());
++            collectLinkIds(item.getItem(), used);
++        }
++    }
++
+     protected final IRepository repository;
+     protected final ExpressionProcessor expressionProcessor;
+     protected final ExtensionProcessor extensionProcessor;
+@@ -62,8 +81,7 @@ public class ItemGenerator {
+     @Nullable
+     public <T extends IBaseExtension<?, ?>> Pair<IQuestionnaireItemComponentAdapter, List<T>> generate(
+             GenerateRequest request) {
+-        final String linkId =
+-                String.valueOf(request.getQuestionnaireAdapter().getItem().size() + 1);
++        final String linkId = nextRootLinkId(request.getQuestionnaireAdapter().getItem());
+         try {
+             int childCount = 0;
+             var caseFeature = getFeatureExpression(request);
+diff --git a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationChoiceGroupProcessor.java b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationChoiceGroupProcessor.java
+new file mode 100644
+--- /dev/null
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationChoiceGroupProcessor.java
+@@ -0,0 +1,153 @@
++package org.opencds.cqf.fhir.cr.plandefinition.apply;
++
++import static org.opencds.cqf.fhir.utility.SearchHelper.searchRepositoryByCanonical;
++
++import ca.uhn.fhir.repository.IRepository;
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.HexFormat;
++import java.util.List;
++import java.util.function.Function;
++import org.hl7.fhir.r4.model.CodeableConcept;
++import org.hl7.fhir.r4.model.Extension;
++import org.hl7.fhir.r4.model.Questionnaire;
++import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent;
++import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemType;
++import org.opencds.cqf.fhir.cr.questionnaire.generate.GenerateProcessor;
++import org.opencds.cqf.fhir.utility.adapter.IDataRequirementAdapter;
++
++/** CRL presentation protocol 1: collect independent Boolean profiles before population. */
++public final class PresentationChoiceGroupProcessor {
++    public static final int PROTOCOL = 1;
++    public static final String URL = "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group";
++    private static final String ITEM_CONTROL = "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl";
++    private PresentationChoiceGroupProcessor() {}
++
++    public static void process(ApplyRequest request, IDataRequirementAdapter input, IRepository repository, GenerateProcessor generator) {
++        if (!input.hasProfile() || input.getExtensionsByUrl(URL).size() != 1) fail("Choice group input requires profiles and exactly one descriptor");
++        if (!(request.getQuestionnaire() instanceof Questionnaire questionnaire)) throw new IllegalArgumentException("CRL choice groups require FHIR R4 Questionnaire");
++        Extension descriptor = input.getExtensionByUrl(URL);
++        var profiles = descriptor.getExtension().stream().filter(e -> e.getUrl().equals("member")).map(e -> field(e, "profile", true)).toList();
++        if (input.getProfile().stream().anyMatch(p -> !profiles.contains(p.getValueAsString()))) fail("Choice group descriptor does not contain its input profile");
++        collect(questionnaire, descriptor, profile -> {
++            var generateRequest = request.toGenerateRequest(searchRepositoryByCanonical(repository, new org.hl7.fhir.r4.model.CanonicalType(profile)));
++            generateRequest.setNextProfileAdapter();
++            var generated = generator.generateItem(generateRequest);
++            if (generated == null || !(generated.getLeft().get() instanceof QuestionnaireItemComponent item)) throw new IllegalArgumentException("CRL choice group profile generated no R4 question: " + profile);
++            request.addLaunchContextExtensions(generated.getRight());
++            return item;
++        });
++    }
++
++    // Questionnaire is the shared registry, including across delegated ApplyRequest copies.
++    static void collect(Questionnaire q, Extension descriptor, Function<String, QuestionnaireItemComponent> generate) {
++        if (!field(descriptor, "protocol", true).equals("1")) fail("Unsupported presentation choice group protocol");
++        var id = field(descriptor, "id", true);
++        field(descriptor, "name", true);
++        var text = field(descriptor, "text", true);
++        try { if (Integer.parseInt(field(descriptor, "columns", true)) < 1) fail("Choice group columns must be positive"); }
++        catch (NumberFormatException e) { fail("Choice group columns must be a positive integer"); }
++        var control = field(descriptor, "control", true);
++        if (!control.equals("radio") && !control.equals("checkbox")) fail("Unknown choice group control");
++        var members = descriptor.getExtension().stream().filter(e -> e.getUrl().equals("member")).toList();
++        if (members.isEmpty()) fail("Empty choice group");
++        var memberProfiles = new HashSet<String>();
++        for (var member : members) {
++            if (!memberProfiles.add(field(member, "profile", true))) fail("Duplicate choice group member profile");
++            field(member, "text", true);
++        }
++        var wrapperId = linkId(id);
++        QuestionnaireItemComponent wrapper = null;
++        for (var item : flatten(q.getItem())) {
++            var marker = item.getExtensionByUrl(URL);
++            if (marker != null) {
++                if (field(marker, "id", true).equals(id)) {
++                    if (wrapper != null || !marker.equalsDeep(descriptor) || !q.getItem().contains(item) || item.getType() != QuestionnaireItemType.GROUP || item.getRepeats() || item.hasDefinition() || item.hasEnableWhen() || item.getReadOnly() || !item.getLinkId().equals(wrapperId)) fail("Incompatible existing choice group");
++                    wrapper = item;
++                } else if (marker.getExtension().stream().filter(e -> e.getUrl().equals("member")).anyMatch(e -> memberProfiles.contains(field(e, "profile", true)))) fail("Question profile belongs to another choice group");
++            }
++            if (item.getLinkId().equals(wrapperId) && marker == null) fail("Choice group linkId collision");
++        }
++        var ordered = new ArrayList<QuestionnaireItemComponent>();
++        for (var member : members) {
++            var profile = field(member, "profile", true);
++            var matches = profileRoots(q.getItem(), profile);
++            if (matches.size() > 1) fail("Duplicate question profile roots: " + profile);
++            var item = matches.isEmpty() ? null : matches.get(0);
++            if (item != null && !q.getItem().contains(item) && (wrapper == null || !wrapper.getItem().contains(item))) fail("Cannot move choice group member from an existing parent: " + profile);
++            if (item == null) {
++                if (wrapper != null) fail("Existing choice group is missing a member");
++                item = generate.apply(profile);
++                if (item == null || !profile.equals(profileOf(item))) fail("Generated question has wrong profile");
++                // Attach sequentially so generation sees all prior descendant IDs.
++                q.addItem(item);
++            }
++            validateMember(item);
++            item.setText(field(member, "text", true));
++            var description = field(member, "description", false);
++            if (description != null && !item.hasExtension(URL + "-description")) item.addExtension(new Extension(URL + "-description", new org.hl7.fhir.r4.model.MarkdownType(description)));
++            ordered.add(item);
++        }
++        if (wrapper == null) {
++            wrapper = new QuestionnaireItemComponent().setLinkId(wrapperId).setType(QuestionnaireItemType.GROUP).setText(text).setRepeats(false);
++            wrapper.addExtension(descriptor.copy());
++            wrapper.addExtension(new Extension(ITEM_CONTROL, new CodeableConcept().addCoding(new org.hl7.fhir.r4.model.Coding("http://hl7.org/fhir/questionnaire-item-control", "list", null))));
++            var description = field(descriptor, "description", false);
++            if (description != null) wrapper.addItem(new QuestionnaireItemComponent().setLinkId(wrapperId + "-help").setType(QuestionnaireItemType.DISPLAY).setText(description));
++            q.addItem(wrapper);
++        } else if (wrapper.getItem().stream().filter(i -> i.getType() != QuestionnaireItemType.DISPLAY).count() != ordered.size()) fail("Existing choice group contains unexpected members");
++        for (var item : ordered) {
++            q.getItem().remove(item);
++            if (!wrapper.getItem().contains(item)) wrapper.addItem(item);
++        }
++        var ids = new HashSet<String>();
++        for (var item : flatten(q.getItem())) if (!item.hasLinkId() || !ids.add(item.getLinkId())) fail("Duplicate Questionnaire linkId");
++    }
++
++    private static void validateMember(QuestionnaireItemComponent root) {
++        var count = 0;
++        for (var item : flatten(List.of(root))) {
++            if (item.getRepeats()) fail("Repeating choice group member");
++            if (item.getType() == QuestionnaireItemType.BOOLEAN) count++;
++            else if (item.getType() != QuestionnaireItemType.GROUP && item.getType() != QuestionnaireItemType.DISPLAY) fail("Choice group members must contain a single Boolean question");
++        }
++        if (count != 1) fail("Choice group members must contain a single Boolean question");
++    }
++    private static String profileOf(QuestionnaireItemComponent item) { return item.hasDefinition() ? item.getDefinition().split("#")[0] : null; }
++    private static List<QuestionnaireItemComponent> profileRoots(List<QuestionnaireItemComponent> items, String profile) {
++        var found = new ArrayList<QuestionnaireItemComponent>();
++        for (var item : items) {
++            if (profile.equals(profileOf(item))) found.add(item);
++            else found.addAll(profileRoots(item.getItem(), profile));
++        }
++        return found;
++    }
++    private static List<QuestionnaireItemComponent> flatten(List<QuestionnaireItemComponent> items) {
++        var found = new ArrayList<QuestionnaireItemComponent>();
++        for (var item : items) { found.add(item); found.addAll(flatten(item.getItem())); }
++        return found;
++    }
++    private static String field(Extension extension, String key, boolean required) {
++        var fields = extension.getExtensionsByUrl(key);
++        if (fields.size() > 1 || (required && fields.isEmpty())) fail("Missing or duplicate choice group field: " + key);
++        if (fields.isEmpty()) return null;
++        var expectedType = switch (key) {
++            case "protocol", "columns" -> "integer";
++            case "profile" -> "canonical";
++            case "control" -> "code";
++            case "description" -> "markdown";
++            default -> "string";
++        };
++        if (!fields.get(0).hasValue() || !fields.get(0).getValue().fhirType().equals(expectedType)) fail("Wrong choice group field type: " + key);
++        var value = fields.get(0).hasValue() ? fields.get(0).getValue().primitiveValue() : null;
++        if (value == null || value.isBlank()) fail("Empty choice group field: " + key);
++        return value;
++    }
++    private static String linkId(String id) {
++        try { return "crl-choice-group-" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(id.getBytes(StandardCharsets.UTF_8))); }
++        catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
++    }
++    private static void fail(String message) { throw new IllegalArgumentException(message); }
++}
+diff --git a/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationChoiceGroupTests.java b/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationChoiceGroupTests.java
+new file mode 100644
+--- /dev/null
++++ b/cqf-fhir-cr/src/test/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationChoiceGroupTests.java
+@@ -0,0 +1,111 @@
++package org.opencds.cqf.fhir.cr.plandefinition.apply;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++import ca.uhn.fhir.context.FhirVersionEnum;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.concurrent.atomic.AtomicInteger;
++import org.hl7.fhir.r4.model.*;
++import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent;
++import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemType;
++import org.junit.jupiter.api.Test;
++import org.opencds.cqf.fhir.cr.questionnaire.generate.ItemGenerator;
++import org.opencds.cqf.fhir.utility.adapter.IAdapterFactory;
++
++class PresentationChoiceGroupTests {
++    @Test void refusesMalformedAnnotatedInputsBeforeGeneration() {
++        var input = new DataRequirement(); input.addExtension(descriptor());
++        var adapter = IAdapterFactory.forFhirVersion(FhirVersionEnum.R4).createDataRequirement(input);
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.process(null, adapter, null, null));
++        input.addProfile("https://example.org/a"); input.addExtension(descriptor());
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.process(null, adapter, null, null));
++        var e = descriptor(); e.getExtensionByUrl("protocol").setValue(new StringType("1"));
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.collect(new Questionnaire(), e, p -> null));
++    }
++    private Extension descriptor() {
++        var e = new Extension(PresentationChoiceGroupProcessor.URL);
++        e.addExtension("protocol", new IntegerType(1));
++        e.addExtension("id", new StringType("[\"https://example.org/Library/Owner\",\"1\",\"Symptoms\"]"));
++        e.addExtension("name", new StringType("Symptoms"));
++        e.addExtension("text", new StringType("Which symptoms apply?"));
++        e.addExtension("columns", new IntegerType(2));
++        e.addExtension("control", new CodeType("checkbox"));
++        for (var profile : List.of("https://example.org/a", "https://example.org/b")) {
++            var member = new Extension("member");
++            member.addExtension("profile", new CanonicalType(profile));
++            member.addExtension("text", new StringType(profile));
++            e.addExtension(member);
++        }
++        return e;
++    }
++    private QuestionnaireItemComponent item(Questionnaire q, String profile) {
++        var adapter = IAdapterFactory.forFhirVersion(FhirVersionEnum.R4).createQuestionnaire(q);
++        var id = ItemGenerator.nextRootLinkId(adapter.getItem());
++        var item = new QuestionnaireItemComponent().setLinkId(id).setType(QuestionnaireItemType.BOOLEAN)
++                .setDefinition(profile + "#Observation.value[x]");
++        item.addExtension("http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract", new CanonicalType(profile));
++        return item;
++    }
++    @Test void gathersOnceAndPreservesIndependentOriginalItems() {
++        var q = new Questionnaire();
++        var made = new ArrayList<QuestionnaireItemComponent>();
++        PresentationChoiceGroupProcessor.collect(q, descriptor(), profile -> {
++            var m = item(q, profile);
++            m.addInitial().setValue(new BooleanType(made.isEmpty()));
++            made.add(m);
++            return m;
++        });
++        var wrapper = q.getItemFirstRep();
++        assertEquals(QuestionnaireItemType.GROUP, wrapper.getType());
++        assertFalse(wrapper.hasDefinition());
++        assertFalse(wrapper.getRepeats());
++        assertEquals(made, wrapper.getItem());
++        assertEquals(List.of("1", "2"), made.stream().map(QuestionnaireItemComponent::getLinkId).toList());
++        assertTrue(((BooleanType) made.get(0).getInitialFirstRep().getValue()).booleanValue());
++        assertFalse(((BooleanType) made.get(1).getInitialFirstRep().getValue()).booleanValue());
++        PresentationChoiceGroupProcessor.collect(q, descriptor().copy(), profile -> { fail("Must reuse original items"); return null; });
++        assertEquals(1, q.getItem().size());
++        assertEquals("3", item(q, "https://example.org/ordinary").getLinkId());
++        assertEquals(2, IAdapterFactory.forFhirVersion(FhirVersionEnum.R4).createQuestionnaire(q).getAllItemDefinitions().size());
++    }
++    @Test void movesOnlyTopLevelOriginalRootsAndPreservesReferences() {
++        var q = new Questionnaire();
++        var old = item(q, "https://example.org/a");
++        old.setLinkId("2");
++        old.addEnableWhen().setQuestion("gate").setOperator(Questionnaire.QuestionnaireItemOperator.EQUAL).setAnswer(new BooleanType(true));
++        q.addItem(old);
++        PresentationChoiceGroupProcessor.collect(q, descriptor(), profile -> item(q, profile));
++        assertSame(old, q.getItemFirstRep().getItemFirstRep());
++        assertEquals("gate", old.getEnableWhenFirstRep().getQuestion());
++        assertEquals("2", old.getLinkId());
++    }
++    @Test void refusesLossOfSuppliedConditionalParent() {
++        var q = new Questionnaire();
++        var parent = q.addItem().setLinkId("parent").setType(QuestionnaireItemType.GROUP);
++        parent.addEnableWhen().setQuestion("gate").setOperator(Questionnaire.QuestionnaireItemOperator.EQUAL).setAnswer(new BooleanType(true));
++        var old = item(q, "https://example.org/a"); parent.addItem(old);
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.collect(q, descriptor(), p -> item(q, p)));
++        assertSame(old, parent.getItemFirstRep());
++    }
++    @Test void rejectsConflictingMetadataAndProfileOwnership() {
++        var q = new Questionnaire();
++        PresentationChoiceGroupProcessor.collect(q, descriptor(), p -> item(q, p));
++        var conflicting = descriptor(); conflicting.getExtensionByUrl("text").setValue(new StringType("Different"));
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.collect(q, conflicting, p -> item(q, p)));
++        var other = descriptor(); other.getExtensionByUrl("id").setValue(new StringType("other-owner"));
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.collect(q, other, p -> item(q, p)));
++    }
++    @Test void rejectsMissingAndDuplicateProfiles() {
++        var q = new Questionnaire();
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.collect(q, descriptor(), p -> null));
++        var e = descriptor(); e.addExtension(e.getExtensionsByUrl("member").get(0).copy());
++        assertThrows(IllegalArgumentException.class, () -> PresentationChoiceGroupProcessor.collect(q, e, p -> item(q, p)));
++    }
++    @Test void allocatorChecksDescendantPrefixes() {
++        var q = new Questionnaire();
++        var root = q.addItem().setLinkId("wrapper").setType(QuestionnaireItemType.GROUP);
++        root.addItem().setLinkId("2.1").setType(QuestionnaireItemType.BOOLEAN);
++        assertEquals("3", item(q, "https://example.org/ordinary").getLinkId());
++    }
++}

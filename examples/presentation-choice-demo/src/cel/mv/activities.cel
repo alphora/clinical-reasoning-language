@@ -1,0 +1,91 @@
+// Synthetic examples for the multi-select presentation.
+library "Activity Choice Examples".
+covers "Activity Choices".
+
+fact "Demo Person":
+- name is "Demo Person".
+- birth date is "1980-01-01".
+- defined by "Patient".
+
+fact "read-book true":
+- date is "2026-10-22".
+- value is true.
+- defined by "Activity Choices"."Read a Book".
+
+fact "read-book false":
+- date is "2026-10-22".
+- value is false.
+- defined by "Activity Choices"."Read a Book".
+
+fact "take-walk true":
+- date is "2026-10-22".
+- value is true.
+- defined by "Activity Choices"."Take a Walk".
+
+fact "take-walk false":
+- date is "2026-10-22".
+- value is false.
+- defined by "Activity Choices"."Take a Walk".
+
+fact "listen-music true":
+- date is "2026-10-22".
+- value is true.
+- defined by "Activity Choices"."Listen to Music".
+
+fact "listen-music false":
+- date is "2026-10-22".
+- value is false.
+- defined by "Activity Choices"."Listen to Music".
+
+fact "draw-picture true":
+- date is "2026-10-22".
+- value is true.
+- defined by "Activity Choices"."Draw a Picture".
+
+fact "draw-picture false":
+- date is "2026-10-22".
+- value is false.
+- defined by "Activity Choices"."Draw a Picture".
+
+fact "play-game true":
+- date is "2026-10-22".
+- value is true.
+- defined by "Activity Choices"."Play a Game".
+
+fact "play-game false":
+- date is "2026-10-22".
+- value is false.
+- defined by "Activity Choices"."Play a Game".
+
+fact "watch-film true":
+- date is "2026-10-22".
+- value is true.
+- defined by "Activity Choices"."Watch a Film".
+
+fact "watch-film false":
+- date is "2026-10-22".
+- value is false.
+- defined by "Activity Choices"."Watch a Film".
+
+case "Two activities selected":
+- id is "two-selected".
+- subject is "Demo Person".
+- fact is "read-book true".
+- fact is "take-walk false".
+- fact is "listen-music true".
+- fact is "draw-picture false".
+- fact is "play-game false".
+- fact is "watch-film false".
+- result is "Activity Review" is "certify.Met".
+
+case "All activities answered No":
+- id is "all-no".
+- subject is "Demo Person".
+- fact is "read-book false".
+- fact is "take-walk false".
+- fact is "listen-music false".
+- fact is "draw-picture false".
+- fact is "play-game false".
+- fact is "watch-film false".
+- result is "Activity Review" is "not-certify.Unmet".
+

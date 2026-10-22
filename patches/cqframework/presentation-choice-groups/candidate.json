@@ -1,0 +1,15 @@
+{
+  "status": "Protocol 1 runtime selected for CRL 6.4.42; source and native qualification recorded in release evidence",
+  "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
+  "patches": [
+    "../security-20261002/dependencies.patch",
+    "groups.patch"
+  ],
+  "patchSha256": "d23d6bf981f9522cecbe99fd609e20e7f353aa98976bcd16c02904af78a45de8",
+  "jarSha256": "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
+  "jarBytes": 216643643,
+  "javaMajor": 17,
+  "protocol": 1,
+  "releaseTag": "engine-dcac972f-presentation-groups-20261022",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar"
+}

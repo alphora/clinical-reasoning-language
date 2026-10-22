@@ -1,9 +1,10 @@
 import type { CRLError } from "../types/errors";
 import type { EmittedResource } from "./types";
+import { PRESENTATION_CHOICE_GROUP_URL, type PresentationExtension } from "./presentationGroups";
 
 type Action = {
   condition?: unknown[];
-  input?: { profile?: string[]; extension?: { url?: string; valueString?: string; valueMarkdown?: string }[] }[];
+  input?: { profile?: string[]; extension?: PresentationExtension[] }[];
   action?: Action[];
   extension?: { url?: string; valueString?: string; valueCode?: string }[];
   definitionCanonical?: string;
@@ -87,10 +88,24 @@ export function checkPresentationReachability(resources: readonly EmittedResourc
   }
   const ownInputs = (action: Action, path: string): Summary => {
     const result = empty();
-    for (const input of action.input ?? []) for (const profile of input.profile ?? []) {
+    for (const input of action.input ?? []) {
+      const group = input.extension?.find(e => e.url === PRESENTATION_CHOICE_GROUP_URL)?.extension;
+      if (group) {
+        const id = group.find(e => e.url === "id")?.valueString;
+        for (const member of group.filter(e => e.url === "member")) {
+          const profile = member.extension?.find(e => e.url === "profile")?.valueCanonical;
+          if (!profile) continue;
+          const wording = JSON.stringify([member.extension?.find(e => e.url === "text")?.valueString ?? "",
+            member.extension?.find(e => e.url === "description")?.valueMarkdown ?? "", id]);
+          merge(result, { inputs: new Map([[profile, new Map([[wording, path]])]]), errors: new Map() }, true, path);
+        }
+        continue;
+      }
+      for (const profile of input.profile ?? []) {
       const wording = JSON.stringify([input.extension?.find(e => e.url === textUrl)?.valueString ?? profileNames.get(profile) ?? "",
         input.extension?.find(e => e.url === descriptionUrl)?.valueMarkdown ?? ""]);
       merge(result, { inputs: new Map([[profile, new Map([[wording, path]])]]), errors: new Map() }, true, path);
+      }
     }
     return result;
   };

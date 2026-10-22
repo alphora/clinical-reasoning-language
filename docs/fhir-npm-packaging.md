@@ -6,7 +6,7 @@
 crl-package-fhir --project /absolute/path/to/project
 ```
 
-The MCP equivalent is `package_fhir({projectRoot: "/absolute/path/to/project"})`. The core API exports `packageFhir`. Optional `outputFile` (`--out`) selects an absolute `.tgz` destination; optional `packageId` (`--package-id`) overrides `crl.packageId`. The CLI also accepts relative paths and resolves them from the working directory.
+The MCP equivalent is `package_fhir({projectRoot: "/absolute/path/to/project"})`. The core API exports `packageFhir`. Optional `outputFile` (`--out`) selects an absolute `.tgz` destination; optional `packageId` (`--package-id`) overrides root `package.json.packageId`. Existing `crl.packageId` is accepted when the root field is absent. A present invalid root value is rejected. The CLI also accepts relative paths and resolves them from the working directory.
 
 Project metadata example (use your own identity, author and applicable license):
 
@@ -14,11 +14,11 @@ Project metadata example (use your own identity, author and applicable license):
 {
   "name": "example-policy",
   "version": "1.0.0",
+  "packageId": "org.example.policy",
   "description": "Example decision support definitions",
   "author": "Example Organization",
   "crl": {
     "canonicalBase": "https://example.org/fhir",
-    "packageId": "org.example.policy",
     "fhirDependencies": {
       "hl7.fhir.uv.cpg": "2.0.0",
       "hl7.fhir.uv.crmi": "2.0.0"

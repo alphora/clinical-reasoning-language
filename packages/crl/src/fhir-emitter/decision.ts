@@ -1,4 +1,5 @@
 import type { PresentationCatalog } from "../emit/presentation";
+import { choiceGroupExtension } from "./presentationGroups";
 /**
  * CRL Decision → cpg-strategydefinition / crmi-publishableplandefinition
  * PlanDefinition emit (Todo 3, Decision lane).
@@ -152,6 +153,7 @@ export type PublicationGuardTargetResolver = (ref: ReferenceName) => Publication
 
 /** One action-level case-feature input (DTR pattern). */
 export interface CaseFeatureInput {
+  presentationGroup?: import("./presentationGroups").ChoiceGroupInput;
   /** CRL concept name, used as question text when no presentation is authored. */
   name: string;
   /** Owning catalog; imported input presentation is inherited, never overridden by a namesake. */
@@ -787,7 +789,7 @@ function buildActionInputs(
   const seenCanonicals = new Set<string>();
   const inputs: Array<Record<string, unknown>> = [];
   for (const conceptName of conceptNames) {
-    for (const { name, canonical, resourceType, presentationOwner } of ctx.caseFeatureInputResolver(conceptName)) {
+    for (const { name, canonical, resourceType, presentationOwner, presentationGroup } of ctx.caseFeatureInputResolver(conceptName)) {
       const catalog = presentationOwner ?? ctx.presentations;
       const occurrenceContexts = catalog && catalog === ctx.presentations
         ? catalog.contextsForInput(ctx.presentationCondition, canonical, ctx.caseFeatureInputResolver) : [undefined];
@@ -816,10 +818,22 @@ function buildActionInputs(
       }
       if (seenCanonicals.has(canonical)) continue;
       seenCanonicals.add(canonical);
+      // REFACTOR:grounded: ordinary CPG wording stays intelligible when an engine ignores grouping.
+      const inputText = presentationGroup
+        ? `${presentationGroup.questionText}: ${wording?.questionText ?? name}` : wording?.questionText;
       const extensions = [
-          ...(wording?.questionText ? [{ url: CPG_INPUT_TEXT_EXT, valueString: wording.questionText }] : []),
+          ...(inputText ? [{ url: CPG_INPUT_TEXT_EXT, valueString: inputText }] : []),
           ...(wording?.questionDescription ? [{ url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: wording.questionDescription }] : []),
+          ...(presentationGroup && catalog ? [choiceGroupExtension(presentationGroup, catalog, occurrenceContexts[0] === undefined ? undefined : { decision: ctx.decisionName, criteria: occurrenceContexts[0] })] : []),
         ];
+      if (presentationGroup && catalog) for (const member of presentationGroup.members) {
+        const variants = occurrenceContexts.map(criteria => {
+          const resolution = catalog.resolveOccurrence(member.name, criteria === undefined ? undefined : { decision: ctx.decisionName, criteria });
+          for (const diagnostic of resolution.diagnostics) if (!ctx.errors.some(e => e.kind === diagnostic.kind && e.message === diagnostic.message)) ctx.errors.push({ type: "Validation", kind: diagnostic.kind, message: diagnostic.message });
+          return JSON.stringify(resolution.wording);
+        });
+        if (new Set(variants).size > 1) ctx.errors.push({ type: "Validation", kind: "presentation-overlap", message: `Choice group "${presentationGroup.name}" member "${member.name}" has conflicting presentations within decision "${ctx.decisionName}".` });
+      }
       inputs.push({
         ...(extensions.length ? { extension: extensions } : {}),
         // REFACTOR:grounded (charter §4) — the case-feature's NATURAL resource type (always present; the

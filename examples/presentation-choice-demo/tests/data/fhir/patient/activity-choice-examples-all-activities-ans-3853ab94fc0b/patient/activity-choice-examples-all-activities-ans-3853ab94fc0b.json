@@ -1,0 +1,21 @@
+{
+  "resourceType": "Patient",
+  "id": "activity-choice-examples-all-activities-ans-3853ab94fc0b",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/us/qicore/StructureDefinition/qicore-patient"
+    ]
+  },
+  "identifier": [
+    {
+      "system": "http://example.org/crl/presentation-choice-demo/identifier/cel-test-patient",
+      "value": "activity-choice-examples-all-activities-ans-3853ab94fc0b"
+    }
+  ],
+  "name": [
+    {
+      "text": "Demo Person"
+    }
+  ],
+  "birthDate": "1980-01-01"
+}

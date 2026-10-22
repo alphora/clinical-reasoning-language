@@ -1,0 +1,12 @@
+{
+  "comparedTo": "../security-20261002/nested-jars.json",
+  "candidateJarSha256": "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
+  "delta": {
+    "added": [],
+    "removed": [],
+    "changed": [
+      "BOOT-INF/lib/cqf-fhir-cr-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+    ]
+  },
+  "scope": "Nested dependency bytes comparison, not a current vulnerability scan."
+}

@@ -1,0 +1,20 @@
+{
+  "name": "presentation-choice-demo",
+  "version": "0.0.0",
+  "private": true,
+  "crl": {
+    "name": "Multi-select Presentation Demo",
+    "canonicalBase": "http://example.org/crl/presentation-choice-demo",
+    "status": "draft",
+    "experimental": true,
+    "date": "2026-10-22",
+    "dispositions": {
+      "version": 1,
+      "mode": "embedded",
+      "options": {
+        "certify": { "Met": { "label": "At least one activity selected" } },
+        "not-certify": { "Unmet": { "label": "No Yes answer recorded" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "celLibrary": "mv",
+  "useCase": "prior-auth",
+  "generatedAt": "2026-10-22T09:19:30.418Z",
+  "provenance": {
+    "crlVersion": "6.4.42",
+    "producerJarSha256": "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
+    "inputClock": "2026-10-22T09:19:27.420Z",
+    "runtimeSha256": "b45723f553fc41a48dc33a0e61520caed58cd01701f032afc85d0b505d001fa3",
+    "definitionClosureSha256": "24f47801b13eb4750814aacc3e09ee11cc77f65ecc6052738912732d3aab22e2"
+  },
+  "cases": [
+    {
+      "caseName": "Two activities selected",
+      "compartmentDir": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "presentation-choice-demo-activity-choice-examples-t-d47d0a756337",
+          "path": "tests/results/fhir/patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/questionnaire/presentation-choice-demo-activity-choice-examples-t-d47d0a756337.json",
+          "sha256": "c33bef45cc44e22522ec502f0ed19c155f4ca068c627717652f4d5198fe47bd4",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "presentation-choice-demo-activity-choice-examples-t-d47d0a756337",
+          "path": "tests/results/fhir/patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/questionnaireresponse/presentation-choice-demo-activity-choice-examples-t-d47d0a756337.json",
+          "sha256": "608a94402b7fe818b368b724aaf0234d8a562b59a98cf0f74de5099d0e2b088e",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/activities.cel",
+      "caseId": "two-selected",
+      "inputSha256": "36210ff92274109e83e5da7cac9c04b7ff6b9260c29f804837560a1788ee0b9b",
+      "producedAt": "2026-10-22T09:19:30.421Z"
+    },
+    {
+      "caseName": "All activities answered No",
+      "compartmentDir": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b",
+      "state": "generated",
+      "artifacts": [
+        {
+          "id": "presentation-choice-demo-activity-choice-examples-a-48287d29900b",
+          "path": "tests/results/fhir/patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/questionnaire/presentation-choice-demo-activity-choice-examples-a-48287d29900b.json",
+          "sha256": "68addb9581aa60e981aa9606fc37ca81cab169c7e22565b6fadda764d4e62a09",
+          "resourceType": "Questionnaire"
+        },
+        {
+          "id": "presentation-choice-demo-activity-choice-examples-a-48287d29900b",
+          "path": "tests/results/fhir/patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/questionnaireresponse/presentation-choice-demo-activity-choice-examples-a-48287d29900b.json",
+          "sha256": "21db6a0e6c98f191ab9591bcd96776808b4606e8cbbe9c3845c94a0428dd7b92",
+          "resourceType": "QuestionnaireResponse"
+        }
+      ],
+      "sourceFile": "src/cel/mv/activities.cel",
+      "caseId": "all-no",
+      "inputSha256": "00b7e54dfdb2f0c1d5dccb313ebe1ca6c7d76faaa3a41491ce5b73231d04f504",
+      "producedAt": "2026-10-22T09:19:43.222Z"
+    }
+  ]
+}

@@ -2,6 +2,27 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Run Multi-select Demo (isolated)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensions-dir=${workspaceFolder}/tmp/crl-debug-extensions",
+        "--disable-extensions",
+        "--user-data-dir=${workspaceFolder}/tmp/presentation-choice-debug/profile",
+        "--extensionDevelopmentPath=${workspaceFolder}/tmp/presentation-choice-debug/extension",
+        "${workspaceFolder}/examples/presentation-choice-demo/medical-validation.code-workspace"
+      ],
+      "env": {
+        "TEMP": "${workspaceFolder}/tmp/presentation-choice-debug/temp",
+        "TMP": "${workspaceFolder}/tmp/presentation-choice-debug/temp",
+        "HOME": "${workspaceFolder}/tmp/presentation-choice-debug/runtime-home"
+      },
+      "outFiles": [
+        "${workspaceFolder}/tmp/presentation-choice-debug/extension/dist/**/*.js"
+      ],
+      "preLaunchTask": "prepare-multiselect-demo"
+    },
+    {
       "name": "Run Bleph Medical Validation (isolated)",
       "type": "extensionHost",
       "request": "launch",

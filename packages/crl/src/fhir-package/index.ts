@@ -122,8 +122,8 @@ export async function packageFhir(options: PackageFhirOptions): Promise<PackageF
     const normalized = normalizePackageMetadata(raw);
     requireThat(normalized.metadata, normalized.errors.map(e => e.message).join("\n"));
     const metadata = normalized.metadata;
-    const packageId = options.packageId ?? raw.crl?.packageId;
-    requireThat(typeof packageId === "string" && packageId.length <= 64 && packageName.test(packageId), "Provide crl.packageId (or packageId): a dotted lowercase FHIR package ID, at most 64 characters. Keep package.json name as the policy ID.");
+    const packageId = options.packageId ?? (raw.packageId !== undefined ? raw.packageId : raw.crl?.packageId);
+    requireThat(typeof packageId === "string" && packageId.length <= 64 && packageName.test(packageId), "Provide root package.json packageId (or an explicit packageId override): a dotted lowercase FHIR package ID, at most 64 characters. Keep package.json name as the policy ID.");
     requireThat(semver.test(metadata.version), "package.json version must be a SemVer 2.0.0 version.");
     requireThat(nonempty(raw.author) || (object(raw.author) && nonempty(raw.author.name)), "package.json author is required for FHIR packaging.");
     requireThat(nonempty(raw.description), "package.json description is required for FHIR packaging.");

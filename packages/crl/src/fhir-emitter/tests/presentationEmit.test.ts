@@ -35,6 +35,67 @@ function inputs(value: any): any[] {
     ...Object.entries(value).filter(([key]) => key !== "input").flatMap(([, child]) => inputs(child))] : [];
 }
 function inputText(input: any) { return input.extension?.find((e: any) => e.url.endsWith("cpg-input-text"))?.valueString; }
+
+describe("choice group descriptors", () => {
+  const group = `presentation group "Panel": - question text is "Select all that apply". - columns is 2. - control is checkbox.
+presentation for "Answer": - question text is "Answer?". - choice group is "Panel".
+presentation for "Later": - question text is "Later?". - choice group is "Panel".
+`;
+  const concepts = answer + answer.replaceAll("Answer", "Later").replace("`answer`", "`later`");
+  // @kit concept-presentation:choice-group-emission
+  it("carries every ordered member including an otherwise unused question, with stable semantic identity", () => {
+    const source = `library "P". ${concepts}${activity}${group}decision "D": - when "Answer" then recommend activity "Met".`;
+    const result = emit(source);
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    const descriptors = inputs(result.resources).flatMap(i => i.extension?.filter((e: any) => e.url.endsWith("/presentation-choice-group")) ?? []);
+    expect(descriptors.length).toBeGreaterThan(0);
+    const data = descriptors[0].extension;
+    expect(data.find((e: any) => e.url === "protocol").valueInteger).toBe(1);
+    const identity = JSON.parse(data.find((e: any) => e.url === "id").valueString);
+    expect(identity).toEqual([expect.stringContaining("/Library/"), "1.0.0", "Panel"]);
+    const members = data.filter((e: any) => e.url === "member").map((e: any) => e.extension);
+    expect(members.map((m: any) => m.find((e: any) => e.url === "text").valueString)).toEqual(["Answer?", "Later?"]);
+    // Ordinary CPG consumers keep the authored group question; capable engines use original member text above.
+    const groupedInputs = inputs(result.resources).filter(i => i.extension?.some((e: any) => e.url.endsWith("/presentation-choice-group")));
+    expect(groupedInputs.every(i => inputText(i)?.startsWith("Select all that apply: "))).toBe(true);
+    for (const m of members) expect(result.resources.some(r => (r.resource as any).url === m.find((e: any) => e.url === "profile").valueCanonical)).toBe(true);
+    expect(inputs(emit(source).resources).flatMap(i => i.extension ?? []).filter((e: any) => e.url.endsWith("/presentation-choice-group"))).toEqual(descriptors);
+  });
+  // @kit concept-presentation:choice-group-coexistence
+  it("rejects later conflicting scoped wording exposed by collective gathering", () => {
+    const result = emit(`library "P". ${concepts}${activity}${group}
+criterion "Later Scope": - when ("Later").
+presentation for "Later": - in criterion "Later Scope". - question text is "Different later?".
+decision "D": - when "Answer" then: - when "Later Scope" then recommend activity "Met". end.`);
+    expect(result.success).toBe(false);
+    expect(result.errors.some(e => e.kind === "presentation-overlap")).toBe(true);
+  });
+  it("uses the actual imported owner, including across delegated decisions", () => {
+    const result = emit(`library "P". ${activity}
+decision "D": - when "Shared"."Answer" then use decision "Nested".
+decision "Nested": - when "Shared"."Later" then recommend activity "Met".`, `library "Shared". ${concepts}${group}`);
+    expect(result.success, JSON.stringify(result.errors)).toBe(true);
+    const descriptors = inputs(result.resources).flatMap(i => i.extension?.filter((e: any) => e.url.endsWith("/presentation-choice-group")) ?? []);
+    expect(descriptors.length).toBeGreaterThan(1);
+    expect(new Set(descriptors.map((d: any) => JSON.stringify(d))).size).toBe(1);
+    const id = JSON.parse(descriptors[0].extension.find((e: any) => e.url === "id").valueString);
+    expect(id[0]).toContain("Shared");
+    expect(id[0]).not.toContain(":\\");
+  });
+  it("does not alter clinical CQL or existing Boolean profile contracts", () => {
+    const ordinary=`library "P". ${concepts}${activity}decision "D": - when "Answer" then recommend activity "Met".
+presentation for "Answer": - question text is "Answer?".
+presentation for "Later": - question text is "Later?".`;
+    const grouped=ordinary.replace('question text is "Answer?".', 'question text is "Answer?". - choice group is "Panel".')
+      .replace('question text is "Later?".', 'question text is "Later?". - choice group is "Panel".')
+      + '\npresentation group "Panel": - question text is "Symptoms".';
+    const a=emit(ordinary),b=emit(grouped);expect(a.success).toBe(true);expect(b.success,JSON.stringify(b.errors)).toBe(true);
+    const libraries=(r:typeof a)=>r.resources.filter(x=>x.resourceType==='Library').map(x=>x.resource);
+    expect(libraries(b)).toEqual(libraries(a));
+    const originalProfile=a.resources.find(r=>r.resourceType==='StructureDefinition'&&(r.resource as any).title==='Answer');
+    expect(b.resources.find(r=>(r.resource as any).url===(originalProfile!.resource as any).url)).toEqual(originalProfile);
+  });
+});
 describe("authored presentation in emitted question inputs", () => {
   it("a source-valid wording edit still requires emission coexistence checks", () => {
     const source = `library "P".\n${answer}${activity}

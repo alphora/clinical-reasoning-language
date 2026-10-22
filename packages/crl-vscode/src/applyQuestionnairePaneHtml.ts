@@ -36,6 +36,7 @@
 /** Webview-safe URIs for the vendored LForms assets (media/lforms/). The host resolves these via
  *  `webview.asWebviewUri`; this module never constructs a path. */
 import { installBooleanAnswerClearControls } from "./lformsBooleanControls";
+import { installPresentationChoiceGroups } from "./lformsPresentationGroups";
 
 export interface ApplyQuestionnaireAssets {
   /** `zone.min.js` — Zone.js. MUST load BEFORE `lhc-forms.js`. The concatenated bundle deliberately EXCLUDES
@@ -147,6 +148,7 @@ const BOOTSTRAP = `
     var q = window.__applyQuestionnaire;
     var qr = window.__applyQuestionnaireResponse;
     if (!q) { fail("no Questionnaire was supplied."); return; }
+    (${installPresentationChoiceGroups.toString()})(el, q);
     var form = LForms.Util.convertFHIRQuestionnaireToLForms(q, "R4");
     if (!form) { fail("convertFHIRQuestionnaireToLForms returned nothing."); return; }
     if (qr) form = LForms.Util.mergeFHIRDataIntoLForms("QuestionnaireResponse", qr, form, "R4");

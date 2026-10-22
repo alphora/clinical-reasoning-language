@@ -71,6 +71,19 @@ public class ApplyDriver {
         if (session) parser.setParserErrorHandler(new ca.uhn.fhir.parser.StrictErrorHandler());
         Bundle bundle = parser.parseResource(Bundle.class,
                 new String(Files.readAllBytes(Paths.get(repoFile)), StandardCharsets.UTF_8));
+        boolean choiceGroups = false;
+        for (var entry : bundle.getEntry()) {
+            if (entry.getResource() instanceof org.hl7.fhir.r4.model.PlanDefinition plan
+                    && hasChoiceGroups(plan.getAction())) choiceGroups = true;
+        }
+        if (choiceGroups) {
+            try {
+                Class<?> capability = Class.forName("org.opencds.cqf.fhir.cr.plandefinition.apply.PresentationChoiceGroupProcessor");
+                if (capability.getField("PROTOCOL").getInt(null) != 1) throw new ReflectiveOperationException("Unsupported protocol");
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalArgumentException("CRL presentation choice groups require the protocol 1 native runtime; this engine does not support them.", e);
+            }
+        }
 
         Bundle requestData = session ? parser.parseResource(Bundle.class,
                 Files.readString(Paths.get(args[4]), StandardCharsets.UTF_8)) : null;
@@ -102,6 +115,15 @@ public class ApplyDriver {
                 (IBaseResource) null,                // contentEndpoint
                 (IBaseResource) null);               // terminologyEndpoint
 
+        if (choiceGroups) {
+            for (var outcome : ctx.newTerser().getAllPopulatedChildElementsOfType(result, org.hl7.fhir.r4.model.OperationOutcome.class)) {
+                for (var issue : outcome.getIssue()) if (issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.ERROR
+                        || issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.FATAL) {
+                    throw new IllegalStateException("CRL presentation choice group native execution failed: " + issue.getDiagnostics());
+                }
+            }
+        }
+
         // REFACTOR:grounded: session output budgets cover files, not only captured log streams.
         if (session) {
             long used = writeSessionArtifact(ctx, result, args[5] + "-result.json", fileLimit, totalLimit);
@@ -125,6 +147,14 @@ public class ApplyDriver {
         System.out.write((json + "\n").getBytes(StandardCharsets.UTF_8));
         System.out.flush();
     }
+    private static boolean hasChoiceGroups(List<org.hl7.fhir.r4.model.PlanDefinition.PlanDefinitionActionComponent> actions) {
+        for (var action : actions) {
+            for (var input : action.getInput()) if (input.hasExtension("http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group")) return true;
+            if (hasChoiceGroups(action.getAction())) return true;
+        }
+        return false;
+    }
+
     private static long writeSessionArtifact(FhirContext ctx, IBaseResource resource, String file,
             long fileLimit, long remaining) throws java.io.IOException {
         byte[] bytes = ctx.newJsonParser().setPrettyPrint(false).encodeResourceToString(resource)

@@ -105,6 +105,8 @@ Operator-approved authoring separates concept identity from wording. Named termi
 
 A presentation targets a concept with `code is`. Each declaration requires question text and may include question description; no separate label/short field is needed. Missing presentation warns. A base presentation plus one applicable scoped presentation is allowed. Multiple applicable scoped presentations are errors regardless of declaration order, and conflicting wording for one profile must not coexist in the generated form. Imported owner defaults are inherited; overriding an imported presentation remains #321. See [the language contract](named-answer-valuesets-and-presentation.md) for syntax, emitted fields, and current engine display limitations.
 
+An authored presentation choice group collects independent selected Boolean questions together when native traversal first encounters any member. This explicit presentation collection can offer a later-branch member early; it does not alter concept values, clinical operands or branch predicates. The answerless, nonrepeating wrapper preserves each original profile's population/extraction and true/false/unknown states. Checkbox mode must distinguish unanswered from explicit false. See the same language contract for the protocol 1 runtime requirement and supported member shape.
+
 ### Case Features and the iterative SDC session
 
 Operator-stated runtime contract (2026-09-06): in workflows using extraction, a concept with `code is`

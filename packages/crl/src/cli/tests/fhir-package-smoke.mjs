@@ -14,7 +14,7 @@ export async function checkFhirPackage(client, includeCli = false) {
     mkdirSync(join(root, "src/fhir"), { recursive: true });
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "package-test", version: "1.0.0", description: "Synthetic packaging integration test", author: "Test Author",
-      crl: { canonicalBase: "https://example.org/fhir", packageId: "org.example.package-test" },
+      packageId: "org.example.package-test", crl: { canonicalBase: "https://example.org/fhir" },
     }));
     const original = { resourceType: "PlanDefinition", id: "package-test", url: "https://example.org/fhir/PlanDefinition/package-test", version: "1.0.0", status: "draft" };
     writeFileSync(join(root, "src/fhir/definition.json"), JSON.stringify(original));

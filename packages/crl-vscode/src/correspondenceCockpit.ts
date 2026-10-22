@@ -10,6 +10,7 @@ import { traversalRouteNeighbors, type BranchIdentity } from "./branchNavigation
 import { allRouteVerdictsApproved, summarizeBranchVerdict } from "./branchVerdict";
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
 import {installBooleanAnswerClearControls} from "./lformsBooleanControls";
+import {installPresentationChoiceGroups} from "./lformsPresentationGroups";
 // REFACTOR:grounded: pinned route cards and coordinated direct edits (docs/medical-validation-plan.md).
 // Correspondence cockpit SHELL (thin vscode) — three-pane viewer C2a (#156).
 // Wires the pure cores to VS Code: a CRL activity-bar navigator (TreeView) + three webview panes (Source rendered;
@@ -6121,7 +6122,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // textarea by its key (+ the focused one's caret), swap, then restore matching textareas. A SENT note doesn't reappear
   // because the click handler cleared its textarea BEFORE this render arrived (snapshot already empty).
   `if(m.type==='render'){var _d={},_a=null,_s=0,_e=0;` +
-  `if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
+  `if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');_d[k]=ta.value;if(ta===document.activeElement){_a=k;_s=ta.selectionStart;_e=ta.selectionEnd;}}` +
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
@@ -6241,13 +6242,13 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // so the pane shows "could not find" until you select a different case and come back. That is precisely the
   // workflow this pane exists for.
   `if(m.key&&m.key===window.__aqKey)return;` +
-  `if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
+  `if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
   `window.__aqKey=undefined;` +
   `const host=document.getElementById('root');` +
   // The case header mirrors the CRL Questionnaire pane's, so the two panes read as the same case side by side.
   `const head=(t)=>{const h=document.createElement('p');h.className='aq-case';h.textContent=t;return h;};` +
   `const addHeader=()=>{if(m.label)host.appendChild(head('Case - '+m.label));if(m.stale||m.definitionState==='checking'||m.definitionState==='unknown'){const p=document.createElement('p');p.className='aq-warning';p.setAttribute('role','status');p.textContent=m.stale?'Historical questionnaire: policy definitions changed. Regenerate native results to refresh this saved form.':m.definitionState==='checking'?'Checking policy definitions; this saved form has not been verified against them.':'Current policy definitions could not be verified. This saved form is retained for inspection.';host.appendChild(p);}};` +
-  `const fail=(t)=>{if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}host.replaceChildren();addHeader();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
+  `const fail=(t)=>{if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}host.replaceChildren();addHeader();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
   `if(!m.label){fail('Select a case to see its FHIR questionnaire.');return;}` +
   // Distinguish "nothing selected" from "selected, but the producer has written nothing for it" — the second is
   // the normal state until #277 lands, and saying WHERE we looked is what makes it actionable.
@@ -6266,6 +6267,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `host.appendChild(c);}` +
   `const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
   `window.__aqClearDispose=(${installBooleanAnswerClearControls.toString()})(mount);` +
+  `window.__aqGroupDispose=(${installPresentationChoiceGroups.toString()})(mount,m.q);` +
   `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
   `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
   `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +

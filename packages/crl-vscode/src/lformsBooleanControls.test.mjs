@@ -8,6 +8,7 @@ describe('Boolean control webview delivery',()=>{
     const saved=renderApplyQuestionnairePane({questionnaire:q,nonce:'n',styleNonce:'s',assets:{zoneJs:'z',lhcFormsJs:'l',lformsFhirR4Js:'f',stylesCss:'c'}}).html;
     for(const script of [interactiveQuestionnaireHtml('n','host',n=>n),saved,COCKPIT_WEBVIEW_SCRIPT]) {
       expect(script).toContain('booleanClear');expect(script).toContain('Clear answer');
+      expect(script).toContain('presentation-choice-group');expect(script).toContain('data-crl-choice-proxy');
     }
   });
   it('disposes cockpit observers before generic renders and replacement case mounts',()=>{

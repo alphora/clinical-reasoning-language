@@ -1,37 +1,38 @@
 {
-  "bytes": 216635407,
+  "bytes": 216643643,
   "upstreamFixes": {
     "askedUnknown": "0ade9a9de6621eabb5adb6ff99cbf01ab67d725d",
     "sharedInputDeduplication": "dcac972fc38bc9a29aae2c662dfb5c4917d27234"
   },
   "embeddedVersionExplanation": "Gradle derives 4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT from the crl/security-20261002 branch and available 4.13.0 tag history. The old detached build reported 0.1.0 because its checkout/tag context differed. Exact source commit plus dependency patch identifies source; SHA-256 identifies delivered bytes.",
   "patchManifests": [
-    "security-20261002/dependencies.patch"
+    "security-20261002/dependencies.patch",
+    "presentation-choice-groups/groups.patch"
   ],
   "buildLauncherJdkMajor": 17,
   "upstreamRelease": false,
   "targetJavaMajor": 17,
-  "sha256": "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b",
+  "sha256": "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
   "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  "asset": "cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
-  "buildId": "cqf-definition-dcac972f-security-20261002",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
+  "buildId": "cqf-definition-dcac972f-presentation-groups-20261022",
   "upstreamBase": "feature-definition-based-population",
   "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/dcac972fc38bc9a29aae2c662dfb5c4917d27234",
   "embeddedBuildVersion": "4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
   "license": "Apache-2.0",
   "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=3",
-  "scope": "Complete maintainer-built CLI jar from upstream dcac972f with dependency security overrides. No Java engine behavior changes or runtime overlay.",
-  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-security-20261002/cqf-fhir-cr-cli-definition-dcac972f-security-20261002.jar",
+  "scope": "Complete maintainer-built CLI from upstream dcac972f, dependency security overrides and protocol 1 independent Boolean presentation grouping. CRL syntax and clinical computation remain outside this engine patch.",
+  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-presentation-groups-20261022/cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
   "dependencyPins": {
     "hl7Core": "6.9.12",
     "jacksonBom": "2.22.3",
     "httpCore5": "5.4.4 constraint if requested; absent from resolved runtime"
   },
   "patchSha256": "6afbc5d5bbbf295fca7fbc315f347cf62eb45e7183fd4d0f0bea9a4d41fd1739",
-  "nestedJarInventory": "security-20261002/nested-jars.json",
+  "nestedJarInventory": "presentation-choice-groups/nested-jars.json",
   "runtimeDependencyInventory": "security-20261002/runtime-dependencies.json",
   "resolvedGraphDelta": "security-20261002/runtime-delta.json",
-  "toolchainChange": "Build launcher changed from JDK 23 to JDK 17; Java 17 target retained. Recompiled module bytes and dependency behavior may differ; no Java source edits.",
+  "toolchainChange": "Inherited Java 17 build and dependency security overrides; presentation-group Java source changes listed in groups.patch.",
   "resolvedGraphChanges": {
     "removed": [
       "httpclient5-5.4.3.jar",
@@ -156,5 +157,6 @@
   "qualificationLimits": [
     "Native session controls do not exercise remote terminology/FHIR-NPM package fetches through OkHttp or XSLT transformations through Saxon.",
     "All four upstream integrationTest tasks returned NO-SOURCE."
-  ]
+  ],
+  "presentationGroupPatchSha256": "d23d6bf981f9522cecbe99fd609e20e7f353aa98976bcd16c02904af78a45de8"
 }

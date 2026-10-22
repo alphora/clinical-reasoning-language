@@ -396,11 +396,11 @@ export function createServer(): McpServer {
   registerPresentationEditing(server);
   server.registerTool("package_fhir", {
     title: "Package FHIR definitions",
-    description: "Build a CRMI FHIR NPM .tgz from existing project src/fhir definitions. Includes package.json, ImplementationGuide, resource index and embedded local Library attachments. Requires author, description, SemVer version and crl.packageId (or packageId override); preserves canonical identities and source files. Replaces only the requested archive. Does not emit, publish, resolve remote dependencies or validate executable conformance.",
+    description: "Build a CRMI FHIR NPM .tgz from existing project src/fhir definitions. Includes package.json, ImplementationGuide, resource index and embedded local Library attachments. Requires author, description, SemVer version and root package.json packageId (or explicit packageId override); preserves canonical identities and source files. Legacy crl.packageId is accepted when root packageId is absent. Replaces only the requested archive. Does not emit, publish, resolve remote dependencies or validate executable conformance.",
     inputSchema: {
       projectRoot: z.string().describe("Absolute project directory containing package.json and src/fhir"),
       outputFile: z.string().optional().describe("Absolute .tgz destination; default output/package.tgz"),
-      packageId: z.string().optional().describe("Dotted FHIR NPM package ID; defaults to crl.packageId"),
+      packageId: z.string().optional().describe("Dotted FHIR NPM package ID; defaults to root package.json packageId, then legacy crl.packageId"),
     },
   }, async args => {
     const result = await packageFhir(args);

@@ -1,0 +1,129 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "presentation-choice-demo-activity-choice-examples-t-d47d0a756337",
+  "questionnaire": "http://example.org/crl/presentation-choice-demo/Questionnaire/presentation-choice-demo-activity-choice-examples-two-activities-sel-da0e18e7b8c6",
+  "status": "in-progress",
+  "subject": {
+    "reference": "Patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6"
+  },
+  "item": [
+    {
+      "linkId": "crl-choice-group-ccc2a98f9a6e3b53ba1976b2036e4b8d416778238b84fa7a60b42ccd309f736c",
+      "text": "Which activities do you enjoy? Select all that apply.",
+      "item": [
+        {
+          "linkId": "crl-choice-group-ccc2a98f9a6e3b53ba1976b2036e4b8d416778238b84fa7a60b42ccd309f736c-help",
+          "text": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "1",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book#Observation.value[x]",
+          "text": "Read a Book",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "2",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk#Observation.value[x]",
+          "text": "Take a Walk",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "3",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music#Observation.value[x]",
+          "text": "Listen to Music",
+          "answer": [
+            {
+              "valueBoolean": true
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "4",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture#Observation.value[x]",
+          "text": "Draw a Picture",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "5",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game#Observation.value[x]",
+          "text": "Play a Game",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+              "valueReference": {
+                "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+              }
+            }
+          ],
+          "linkId": "6",
+          "definition": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film#Observation.value[x]",
+          "text": "Watch a Film",
+          "answer": [
+            {
+              "valueBoolean": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

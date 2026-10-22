@@ -1,0 +1,87 @@
+// Synthetic UI demonstration; no clinical criteria.
+library "Activity Choices".
+
+concept "Read a Book":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `read-book`.
+- shape reduction is most recent.
+
+concept "Take a Walk":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `take-walk`.
+- shape reduction is most recent.
+
+concept "Listen to Music":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `listen-music`.
+- shape reduction is most recent.
+
+concept "Draw a Picture":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `draw-picture`.
+- shape reduction is most recent.
+
+concept "Play a Game":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `play-game`.
+- shape reduction is most recent.
+
+concept "Watch a Film":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `watch-film`.
+- shape reduction is most recent.
+
+presentation group "Activities":
+- question text is "Which activities do you enjoy? Select all that apply.".
+- question description is "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered.".
+- columns is 3.
+- control is checkbox.
+
+presentation for "Read a Book":
+- question text is "Read a Book".
+- choice group is "Activities".
+
+presentation for "Take a Walk":
+- question text is "Take a Walk".
+- choice group is "Activities".
+
+presentation for "Listen to Music":
+- question text is "Listen to Music".
+- choice group is "Activities".
+
+presentation for "Draw a Picture":
+- question text is "Draw a Picture".
+- choice group is "Activities".
+
+presentation for "Play a Game":
+- question text is "Play a Game".
+- choice group is "Activities".
+
+presentation for "Watch a Film":
+- question text is "Watch a Film".
+- choice group is "Activities".
+
+activity "certify.Met":
+- request CPGTaskRequest.
+- with `Met`.
+
+activity "not-certify.Unmet":
+- request CPGTaskRequest.
+- with `Unmet`.
+
+decision "Activity Review":
+first:
+- when "Read a Book" or "Take a Walk" or "Listen to Music" or "Draw a Picture" or "Play a Game" or "Watch a Film" then recommend activity "certify.Met".
+- otherwise then recommend activity "not-certify.Unmet".

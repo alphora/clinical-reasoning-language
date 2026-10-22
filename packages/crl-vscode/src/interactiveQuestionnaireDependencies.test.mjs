@@ -7,6 +7,23 @@ const bundle=action=>({entry:[{resource:{resourceType:'PlanDefinition',id:'p',ur
 const any=action=>({extension:[{url:'http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior',valueString:'any'}],action});
 const pair=()=>({q:{resourceType:'Questionnaire',item:['g','a','b','c'].map(linkId=>({linkId,type:'boolean',definition:'urn:'+linkId+'#Observation.value[x]'}))},qr:{item:['g','a','b','c'].map(linkId=>({linkId,answer:[{valueBoolean:true}]}))}});
 describe('definition-backed editing dependencies',()=>{
+  // @kit concept-presentation:choice-group-pruning
+  it('keeps collectively gathered group members as peers across nested branches',()=>{
+    const ext={url:'http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group',extension:[
+      {url:'protocol',valueInteger:1},...['urn:a','urn:b'].map(valueCanonical=>({url:'member',extension:[{url:'profile',valueCanonical}]}))]};
+    const d=bundle([{input:[{...input('urn:a').input[0],extension:[ext]}],action:[{...input('urn:b'),action:[input('urn:c')]}]}]);
+    expect(graph(d,'p')).toEqual({'urn:a':[],'urn:b':[],'urn:c':['urn:a','urn:b']});
+  });
+  it('does not make a display peer invalidate an unrelated descendant answer',()=>{
+    const extension=[{url:'http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group',extension:[
+      {url:'protocol',valueInteger:1},...['urn:a','urn:b'].map(valueCanonical=>({url:'member',extension:[{url:'profile',valueCanonical}]}))]}];
+    const dependencies=graph(bundle([{input:[{...input('urn:a').input[0],extension}],action:[input('urn:c')]}]),'p');
+    expect(dependencies).toEqual({'urn:a':[],'urn:b':[],'urn:c':['urn:a']});
+    const {q,qr}=pair(),peerEdit=structuredClone(qr);peerEdit.item.find(i=>i.linkId==='b').answer=[{valueBoolean:false}];
+    expect(prune(q,qr,peerEdit,retain,dependencies).response.item.find(i=>i.linkId==='c').answer).toEqual([{valueBoolean:true}]);
+    const guardEdit=structuredClone(qr);guardEdit.item.find(i=>i.linkId==='a').answer=[{valueBoolean:false}];
+    expect(prune(q,qr,guardEdit,retain,dependencies).response.item.some(i=>i.linkId==='c')).toBe(false);
+  });
   // @kit interactive-questionnaire:definition-pruning
   it('orders guards, preserves grouped peers and intersects independent uses',()=>{
     const d=bundle([any([{...input('urn:g')},{input:[...input('urn:a').input,...input('urn:b').input],action:[input('urn:c')]}])]);

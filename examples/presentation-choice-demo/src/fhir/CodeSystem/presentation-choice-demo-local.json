@@ -1,0 +1,61 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "presentation-choice-demo-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/presentation-choice-demo/CodeSystem/presentation-choice-demo-local",
+  "version": "0.0.0",
+  "name": "ActivityChoicesLocal",
+  "title": "Activity Choices",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-10-22T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Activity Choices",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "read-book",
+      "display": "Read a Book"
+    },
+    {
+      "code": "take-walk",
+      "display": "Take a Walk"
+    },
+    {
+      "code": "listen-music",
+      "display": "Listen to Music"
+    },
+    {
+      "code": "draw-picture",
+      "display": "Draw a Picture"
+    },
+    {
+      "code": "play-game",
+      "display": "Play a Game"
+    },
+    {
+      "code": "watch-film",
+      "display": "Watch a Film"
+    }
+  ]
+}

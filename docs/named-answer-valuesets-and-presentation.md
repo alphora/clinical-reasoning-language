@@ -2,6 +2,92 @@
 
 A concept names a clinical fact. Its question wording is authored separately. Neither question text nor description changes a concept's code, canonical identity, or computation.
 
+## Independent Boolean choice groups
+
+Use a named presentation group to display normal Boolean concepts as a select-all panel:
+
+```crl
+library "Symptoms Demo".
+
+concept "Blurred Vision":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `blurred-vision`.
+- shape reduction is most recent.
+
+concept "Eye Strain":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `eye-strain`.
+- shape reduction is most recent.
+
+presentation group "Symptoms":
+- question text is "Which symptoms apply?".
+- question description is "Select each documented symptom.".
+- columns is 3.
+- control is checkbox.
+
+presentation for "Blurred Vision":
+- question text is "Blurred vision".
+- choice group is "Symptoms".
+
+presentation for "Eye Strain":
+- question text is "Eye strain".
+- choice group is "Symptoms".
+
+activity "Record Finding":
+- request CPGTaskRequest.
+- with `Finding documented`.
+
+decision "Review":
+- when "Blurred Vision" or "Eye Strain" then recommend activity "Record Finding".
+```
+
+Each option retains its own concept, Boolean Observation, profile and selection.
+There is no shared answer terminology or multi-answer value. Use ordinary authored
+conditions to interpret the independent facts. A group requires title text; its
+description is optional. Columns must be a positive integer and default to one;
+control defaults to `radio`, or use `checkbox`. Members appear in the order of
+their default presentation declarations. This slice supports local coded selected
+Record/Observation/boolean members with most-recent shape reduction. Empty groups,
+missing/duplicate membership, incompatible members and scoped group reassignment
+are errors. Imported groups use their actual owner's metadata.
+
+At the first native encounter of any member, the complete declared panel is
+collected before population. A later-branch member can therefore appear early;
+its clinical branch condition still evaluates normally. Use separate groups when
+questions must remain private to their branches. Nonmembers and entirely
+unencountered groups keep normal collection. All co-collected wording must be
+compatible, including scoped wording. Editing a presentation peer does not make
+it a clinical dependency of another member's branch.
+
+The native Questionnaire contains one answerless, nonrepeating list group around
+the original independent profile items. Their linkIds, population, extraction,
+enablement and read-only state are retained. Checked means true; unchecked means
+an explicit false; mixed, labeled **Not answered**, means unknown. Clear restores
+unknown. Showing a question or leaving it untouched never asserts false. The
+client adapts columns to available width; unfamiliar rendering shapes retain
+normal Yes/No/Clear controls.
+
+CRL 6.4.42 includes the grouping compiler, MV client adapter and a protocol 1
+native engine selected by default. Upgrade these together; the driver refuses
+grouped inputs under older engines. Other FHIR consumers can display the standard
+Questionnaire group with independent Boolean controls. The responsive checkbox
+grid is a renderer enhancement, not a new answer representation. The engine reads
+the emitted presentation extension, never CRL syntax. Normal authored branch
+selection still applies; use `first:` explicitly for an ordered single outcome.
+For an older engine that ignores the custom extension, ordinary `cpg-input-text`
+repeats the authored group question before each member question. This gives flat
+Yes/No questions meaningful wording; it does not promise whole-panel collection
+or a shared heading on that older engine.
+
+The generation instruction is the CRL-owned extension
+`http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group`,
+not an HL7-defined extension. Its protocol, group identity, wording, layout hints and
+ordered profile members are described in the [native contract](../patches/cqframework/presentation-choice-groups/README.md).
+
 ## Answer options
 
 Use a named terminology as the answer ValueSet. The terminology owns codes, code-system URLs, and displays. A concept lists only exceptions to qualification:

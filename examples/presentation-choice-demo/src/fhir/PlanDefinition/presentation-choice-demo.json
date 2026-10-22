@@ -1,0 +1,865 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "presentation-choice-demo",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-questionnaireAdaptive",
+      "valueBoolean": true
+    }
+  ],
+  "url": "http://example.org/crl/presentation-choice-demo/PlanDefinition/presentation-choice-demo",
+  "version": "0.0.0",
+  "name": "ActivityChoicesActivityReview",
+  "title": "Activity Review",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-10-22T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Activity Review",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInterface"
+  ],
+  "action": [
+    {
+      "title": "Activity Review",
+      "description": "Activity Review",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
+        }
+      ],
+      "action": [
+        {
+          "title": "Read a Book or Take a Walk or Listen to Music or Draw a Picture or Play a Game or Watch a Film",
+          "description": "Read a Book or Take a Walk or Listen to Music or Draw a Picture or Play a Game or Watch a Film",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "CRL branch Or L86C7"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Which activities do you enjoy? Select all that apply.: Read a Book"
+                },
+                {
+                  "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+                  "extension": [
+                    {
+                      "url": "protocol",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "id",
+                      "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+                    },
+                    {
+                      "url": "name",
+                      "valueString": "Activities"
+                    },
+                    {
+                      "url": "text",
+                      "valueString": "Which activities do you enjoy? Select all that apply."
+                    },
+                    {
+                      "url": "description",
+                      "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+                    },
+                    {
+                      "url": "columns",
+                      "valueInteger": 3
+                    },
+                    {
+                      "url": "control",
+                      "valueCode": "checkbox"
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Read a Book"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Take a Walk"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Listen to Music"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Draw a Picture"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Play a Game"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Watch a Film"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Which activities do you enjoy? Select all that apply.: Take a Walk"
+                },
+                {
+                  "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+                  "extension": [
+                    {
+                      "url": "protocol",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "id",
+                      "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+                    },
+                    {
+                      "url": "name",
+                      "valueString": "Activities"
+                    },
+                    {
+                      "url": "text",
+                      "valueString": "Which activities do you enjoy? Select all that apply."
+                    },
+                    {
+                      "url": "description",
+                      "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+                    },
+                    {
+                      "url": "columns",
+                      "valueInteger": 3
+                    },
+                    {
+                      "url": "control",
+                      "valueCode": "checkbox"
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Read a Book"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Take a Walk"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Listen to Music"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Draw a Picture"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Play a Game"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Watch a Film"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Which activities do you enjoy? Select all that apply.: Listen to Music"
+                },
+                {
+                  "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+                  "extension": [
+                    {
+                      "url": "protocol",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "id",
+                      "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+                    },
+                    {
+                      "url": "name",
+                      "valueString": "Activities"
+                    },
+                    {
+                      "url": "text",
+                      "valueString": "Which activities do you enjoy? Select all that apply."
+                    },
+                    {
+                      "url": "description",
+                      "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+                    },
+                    {
+                      "url": "columns",
+                      "valueInteger": 3
+                    },
+                    {
+                      "url": "control",
+                      "valueCode": "checkbox"
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Read a Book"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Take a Walk"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Listen to Music"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Draw a Picture"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Play a Game"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Watch a Film"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Which activities do you enjoy? Select all that apply.: Draw a Picture"
+                },
+                {
+                  "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+                  "extension": [
+                    {
+                      "url": "protocol",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "id",
+                      "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+                    },
+                    {
+                      "url": "name",
+                      "valueString": "Activities"
+                    },
+                    {
+                      "url": "text",
+                      "valueString": "Which activities do you enjoy? Select all that apply."
+                    },
+                    {
+                      "url": "description",
+                      "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+                    },
+                    {
+                      "url": "columns",
+                      "valueInteger": 3
+                    },
+                    {
+                      "url": "control",
+                      "valueCode": "checkbox"
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Read a Book"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Take a Walk"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Listen to Music"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Draw a Picture"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Play a Game"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Watch a Film"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Which activities do you enjoy? Select all that apply.: Play a Game"
+                },
+                {
+                  "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+                  "extension": [
+                    {
+                      "url": "protocol",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "id",
+                      "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+                    },
+                    {
+                      "url": "name",
+                      "valueString": "Activities"
+                    },
+                    {
+                      "url": "text",
+                      "valueString": "Which activities do you enjoy? Select all that apply."
+                    },
+                    {
+                      "url": "description",
+                      "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+                    },
+                    {
+                      "url": "columns",
+                      "valueInteger": 3
+                    },
+                    {
+                      "url": "control",
+                      "valueCode": "checkbox"
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Read a Book"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Take a Walk"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Listen to Music"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Draw a Picture"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Play a Game"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Watch a Film"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Which activities do you enjoy? Select all that apply.: Watch a Film"
+                },
+                {
+                  "url": "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group",
+                  "extension": [
+                    {
+                      "url": "protocol",
+                      "valueInteger": 1
+                    },
+                    {
+                      "url": "id",
+                      "valueString": "[\"http://example.org/crl/presentation-choice-demo/Library/PresentationChoiceDemoInferences\",\"0.0.0\",\"Activities\"]"
+                    },
+                    {
+                      "url": "name",
+                      "valueString": "Activities"
+                    },
+                    {
+                      "url": "text",
+                      "valueString": "Which activities do you enjoy? Select all that apply."
+                    },
+                    {
+                      "url": "description",
+                      "valueMarkdown": "Demo note: This description is optional and is authored in CRL. Each activity has its own answer. Mixed means unanswered, checked means Yes, and unchecked means No. Clear returns a choice to unanswered."
+                    },
+                    {
+                      "url": "columns",
+                      "valueInteger": 3
+                    },
+                    {
+                      "url": "control",
+                      "valueCode": "checkbox"
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-read-a-book"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Read a Book"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-take-a-walk"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Take a Walk"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-listen-to-music"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Listen to Music"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-draw-a-picture"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Draw a Picture"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-play-a-game"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Play a Game"
+                        }
+                      ]
+                    },
+                    {
+                      "url": "member",
+                      "extension": [
+                        {
+                          "url": "profile",
+                          "valueCanonical": "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+                        },
+                        {
+                          "url": "text",
+                          "valueString": "Watch a Film"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/crl/presentation-choice-demo/StructureDefinition/presentation-choice-demo-watch-a-film"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/crl/presentation-choice-demo/PlanDefinition/presentation-choice-demo-certify-met-recommendation"
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/crl/presentation-choice-demo/PlanDefinition/presentation-choice-demo-not-certify-unmet-recommendation",
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Not CRL branch Or L86C7"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "caseName": "Two activities selected",
+      "sourceFile": "src/cel/mv/activities.cel",
+      "caseId": "two-selected",
+      "compartmentDir": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6",
+      "artifacts": [
+        {
+          "id": "activity-choice-examples-two-activities-sel-da0e18e7b8c6",
+          "resourceType": "Patient",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6.json",
+          "sha256": "df75fe05a61f224052b4014a0379d79172038b6f867746651dfe9570faf372d9"
+        },
+        {
+          "id": "activity-choice-examples-two-activities-sel-9632dccab279",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/observation/activity-choice-examples-two-activities-sel-9632dccab279.json",
+          "sha256": "f7c84c011da1a0b0500f09533a27a98fad9d48dd13243832cfaa69bc48b62004"
+        },
+        {
+          "id": "activity-choice-examples-two-activities-sel-1eb3cf25545d",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/observation/activity-choice-examples-two-activities-sel-1eb3cf25545d.json",
+          "sha256": "b8f483370143cc6e05e44fb7a8bae65ebe8601e66ea9a96dccd56b4cd9a0b48b"
+        },
+        {
+          "id": "activity-choice-examples-two-activities-sel-0703ecd77ae2",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/observation/activity-choice-examples-two-activities-sel-0703ecd77ae2.json",
+          "sha256": "bfcc7e77f12a6c78f8a8bb5fd608ebee0ea93827ae171a54b5b71b7a2bf960e3"
+        },
+        {
+          "id": "activity-choice-examples-two-activities-sel-ff75dbd64591",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/observation/activity-choice-examples-two-activities-sel-ff75dbd64591.json",
+          "sha256": "7ed0c2d7b66c34b0acfdbc259659857eea294e171d95a215cbf24bb3a22432c9"
+        },
+        {
+          "id": "activity-choice-examples-two-activities-sel-1ea67e5a63f2",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/observation/activity-choice-examples-two-activities-sel-1ea67e5a63f2.json",
+          "sha256": "0e98554091869a631c33a50d54a2ec5d546ba936d86abfdf54b5cbf3835245f0"
+        },
+        {
+          "id": "activity-choice-examples-two-activities-sel-a09ddf8ed543",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-two-activities-sel-da0e18e7b8c6/observation/activity-choice-examples-two-activities-sel-a09ddf8ed543.json",
+          "sha256": "695ecd45ac7ddb33476f19ba8386a68ec1af7bc55f2cde8ce4ec51600c7a851d"
+        }
+      ]
+    },
+    {
+      "caseName": "All activities answered No",
+      "sourceFile": "src/cel/mv/activities.cel",
+      "caseId": "all-no",
+      "compartmentDir": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b",
+      "artifacts": [
+        {
+          "id": "activity-choice-examples-all-activities-ans-3853ab94fc0b",
+          "resourceType": "Patient",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/patient/activity-choice-examples-all-activities-ans-3853ab94fc0b.json",
+          "sha256": "18d26f8369242faf190a59f6f487ba89bf9bc8ef49f70ae5d76d103447b0cbe0"
+        },
+        {
+          "id": "activity-choice-examples-all-activities-ans-4e167cc6f025",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/observation/activity-choice-examples-all-activities-ans-4e167cc6f025.json",
+          "sha256": "caa0e3f9c199e5de9ba280dd0d39835a59b3d0a03053c3c8050037129a313934"
+        },
+        {
+          "id": "activity-choice-examples-all-activities-ans-30f035278fa5",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/observation/activity-choice-examples-all-activities-ans-30f035278fa5.json",
+          "sha256": "687f6d216ec3c40ab686959b77108a622efe622e95eb006ddded217b04d928e2"
+        },
+        {
+          "id": "activity-choice-examples-all-activities-ans-4f4fe9759c8d",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/observation/activity-choice-examples-all-activities-ans-4f4fe9759c8d.json",
+          "sha256": "180d45ada46fdc2fa9a08e4cd7a594e61ad4df122209d4ecbdd76aa89ba19090"
+        },
+        {
+          "id": "activity-choice-examples-all-activities-ans-9ea47e0fea0e",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/observation/activity-choice-examples-all-activities-ans-9ea47e0fea0e.json",
+          "sha256": "79830963facebed9aca8b6e8c74d7470f20353f7451734b1570fd3e94b0e8bf7"
+        },
+        {
+          "id": "activity-choice-examples-all-activities-ans-704669f30ee0",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/observation/activity-choice-examples-all-activities-ans-704669f30ee0.json",
+          "sha256": "7116c173328fcdc1c0ae1a4aee582d85c79075ed664b945997ef252c43948e40"
+        },
+        {
+          "id": "activity-choice-examples-all-activities-ans-4b3c4a5acd6e",
+          "resourceType": "Observation",
+          "path": "patient/activity-choice-examples-all-activities-ans-3853ab94fc0b/observation/activity-choice-examples-all-activities-ans-4b3c4a5acd6e.json",
+          "sha256": "b1a537d6727197a9bc71a0126ffed459a232c831d04ece5089c5b5de4c3fa377"
+        }
+      ]
+    }
+  ]
+}

@@ -9,13 +9,22 @@ const descriptionExtension='http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-i
 const canonical=(ref:string)=>ref.split('#')[0].split('|')[0];
 export function retainStaticQuestionDescriptions(root:string,definitions:Record<string,unknown>[],result:Pick<Extract<ProduceOutcome,{ok:true}>,'manifest'|'manifestPath'>){
   const descriptions=new Map<string,Set<string>>();
+  const remember=(profile:unknown,text:unknown,description:unknown)=>{
+    if(typeof profile!=='string'||typeof text!=='string'||typeof description!=='string')return;
+    const key=JSON.stringify([canonical(profile),text]);let set=descriptions.get(key);if(!set)descriptions.set(key,set=new Set());set.add(description);
+  };
   const collect=(node:any)=>{
     if(!node || typeof node!=='object')return;
     for(const input of node.input??[]){
       const text=input.extension?.find((e:any)=>e.url===textExtension)?.valueString;
       const description=input.extension?.find((e:any)=>e.url===descriptionExtension)?.valueMarkdown??'';
-      if(typeof text!=='string' || typeof description!=='string')continue;
-      for(const profile of input.profile??[]){const key=JSON.stringify([canonical(profile),text]);let set=descriptions.get(key);if(!set)descriptions.set(key,set=new Set());set.add(description);}
+      for(const profile of input.profile??[])remember(profile,text,description);
+      // REFACTOR:grounded: grouped native items use descriptor text; flat fallback items use cpg-input-text.
+      const fields=input.extension?.find((e:any)=>e.url==='http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group')?.extension;
+      for(const member of fields?.filter((e:any)=>e.url==='member')??[]){
+        const field=(name:string,type:string)=>member.extension?.find((e:any)=>e.url===name)?.[type];
+        remember(field('profile','valueCanonical'),field('text','valueString'),field('description','valueMarkdown')??'');
+      }
     }
     for(const value of Object.values(node))if(value && typeof value==='object')if(Array.isArray(value))value.forEach(collect);else collect(value);
   };

@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.35");
+    expect(kit.schemaVersion).toBe("2.36");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -676,8 +676,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.35");
-    expect(kit.contentHash).toBe("5a6c62de639fd4a7752669d30d021c7ff439a50d76f9072cfac033de08ed22cd");
+    expect(kit.schemaVersion).toBe("2.36");
+    expect(kit.contentHash).toBe("4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99");
   });
 
   // @kit criterion:description-navigation
