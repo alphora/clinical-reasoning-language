@@ -60,7 +60,8 @@ public class WatchdogControl {
   done.set(true);monitor.join();System.out.println("watchdog-ok");
  }
 }`);
-  execFileSync(path.join(path.dirname(java),process.platform==='win32'?'javac.exe':'javac'),['--release','17','-cp',driverDir(),watchdog],{timeout:15000,windowsHide:true});
+  // Compile only this control; checkout mtimes must not cause javac to rebuild driver sources.
+  execFileSync(path.join(path.dirname(java),process.platform==='win32'?'javac.exe':'javac'),['--release','17','-sourcepath',root,'-cp',driverDir(),watchdog],{timeout:15000,windowsHide:true});
   const controlArgs=['-Xmx64m','-cp',root+path.delimiter+driverDir(),'WatchdogControl'];
   expect(await runOwnedProcess(java,controlArgs,{timeoutMs:15000,maxBytes:65536})).toMatchObject({status:0,stdout:'watchdog-ok'+(process.platform==='win32'?'\r\n':'\n'),cleanupConfirmed:true});
   expect(await runOwnedProcess(java,[...controlArgs,'stale-token'],{timeoutMs:15000,maxBytes:65536})).toMatchObject({status:124,cleanupConfirmed:true});
