@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 const native = vi.hoisted(() => ({ run: vi.fn(), verify: vi.fn(), fingerprint: vi.fn() }));
 vi.mock("../ownedProcess", () => ({ runOwnedProcess: native.run }));
 vi.mock("../runtimeFingerprint", () => ({ runtimeFingerprint: native.fingerprint }));
+vi.mock('../nativeWorker',async original=>({...await original<typeof import('../nativeWorker')>(),withNativeRuntime:async (_spec:unknown,use:(runtime:unknown)=>unknown)=>use({mode:'worker',run:(args:string[],options:unknown)=>native.run('java',args,options)})}));
 vi.mock("../spawn", async importOriginal => ({ ...await importOriginal<typeof import("../spawn")>(), verifyJar: native.verify,
   resolveJavaAsync: async (_env: unknown, _windows: unknown, probe: (exe: string) => Promise<string | undefined>) =>
     await probe("java") ? { ok: true, javaExe: "java", major: 17 } : { ok: false, reason: "probe failed" } }));

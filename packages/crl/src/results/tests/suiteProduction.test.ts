@@ -13,6 +13,7 @@ import { emitResultDefinitionClosure } from '../definitionClosure';
 const engine = vi.hoisted(() => ({ state: "generated" as ProducerCaseState, calls: 0, hasInputs: true, inputChanged: undefined as (() => void) | undefined, wait: undefined as (() => Promise<void>) | undefined, probeWait: undefined as Promise<void> | undefined, uncertainAt: 0 }));
 vi.mock("../spawn", async original => ({ ...await original<typeof import("../spawn")>(), verifyJar: () => ({ ok: true, hasLauncher: true, sha256: "engine-sha" }), resolveJavaAsync: async () => { await engine.probeWait; return { ok: true, javaExe: "fake-java", major: 21 }; } }));
 vi.mock("../runtimeFingerprint", async original => ({ ...await original<typeof import("../runtimeFingerprint")>(), runtimeFingerprint: async () => ({sha256:"runtime",cleanupConfirmed:true}) }));
+vi.mock('../nativeWorker',async original=>({...await original<typeof import('../nativeWorker')>(),withNativeRuntime:async (_spec:unknown,use:(runtime:unknown)=>unknown)=>use({mode:'worker'})}));
 vi.mock("../driver", () => ({ driverReady: () => ({ ok: true }) }));
 vi.mock("../../emit-two-lane", () => ({ emitCrlTwoLane: (_path: string, options: {date?: string} = {}) => ({ success: true, cqlLibraries: [], fhir: { resources: [
   { resource: { resourceType: "PlanDefinition", id: "policy", type: { coding: [{ code: "workflow-definition" }] }, date: options.date ?? "2026-09-13", action: engine.hasInputs ? [{ input: [{ type: "Observation", profile: ["http://example.org/A"] }] }] : [] } },

@@ -57,7 +57,7 @@ export type DriverReady =
  * class no user could obtain. A missing class must never degrade into "go compile it yourself".
  */
 export function driverReady(): DriverReady {
-  const cls = driverClassPath();
+  for(const cls of [driverClassPath(),path.join(driverDir(),'ApplyWorker.class')]){
   if (!existsSync(cls)) return { ok: false, reason: "class-missing", expectedAt: cls };
 
   // ⚠ EXISTENCE IS NOT READINESS — the same lesson as the Java resolver one file over, which
@@ -80,6 +80,7 @@ export function driverReady(): DriverReady {
         "rebuild with `node packages/crl/scripts/build-driver.mjs <engine.jar>`, which pins --release 17",
       ],
     };
+  }
   }
   return { ok: true, loaderPath: driverDir() };
 }

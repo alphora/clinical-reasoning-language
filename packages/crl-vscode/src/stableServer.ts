@@ -31,6 +31,8 @@ export const STABLE_SERVER_ASSETS = [
   "FHIRHelpers.cql",
   join("driver", "ApplyDriver.class"),
   join("driver", "ApplyDriver.java"),
+  join("driver", "ApplyWorker.class"),
+  join("driver", "ApplyWorker.java"),
   join("driver", "ApplyDriver.build.json"),
   join("driver", "windows-owned-process.ps1"),
 ] as const;

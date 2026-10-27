@@ -36,11 +36,13 @@ import {
 } from "./spawn";
 import { runOwnedProcess } from "./ownedProcess";
 import { driverReady } from "./driver";
+import {withNativeRuntime,shutdownNativeRuntime,type NativeMode} from './nativeWorker';
 import { digest, runtimeFingerprint } from "./runtimeFingerprint";
 import { caseKey, readRetry, reusableCase, preflightOutputs, regressionRetryRoot, excludeMvDestination, canonicalOutputRoot } from "./retry";
 import { isImplementedUseCase, type ResultUseCase } from "./useCases";
 
 export interface ProduceRequest {
+  nativeMode?:NativeMode;
   celPath: string;
   crlPath: string;
   /** MV captures these once and uses them for Save, freshness and native refresh. Omitted retains normal defaults. */
@@ -115,6 +117,7 @@ export async function shutdownProducer(): Promise<void> {
   shuttingDown = true;
   activeAbort?.abort();
   await activeWork;
+  await shutdownNativeRuntime();
 }
 async function guardedProduction(req: Omit<ProduceRequest, "outRoot" | "celPath">, make: () => ProduceRequest, purpose: "mv" | "regression"): Promise<ProduceOutcome> {
   if (quarantined) return { ok: false, reason: "Native cleanup was not confirmed; restart this server after checking its reported process failure." };
@@ -313,9 +316,10 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   const planDefinitionId = String(roots[0].id);
 
   preflightOutputs(req.outRoot, suite.purpose, inputs);
-  const runtime = await runtimeFingerprint(java.javaExe, jarPath, req.bounds ?? DEFAULT_BOUNDS, req.signal);
+  return await withNativeRuntime<ProduceOutcome>({javaExe:java.javaExe,engineJarPath:jarPath,engineSha256:jarCheck.sha256,bounds:req.bounds??DEFAULT_BOUNDS,signal:req.signal,nativeMode:req.nativeMode},async native=>{
+  const runtime = await runtimeFingerprint(java.javaExe, jarPath, req.bounds ?? DEFAULT_BOUNDS, req.signal,process.env,native);
   if (!runtime.cleanupConfirmed) quarantined = true;
-  if (!runtime.sha256) return { ok: false, reason: runtime.reason ?? "Native runtime probe failed." };
+  if (!runtime.sha256) return { ok: false, reason: runtime.reason ?? "Native runtime probe failed." } as ProduceOutcome;
   const definitionClosureSha256 = closure.definitionClosureSha256!;
   const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: jarCheck.sha256 });
   if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
@@ -383,6 +387,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
         bounds: req.bounds ?? DEFAULT_BOUNDS,
         planDefinitionId,
         artifactRoot: req.outRoot,
+        runtime:native,
       },
       {
         caseName: input.caseName,
@@ -415,4 +420,5 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     java: { exe: java.javaExe, major: java.major },
     engineJar: { path: jarPath, defaulted: req.jarPath === undefined },
   };
+  });
 }

@@ -11,6 +11,11 @@ afterEach(()=>{for(const root of roots.splice(0)) rmSync(root,{recursive:true,fo
 function fixture() { const dir=mkdtempSync(path.join(tmpdir(),"crl-owned-")); roots.push(dir); return dir; }
 async function waitFor(file:string) { for(let n=0;n<200&&!existsSync(file);n++) await sleep(50); expect(existsSync(file)).toBe(true); }
 describe("owned native processes",()=>{
+  it('keeps persistent ownership beyond an invocation deadline and still cancels cleanly',async()=>{
+    const file=path.join(fixture(),'persistent.pid'),controller=new AbortController();
+    const work=runOwnedProcess(process.execPath,['-e',"require('node:fs').writeFileSync("+JSON.stringify(file)+",String(process.pid));setInterval(()=>{},1000)"],{timeoutMs:1,maxBytes:65536,signal:controller.signal,persistent:true,unref:true});
+    await waitFor(file);await sleep(80);const pid=Number(readFileSync(file,'utf8'));expect(alive(pid)).toBe(true);controller.abort();expect(await work).toMatchObject({failure:'cancelled',cleanupConfirmed:true});expect(alive(pid)).toBe(false);
+  },25000);
   it("preserves argv quoting and UTF-8 raw output",async()=>{
     const args=["space here",'a"b',"tail\\",String.fromCodePoint(0x65e5,0x672c,0x1fa7a)];
     const r=await runOwnedProcess(process.execPath,["-e","process.stdout.write(JSON.stringify(process.argv.slice(1)))",...args],{timeoutMs:15000,maxBytes:65536});

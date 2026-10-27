@@ -15,3 +15,10 @@ it.each(["SIGINT","SIGTERM"] as const)("waits for cleanup before exiting on %s",
   expect(lifecycle.interrupted).toBe(true);expect(exit).not.toHaveBeenCalled();
   release();await vi.waitFor(()=>expect(exit).toHaveBeenCalledWith(signal==="SIGINT"?130:143));
 });
+it('reports unconfirmed cleanup and still terminates after signal handling',async()=>{
+ shutdown.mockRejectedValue(new Error('cleanup-unconfirmed'));
+ const handlers:Record<string,()=>void>={};
+ vi.spyOn(process,'on').mockImplementation(((event:string,handler:()=>void)=>{handlers[event]=handler;return process;}) as any);
+ const exit=vi.spyOn(process,'exit').mockImplementation((()=>undefined) as never),log=vi.spyOn(console,'error').mockImplementation(()=>{});
+ installNativeSignals();handlers.SIGTERM();await vi.waitFor(()=>expect(exit).toHaveBeenCalledWith(143));expect(log).toHaveBeenCalledWith(expect.stringContaining('cleanup-unconfirmed'));
+});

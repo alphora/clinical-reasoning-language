@@ -20,8 +20,11 @@ engine identity, per-case artifact hashes, exact Q/QR association and populated 
 unanswered Boolean values. Batch output contains Q/QR, not action dispositions.
 The separate six-step answer/change/clear and four-step dateTime/Coding controls
 assert actions against full native results and check extraction and retained answers.
-Process/cancellation changes also require the affected process tests; these fixed
-controls alone do not establish every cancellation behavior.
+Qualification compares installed runtime modules and both Java classes with the
+source controls, requires one stable worker PID across each installed session,
+then runs process ownership and native same-identity isolation/recovery/watchdog
+tests against the downloaded engine. These bounded controls do not establish
+every possible cancellation behavior.
 
 Download the workflow artifact and inspect `results/verification.json`, MCP logs,
 native forms, session progress/results and package hashes. A pass requires the

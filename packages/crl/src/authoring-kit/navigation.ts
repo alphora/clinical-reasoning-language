@@ -9,7 +9,7 @@ const ALIASES: Record<string, string[]> = {
   "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
   "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers", "uncertainty check", "computed guard", "uncertain assume yes", "uncertain assume no"],
   "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
-  "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API"],
+  "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API", "--serve", "reusable JVM", "warm JVM", "NDJSON"],
   "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
   "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start", "Quantity", "Number", "count", "sessions", "rate", "d/wk", "h/d"],
   "concept-form": ["concept", "case feature", "Scalar", "remove scalar", "Observation", "code is", "absence", "completeness", "evidence completeness"],

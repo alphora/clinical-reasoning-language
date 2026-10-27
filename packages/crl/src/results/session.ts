@@ -9,6 +9,8 @@ import { driverArgs, driverDir, driverReady } from "./driver";
 import { runOwnedProcess } from "./ownedProcess";
 import { DEFAULT_BOUNDS, ENGINE_JAR_SOURCE, defaultEngineJarPath, verifyJar, resolveJavaAsync, jvmFlags } from "./spawn";
 import { runtimeFingerprint } from "./runtimeFingerprint";
+import {withNativeRuntime,NativeRuntimeError,type NativeMode} from './nativeWorker';
+export {shutdownNativeRuntime} from './nativeWorker';
 export { buildSessionResponse } from "./sessionResponse";
 export type { SessionAnswerEdit, SessionResponseOptions } from "./sessionResponse";
 export { SessionInputError } from "./sessionJson";
@@ -21,13 +23,13 @@ export interface ApplySessionRequestV1 {
 export interface SessionLimits { inputBytes: number; fileBytes: number; artifactBytes: number; logBytes: number; timeoutMs: number; maxHeapMb: number }
 export const DEFAULT_SESSION_LIMITS: Readonly<SessionLimits> = Object.freeze({ inputBytes: 32 * 1024 * 1024, fileBytes: 32 * 1024 * 1024, artifactBytes: 96 * 1024 * 1024, logBytes: 1024 * 1024, timeoutMs: 600000, maxHeapMb: 1024 });
 export interface SessionArtifact { path: string; bytes: number; sha256: string; jsonStatus?: "valid" | "invalid" | "not-validated" }
-export interface SessionRuntime { packageVersion: string; enginePath: string; engineSha256: string; driverSha256: string; driverSourceSha256: string; javaExe: string; javaMajor: number; fingerprint: string }
+export interface SessionRuntime { packageVersion: string; enginePath: string; engineSha256: string; driverSha256: string; driverSourceSha256: string; javaExe: string; javaMajor: number; fingerprint: string; workerPid?:number }
 interface SessionResultBase {
   schemaVersion: 1; requestId?: string; caseId?: string; stepId?: string; runtime?: SessionRuntime;
   artifacts: Record<string, SessionArtifact>; diagnostics: SessionDiagnostic[]; elapsedMs: number; nativeMs?: number; cleanupConfirmed: boolean;
 }
 export type ApplySessionResult = SessionResultBase & ({ ok: true } | { ok: false; error: { code: string; message: string; path?: string } });
-export interface ApplySessionOptions { outDir: string; limits?: Partial<SessionLimits>; signal?: AbortSignal; originalRequestJson?: string }
+export interface ApplySessionOptions { outDir: string; limits?: Partial<SessionLimits>; signal?: AbortSignal; originalRequestJson?: string; nativeMode?:NativeMode }
 const version: string = (require("../../package.json") as { version: string }).version;
 function limitsFor(overrides?: Partial<SessionLimits>): SessionLimits {
   const limits = { ...DEFAULT_SESSION_LIMITS, ...overrides };
@@ -100,15 +102,19 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     if (options.signal?.aborted) throw new SessionInputError("cancelled", "Cancelled during Java discovery.");
     if (!java.ok) throw new SessionInputError("java-unavailable", java.reason);
     const bounds = { ...DEFAULT_BOUNDS, maxHeapMb: limits.maxHeapMb, batchTimeoutMs: limits.timeoutMs, maxCapturedBytes: limits.logBytes };
-    const fingerprint = await runtimeFingerprint(java.javaExe, jarPath, bounds, options.signal, environment);
+    const preparedLimits=limits;
+    return await withNativeRuntime<ApplySessionResult>({javaExe:java.javaExe,engineJarPath:jarPath,engineSha256:jar.sha256,bounds,env:environment,signal:options.signal,nativeMode:options.nativeMode},async runtime=>{
+    const limits=preparedLimits;
+    const fingerprint = await runtimeFingerprint(java.javaExe, jarPath, bounds, options.signal, environment,runtime);
     base.cleanupConfirmed = fingerprint.cleanupConfirmed;
     if (!fingerprint.sha256) throw new SessionInputError(options.signal?.aborted ? "cancelled" : "runtime-fingerprint", fingerprint.reason ?? "Native runtime fingerprint unavailable.");
     base.runtime = { packageVersion: version, enginePath: path.resolve(jarPath), engineSha256: jar.sha256, driverSha256: sha256(readFileSync(path.join(driverDir(), "ApplyDriver.class"))), driverSourceSha256: sha256(readFileSync(path.join(driverDir(), "ApplyDriver.java"))), javaExe: java.javaExe, javaMajor: java.major, fingerprint: fingerprint.sha256 };
     const args = driverArgs({ jvmFlags: [...jvmFlags(bounds), "-Djava.io.tmpdir=" + output], engineJarPath: path.resolve(jarPath), loaderPath: driver.loaderPath,
       repoPath, planDefinitionId: request.planDefinitionId, subjectReference: request.subjectReference,
-      session: { dataPath, outputPrefix: path.join(output, "native"), fileByteLimit: limits.fileBytes, totalByteLimit: limits.artifactBytes } });
+      session: { dataPath, outputPrefix: path.join(output!, "native"), fileByteLimit: limits.fileBytes, totalByteLimit: limits.artifactBytes } });
     const nativeStart = performance.now();
-    const processResult = await runOwnedProcess(java.javaExe, args, { timeoutMs: limits.timeoutMs, maxBytes: limits.logBytes, signal: options.signal, env: environment });
+    const processResult = await runtime.run(args, { timeoutMs: limits!.timeoutMs, maxBytes: limits!.logBytes, signal: options.signal, env: environment });
+    if(runtime.pid)base.runtime.workerPid=runtime.pid;
     base.nativeMs = performance.now() - nativeStart; base.cleanupConfirmed = processResult.cleanupConfirmed;
     save("stdout.log", processResult.stdout); save("stderr.log", processResult.stderr);
     if (!processResult.cleanupConfirmed) throw new SessionInputError("cleanup-unconfirmed", "Native cleanup could not be confirmed; outputs may still be changing.");
@@ -119,7 +125,7 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     // Inventory available bounded files before parsing or reporting native failure.
     for (const name of names) {
       try {
-        const file = path.join(output, name), stat = lstatSync(file);
+        const file = path.join(output!, name), stat = lstatSync(file);
         if (!stat.isFile() || stat.isSymbolicLink()) throw new SessionInputError("invalid-output", "Native output must be a regular file.", name);
         if (stat.size > limits.fileBytes || total + stat.size > limits.artifactBytes) throw new SessionInputError("output-limit", "Native artifacts exceed the byte budget.", name);
         total += stat.size;
@@ -147,8 +153,10 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     base.diagnostics = inspectSessionOutcome(result, processResult.stdout, processResult.stderr);
     if (base.diagnostics.some(d => d.severity === "error")) throw new SessionInputError("native-error", "Native apply returned errors; see diagnostics and raw artifacts.");
     return finish();
+    });
   } catch (error) {
-    const failure = error instanceof SessionInputError ? { code: error.code, message: error.message, ...(error.path ? { path: error.path } : {}) } : { code: "session-failure", message: error instanceof Error ? error.message : String(error) };
+    if(error instanceof NativeRuntimeError)base.cleanupConfirmed=error.cleanupConfirmed;
+    const failure = error instanceof SessionInputError || error instanceof NativeRuntimeError ? { code: error.code, message: error.message, ...(error instanceof SessionInputError&&error.path ? { path: error.path } : {}) } : { code: "session-failure", message: error instanceof Error ? error.message : String(error) };
     try { return finish(failure); } catch (writeError) { return { ...base, elapsedMs: performance.now() - started, ok: false, error: { code: "evidence-write", message: failure.message + "; could not write result: " + String(writeError) } }; }
   }
 }

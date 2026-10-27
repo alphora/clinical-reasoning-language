@@ -4,6 +4,20 @@
 
 Each call performs one native R4 PlanDefinition `$r5.apply`. The caller supplies its current data explicitly. There is no hidden session, persistence service, inferred timestamp, or automatic reconciliation of previously extracted resources.
 
+The tool process reuses one JVM across calls. Each evaluation still constructs its own
+repository, settings, terminology/library caches and processor. A reservation keeps
+runtime fingerprinting and evaluation on the same runtime specification. Requests
+execute sequentially; cancelling queued work does not interrupt the active request.
+An active timeout, cancellation or native failure retires the worker. The failed
+request is not replayed; the next request can start a clean worker. Unconfirmed
+cleanup blocks further launches until the tool process restarts. The worker has its
+own temporary directory, independent of any request's evidence directory.
+
+`shutdownNativeRuntime()` closes the worker explicitly; tool-process exit also closes
+it. Explicit shutdown rejects if cleanup cannot be confirmed. `applySession` accepts `nativeMode: "isolated"` for differential qualification.
+Normal use defaults to `"worker"`. Successful worker execution reports `runtime.workerPid`;
+the PID is diagnostic metadata, not part of the compatibility fingerprint.
+
 ## Run one step
 
 ```sh
@@ -11,6 +25,30 @@ crl-apply-session --request step.json --out runs/step-1
 # From an installed VSIX directory:
 node dist/crl-apply-session.js --request step.json --out runs/step-1
 ```
+
+## Keep one CLI process for repeated calls
+
+Separate one-step CLI processes cannot share a JVM. A pipeline can instead start
+`crl-apply-session --serve` (or `node dist/crl-apply-session.js --serve`) once and
+write one NDJSON control envelope per line:
+
+```json
+{"request":"steps/step-1.json","out":"runs/step-1"}
+{"request":"steps/step-2.json","out":"runs/step-2"}
+```
+
+Each line returns one ordinary session-result JSON line on stdout, including failures.
+Controls are limited to 65,536 bytes while reading, including unterminated lines;
+an oversized line is rejected and discarded through its next newline. Input is
+consumed with backpressure while each request executes.
+The request files and evidence directories use the same one-step contract. Request/out
+paths resolve from the CLI working directory; FHIR paths inside a request file resolve
+from that file. Later lines continue after an ordinary failed request. End stdin to
+shut down; SIGINT/SIGTERM cancel active work. The final CLI exit status remains nonzero
+if a request failed. The native worker retains execution machinery, not patient state:
+each request file must contain the complete intended inputs for that evaluation.
+
+## Request files
 
 The output directory must be new and its parent must exist. Previous runs are never overwritten. A request file can use paths relative to itself:
 

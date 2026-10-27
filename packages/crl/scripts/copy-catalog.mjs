@@ -74,3 +74,4 @@ for (const f of EXPECTED) {
 // REFACTOR:grounded: runtime identity and installed verification retain the driver build provenance.
 copyFileSync(join(here, "..", "src", "results", "driver", "ApplyDriver.build.json"),
   join(here, "..", "dist", "results", "driver", "ApplyDriver.build.json"));
+for(const file of ['ApplyWorker.java','ApplyWorker.class'])copyFileSync(join(here,'..','src','results','driver',file),join(here,'..','dist','results','driver',file));

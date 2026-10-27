@@ -1,3 +1,44 @@
+## Reusable native execution - schema2.37 maintenance review
+
+Audit baseline `414dc98ba6070ca706d6d7637ffea06e7da3720e`, schema2.36/hash
+`4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99`.
+Reviewed target and schema2.37 hash are finalized in the separate metadata stamp
+after committing reviewed content. This pending interval does not claim an audit.
+
+Operator authorizes one reusable JVM per tool process and a runtime-only6.4.43
+release. Clinical inputs remain explicit and stateless per request. No CRL/CQL/FHIR
+emission or clinical determination rule changes. Unfinished Move work is excluded.
+
+| Complete changed-path / assertion inventory | Disposition and proof boundary |
+| --- | --- |
+| Prior `271cbec53953560b552b34de04c04e028a6e07d0` audit/coverage and `3644907a1a075cbc4ebca266c4f2a7415245e32a` versions/lock | Metadata-only: inspected complete delta from audit baseline. The former binds reviewed2.36 content; the latter releases it. Neither changes a runtime assertion. Existing guidance remains sufficient. |
+| `results/nativeWorker.ts`, `driver/ApplyWorker.java/.class`, `ApplyDriver.build.json`; `tests/nativeWorker.test.ts` | Kit updated `native-apply-session`: worker-reuse/failure/quarantine tags own repeated request results/samePID/one launch, no crash replay then fresh next worker, and cleanup uncertainty refusing later launch/shutdown. Other unit cases (concurrent calls within lease and escaped-use refusal, per-request deadlines beyond combined worker lifetime, queued/active cancellation, different-heap serialized reservation, engine change during lease/queue, hash verification and producer idle shutdown) establish internal lifecycle mechanics; they are not additional clinical or authoring capabilities. Tests use synthetic bounded owned-process transport; they do not establish real native execution. |
+| `tests/nativeWorker.native.test.ts` | Kit updated `native-apply-session:native-isolation`. Actual pinned engine synthetic same-ID/canonical/version Library+expanded ValueSet and Patient/Observation data A/B/A changes produce expected Met/Unmet Task codes; isolated A control, one workerPID, removing first evidence dir, native crash/timeout then replacement and expected result. Same fixture invokes actual Java100000transition deadline/token monitor and stale-completion expiry controls. Full FHIR/CQL fixture is runtime qualification, not a recommended CRL clinical model or completeness assumption. Opt-in requires CRL_NATIVE_WORKER_JAR and maintainer JDK; ordinary installed use still requires onlyJRE17+. |
+| `results/ownedProcess.ts`, `driver/windows-owned-process.ps1`; `tests/ownedProcess.test.ts` | Existing ownership guidance sufficient; new persistent-mode test keeps actual target alive beyond former lifetime deadline, cancels and confirms cleanup. Existing descendant/owner-loss/quoting/overflow/pre-cancel cases retained. Persistent process ownership is internal, not hidden clinical persistence. POSIX owning tests unchanged and explicitly run remotely. |
+| `results/session.ts`, `runtimeFingerprint.ts`; `tests/session.test.ts`, `runtimeFingerprint.test.ts` | Kit updated for default reuse and shutdown API. Existing session inputs/typed/error/raw evidence/cancellation cases unchanged; test change borrows controlled runtime for boundary tests. New fingerprint case asserts actual-worker fields avoid an extra JVM launch: internal retry/provenance mechanic. Driver/engine/environment identity checks still bind actual execution; workerPID is diagnostic, excluded from compatibility hash. No answer/clear/recency contract changed. |
+| `results/produce.ts`, `runProducer.ts`; `tests/retry.test.ts`, `suiteProduction.test.ts` | Kit updated `produce-results` to say suite reuses JVM with fresh clinical state and no failed-call replay. Existing producer/retry assertions unchanged; test module injection supplies borrowed runtime only. Existing classify/persisted-pair/cleanup assertions remain sufficient. No manifest state, output directory, expected disposition or retry oracle changed. |
+| `cli/run-apply-session.ts`; `tests/sessionCli.test.ts` | Kit updated `native-apply-session:streaming-cli` and `bounded-controls`. Existing malformed/missing/ambiguous/prior-evidence tests retained. Live child control test receives3independent errors and continues; oversized65537byte unterminated input produces input-limit before newline, then discard/recovery yields next control result. These tests verify transport/evidence failures, not native clinical execution; installed two-request samePID check is separate. No fresh CRL teaching example needed; canonical docs own exact request/out envelope. |
+| `cli/nativeSignals.ts`, `cli/tests/nativeSignals.test.ts`, `mcp/server.ts` | Existing cleanup/error guidance sufficient. Existing SIGINT/SIGTERM cases still await cleanup before signal exit; new rejection case verifies visible cleanup-unconfirmed and exit. MCP EOF/signals explicitly await worker shutdown and return failure on uncertainty. Actual local MCP idle EOF/signal-handler controls confirm dead PID and removed mailbox; this is tooling process behavior. |
+| `scripts/build-driver.mjs`, `copy-catalog.mjs`, `results/driver.ts`, `driver/ApplyDriver.java`; `tests/driver.test.ts`; extension `esbuild.js`, `src/stableServer.ts` | Not author-facing mechanics. Java compilation now ships exact2class set at Java17 floor, both source/class hashes; legacy ApplyDriver method unchanged (header-only edit). Worker source/class copied beside all bundled/stable runtime owners. Drift/magic/class-major and asset inventory checks retain maintainer setup responsibility; user needs no javac/jar extraction. Existing engine pin remains unchanged. |
+| `authoring-kit/index.ts`, `navigation.ts`; `tests/authoring-kit.test.ts`, `query.test.ts`; core CLI and extension MCP tests | Kit updated2canonical process rules and native-session owning refs; schema2.37, new --serve/reusableJVM/NDJSON discovery rows, current identity pins. No examples/artifacts/clinical syntax added. Full/entry/search/export content identity remains separately verified, including both installed MCP surfaces. |
+| `crl/docs/apply-session.md` | Kit updated canonical user instructions: one process, explicit clinical data, fresh evaluation state, --serve path envelope, EOF/shutdown, per-request bounds, no replay, uncertainty restart and isolated comparison mode. Existing typed response preparation and clinical proof limits retained. |
+| `scripts/qualification/installed.cjs`, `.github/workflows/linux-qualification.yml`, `docs/linux-qualification.md` | Qualification mechanics. Compare installed runtime JS and6Java/supervisor assets to built source before source controls, record worker class hash, and require positive identical workerPID across6session/4typed steps. Source ownership/native isolation/watchdog tests use the downloaded pinned engine only after installed-byte binding. This closes source-vs-package proof gap; it is not new clinical guidance. Remote source-build and release-asset receipts remain distinct. |
+| Root/core/extension package versions and lock | Metadata-only6.4.43 lockstep bump; dependency versions unchanged. Installed acceptance and publication are separate from source tests. |
+
+Added owning tags: native-apply-session:{worker-reuse,worker-failure,
+worker-quarantine,native-isolation,streaming-cli,bounded-controls}. No prior tag
+removed or changed. Existing verify-loop:kit-discovery parameterized declaration
+adds3rows, each expecting native-apply-session as the first current search hit.
+No language/golden/shared authoring example changed. Untagged new lifecycle/mock
+and metadata assertions are dispositioned individually by purpose above.
+
+Source runtime review1158plan/1159-1160code converged after5/4accepted lifecycle
+findings. Local168focused tests and installed read-only HCSC/runtime comparisons
+passed; these do not substitute for final6.4.43 full suite, installed delivery or
+remote Linux receipts. Release/kit plan review accepts installed byte/PID binding.
+Audit scope excludes customer clinical acceptance, fleet deployment, unfinished
+Move editing and assertions of old/new engine or Codespaces performance parity.
+
 ## Presentation choice groups - schema 2.36 maintenance review
 
 Accepted audit baseline `6be0ed61b534c6c5ad2981fb4e199ee8bc8a02f9`, schema2.35/hash

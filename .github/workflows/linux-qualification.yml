@@ -79,6 +79,9 @@ jobs:
             exit 1
           fi
           node packages/crl/scripts/qualification/installed.cjs "$PACKAGE" "$QUALIFY/results" "$ARCHIVE" 2>&1 | tee "$QUALIFY/results/run.log"
+          # installed.cjs first proves source/installed runtime byte equality.
+          export CRL_NATIVE_WORKER_JAR=$(node -p 'JSON.parse(require("fs").readFileSync(process.env.QUALIFY+"/results/engine.json","utf8")).path')
+          npx vitest run --project crl --no-file-parallelism ownedProcess.test ownedProcessPosix.test nativeWorker.test nativeWorker.native.test 2>&1 | tee "$QUALIFY/results/lifecycle.log"
       - name: Preserve evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4

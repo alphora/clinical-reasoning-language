@@ -1,19 +1,6 @@
 /**
- * ⭐ THE PRODUCER LOOP — one bounded JVM per case, results written through the manifest.
- *
- * ⚠ ONE JVM PER CASE, not one per batch, and this is a deliberate deviation from the design rounds.
- * Both review arms specified a single batching JVM to avoid startup churn. Building it showed the
- * trade runs the other way:
- *
- *   - A hung case cannot be interrupted inside a shared JVM, so a batch design has to kill the whole
- *     process tree and mark every unreached case `not-run`. Per-case isolation makes a per-case timeout
- *     ACTUALLY ENFORCEABLE and costs only that case.
- *   - The repository is per-case anyway (each case has its own Patient compartment), so a batch JVM
- *     would still rebuild and reload state per case. The saving is JVM startup, not engine work.
- *   - One case cannot leak state into the next, which a shared engine cannot promise.
- *
- * The cost is real — JVM startup per case, seconds each — and it is the right trade for a KE-run tool
- * over tens of cases. If a suite grows to hundreds this is the first thing to revisit.
+ * REFACTOR:grounded: fresh per-case repositories run in the suite's reserved warm runtime.
+ * A failed request retires the worker; later cases may use its clean replacement.
  */
 
 import { uniqueCapSlug } from "../fhir-emitter/slug";
@@ -27,6 +14,7 @@ import { parseDriverStdout } from "./repoBundle";
 import type { ProducerCaseEntry, ProducerCaseState } from "./manifest";
 import { jvmFlags, type JvmBounds } from "./spawn";
 import { driverArgs, driverReady } from "./driver";
+import type {NativeRuntime} from './nativeWorker';
 
 export interface RunOneCase {
   caseName: string;
@@ -45,6 +33,7 @@ export interface RunContext {
   planDefinitionId: string;
   /** Artifact root the results tree hangs from. */
   artifactRoot: string;
+  runtime?:NativeRuntime;
 }
 
 /** What the engine returned, reduced to the two things a result consumer needs. */
@@ -173,22 +162,20 @@ export async function runOneCase(ctx: RunContext, c: RunOneCase): Promise<Produc
       reason: `the shipped driver class is missing at ${ready.expectedAt}`,
     };
   }
-  const proc = await runOwnedProcess(
-    ctx.javaExe,
-    driverArgs({
+  const args=driverArgs({
       jvmFlags: jvmFlags(ctx.bounds),
       engineJarPath: ctx.engineJarPath,
       loaderPath: ready.loaderPath,
       repoPath: c.repoPath,
       planDefinitionId: ctx.planDefinitionId,
       subjectReference: c.subjectReference,
-    }),
-    {
+    });
+  const options={
       timeoutMs: ctx.bounds.batchTimeoutMs,
       maxBytes: ctx.bounds.maxCapturedBytes,
       signal: ctx.signal,
-    },
-  );
+    };
+  const proc=ctx.runtime?await ctx.runtime.run(args,options):await runOwnedProcess(ctx.javaExe,args,options);
   const { stdout, stderr } = proc;
   const timedOut = proc.failure === "timeout";
   if (proc.failure && !timedOut) return {

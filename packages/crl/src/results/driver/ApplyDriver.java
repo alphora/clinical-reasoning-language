@@ -1,5 +1,5 @@
 /*
- * ApplyDriver — the ONE Java file CRL ships for result production.
+ * ApplyDriver — one stateless evaluation, called directly or by the reusable ApplyWorker.
  *
  * Adapted from a working harness contributed by the IEHP knowledge-engineering project, whose operator
  * cleared it for use here. Their version also derived the case list, built the repository and chose the

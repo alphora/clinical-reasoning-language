@@ -19,12 +19,20 @@ async function main(){
  const expected= require(path.join(repo,'packages/crl/dist/authoring-kit')).getAuthoringKit();
  const installed=load('./dist/authoring-kit').getAuthoringKit();assert.deepEqual(installed,expected);assert(installed.audit.contentMatchesAudit);
  receipt.kit={schema:installed.schemaVersion,hash:installed.contentHash,audit:installed.audit};stage('installed kit identity');
+ // Bind source lifecycle controls to the actual installed runtime bytes.
+ receipt.runtimeFiles={};
+ for(const relative of [...['session','nativeWorker','ownedProcess','driver','runtimeFingerprint','produce','runProducer','spawn'].map(n=>'results/'+n+'.js'),...['ApplyDriver.class','ApplyDriver.java','ApplyWorker.class','ApplyWorker.java','ApplyDriver.build.json','windows-owned-process.ps1'].map(n=>'results/driver/'+n)]){
+  const bytes=fs.readFileSync(path.join(pkg,'dist',relative));
+  assert.deepEqual(bytes,fs.readFileSync(path.join(repo,'packages/crl/dist',relative)),relative+' differs from source controls');
+  receipt.runtimeFiles[relative]=hash(bytes);
+ }
+ stage('installed lifecycle runtime identity');
  const engineSource=load('./dist/results/spawn').ENGINE_JAR_SOURCE;
  const home=path.join(out,'home'),jar=path.join(home,engineSource.cacheRelativePath);fs.mkdirSync(path.dirname(jar),{recursive:true});
  const response=await fetch(engineSource.url,{signal:AbortSignal.timeout(180000)});assert(response.ok,'Engine HTTP '+response.status);
  await pipeline(Readable.fromWeb(response.body),fs.createWriteStream(jar));assert.equal(hash(fs.readFileSync(jar)),engineSource.sha256);
  const engine={path:jar,sha256:engineSource.sha256};const engineFile=path.join(out,'engine.json');fs.writeFileSync(engineFile,JSON.stringify(engine));
- receipt.engine={...engineSource,path:jar};receipt.driverSha256=hash(fs.readFileSync(path.join(pkg,'dist/results/driver/ApplyDriver.class')));stage('pinned engine download');
+ receipt.engine={...engineSource,path:jar};receipt.driverSha256=hash(fs.readFileSync(path.join(pkg,'dist/results/driver/ApplyDriver.class')));receipt.workerSha256=hash(fs.readFileSync(path.join(pkg,'dist/results/driver/ApplyWorker.class')));stage('pinned engine download');
  const env={...process.env,HOME:home,USERPROFILE:home,CRL_ENABLE_RESULTS:'1',CRL_TEST_PACKAGE:pkg,CRL_TEST_ENGINE:engineFile};
  const {Client}=load('@modelcontextprotocol/sdk/client/index.js'),{StdioClientTransport}=load('@modelcontextprotocol/sdk/client/stdio.js');
  const client=new Client({name:'remote-installed-qualification',version:'1'}),transport=new StdioClientTransport({command:process.execPath,args:[path.join(pkg,'dist/cli/run-mcp-server.js')],env,stderr:'pipe'});
@@ -57,7 +65,9 @@ async function main(){
  for(const [script,count] of [['session',6],['typed',4]]){
   const target=path.join(out,script),logFile=fs.openSync(path.join(out,script+'.log'),'w');
   try{execFileSync(process.execPath,[path.join(__dirname,script+'.cjs'),target],{env,stdio:['ignore',logFile,logFile],timeout:script==='session'?780000:540000});}finally{fs.closeSync(logFile);}
-  const result=read(path.join(target,'verification.json'));assert(result.passed);assert.equal(result.rows.length,count);stage(script+' native steps');
+  const result=read(path.join(target,'verification.json'));assert(result.passed);assert.equal(result.rows.length,count);
+  const pids=result.rows.map(row=>row.runtime?.workerPid);assert(pids.every(pid=>Number.isSafeInteger(pid)&&pid>0));assert.equal(new Set(pids).size,1,script+' must reuse its installed worker');
+  receipt[script+'WorkerPid']=pids[0];stage(script+' native steps');
  }
  receipt.passed=true;save();
 }

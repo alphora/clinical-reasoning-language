@@ -83,6 +83,9 @@ describe("one authoring kit: discovery and complete guidance", () => {
 
   // @kit verify-loop:kit-discovery
   it.each([
+    ["--serve", "rule:native-apply-session"],
+    ["reusable JVM", "rule:native-apply-session"],
+    ["NDJSON", "rule:native-apply-session"],
     ["uncertainty check", "rule:selected-answer-aggregate"],
     ["computed guard", "rule:selected-answer-aggregate"],
     ["dropdown with a none answer", "rule:named-answer-options"],

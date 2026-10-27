@@ -29,6 +29,7 @@ interface BuildMeta {
   javaSha256: string;
   classSha256: string;
   classFileMajor: number;
+  workerJavaSha256:string;workerClassSha256:string;
 }
 
 describe("the committed driver binary", () => {
@@ -53,12 +54,14 @@ describe("the committed driver binary", () => {
     expect(meta.classFileMajor).toBe(EXPECTED_CLASS_MAJOR);
   });
 
-  // The shipping steps (copy-catalog.mjs, esbuild.js, STABLE_SERVER_ASSETS) each carry ONE filename.
-  it("is a single class — a lambda or inner class would be left behind by every copy step", () => {
+  it("ships every compiled worker/driver class with matching source provenance", () => {
     const extras = require("node:fs")
       .readdirSync(SRC_DRIVER_DIR)
       .filter((f: string) => f.endsWith(".class"));
-    expect(extras).toEqual(["ApplyDriver.class"]);
+    expect(extras.sort()).toEqual(["ApplyDriver.class","ApplyWorker.class"]);
+    expect(sha(read('ApplyWorker.java'))).toBe(meta.workerJavaSha256);
+    expect(sha(read('ApplyWorker.class'))).toBe(meta.workerClassSha256);
+    expect(read('ApplyWorker.class').readUInt16BE(6)).toBe(EXPECTED_CLASS_MAJOR);
   });
 });
 

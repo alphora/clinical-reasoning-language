@@ -205,7 +205,7 @@ async function build() {
   // THIS dist/ dir. 4.114.0 shipped `emit_results` with the driver in neither the vsix nor the npm
   // tarball, so the tool required a class no user could obtain; copying it beside the core .cql is
   // the same lesson as #187, one directory deeper. Fail loud rather than ship the tool broken again.
-  for (const driverFile of ["ApplyDriver.class", "ApplyDriver.java", "ApplyDriver.build.json", "windows-owned-process.ps1"]) {
+  for (const driverFile of ["ApplyDriver.class", "ApplyDriver.java", "ApplyWorker.class", "ApplyWorker.java", "ApplyDriver.build.json", "windows-owned-process.ps1"]) {
     const DRIVER_ASSET = path.join("driver", driverFile);
     const src = path.resolve(__dirname, "../crl/dist/results/driver", driverFile);
     if (!fs.existsSync(src)) {

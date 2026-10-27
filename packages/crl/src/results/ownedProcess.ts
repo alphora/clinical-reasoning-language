@@ -9,6 +9,9 @@ export interface OwnedProcessOptions {
   maxBytes: number;
   signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
+  /** Owner/cancellation supervision continues; active requests supply their own deadlines. */
+  persistent?: boolean;
+  unref?: boolean;
 }
 export interface OwnedProcessResult {
   stdout: string;
@@ -20,7 +23,7 @@ export interface OwnedProcessResult {
 export function runOwnedProcess(executable: string, args: readonly string[], options: OwnedProcessOptions): Promise<OwnedProcessResult> {
   if (options.signal?.aborted) return Promise.resolve({stdout:"",stderr:"",status:null,failure:"cancelled",cleanupConfirmed:true});
   const windows = process.platform === "win32", token = randomBytes(16).toString("hex");
-  const request = Buffer.from(JSON.stringify({executable,arguments:args,ownerPid:process.pid,deadline:Date.now()+options.timeoutMs,token})).toString("base64");
+  const request = Buffer.from(JSON.stringify({executable,arguments:args,ownerPid:process.pid,deadline:options.persistent?0:Date.now()+options.timeoutMs,token})).toString("base64");
   const command = windows ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe") : executable;
   const argv = windows ? ["-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",path.join(driverDir(),"windows-owned-process.ps1"),request] : [...args];
   return new Promise(resolve => {
@@ -53,7 +56,8 @@ export function runOwnedProcess(executable: string, args: readonly string[], opt
       cleanupTimer=setTimeout(()=>{ child.kill("SIGKILL"); finish(false); },15000);
     };
     const cancel=()=>stop("cancelled");
-    const timer=setTimeout(()=>stop("timeout"),options.timeoutMs);
+    const timer=options.persistent?undefined:setTimeout(()=>stop("timeout"),options.timeoutMs);
+    if(options.unref){child.unref();timer?.unref();for(const stream of [child.stdin,child.stdout,child.stderr]){const pipe=stream as unknown as {unref?:()=>void};pipe.unref?.();}}
     options.signal?.addEventListener("abort",cancel,{once:true});
     if(options.signal?.aborted) cancel();
     child.stdin.on("error",()=>{ /* wrapper may close input while exiting; close/ack decides */ });
