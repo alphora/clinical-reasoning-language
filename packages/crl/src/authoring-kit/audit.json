@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "414dc98ba6070ca706d6d7637ffea06e7da3720e",
-  "auditedSchemaVersion": "2.36",
-  "auditedContentHash": "4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99",
-  "scope": "Reviewed schema 2.36 independent Boolean presentation choice groups, portable ordinary CPG question wording, protocol 1 native collection, grouped client/extraction behavior, root packageId placement, runtime availability and kit discovery through 414dc98ba6070ca706d6d7637ffea06e7da3720e. Existing owning parser/emitter/native/client/KE-static tests and shared examples are bounded in coverage.md. One CRL compilation emits one CQL/FHIR set for both tested engines; the older engine displays encountered members as independent fully worded questions and does not implement whole-group collection. Native operation, source audit, installed release and customer deployment remain distinct evidence tiers.",
+  "auditedRevision": "d2ef56aadadb999911cdee88f060b64d817d7b04",
+  "auditedSchemaVersion": "2.37",
+  "auditedContentHash": "c6749e23a46d597fe33523cb3746a06ad41a47ec1cd79ca1d33926151795121e",
+  "scope": "Reviewed schema 2.37 reusable owned JVM and streaming native-session CLI guidance through d2ef56aadadb999911cdee88f060b64d817d7b04. Fresh explicit clinical state, bounded ownership/deadlines, no failed-request replay, cancellation and cleanup limits are covered by existing owning tests and the coverage ledger. Installed source/package identity and stable worker-PID controls bind remote native qualification. Language and clinical semantics are unchanged. Source audit, installed execution, publication and customer deployment remain distinct evidence tiers.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

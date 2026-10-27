@@ -2,8 +2,12 @@
 
 Audit baseline `414dc98ba6070ca706d6d7637ffea06e7da3720e`, schema2.36/hash
 `4d90afadf04e1de61f8cd3e740a49a0841a981667b4952ed9fc20054abf01a99`.
-Reviewed target and schema2.37 hash are finalized in the separate metadata stamp
-after committing reviewed content. This pending interval does not claim an audit.
+Reviewed content target `d2ef56aadadb999911cdee88f060b64d817d7b04`, schema2.37/hash
+`c6749e23a46d597fe33523cb3746a06ad41a47ec1cd79ca1d33926151795121e`,
+bound by the separate metadata-only stamp. Owning kit/worker/CLI195tests pass;
+release/kit code review converged0critical0important with1accepted wording nit.
+Explicit audited export and both fresh MCP delivery checks are required before
+committing this stamp. Installed release and remote qualification remain separate.
 
 Operator authorizes one reusable JVM per tool process and a runtime-only6.4.43
 release. Clinical inputs remain explicit and stateless per request. No CRL/CQL/FHIR
