@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "d2ef56aadadb999911cdee88f060b64d817d7b04",
-  "auditedSchemaVersion": "2.37",
-  "auditedContentHash": "c6749e23a46d597fe33523cb3746a06ad41a47ec1cd79ca1d33926151795121e",
-  "scope": "Reviewed schema 2.37 reusable owned JVM and streaming native-session CLI guidance through d2ef56aadadb999911cdee88f060b64d817d7b04. Fresh explicit clinical state, bounded ownership/deadlines, no failed-request replay, cancellation and cleanup limits are covered by existing owning tests and the coverage ledger. Installed source/package identity and stable worker-PID controls bind remote native qualification. Language and clinical semantics are unchanged. Source audit, installed execution, publication and customer deployment remain distinct evidence tiers.",
+  "auditedRevision": "a9724cb0fdabdeb52c05a5d8d2660ef76b39c5d6",
+  "auditedSchemaVersion": "2.38",
+  "auditedContentHash": "a40923e661e389ed6a49334f92d4bfcaf2470c70fee008b5db720dd8326a4417",
+  "scope": "Reviewed schema 2.38 bounded concurrent reusable native worker jobs and serial complete-session ownership through a9724cb0fdabdeb52c05a5d8d2660ef76b39c5d6. Owning queue, capacity, resize, cancellation, cleanup, producer and CLI controls are mapped in coverage.md. Native two-owner isolation and a frozen MED caller smoke pass. Language/clinical semantics are unchanged. Source audit, installed delivery, real-policy performance qualification and release remain separate tiers.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
