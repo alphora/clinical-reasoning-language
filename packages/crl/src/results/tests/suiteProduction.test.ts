@@ -10,23 +10,23 @@ import { readSuiteResult } from "../readSuiteResult";
 import type { ProducerCaseState } from "../manifest";
 import { emitResultDefinitionClosure } from '../definitionClosure';
 
-const engine = vi.hoisted(() => ({ state: "generated" as ProducerCaseState, calls: 0, hasInputs: true, inputChanged: undefined as (() => void) | undefined, wait: undefined as (() => Promise<void>) | undefined, probeWait: undefined as Promise<void> | undefined, uncertainAt: 0 }));
+const engine = vi.hoisted(() => ({ state: "generated" as ProducerCaseState, calls: 0, hasInputs: true, inputChanged: undefined as (() => void) | undefined, wait: undefined as ((input?:{repoPath:string;caseName:string}) => Promise<void>) | undefined, active:0,peak:0,fingerprints:0,prepFailAt:0,prepGate:undefined as Promise<void>|undefined,onPrepFail:undefined as (()=>void)|undefined, probeWait: undefined as Promise<void> | undefined, uncertainAt: 0 }));
 vi.mock("../spawn", async original => ({ ...await original<typeof import("../spawn")>(), verifyJar: () => ({ ok: true, hasLauncher: true, sha256: "engine-sha" }), resolveJavaAsync: async () => { await engine.probeWait; return { ok: true, javaExe: "fake-java", major: 21 }; } }));
-vi.mock("../runtimeFingerprint", async original => ({ ...await original<typeof import("../runtimeFingerprint")>(), runtimeFingerprint: async () => ({sha256:"runtime",cleanupConfirmed:true}) }));
-vi.mock('../nativeWorker',async original=>({...await original<typeof import('../nativeWorker')>(),withNativeRuntime:async (_spec:unknown,use:(runtime:unknown)=>unknown)=>use({mode:'worker'})}));
+vi.mock("../runtimeFingerprint", async original => ({ ...await original<typeof import("../runtimeFingerprint")>(), runtimeFingerprint: async () => {engine.fingerprints++;if(engine.fingerprints===engine.prepFailAt){await engine.prepGate;engine.onPrepFail?.();throw new Error("preparation control failed");}return {sha256:"runtime",cleanupConfirmed:true};} }));
+vi.mock('../nativeWorker',async original=>({...await original<typeof import('../nativeWorker')>(),withNativeRuntime:async (spec:{signal?:AbortSignal},use:(runtime:unknown)=>Promise<unknown>)=>{const real=await original<typeof import('../nativeWorker')>();return real.withDefaultNativeJob(()=>use({mode:'worker'}),spec.signal,undefined,false);}}));
 vi.mock("../driver", () => ({ driverReady: () => ({ ok: true }) }));
 vi.mock("../../emit-two-lane", () => ({ emitCrlTwoLane: (_path: string, options: {date?: string} = {}) => ({ success: true, cqlLibraries: [], fhir: { resources: [
   { resource: { resourceType: "PlanDefinition", id: "policy", type: { coding: [{ code: "workflow-definition" }] }, date: options.date ?? "2026-09-13", action: engine.hasInputs ? [{ input: [{ type: "Observation", profile: ["http://example.org/A"] }] }] : [] } },
 ] } }) }));
-vi.mock("../runProducer", () => ({ runOneCase: async (opts: { artifactRoot: string }, input: { caseName: string; compartmentId: string }) => {
-  engine.calls++; await engine.wait?.(); engine.inputChanged?.();
+vi.mock("../runProducer", () => ({ runOneCase: async (opts: { artifactRoot: string }, input: { caseName: string; compartmentId: string;repoPath:string }) => {
+  const call=++engine.calls;engine.active++;engine.peak=Math.max(engine.peak,engine.active);try{await engine.wait?.(input);}finally{engine.active--;}engine.inputChanged?.();
   const artifacts = ["Questionnaire", "QuestionnaireResponse"].map(resourceType => {
     const path = `tests/results/fhir/patient/${input.compartmentId}/${resourceType.toLowerCase()}/form.json`;
     const bytes = JSON.stringify({ resourceType, id: "form" }) + "\n";
     const file = join(opts.artifactRoot, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, bytes);
     return { path, resourceType, id: "form", sha256: suiteHash(bytes) };
   });
-  return { caseName: input.caseName, compartmentDir: `patient/${input.compartmentId}`, state: engine.state, artifacts, ...(engine.calls === engine.uncertainAt ? {cleanupUncertain: true, state: "failed", reason: "cleanup unconfirmed"} : {}) };
+  return { caseName: input.caseName, compartmentDir: `patient/${input.compartmentId}`, state: engine.state, artifacts, ...(call === engine.uncertainAt ? {cleanupUncertain: true, state: "failed", reason: "cleanup unconfirmed"} : {}) };
 } }));
 
 const roots: string[] = [];
@@ -46,7 +46,7 @@ case "Same name":
 - fact is "A".
 `;
 beforeEach(() => {
-  engine.state = "generated"; engine.calls = 0; engine.hasInputs = true; engine.inputChanged = undefined; engine.wait = undefined; engine.probeWait = undefined; engine.uncertainAt = 0;
+  engine.state = "generated"; engine.calls = 0; engine.hasInputs = true; engine.inputChanged = undefined; engine.wait = undefined; engine.probeWait = undefined; engine.uncertainAt = 0;engine.active=0;engine.peak=0;engine.fingerprints=0;engine.prepFailAt=0;engine.prepGate=undefined;engine.onPrepFail=undefined;
   root = mkdtempSync(join(tmpdir(), "crl-suite-results-")); roots.push(root);
   put("package.json", JSON.stringify({ name: "results", version: "1.0.0", crl: { canonicalBase: "http://example.org/results" } }));
   put("src/crl/policy.crl", 'library "Policy".\nconcept "A":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `a`.\n');
@@ -148,6 +148,32 @@ it("cancellation persists between cases and accounts for unreached rows", async 
 it.each([0,-1,NaN,Infinity,1.5,2147483648])("refuses invalid timeout %s before execution", async caseTimeoutMs => {
   const result = await produceResults({...request(), caseTimeoutMs});
   expect(result.ok).toBe(false); expect(engine.calls).toBe(0);
+});
+// @kit produce-results:parallel-cases
+it('parallelizes independent cases inside one admitted producer and preserves manifest order',async()=>{
+  const {setNativeWorkerLimit}=await import('../nativeWorker');
+  put('src/cel/mv/c.cel',cel('Clinical C','c'));engine.wait=async()=>{await new Promise(resolve=>setTimeout(resolve,25));};
+  const result=await produceResults({...request(),workerLimit:2});expect(result.ok).toBe(true);if(!result.ok)throw Error(result.reason);
+  expect(engine.peak).toBe(2);expect(engine.calls).toBe(3);expect(result.manifest.cases.map(c=>c.caseId)).toEqual(['a','b','c']);
+  expect(result.workerPool).toMatchObject({workerLimit:2,nativeCalls:3,peakActiveCases:2});expect(result.failed).toBe(0);
+  await setNativeWorkerLimit(1);
+});
+// @kit produce-results:parallel-settlement
+it('retains scratch through a preparation failure, active sibling and cancelled queued case',async()=>{
+  const {setNativeWorkerLimit}=await import('../nativeWorker');put('src/cel/mv/c.cel',cel('Clinical C','c'));
+  let release!:()=>void,started!:()=>void,savedRepo='';const held=new Promise<void>(r=>{release=r;}),active=new Promise<void>(r=>{started=r;});
+  const controller=new AbortController();engine.prepFailAt=3;engine.prepGate=active;engine.onPrepFail=()=>controller.abort();
+  engine.wait=async input=>{savedRepo=input!.repoPath;started();await held;};
+  let done=false;const work=produceResults({...request(),workerLimit:2,signal:controller.signal}).then(r=>{done=true;return r;});
+  await vi.waitFor(()=>expect(engine.fingerprints).toBe(3));await active;
+  expect(done).toBe(false);expect(existsSync(savedRepo)).toBe(true);expect(engine.calls).toBe(1);
+  release();const result=await work;expect(result.ok).toBe(true);if(!result.ok)throw Error(result.reason);
+  expect(result.manifest.cases.map(c=>c.caseId)).toEqual(['a','b','c']);
+  expect(result.manifest.cases.map(c=>c.state)).toEqual(['generated','failed','not-run']);expect(result.failed).toBe(2);
+  expect(existsSync(savedRepo)).toBe(false);await setNativeWorkerLimit(1);
+});
+it.each([0,-1,33,1.5,NaN])('refuses invalid worker limit%s before starting cases',async workerLimit=>{
+  expect(await produceResults({...request(),workerLimit})).toMatchObject({ok:false,reason:expect.stringContaining('workerLimit')});expect(engine.calls).toBe(0);
 });
 it("accounts for cleanup uncertainty, skips pruning, and quarantines subsequent requests", async () => {
   put("src/cel/mv/c.cel", cel("Clinical C", "c"));

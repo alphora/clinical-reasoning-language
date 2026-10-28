@@ -6,11 +6,12 @@ import { JsonDocument, SessionInputError, sha256 } from "./sessionJson";
 import { validateSessionBundles } from "./sessionValidation";
 import { inspectSessionOutcome, type SessionDiagnostic } from "./sessionErrors";
 import { driverArgs, driverDir, driverReady } from "./driver";
-import { runOwnedProcess } from "./ownedProcess";
+import { runNativeProcess } from "./nativeProcess";
 import { DEFAULT_BOUNDS, ENGINE_JAR_SOURCE, defaultEngineJarPath, verifyJar, resolveJavaAsync, jvmFlags } from "./spawn";
 import { runtimeFingerprint } from "./runtimeFingerprint";
-import {withNativeRuntime,NativeRuntimeError,type NativeMode} from './nativeWorker';
-export {shutdownNativeRuntime} from './nativeWorker';
+import {withNativeRuntime,withNativeOperation,checkNativeAdmission,NativeRuntimeError,type NativeMode} from './nativeWorker';
+export {shutdownNativeRuntime,createNativeWorkerPool,setNativeWorkerLimit,nativeWorkerPoolStatus} from './nativeWorker';
+export type {NativeWorkerPool,NativeWorkerPoolStatus} from './nativeWorker';
 export { buildSessionResponse } from "./sessionResponse";
 export type { SessionAnswerEdit, SessionResponseOptions } from "./sessionResponse";
 export { SessionInputError } from "./sessionJson";
@@ -36,8 +37,19 @@ function limitsFor(overrides?: Partial<SessionLimits>): SessionLimits {
   for (const [name, value] of Object.entries(limits)) if (!Number.isSafeInteger(value) || value <= 0 || value > (name === "maxHeapMb" ? 65536 : 268435456)) throw new SessionInputError("invalid-limit", "Invalid positive bounded integer for " + name);
   return limits;
 }
-export async function applySession(request: ApplySessionRequestV1, options: ApplySessionOptions): Promise<ApplySessionResult> {
-  const started = performance.now();
+export function applySession(request: ApplySessionRequestV1, options: ApplySessionOptions): Promise<ApplySessionResult> {
+  const started=performance.now();
+  const refused=(error:unknown):ApplySessionResult=>({schemaVersion:1,ok:false,artifacts:{},diagnostics:[],elapsedMs:performance.now()-started,
+    cleanupConfirmed:error instanceof NativeRuntimeError?error.cleanupConfirmed:true,
+    error:{code:error instanceof NativeRuntimeError?error.code:'session-failure',message:error instanceof Error?error.message:String(error)}});
+  try{
+    request=request&&{...request,...(request.engine?{engine:{...request.engine}}:{})};
+    options=options&&{...options,limits:options.limits&&{...options.limits}};
+    const environment={...process.env};
+    return withNativeOperation(options?.signal,signal=>executeSession(request,{...options,signal},environment,started)).catch(refused);
+  }catch(error){return Promise.resolve(refused(error));}
+}
+async function executeSession(request:ApplySessionRequestV1,options:ApplySessionOptions,environment:NodeJS.ProcessEnv,started:number):Promise<ApplySessionResult> {
   const base: SessionResultBase = { schemaVersion: 1, artifacts: {}, diagnostics: [], elapsedMs: 0, cleanupConfirmed: true };
   let output: string | undefined, limits: SessionLimits | undefined;
   const finish = (error?: { code: string; message: string; path?: string }): ApplySessionResult => {
@@ -54,7 +66,6 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     // Snapshot execution fields before awaiting; the original AbortSignal stays live.
     request = request && { ...request, ...(request.engine ? { engine: { ...request.engine } } : {}) };
     options = options && { ...options, limits: options.limits && { ...options.limits } };
-    const environment = { ...process.env };
     limits = limitsFor(options?.limits);
     if (!options?.outDir || typeof options.outDir !== "string") throw new SessionInputError("output-directory", "Supply a new output directory.");
     const destination = path.resolve(options.outDir);
@@ -82,6 +93,7 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     const conflicting = Object.keys(environment).filter(key => environment[key] && /^(JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|CLASSPATH|LOADER_.*|SPRING_.*|LD_PRELOAD|DYLD_INSERT_LIBRARIES)$/i.test(key));
     if (conflicting.length) throw new SessionInputError("java-environment", "Unset Java or loader overrides for bounded session execution: " + conflicting.sort().join(", "));
     if (options.signal?.aborted) throw new SessionInputError("cancelled", "Cancelled before native execution.");
+    checkNativeAdmission(limits.maxHeapMb);
     if (request.engine !== undefined && (!request.engine || typeof request.engine.path !== "string" || !request.engine.path || typeof request.engine.sha256 !== "string" || !/^[a-fA-F0-9]{64}$/.test(request.engine.sha256))) throw new SessionInputError("engine-configuration", "An explicit engine requires both a path and SHA256.");
     const configuredJar = request.engine?.path ?? defaultEngineJarPath(environment);
     const jarPath = configuredJar ? path.resolve(configuredJar) : undefined;
@@ -94,7 +106,7 @@ export async function applySession(request: ApplySessionRequestV1, options: Appl
     let probeFailure: string | undefined;
     const java = await resolveJavaAsync(environment, process.platform === "win32", async exe => {
       if (probeFailure || options.signal?.aborted) return undefined;
-      const probe = await runOwnedProcess(exe, ["-version"], { timeoutMs: 15000, maxBytes: 65536, signal: options.signal, env: environment });
+      const probe = await runNativeProcess(exe, ["-version"], { timeoutMs: 15000, maxBytes: 65536, signal: options.signal, env: environment });
       if (!probe.cleanupConfirmed) { base.cleanupConfirmed = false; probeFailure = "cleanup-unconfirmed"; }
       return probe.failure || probe.status !== 0 ? undefined : probe.stderr + probe.stdout;
     });

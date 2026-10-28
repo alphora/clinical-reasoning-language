@@ -9,7 +9,7 @@ const ALIASES: Record<string, string[]> = {
   "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
   "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers", "uncertainty check", "computed guard", "uncertain assume yes", "uncertain assume no"],
   "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
-  "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API", "--serve", "reusable JVM", "warm JVM", "NDJSON"],
+  "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API", "--serve", "reusable JVM", "warm JVM", "NDJSON", "createNativeWorkerPool", "runJob", "setWorkerLimit", "worker pool", "independent sessions"],
   "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
   "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start", "Quantity", "Number", "count", "sessions", "rate", "d/wk", "h/d"],
   "concept-form": ["concept", "case feature", "Scalar", "remove scalar", "Observation", "code is", "absence", "completeness", "evidence completeness"],
@@ -33,7 +33,7 @@ const ALIASES: Record<string, string[]> = {
   "mv-case-authoring": ["MV CEL", "medical validation cases", "off path data", "regression suite", "Result Questionnaire", "selected route"],
   "shared-wording-editing": ["edit source wording", "preview_presentation_edit", "apply_presentation_edit", "revert_presentation_edit", "Edit Question Wording", "shared default", "undo wording", "wording conflict"],
   "mv-wording-patches": ["edit question", "pencil", "wording patch", "CRL patch", "MV scope", "KE handoff", "Save change", "Question Edit", "Answer CRUD", "Pending fix", "Fixed", "Approved", "KE Updates", "Knowledge Engineer", "crl.knowledgeEngineering.show", "preview Q/A edits", "run Q/A edits", "revert answer", "static questionnaire"],
-  "produce-results": ["retryFailed", "retry failed cases", "caseTimeoutMs", "native timeout", "retry-from", "emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation"],
+  "produce-results": ["retryFailed", "retry failed cases", "caseTimeoutMs", "native timeout", "retry-from", "emit_results", "$apply", "QuestionnaireResponse", "MV", "medical validation", "workerLimit", "--workers", "parallel native cases", "heap budget"],
   "verify-loop": ["verify", "run_decision", "CRE", "acceptance", "native engine", "active Condition", "verified Condition", "record filters", "preview discrepancy", "RecordSet existence"],
 };
 

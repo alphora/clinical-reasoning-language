@@ -55,6 +55,7 @@ FLAGS:
   --crl <file>         The CRL library the suite covers. Required.
   --use-case <name>    ${RESULT_USE_CASES.join(" | ")}. Required.
   --retry-failed       Retain compatible successes from the previous run; retry other cases.
+  --workers <n>       Independent-case worker limit (1..32); heap admission still applies.
   --case-timeout-ms <ms> Per-case timeout (default 600000; positive integer).
   --jar <path>         Engine jar. OPTIONAL — uses this build's identified cache.
                        ${engineJarHelp().join("\n                       ")}
@@ -75,6 +76,7 @@ EXIT CODES:
 `;
 
 interface Args {
+  workerLimit?:number;
   caseTimeoutMs?: number;
   retryFailed?: boolean;
   cel?: string; crl?: string; useCase?: string; jar?: string; jarSha?: string;
@@ -99,6 +101,7 @@ function parseArgs(argv: string[]): Args {
     else if (f === "--use-case") a.useCase = need(i++, f);
     else if (f === "--jar") a.jar = need(i++, f);
     else if (f === "--jar-sha256") a.jarSha = need(i++, f);
+    else if (f === "--workers") a.workerLimit=Number(need(i++,f));
     else if (f === "--case-timeout-ms") a.caseTimeoutMs = Number(need(i++, f));
     else if (f === "--out") a.out = need(i++, f);
     else if (f === "--enable") a.enable = true;
@@ -162,6 +165,7 @@ async function main(): Promise<void> {
     jarSha256: a.jarSha,
     prune: a.prune,
     caseTimeoutMs: a.caseTimeoutMs,
+    workerLimit:a.workerLimit,
     crlVersion: CRL_VERSION,
   });
 

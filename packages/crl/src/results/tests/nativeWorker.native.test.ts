@@ -12,6 +12,7 @@ import {DEFAULT_BOUNDS,jvmFlags} from '../spawn';
 import {runOwnedProcess} from '../ownedProcess';
 const engine=process.env.CRL_NATIVE_WORKER_JAR;
 // @kit native-apply-session:native-isolation
+// @kit native-apply-session:pool-native-isolation
 it.skipIf(!engine)('native A/B/A isolates same-identity Library, terminology and patient content; reuses and recovers the JVM',async()=>{
  const root=mkdtempSync(path.join(tmpdir(),'native-worker-controls-'));let seq=0;
  const cql=(inverted=false)=>`library Warm version '1.0.0'
@@ -77,5 +78,18 @@ public class WatchdogControl {
   const repo=path.join(recovered.out,'repository-input.json');
   const timed=await withNativeRuntime(spec,r=>r.run(driverArgs({jvmFlags:jvmFlags(spec.bounds),engineJarPath:engine!,loaderPath:driverDir(),repoPath:repo,planDefinitionId:'policy',subjectReference:'Patient/p'}),{timeoutMs:1,maxBytes:65536}));expect(timed).toMatchObject({failure:'timeout',cleanupConfirmed:true});
   const afterTimeout=await evaluate('A');expect(afterTimeout.codes).toEqual(['Met']);expect(afterTimeout.r.runtime?.workerPid).not.toBe(recovered.r.runtime?.workerPid);
+  await shutdownNativeRuntime();
+  const {createNativeWorkerPool}=await import('../session');
+  const pool=createNativeWorkerPool({workerLimit:2,maxHeapMb:512}),pids=new Set<number>();
+  let arrived=0,release!:()=>void;const both=new Promise<void>(resolve=>{release=resolve;});
+  try{
+   await Promise.all(['terminology','library'].map(variant=>pool.runJob(async()=>{
+    const first=await evaluate(variant);expect(first.codes).toEqual(['Unmet']);pids.add(first.r.runtime!.workerPid!);
+    arrived++;if(arrived===2)release();await both;
+    const next=await evaluate('A');expect(next.codes).toEqual(['Met']);expect(next.r.runtime?.workerPid).toBe(first.r.runtime?.workerPid);
+   })));
+   expect(pids.size).toBe(2);
+   console.log('Native pool isolation '+JSON.stringify({workerPids:[...pids],jobs:2,nativeCalls:4,sameIdentityReplacement:true}));
+  }finally{await pool.shutdown();}
  }finally{await shutdownNativeRuntime();rmSync(root,{recursive:true,force:true});}
 },300000);

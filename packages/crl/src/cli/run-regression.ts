@@ -13,17 +13,18 @@ try {
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     if (flag === "--help") {
-      console.log("crl-run-regression --project <policy> [--native [--jar <engine.jar>] [--case-timeout-ms <ms>] [--retry-from <manifest>]]\nRuns each MV and regression CEL file once. Default: CRE checks only, no FHIR emission. --native enables the JVM and writes results to a new temporary directory. --retry-from retains compatible successes in that earlier regression run.");
+      console.log("crl-run-regression --project <policy> [--native [--jar <engine.jar>] [--case-timeout-ms <ms>] [--retry-from <manifest>] [--workers <n>]]\nRuns each MV and regression CEL file once. Default: CRE checks only, no FHIR emission. --native enables the JVM and writes results to a new temporary directory. --retry-from retains compatible successes in that earlier regression run.");
       process.exit(0);
     }
     if (flag === "--native") options.native = true;
-    else if (["--project", "--jar", "--case-timeout-ms", "--retry-from"].includes(flag)) {
+    else if (["--project", "--jar", "--case-timeout-ms", "--retry-from", "--workers"].includes(flag)) {
       if (!args[i + 1] || args[i + 1].startsWith("--")) throw new Error(`Missing value for ${flag}`);
       options[flag.slice(2)] = args[++i];
     } else throw new Error(`Unknown option ${flag}`);
   }
   if (typeof options.project !== "string") throw new Error("--project is required");
-  if (!options.native && (options.jar || options["case-timeout-ms"] || options["retry-from"])) throw new Error("--jar, --case-timeout-ms and --retry-from require --native");
+  if (!options.native && (options.jar || options["case-timeout-ms"] || options["retry-from"] || options.workers)) throw new Error("--jar, --case-timeout-ms and --retry-from and --workers require --native");
+  if(options.workers!==undefined&&(!Number.isSafeInteger(Number(options.workers))||Number(options.workers)<1||Number(options.workers)>32))throw new Error("--workers requires an integer from1to32");
   const checks = runRegression(options.project);
   let native;
   if (options.native && checks.success) {
@@ -31,6 +32,7 @@ try {
     if (!selected.ok) throw new Error(selected.diagnostics.map(d => d.message).join("\n"));
     native = await produceRegressionResults({ projectPath: options.project, retryFrom: options["retry-from"] as string | undefined,
       crlPath: selected.suite.policyPath ?? options.project, useCase: "prior-auth", jarPath: options.jar as string | undefined,
+      workerLimit:options.workers===undefined?undefined:Number(options.workers),
       caseTimeoutMs: options["case-timeout-ms"] === undefined ? undefined : Number(options["case-timeout-ms"]),
       crlVersion: (require("../../package.json") as { version: string }).version });
   }

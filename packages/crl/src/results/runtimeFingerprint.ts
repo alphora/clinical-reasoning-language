@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { driverArgs, driverDir } from "./driver";
 import { jvmFlags, type JvmBounds } from "./spawn";
-import { runOwnedProcess } from "./ownedProcess";
+import { runNativeProcess } from "./nativeProcess";
 import type {NativeRuntime} from './nativeWorker';
 
 export const digest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -15,10 +15,10 @@ Promise<{ sha256?: string; cleanupConfirmed: boolean; reason?: string }> {
   const args = driverArgs({ jvmFlags: jvmFlags(bounds), engineJarPath, loaderPath: driverDir(),
     repoPath: "--runtime-info", planDefinitionId: "-", subjectReference: "-" });
   // REFACTOR:grounded: borrow actual reserved-worker identity; isolated mode retains its probe.
-  const probe = runtime?.runtimeInfo ? {stdout:runtime.runtimeInfo,cleanupConfirmed:true,status:0,failure:undefined} : await runOwnedProcess(javaExe, args, { timeoutMs: 30000, maxBytes: 65536, signal, env });
+  const probe = runtime?.runtimeInfo ? {stdout:runtime.runtimeInfo,cleanupConfirmed:true,status:0,failure:undefined} : await runNativeProcess(javaExe, args, { timeoutMs: 30000, maxBytes: 65536, signal, env });
   const line = probe.stdout.split(/\r?\n/).find(s => s.startsWith("CRL_RUNTIME_INFO:"));
   const fields = line?.slice("CRL_RUNTIME_INFO:".length).split(".");
-  if (probe.failure || probe.status !== 0 || fields?.length !== 9 || fields.some(s => !/^[A-Za-z0-9+/]*={0,2}$/.test(s))) {
+  if (!probe.cleanupConfirmed || probe.failure || probe.status !== 0 || fields?.length !== 9 || fields.some(s => !/^[A-Za-z0-9+/]*={0,2}$/.test(s))) {
     return { cleanupConfirmed: probe.cleanupConfirmed, reason: "Cannot fingerprint the effective Java runtime; retry compatibility is unavailable." };
   }
   const environment = Object.fromEntries(Object.entries(env).filter(([key]) =>

@@ -857,6 +857,7 @@ export function createServer(): McpServer {
           ),
         retryFailed: z.boolean().optional().describe("Retain compatible successful native results and retry remaining cases."),
         caseTimeoutMs: z.number().int().min(1).max(2147483647).optional().describe("Per-case timeout in milliseconds; default 600000."),
+        workerLimit:z.number().int().min(1).max(32).optional().describe("Concurrent independent cases in this process; bounded by aggregate heap admission. Omitted keeps the process limit (initially 1)."),
         prune: z.literal(true).optional().describe("Normal runs replace the complete generated results directory. false is not supported; use Git or a scratch output root. Explicit retry retains verified successful results."),
       },
     },
@@ -872,6 +873,7 @@ export function createServer(): McpServer {
           prune?: boolean;
           retryFailed?: boolean;
           caseTimeoutMs?: number;
+  workerLimit?:number;
           signal?: AbortSignal;
         },
       ),
@@ -1775,6 +1777,7 @@ async function emitResults(args: {
   prune?: boolean;
   retryFailed?: boolean;
   caseTimeoutMs?: number;
+  workerLimit?:number;
   signal?: AbortSignal;
 }): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   const err = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
@@ -1840,6 +1843,7 @@ async function emitResults(args: {
     jarSha256: args.jarSha256,
     prune: args.prune,
     caseTimeoutMs: args.caseTimeoutMs,
+    workerLimit:args.workerLimit,
     retryFailed: args.retryFailed,
     signal: args.signal,
     crlVersion: CRL_PACKAGE_VERSION,
@@ -1857,6 +1861,7 @@ async function emitResults(args: {
             ok: true,
             manifestPath: outcome.manifestPath,
             failed: outcome.failed,
+            workerPool:outcome.workerPool,
             notEmitted: outcome.notEmitted,
             // Superseded artifacts this run removed, and unclaimed files it LEFT (types it does
             // not own). A renamed case leaves a complete pair behind that the viewer shows as real.

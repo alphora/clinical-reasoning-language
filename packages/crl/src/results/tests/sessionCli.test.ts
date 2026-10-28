@@ -56,3 +56,29 @@ it('rejects oversized controls before newline and resumes at the next control',a
   expect(await closed).toBe(1);const results=output.trim().split('\n').map(line=>JSON.parse(line));expect(results).toHaveLength(2);expect(results[1].error.code).toBe('request-failure');
  }finally{child.kill();}
 });
+
+it('parallel serve retains response order for failed controls and successful resize acknowledgments',()=>{
+ const controls=[
+  {request:path.join(root,'first-missing.json'),out:path.join(root,'first-parallel')},
+  {workers:2},
+  {request:path.join(root,'second-missing.json'),out:path.join(root,'second-parallel')},
+  {workers:1},
+ ];
+ const child=spawnSync(process.execPath,[cli,'--serve','--workers','2'],{input:controls.map(c=>JSON.stringify(c)).join('\n')+'\n',encoding:'utf8',timeout:30000,windowsHide:true});
+ expect(child.error).toBeUndefined();expect(child.status).toBe(1);
+ const result=child.stdout.trim().split('\n').map(l=>JSON.parse(l));expect(result).toHaveLength(4);
+ expect(result[0]).toMatchObject({ok:false,error:{code:'request-failure'}});
+ expect(result[1]).toMatchObject({ok:true,control:'workers',workerLimit:2});
+ expect(result[2]).toMatchObject({ok:false,error:{code:'request-failure'}});
+ expect(result[3]).toMatchObject({ok:true,control:'workers',workerLimit:1});
+});
+it('more than twelve queued controls keep failure status and avoid process/signal listener warnings',()=>{
+ const controls=Array.from({length:24},(_,i)=>JSON.stringify({request:path.join(root,'absent-'+i+'.json'),out:path.join(root,'queued-'+i)})).join('\n')+'\n';
+ const child=spawnSync(process.execPath,[cli,'--serve','--workers','2'],{input:controls,encoding:'utf8',timeout:30000,windowsHide:true});
+ expect(child.error).toBeUndefined();expect(child.status).toBe(1);expect(child.stdout.trim().split('\n')).toHaveLength(24);
+ expect(child.stderr).not.toContain('MaxListenersExceededWarning');
+});
+it.each(['0','33','1.5','not-a-number'])('refuses invalid serve worker limit %s',limit=>{
+ const child=spawnSync(process.execPath,[cli,'--serve','--workers',limit],{encoding:'utf8',timeout:30000,windowsHide:true});
+ expect(child.status).toBe(1);expect(JSON.parse(child.stdout)).toMatchObject({ok:false,error:{code:'arguments'}});
+});

@@ -11,14 +11,15 @@ import { clearGeneratedDirectory } from "../generated-output";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import {performance} from "node:perf_hooks";
 
 import { emitCelSuite, type CelSuiteEmission } from "../cel/suiteEmit";
 import { resolveCelSuite, type CelSuite } from "../cel/suite";
 import { canonicalizeFsPath } from "../imports/paths";
 import { emitResultDefinitionClosure, type DefinitionPublicationOptions } from './definitionClosure';
-import { buildProducerInputs } from "./caseInput";
+import { buildProducerInputs,type ProducerCaseInput } from "./caseInput";
 import { isInsideResultsTree, scanOrphans, splitOrphans } from "./orphans";
-import { suiteResultsManifestPath, type ProducerManifest } from "./manifest";
+import { suiteResultsManifestPath, type ProducerManifest,type ProducerCaseEntry } from "./manifest";
 import { buildEngineRepoBundle } from "./repoBundle";
 import { runOneCase } from "./runProducer";
 import {
@@ -34,15 +35,17 @@ import {
   verifyJar,
   type JvmBounds,
 } from "./spawn";
-import { runOwnedProcess } from "./ownedProcess";
+import {runNativeProcess,nativeQuarantined,reportNativeCleanup,subscribeNativeAbort} from "./nativeProcess";
 import { driverReady } from "./driver";
-import {withNativeRuntime,shutdownNativeRuntime,type NativeMode} from './nativeWorker';
+import {withNativeRuntime,shutdownNativeRuntime,withNativeOperation,assertOutsideNativeJob,checkNativeAdmission,setNativeWorkerLimit,nativeWorkerPoolStatus,drainRetiredNativeWorkers,NativeRuntimeError,type NativeMode} from './nativeWorker';
 import { digest, runtimeFingerprint } from "./runtimeFingerprint";
 import { caseKey, readRetry, reusableCase, preflightOutputs, regressionRetryRoot, excludeMvDestination, canonicalOutputRoot } from "./retry";
 import { isImplementedUseCase, type ResultUseCase } from "./useCases";
 
 export interface ProduceRequest {
   nativeMode?:NativeMode;
+  /** Independent case concurrency in the same reusable native pool. Default retains configured limit1. */
+  workerLimit?:number;
   celPath: string;
   crlPath: string;
   /** MV captures these once and uses them for Save, freshness and native refresh. Omitted retains normal defaults. */
@@ -88,6 +91,7 @@ export type ProduceOutcome =
       /** Symlinks found under the results tree and deliberately not followed. */
       skippedLinks: string[];
       failed: number;
+      workerPool?:{workerLimit:number;workerPids:number[];nativeCalls:number;peakActiveCases:number;elapsedMs:number};
       java: { exe: string; major: number };
       /**
        * The engine jar that actually ran, and whether it was DEFAULTED.
@@ -107,41 +111,45 @@ export type ProduceOutcome =
  * plausible-looking empty success in an earlier cut of this code.
  */
 let running = false;
-let quarantined = false;
 let shuttingDown = false;
 let activeAbort: AbortController | undefined;
 let activeWork: Promise<ProduceOutcome> | undefined;
 
 /** Cancel only for server lifecycle shutdown. Per-request cancellation uses req.signal. */
 export async function shutdownProducer(): Promise<void> {
+  assertOutsideNativeJob("shutdownProducer");
   shuttingDown = true;
   activeAbort?.abort();
   await activeWork;
   await shutdownNativeRuntime();
 }
 async function guardedProduction(req: Omit<ProduceRequest, "outRoot" | "celPath">, make: () => ProduceRequest, purpose: "mv" | "regression"): Promise<ProduceOutcome> {
-  if (quarantined) return { ok: false, reason: "Native cleanup was not confirmed; restart this server after checking its reported process failure." };
+  // Terminal lifecycle refusal remains ahead of operation/barrier admission.
+  if (nativeQuarantined()) return { ok: false, reason: "Native cleanup was not confirmed; restart this server after checking its reported process failure." };
   if (running || shuttingDown) return { ok: false, reason: "Native producer is busy or shutting down." };
   if (req.signal?.aborted) return { ok: false, reason: "Native production cancelled." };
+  if(req.workerLimit!==undefined){
+    if(!Number.isSafeInteger(req.workerLimit)||req.workerLimit<1||req.workerLimit>32)return {ok:false,reason:"workerLimit must be an integer from1to32."};
+    try{assertOutsideNativeJob("Producer worker-limit configuration");}catch(error){return {ok:false,reason:String(error)};}
+  }
   running = true;
-  const controller = new AbortController(); activeAbort = controller;
-  const cancel = () => controller.abort();
-  req.signal?.addEventListener("abort", cancel, { once: true });
-  if (req.signal?.aborted) cancel();
-  const work = (async (): Promise<ProduceOutcome> => {
+  const started=performance.now(),controller = new AbortController(); activeAbort = controller;
+  const stopCancel=subscribeNativeAbort(req.signal,()=>controller.abort());
+  const work:Promise<ProduceOutcome> = withNativeOperation<ProduceOutcome>(controller.signal,async signal=>{
     try {
       const bounds = resultBounds(req.bounds, req.caseTimeoutMs);
-      if (controller.signal.aborted) return { ok: false, reason: "Native production cancelled." };
-      return await produceSuiteResults({ ...make(), bounds, signal: controller.signal }, purpose);
+      if(signal?.aborted)return {ok:false,reason:"Native production cancelled."};
+      if(req.workerLimit!==undefined)await setNativeWorkerLimit(req.workerLimit);
+      return await produceSuiteResults({...make(),bounds,signal},purpose);
     } catch (error) { return { ok: false, reason: String(error) }; }
-    finally {
-      req.signal?.removeEventListener("abort", cancel);
-      activeAbort = undefined;
-      if (!quarantined) running = false;
-    }
-  })();
-  activeWork = work;
-  return work;
+  }).catch(error=>({ok:false as const,reason:String(error)})).then(result=>{
+    if(result.ok&&result.workerPool)result.workerPool.elapsedMs=performance.now()-started;
+    return result;
+  }).finally(()=>{
+    stopCancel();activeAbort=undefined;
+    if(!nativeQuarantined())running=false;
+  });
+  activeWork=work;return work;
 }
 
 export function produceResults(req: ProduceRequest): Promise<ProduceOutcome> {
@@ -173,13 +181,13 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
     if (emission.result.diagnostics.some(d => d.severity === "error")) return { ok: false, reason: "CEL suite did not emit completely", detail: emission.result.diagnostics.map(d => d.message) };
     preflightOutputs(req.outRoot, purpose, []);
     if (previous && !suite.files.length) throw new Error("Cannot retry an empty suite; run without retry.");
-    if (req.signal?.aborted || quarantined) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
+    if (req.signal?.aborted || nativeQuarantined()) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
     if (!suite.files.length) clearGeneratedDirectory(path.join(req.outRoot, "tests/results"));
     const result = suite.files.length ? await produceCandidate(req, suite, emission, previous) : emptyResult(req, suite, emission);
     if (!result.ok) return result;
     mkdirSync(path.dirname(result.manifestPath), { recursive: true });
     writeFileSync(result.manifestPath, JSON.stringify(result.manifest, null, 2) + "\n");
-    if (quarantined) return result; // Account for every case, but do not prune after uncertain cleanup.
+    if (nativeQuarantined()) return result; // Account for every case, but do not prune after uncertain cleanup.
     // Existing results-tree cleanup, once for the complete selected case set.
     const scan = scanOrphans(req.outRoot, result.manifest);
     const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
@@ -211,7 +219,8 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   // hash — and the refusal that names the download URL sits AFTER the call they cannot make. As the
   // IEHP KE put it: "the gate is not the failure path — it is the signature." They recovered the URL
   // by reading back an agent-to-agent message thread, because it existed nowhere in the shipped tool.
-  const jarPath = req.jarPath ?? defaultEngineJarPath();
+  const environment={...process.env};
+  const jarPath = req.jarPath ?? defaultEngineJarPath(environment);
   if (!jarPath) {
     return {
       ok: false,
@@ -260,14 +269,15 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   // ⚠ The verified jar IS the jar executed — it goes on `-cp` directly. The classpath-containment
   // check this replaces existed only because the user supplied a separate classpath that need not
   // have contained it, which made `producerJarSha256` a claim about an artifact that never ran.
+  checkNativeAdmission((req.bounds??DEFAULT_BOUNDS).maxHeapMb);
   const probe = async (exe: string): Promise<string | undefined> => {
-    if (req.signal?.aborted || quarantined) return undefined;
-    const result = await runOwnedProcess(exe, ["-version"], { timeoutMs: 15000, maxBytes: 65536, signal: req.signal });
-    if (!result.cleanupConfirmed) quarantined = true;
+    if (req.signal?.aborted || nativeQuarantined()) return undefined;
+    const result = await runNativeProcess(exe, ["-version"], { timeoutMs: 15000, maxBytes: 65536, signal: req.signal,env:environment });
+    if (!result.cleanupConfirmed) reportNativeCleanup(false);
     return result.failure || result.status !== 0 ? undefined : result.stderr + result.stdout;
   };
-  const java = await resolveJavaAsync(process.env, process.platform === "win32", probe);
-  if (quarantined) return { ok: false, reason: "Java discovery cleanup could not be confirmed; native execution stopped." };
+  const java = await resolveJavaAsync(environment, process.platform === "win32", probe);
+  if (nativeQuarantined()) return { ok: false, reason: "Java discovery cleanup could not be confirmed; native execution stopped." };
   if (req.signal?.aborted) return { ok: false, reason: "Native production cancelled during Java discovery." };
   if (!java.ok) {
     return {
@@ -316,17 +326,22 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   const planDefinitionId = String(roots[0].id);
 
   preflightOutputs(req.outRoot, suite.purpose, inputs);
-  return await withNativeRuntime<ProduceOutcome>({javaExe:java.javaExe,engineJarPath:jarPath,engineSha256:jarCheck.sha256,bounds:req.bounds??DEFAULT_BOUNDS,signal:req.signal,nativeMode:req.nativeMode},async native=>{
-  const runtime = await runtimeFingerprint(java.javaExe, jarPath, req.bounds ?? DEFAULT_BOUNDS, req.signal,process.env,native);
-  if (!runtime.cleanupConfirmed) quarantined = true;
-  if (!runtime.sha256) return { ok: false, reason: runtime.reason ?? "Native runtime probe failed." } as ProduceOutcome;
+  const spec={javaExe:java.javaExe,engineJarPath:jarPath,engineSha256:jarCheck.sha256,bounds:req.bounds??DEFAULT_BOUNDS,signal:req.signal,nativeMode:req.nativeMode,env:environment};
+  const workerPids=new Set<number>();
+  // Release this short borrow before queueing cases: there is no suite-long reservation.
+  const runtime=await withNativeRuntime(spec,async native=>{
+    if(native.pid)workerPids.add(native.pid);
+    return runtimeFingerprint(java.javaExe,jarPath,spec.bounds,req.signal,environment,native);
+  });
+  if(!runtime.cleanupConfirmed)reportNativeCleanup(false);
+  if(!runtime.sha256)return {ok:false,reason:runtime.reason??"Native runtime probe failed."};
   const definitionClosureSha256 = closure.definitionClosureSha256!;
   const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: jarCheck.sha256 });
   if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
       previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {
     return { ok: false, reason: "Cannot retry: definitions or runtime changed. Run without retry." };
   }
-  if (req.signal?.aborted || quarantined) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
+  if (req.signal?.aborted || nativeQuarantined()) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
   if (!previous) clearGeneratedDirectory(path.join(req.outRoot, "tests/results"));
   const prior = new Map(previous?.cases.map(c => [caseKey(c), c]) ?? []);
   // ⚠ Build inputs go to scratch, never into the results tree.
@@ -344,67 +359,51 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     cases: [],
   };
 
-  let failed = 0;
-  try {
-  for (const input of inputs) {
-    const inputSha256 = digest({ input, planDefinitionId });
-    const retained = reusableCase(req.outRoot, prior.get(caseKey(input)), inputSha256);
-    if (retained) { manifest.cases.push(retained); continue; }
-    if (quarantined || req.signal?.aborted) {
-      manifest.cases.push({ sourceFile: input.sourceFile, caseId: input.caseId, caseName: input.caseName,
-        compartmentDir: `patient/${input.compartmentId}`, state: "not-run",
-        reason: quarantined ? "Queue stopped: previous owned-process cleanup unconfirmed." : "Production cancelled before this case." });
-      failed++; continue;
-    }
-    const repo = buildEngineRepoBundle({
-      definitions: defs as never,
-      cqlByLibraryFile: cql,
-      caseInput: input,
-    });
-    if (repo.missingCql.length > 0) {
-      // ⚠ FAIL the case. Launching without its CQL produces an expression-level engine error that never
-      // names the missing library, which then reads as a legitimate empty result.
-      manifest.cases.push({
-        sourceFile: input.sourceFile,
-        caseId: input.caseId,
-        caseName: input.caseName,
-        compartmentDir: `patient/${input.compartmentId}`,
-        state: "failed",
-        reason: `no CQL available for ${repo.missingCql.join(", ")}`,
+  let activeCases=0,peakActiveCases=0,nativeCalls=0;
+  const notRun=(input:ProducerCaseInput,reason:string):ProducerCaseEntry=>({sourceFile:input.sourceFile,caseId:input.caseId,caseName:input.caseName,compartmentDir:`patient/${input.compartmentId}`,state:"not-run",reason});
+  const execute=async(input:ProducerCaseInput,index:number):Promise<ProducerCaseEntry>=>{
+    const inputSha256=digest({input,planDefinitionId});
+    const retained=reusableCase(req.outRoot,prior.get(caseKey(input)),inputSha256);if(retained)return retained;
+    if(nativeQuarantined()||req.signal?.aborted)return notRun(input,nativeQuarantined()?"Queue stopped: previous owned-process cleanup unconfirmed.":"Production cancelled before this case.");
+    let started=false;
+    try{
+      const repo=buildEngineRepoBundle({definitions:defs as never,cqlByLibraryFile:cql,caseInput:input});
+      if(repo.missingCql.length)return {...notRun(input,`no CQL available for ${repo.missingCql.join(", ")}`),state:"failed"};
+      // Index-keyed even if a malformed compartment identity were repeated.
+      const repoPath=path.join(scratch,index+".json");writeFileSync(repoPath,JSON.stringify(repo.bundle));
+      const entry=await withNativeRuntime(spec,async native=>{
+        const actual=await runtimeFingerprint(java.javaExe,jarPath,spec.bounds,req.signal,environment,native);
+        if(!actual.cleanupConfirmed)reportNativeCleanup(false);
+        if(!actual.sha256||actual.sha256!==runtime.sha256)throw new NativeRuntimeError("runtime-fingerprint","Case owner differs from the frozen preflight runtime.",actual.cleanupConfirmed);
+        if(nativeQuarantined()||req.signal?.aborted)return notRun(input,nativeQuarantined()?"Queue stopped: native cleanup unconfirmed.":"Production cancelled before this case.");
+        activeCases++;peakActiveCases=Math.max(peakActiveCases,activeCases);started=true;
+        const before=native.calls??0;let counted=false;
+        try{
+          const result=await runOneCase({javaExe:java.javaExe,signal:req.signal,engineJarPath:jarPath,bounds:spec.bounds,planDefinitionId,artifactRoot:req.outRoot,runtime:native},
+            {caseName:input.caseName,compartmentId:input.compartmentId,subjectReference:input.subjectReference,repoPath});
+          nativeCalls+=(native.calls===undefined?1:native.calls-before);counted=true;
+          if(result.cleanupUncertain)reportNativeCleanup(false);
+          return result;
+        }finally{
+          if(!counted)nativeCalls+=(native.calls===undefined?1:native.calls-before);
+          if(native.pid)workerPids.add(native.pid);activeCases--;
+        }
       });
-      failed++;
-      continue;
+      return {...entry,sourceFile:input.sourceFile,caseId:input.caseId,inputSha256,producedAt:new Date().toISOString()};
+    }catch(error){
+      const stopped=error instanceof NativeRuntimeError&&(error.code==='cancelled'||error.code==='cleanup-unconfirmed');
+      return {...notRun(input,String(error)),state:!started&&stopped?"not-run":"failed",inputSha256,
+        ...(started&&error instanceof NativeRuntimeError&&!error.cleanupConfirmed?{cleanupUncertain:true}:{})};
     }
-    const repoPath = path.join(scratch, `${input.compartmentId}.json`);
-    writeFileSync(repoPath, JSON.stringify(repo.bundle));
-
-    const producedAt = new Date().toISOString();
-    const entry = await runOneCase(
-      {
-        javaExe: java.javaExe,
-        signal: req.signal,
-        engineJarPath: jarPath, // the VERIFIED jar, and nothing else, is what runs
-        bounds: req.bounds ?? DEFAULT_BOUNDS,
-        planDefinitionId,
-        artifactRoot: req.outRoot,
-        runtime:native,
-      },
-      {
-        caseName: input.caseName,
-        compartmentId: input.compartmentId,
-        subjectReference: input.subjectReference,
-        repoPath,
-      },
-    );
-    if (entry.cleanupUncertain) quarantined = true;
-    entry.sourceFile = input.sourceFile;
-    entry.caseId = input.caseId;
-    entry.inputSha256 = inputSha256;
-    entry.producedAt = producedAt;
-    manifest.cases.push(entry);
-    if (entry.state !== "generated" && entry.state !== "no-questionnaire") failed++;
-  }
-  } finally { rmSync(scratch, { recursive: true, force: true, maxRetries: 3 }); }
+  };
+  const jobs=inputs.map((input,index)=>execute(input,index));
+  try{
+    // No early Promise.all unwind may delete a sibling's input or omit a queued case.
+    const settled=await Promise.allSettled(jobs);
+    manifest.cases=settled.map((row,index)=>row.status==='fulfilled'?row.value:{...notRun(inputs[index],String(row.reason)),state:"failed"});
+  }finally{await Promise.allSettled(jobs);rmSync(scratch,{recursive:true,force:true,maxRetries:3});}
+  await drainRetiredNativeWorkers();
+  const failed=manifest.cases.filter(entry=>entry.state!=="generated"&&entry.state!=="no-questionnaire").length;
 
   const manifestPath = path.join(req.outRoot, suiteResultsManifestPath(suite.purpose));
 
@@ -417,8 +416,8 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     pruned: [],
     skippedLinks: [],
     failed,
+    workerPool:{workerLimit:nativeWorkerPoolStatus().workerLimit,workerPids:[...workerPids].sort((a,b)=>a-b),nativeCalls,peakActiveCases,elapsedMs:0},
     java: { exe: java.javaExe, major: java.major },
     engineJar: { path: jarPath, defaulted: req.jarPath === undefined },
   };
-  });
 }

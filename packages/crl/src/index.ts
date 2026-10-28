@@ -676,3 +676,7 @@ export { publishMvCel } from "./cel/publishSuite";
 export { runRegression } from "./cel/regression";
 
 export { packageFhir, type PackageFhirOptions, type PackageFhirResult } from "./fhir-package";
+
+// Bounded native scheduling; request and clinical state remain explicit.
+export {createNativeWorkerPool,setNativeWorkerLimit,nativeWorkerPoolStatus,shutdownNativeRuntime} from "./results/nativeWorker";
+export type {NativeWorkerPool,NativeWorkerPoolStatus} from "./results/nativeWorker";

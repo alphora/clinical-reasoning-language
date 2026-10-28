@@ -85,6 +85,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
   it.each([
     ["--serve", "rule:native-apply-session"],
     ["reusable JVM", "rule:native-apply-session"],
+    ["createNativeWorkerPool", "rule:native-apply-session"],
+    ["parallel native cases", "rule:produce-results"],
     ["NDJSON", "rule:native-apply-session"],
     ["uncertainty check", "rule:selected-answer-aggregate"],
     ["computed guard", "rule:selected-answer-aggregate"],

@@ -253,11 +253,9 @@ export function capTail(chunks: readonly Buffer[], maxBytes: number): string {
 }
 
 /**
- * ⚠ SINGLE-FLIGHT. A second concurrent run must REFUSE, not queue.
- *
- * Two JVMs at the heap cap is twice the ceiling that already crashed a machine, and an MCP caller can
- * invoke a tool repeatedly with no natural backpressure. Refusing is legible; a queue silently converts
- * impatience into memory pressure.
+ * SingleFlight is a refusal-based guard for callers choosing one active operation.
+ * Native worker pools separately bound queued jobs and aggregate JVM heap capacity.
+ * Every native process still needs an explicit heap bound; unbounded heaps crashed a machine.
  */
 export class SingleFlight {
   private held = false;

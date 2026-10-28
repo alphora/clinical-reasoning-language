@@ -88,6 +88,9 @@ try {
   await check("MCP tools: 23 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
     const { tools } = await client.listTools();
     const native = tools.find(t => t.name === "emit_results").inputSchema.properties;
+    assert.equal(native.workerLimit.type, "integer");
+    assert.equal(native.workerLimit.minimum, 1);
+    assert.equal(native.workerLimit.maximum, 32);
     assert.equal(native.retryFailed.type, "boolean");
     assert.equal(native.caseTimeoutMs.type, "integer");
     assert.equal(native.caseTimeoutMs.minimum, 1);
@@ -387,8 +390,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.37");
-    assert.equal(kit.contentHash, "c6749e23a46d597fe33523cb3746a06ad41a47ec1cd79ca1d33926151795121e");
+    assert.equal(kit.schemaVersion, "2.38");
+    assert.equal(kit.contentHash, "a40923e661e389ed6a49334f92d4bfcaf2470c70fee008b5db720dd8326a4417");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);

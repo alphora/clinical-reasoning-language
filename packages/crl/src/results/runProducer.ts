@@ -1,10 +1,10 @@
 /**
- * REFACTOR:grounded: fresh per-case repositories run in the suite's reserved warm runtime.
+ * REFACTOR:grounded: fresh per-case repositories run on each case's selected warm runtime.
  * A failed request retires the worker; later cases may use its clean replacement.
  */
 
 import { uniqueCapSlug } from "../fhir-emitter/slug";
-import { runOwnedProcess } from "./ownedProcess";
+import { runNativeProcess } from "./nativeProcess";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -175,7 +175,7 @@ export async function runOneCase(ctx: RunContext, c: RunOneCase): Promise<Produc
       maxBytes: ctx.bounds.maxCapturedBytes,
       signal: ctx.signal,
     };
-  const proc=ctx.runtime?await ctx.runtime.run(args,options):await runOwnedProcess(ctx.javaExe,args,options);
+  const proc=ctx.runtime?await ctx.runtime.run(args,options):await runNativeProcess(ctx.javaExe,args,options);
   const { stdout, stderr } = proc;
   const timedOut = proc.failure === "timeout";
   if (proc.failure && !timedOut) return {

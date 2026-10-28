@@ -70,6 +70,38 @@ describe("applySession boundary", () => {
     expect(JSON.parse(readFileSync(result.artifacts["request.json"].path, "utf8")).planDefinitionId).toBe("test");
     expect(existsSync(options.outDir)).toBe(false);
   });
+  // @kit native-apply-session:pool-operation-lifetime
+  it("retains the whole unawaited API operation through delayed discovery and evidence finalization",async()=>{
+    const {createNativeWorkerPool}=await import('../nativeWorker');const pool=createNativeWorkerPool({maxHeapMb:1024});
+    let release!:(value:unknown)=>void;native.run.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;}));
+    let result:Awaited<ReturnType<typeof applySession>>|undefined,finished=false;
+    const outDir=path.join(dir,'unawaited');
+    const job=pool.runJob(async()=>{void applySession(request(),{outDir}).then(value=>{result=value;});});
+    const settled=job.then(()=>{finished=true;});
+    await vi.waitFor(()=>expect(release).toBeTypeOf('function'));expect(finished).toBe(false);expect(pool.status().activeJobs).toBe(1);
+    release({...success,stderr:'openjdk version "17.0.1"'});await settled;
+    expect(result?.ok).toBe(true);expect(JSON.parse(readFileSync(path.join(outDir,'result.json'),'utf8')).ok).toBe(true);
+    await pool.shutdown();
+  });
+  it("refuses API work inherited by a late timer before any writes or Java probes",async()=>{
+    const {createNativeWorkerPool}=await import('../nativeWorker');const pool=createNativeWorkerPool();
+    const outDir=path.join(dir,'late');let late!:Promise<Awaited<ReturnType<typeof applySession>>>;
+    await pool.runJob(async()=>{late=new Promise(resolve=>{setTimeout(()=>{void applySession(request(),{outDir}).then(resolve);},15);});});
+    expect(await late).toMatchObject({ok:false,error:{code:'reservation-closed'}});
+    expect(existsSync(outDir)).toBe(false);expect(native.run).not.toHaveBeenCalled();await pool.shutdown();
+  });
+  it("job cancellation reaches discovery despite an independent request signal",async()=>{
+    const {createNativeWorkerPool}=await import('../nativeWorker');const pool=createNativeWorkerPool();
+    const jobSignal=new AbortController(),requestSignal=new AbortController();
+    native.run.mockImplementationOnce((_exe:string,_args:string[],options:{signal:AbortSignal})=>new Promise(resolve=>{
+      options.signal.addEventListener('abort',()=>resolve({...success,status:null,failure:'cancelled'}),{once:true});
+    }));
+    let result:Awaited<ReturnType<typeof applySession>>|undefined;
+    const job=pool.runJob(async()=>{result=await applySession(request(),{outDir:path.join(dir,'job-cancel'),signal:requestSignal.signal});},{signal:jobSignal.signal});
+    const cancelled=expect(job).rejects.toMatchObject({code:'cancelled'});
+    await vi.waitFor(()=>expect(native.run).toHaveBeenCalledTimes(1));jobSignal.abort();await cancelled;
+    expect(result).toMatchObject({ok:false,error:{code:'cancelled'}});expect(requestSignal.signal.aborted).toBe(false);await pool.shutdown();
+  });
   it.each(["_JAVA_OPTIONS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "LOADER_PATH", "CLASSPATH"])("rejects %s before starting Java", async key => {
     vi.stubEnv(key, "conflicting-private-value");
     const result = await applySession(request(), { outDir: path.join(dir, "env") });
