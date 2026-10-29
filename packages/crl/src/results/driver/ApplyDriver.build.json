@@ -5,6 +5,6 @@
   "classFileMajor": 61,
   "workerJavaSha256": "20167074de456ca4f6144a8662bdda911bf2bd32490b123afe2d1c54a96703b3",
   "workerClassSha256": "afc6612d751647af6ca937de356ed520e1a903a5a1b9233af7682d88c5cf10ce",
-  "engineJar": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
-  "engineJarSha256": "98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f"
+  "engineJar": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
+  "engineJarSha256": "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2"
 }

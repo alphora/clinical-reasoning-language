@@ -33,7 +33,7 @@
   },
   "patchSha256": "6afbc5d5bbbf295fca7fbc315f347cf62eb45e7183fd4d0f0bea9a4d41fd1739",
   "nestedJarInventory": "security-20261029/nested-jars.json",
-  "runtimeDependencyInventory": "security-20261002/runtime-dependencies.json",
+  "runtimeDependencyInventory": "security-20261029/runtime-dependencies.json",
   "resolvedGraphDelta": "security-20261029/runtime-delta.json",
   "toolchainChange": "Inherited Java 17 build and dependency security overrides; presentation-group Java source changes listed in groups.patch.",
   "resolvedGraphChanges": {
