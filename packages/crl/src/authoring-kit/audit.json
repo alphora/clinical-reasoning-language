@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "23cdbcc92e5490269bfaff78961d268e4c9055b3",
-  "auditedSchemaVersion": "2.39",
-  "auditedContentHash": "0d83f69f861b4583d6c576103d1222034c0b8873749b07e32175882e48ed5faa",
-  "scope": "Reviewed schema 2.39 current-content compiled-definition reuse and fresh clinical state, bounded worker pool and pinned normalized-source cache engine. Owning source/cache/error controls and full change dispositions are mapped in coverage.md. This source audit does not certify final installed artifacts, complete clinical acceptance or deployment.",
+  "auditedRevision": "0aaafaf28201c4b7a6ff417a8cbf77b5bcb4b154",
+  "auditedSchemaVersion": "2.40",
+  "auditedContentHash": "d4664026afe0d21fffa422b1f7be954d9036bf99297c47551f54388fbc908cdc",
+  "scope": "Reviewed schema 2.40 dependency-only normalized-cache security engine acquisition identity. Guava runtime33.7.2-jre, unchanged application/CQL-cache classes and source/kit identity controls are mapped in coverage.md. Final installed/native qualification and deployment remain separate release gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
