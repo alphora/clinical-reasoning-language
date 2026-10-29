@@ -1,0 +1,13 @@
+--- a/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
++++ b/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
+@@ -42,6 +42,10 @@
+ // Preserve dcac972f engine behavior while replacing vulnerable transitive libraries.
+ configurations.configureEach {
+     resolutionStrategy.eachDependency {
++        if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-stdlib") {
++            useVersion("2.3.20")
++            because("Retain the existing CRL engine runtime while building CQL from source")
++        }
+         if (requested.group == "ca.uhn.hapi.fhir" && requested.name.startsWith("org.hl7.fhir.")) {
+             useVersion("6.9.12")
+             because("CRL security build: patched HL7 core family")

@@ -1,10 +1,10 @@
 {
   "builtFrom": "ApplyDriver.java",
-  "javaSha256": "76a3f0b5f56d0d95f0104a37a9388323bbccfce176906de3c97e89469ea7ad54",
-  "classSha256": "e57cffa2335cdb7a7e11ff62fd96c01775f478704b40c5c208abe2aa9cae9f94",
+  "javaSha256": "ea64215bb4098d1f2a4651ed9c01f3584d692c0a80e8f33aefa3f498a1c3cd8c",
+  "classSha256": "d01ff0ad88ddadc8deaf6c0f9efbad53c9bee3fce8bce9643c19b5e3097b50fd",
   "classFileMajor": 61,
-  "workerJavaSha256": "32335adeaceaa07606d22be7c2a9a7a18226153590dec8c5e4aa8ca453dcd217",
-  "workerClassSha256": "7e3a906671182cd4b86ab4a9bef7106be5362f1af3688d986dd4c0c360382473",
-  "engineJar": "cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
-  "engineJarSha256": "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516"
+  "workerJavaSha256": "20167074de456ca4f6144a8662bdda911bf2bd32490b123afe2d1c54a96703b3",
+  "workerClassSha256": "afc6612d751647af6ca937de356ed520e1a903a5a1b9233af7682d88c5cf10ce",
+  "engineJar": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
+  "engineJarSha256": "98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f"
 }

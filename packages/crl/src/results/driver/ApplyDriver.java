@@ -1,14 +1,15 @@
 /*
- * ApplyDriver — one stateless evaluation, called directly or by the reusable ApplyWorker.
+ * ApplyDriver — one independent clinical evaluation, called directly or by the reusable ApplyWorker.
  *
  * Adapted from a working harness contributed by the IEHP knowledge-engineering project, whose operator
  * cleared it for use here. Their version also derived the case list, built the repository and chose the
  * answers; all of that now lives in TypeScript, where the CRL parser, the emit result and the path
  * authorities already are. What remains here is the part that genuinely needs a JVM: driving the engine.
  *
- * ⚠ DELIBERATELY ARGUMENT-DRIVEN AND STATELESS. It reads one repository bundle, applies one
+ * ⚠ REQUEST CLINICAL STATE IS ARGUMENT-DRIVEN. It reads one repository bundle, applies one
  * PlanDefinition for one subject. Legacy mode writes Parameters to stdout; explicit session mode
  * accepts request data and writes bounded native artifacts. It does not
+ * reuse evaluated clinical data. Only content-keyed compiled definitions may survive a call. It does not
  * choose a case, compose a path, or decide what is a pass. Every one of those was a source of drift in
  * the harness this replaces.
  *
@@ -42,7 +43,75 @@ import org.opencds.cqf.fhir.utility.monad.Eithers;
 import org.opencds.cqf.fhir.utility.repository.InMemoryFhirRepository;
 
 public class ApplyDriver {
-    public static void main(String[] args) throws Exception {
+    // REFACTOR:grounded: compiled definitions are reusable; clinical execution state is request-local.
+    // Retain one definition generation per JVM, never repositories, evaluation results, or terminology expansions.
+    private static String compilationKey;
+    private static java.util.Map<org.hl7.cql.model.ModelIdentifier, org.cqframework.cql.cql2elm.model.Model> compiledModels = new java.util.concurrent.ConcurrentHashMap<>();
+    private static java.util.Map<org.hl7.elm.r1.VersionedIdentifier, org.cqframework.cql.cql2elm.model.CompiledLibrary> compiledLibraries = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static synchronized void clearCompilation() {
+        compilationKey = null;
+        compiledModels = new java.util.concurrent.ConcurrentHashMap<>();
+        compiledLibraries = new java.util.concurrent.ConcurrentHashMap<>();
+    }
+
+    private static String definitionKey(FhirContext ctx, Bundle repository, Bundle data) throws Exception {
+        var hash = java.security.MessageDigest.getInstance("SHA-256");
+        hash.update((byte) (data == null ? 0 : 1)); // legacy lenient parsing and explicit strict sessions are separate generations.
+        var terser = ctx.newTerser();
+        for (Bundle input : new Bundle[] {repository, data}) {
+            Bundle definitions = new Bundle().setType(Bundle.BundleType.COLLECTION);
+            if (input != null) {
+                // External attachment bytes are not pinned by this request. Use fresh compilation in that case.
+                for (var library : terser.getAllPopulatedChildElementsOfType(input, org.hl7.fhir.r4.model.Library.class))
+                    for (var content : library.getContent()) if (content.hasUrl()) return null;
+                for (var entry : input.getEntry()) {
+                    var resource = entry.getResource();
+                    if (resource instanceof org.hl7.fhir.r4.model.MetadataResource || resource instanceof org.hl7.fhir.r4.model.Binary) {
+                        // Preserve definition order, fullUrl and all entry fields, including contained definition bytes.
+                        definitions.addEntry(entry);
+                    } else if (resource instanceof org.hl7.fhir.r4.model.Bundle
+                            || (resource instanceof org.hl7.fhir.r4.model.DomainResource domain && !domain.getContained().isEmpty())
+                            || !terser.getAllPopulatedChildElementsOfType(resource, org.hl7.fhir.r4.model.MetadataResource.class).isEmpty()
+                            || !terser.getAllPopulatedChildElementsOfType(resource, org.hl7.fhir.r4.model.Binary.class).isEmpty()) return null;
+                }
+            }
+            // The repository indexes Bundle entries, not clinical Bundle headers. Separate repository and request data.
+            hash.update((byte) 0);
+            hash.update(ctx.newJsonParser().encodeResourceToString(definitions).getBytes(StandardCharsets.UTF_8));
+        }
+        return java.util.HexFormat.of().formatHex(hash.digest());
+    }
+
+    private static synchronized org.opencds.cqf.fhir.cr.CrSettings compilationSettings(FhirContext ctx, Bundle repository, Bundle data) throws Exception {
+        var settings = org.opencds.cqf.fhir.cr.CrSettings.getDefault();
+        String key;
+        try { key = definitionKey(ctx, repository, data); }
+        catch (Exception unavailable) { clearCompilation(); return settings; }
+        if (key == null) { clearCompilation(); return settings; }
+        if (!key.equals(compilationKey)) { clearCompilation(); compilationKey = key; }
+        // The engine's inline-expression copy uses expression/1.0.0. Never seed that temporary identifier from a prior call.
+        compiledLibraries.keySet().removeIf(id -> "expression".equals(id.getId()));
+        settings.getEvaluationSettings().setModelCache(compiledModels);
+        settings.getEvaluationSettings().setLibraryCache(compiledLibraries);
+        return settings;
+    }
+
+    private static void finishCompilation(FhirContext ctx, IBaseResource result) {
+        // A diagnostic scan must not change the returned clinical outcome if traversal itself fails.
+        try {
+            for (var outcome : ctx.newTerser().getAllPopulatedChildElementsOfType(result, org.hl7.fhir.r4.model.OperationOutcome.class))
+                for (var issue : outcome.getIssue()) if (issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.ERROR
+                        || issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.FATAL) clearCompilation();
+        } catch (RuntimeException unavailable) { clearCompilation(); }
+    }
+
+    public static synchronized void main(String[] args) throws Exception {
+        try { apply(args); }
+        catch (Exception | Error failure) { clearCompilation(); throw failure; }
+    }
+
+    private static void apply(String[] args) throws Exception {
         if (args.length > 0 && "--runtime-info".equals(args[0])) {
             String[] values = {
                 System.getProperty("java.version"), System.getProperty("java.runtime.version"),
@@ -92,7 +161,7 @@ public class ApplyDriver {
         if (session && (fileLimit <= 0 || totalLimit <= 0)) throw new IllegalArgumentException("Positive artifact byte limits required");
         InMemoryFhirRepository repo = new InMemoryFhirRepository(ctx, bundle);
         // Resolve the standard qualified helper include without a FHIR Library resource.
-        org.opencds.cqf.fhir.cr.CrSettings settings = org.opencds.cqf.fhir.cr.CrSettings.getDefault();
+        org.opencds.cqf.fhir.cr.CrSettings settings = compilationSettings(ctx, bundle, requestData);
         settings.getEvaluationSettings().addRegisteredNamespace("hl7.fhir.uv.cql", "http://hl7.org/fhir/uv/cql");
         PlanDefinitionProcessor processor = new PlanDefinitionProcessor(repo, settings);
 
@@ -114,6 +183,8 @@ public class ApplyDriver {
                 (IBaseResource) null,                // dataEndpoint
                 (IBaseResource) null,                // contentEndpoint
                 (IBaseResource) null);               // terminologyEndpoint
+
+        finishCompilation(ctx, result);
 
         if (choiceGroups) {
             for (var outcome : ctx.newTerser().getAllPopulatedChildElementsOfType(result, org.hl7.fhir.r4.model.OperationOutcome.class)) {

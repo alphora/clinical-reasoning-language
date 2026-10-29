@@ -1,5 +1,5 @@
 {
-  "bytes": 216643643,
+  "bytes": 216643872,
   "upstreamFixes": {
     "askedUnknown": "0ade9a9de6621eabb5adb6ff99cbf01ab67d725d",
     "sharedInputDeduplication": "dcac972fc38bc9a29aae2c662dfb5c4917d27234"
@@ -7,29 +7,30 @@
   "embeddedVersionExplanation": "Gradle derives 4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT from the crl/security-20261002 branch and available 4.13.0 tag history. The old detached build reported 0.1.0 because its checkout/tag context differed. Exact source commit plus dependency patch identifies source; SHA-256 identifies delivered bytes.",
   "patchManifests": [
     "security-20261002/dependencies.patch",
-    "presentation-choice-groups/groups.patch"
+    "presentation-choice-groups/groups.patch",
+    "normalized-library-cache/kotlin-runtime.patch"
   ],
   "buildLauncherJdkMajor": 17,
   "upstreamRelease": false,
   "targetJavaMajor": 17,
-  "sha256": "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
+  "sha256": "98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f",
   "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  "asset": "cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
-  "buildId": "cqf-definition-dcac972f-presentation-groups-20261022",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
+  "buildId": "cqf-definition-dcac972f-normalized-cache-20261029",
   "upstreamBase": "feature-definition-based-population",
   "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/dcac972fc38bc9a29aae2c662dfb5c4917d27234",
   "embeddedBuildVersion": "4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
   "license": "Apache-2.0",
-  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=3",
-  "scope": "Complete maintainer-built CLI from upstream dcac972f, dependency security overrides and protocol 1 independent Boolean presentation grouping. CRL syntax and clinical computation remain outside this engine patch.",
-  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-presentation-groups-20261022/cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
+  "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=1 --init-script <module-repository-init.gradle>",
+  "scope": "Complete maintainer-built CLI from dcac972f, inherited security and presentation-group patches, and source-built CQL5.3.0 LibraryManager normalized-identifier compilation-cache repair. Clinical computations and CRL emission unchanged.",
+  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-20261029/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
   "dependencyPins": {
     "hl7Core": "6.9.12",
     "jacksonBom": "2.22.3",
     "httpCore5": "5.4.4 constraint if requested; absent from resolved runtime"
   },
   "patchSha256": "6afbc5d5bbbf295fca7fbc315f347cf62eb45e7183fd4d0f0bea9a4d41fd1739",
-  "nestedJarInventory": "presentation-choice-groups/nested-jars.json",
+  "nestedJarInventory": "normalized-library-cache/nested-jars.json",
   "runtimeDependencyInventory": "security-20261002/runtime-dependencies.json",
   "resolvedGraphDelta": "security-20261002/runtime-delta.json",
   "toolchainChange": "Inherited Java 17 build and dependency security overrides; presentation-group Java source changes listed in groups.patch.",
@@ -158,5 +159,20 @@
     "Native session controls do not exercise remote terminology/FHIR-NPM package fetches through OkHttp or XSLT transformations through Saxon.",
     "All four upstream integrationTest tasks returned NO-SOURCE."
   ],
-  "presentationGroupPatchSha256": "d23d6bf981f9522cecbe99fd609e20e7f353aa98976bcd16c02904af78a45de8"
+  "presentationGroupPatchSha256": "d23d6bf981f9522cecbe99fd609e20e7f353aa98976bcd16c02904af78a45de8",
+  "cqlSource": {
+    "repository": "https://github.com/cqframework/clinical_quality_language",
+    "tag": "v5.3.0",
+    "commit": "88693baefa482ec6f189c90113cfe1f3f4ce9d31",
+    "module": "cql-to-elm-jvm",
+    "version": "5.3.0",
+    "sourceBuiltModuleSha256": "0dfb610188cbdee461f78cb97a969b94d7f37a31c0cf5891175c74f93a4fc994",
+    "patchSha256": "258c09fa906fae38640916d81ff7cc52c1965155cfc8b12140d2a88dfc47ef30",
+    "upstreamRelease": false,
+    "controls": "8 normalized-source controls plus21 existing LibraryManager tests; final installed/native qualification is recorded separately",
+    "patch": "normalized-library-cache/library-manager.patch",
+    "baselineModuleSha256": "34fe17f7c63e916270e927c94f138266ac073fb40db62a3d82fea4825a1db06f",
+    "coordinateNote": "The private source-built module retains cql-to-elm-jvm5.3.0 and its translator version; it is not the published upstream binary. Compare baselineModuleSha256 with sourceBuiltModuleSha256."
+  },
+  "scopeBoundary": "The modified CQL module is a private maintainer build, not unmodified upstream5.3.0. All other dependency bytes match the prior engine; other CQF library change is build timestamp only."
 }

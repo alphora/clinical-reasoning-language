@@ -1,0 +1,70 @@
+diff --git a/cql-to-elm/src/commonMain/kotlin/org/cqframework/cql/cql2elm/LibraryManager.kt b/cql-to-elm/src/commonMain/kotlin/org/cqframework/cql/cql2elm/LibraryManager.kt
+index b9fbcdd..69ae50f 100644
+--- a/cql-to-elm/src/commonMain/kotlin/org/cqframework/cql/cql2elm/LibraryManager.kt
++++ b/cql-to-elm/src/commonMain/kotlin/org/cqframework/cql/cql2elm/LibraryManager.kt
+@@ -161,7 +161,7 @@ constructor(
+                 continue
+             }
+ 
+-            val compiledLibraryResult = compileLibrary(libraryIdentifier)
++            val compiledLibraryResult = compileLibrary(libraryIdentifier, cacheMode)
+ 
+             // If we have any errors, ignore the compiled library altogether just like in the single
+             // lib case
+@@ -170,7 +170,12 @@ constructor(
+                     cacheMode == CacheMode.READ_WRITE
+             ) {
+                 logger.debug { "adding library to cache: ${libraryIdentifier.id}" }
+-                compiledLibraries[libraryIdentifier] = compiledLibraryResult.compiledLibrary
++                val cacheKey =
++                    VersionedIdentifier()
++                        .withId(libraryIdentifier.id)
++                        .withSystem(libraryIdentifier.system)
++                        .withVersion(libraryIdentifier.version)
++                compiledLibraries[cacheKey] = compiledLibraryResult.compiledLibrary
+             }
+ 
+             compiledLibraryResults.add(compiledLibraryResult)
+@@ -203,7 +208,10 @@ constructor(
+     }
+ 
+     @Suppress("ThrowsCount")
+-    private fun compileLibrary(libraryIdentifier: VersionedIdentifier): CompiledLibraryResult {
++    private fun compileLibrary(
++        libraryIdentifier: VersionedIdentifier,
++        cacheMode: CacheMode,
++    ): CompiledLibraryResult {
+         val libraryPath = NamespaceManager.getPath(libraryIdentifier.system, libraryIdentifier.id!!)
+ 
+         if (!this.cqlCompilerOptions.enableCqlOnly) {
+@@ -226,13 +234,23 @@ constructor(
+                 )
+ 
+         val compiler =
+-            CqlCompiler(
+-                libraryIdentifier.system?.let { namespaceManager.getNamespaceInfoFromUri(it) },
+-                libraryIdentifier,
+-                this,
+-            )
+-
+-        cqlSource.use { compiler.run(it) }
++            cqlSource.use { source ->
++                // A source provider may normalize the requested identifier. Recheck the
++                // normalized key before compiling, while keeping its source owned by use.
++                if (cacheMode != CacheMode.NONE) {
++                    compiledLibraries[libraryIdentifier]?.let { cached ->
++                        return CompiledLibraryResult(libraryIdentifier, cached, mutableListOf())
++                    }
++                }
++                CqlCompiler(
++                        libraryIdentifier.system?.let {
++                            namespaceManager.getNamespaceInfoFromUri(it)
++                        },
++                        libraryIdentifier,
++                        this,
++                    )
++                    .also { it.run(source) }
++            }
+ 
+         val compiledLibrary =
+             compiler.compiledLibrary

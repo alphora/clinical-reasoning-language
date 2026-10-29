@@ -1,4 +1,4 @@
-// REFACTOR:grounded: transport reuses classes; ApplyDriver creates each request's clinical state.
+// REFACTOR:grounded: transport reuses classes and compiled definitions; ApplyDriver creates each request's clinical state.
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.ByteArrayOutputStream;

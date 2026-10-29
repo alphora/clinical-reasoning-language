@@ -1,0 +1,16 @@
+// Build input only: use our source-built module, with its original upstream POM.
+// Other modules continue to resolve from the original repositories.
+allprojects {
+    repositories {
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'crlSourceBuiltCqlModule'
+                    url = uri(System.getenv('CRL_PATCHED_CQL_REPOSITORY'))
+                    metadataSources { mavenPom(); ignoreGradleMetadataRedirection() }
+                }
+            }
+            filter { includeModule('org.cqframework', 'cql-to-elm-jvm') }
+        }
+    }
+}

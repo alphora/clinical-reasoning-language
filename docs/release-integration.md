@@ -270,3 +270,38 @@ Clean candidate validation: 5392 core tests passed, 32 skipped; 1341 extension t
 Fresh installed Windows evidence: all 981 npm and 34 VSIX payload files match archives; Code 1.140.0 activated the installed VSIX in an isolated profile and all 11 staged runtime files match. Both installed MCP servers expose 25 tools, return the exact audited kit export and pass two generic native emission cases using the default pinned engine through the Oracle Java 23 shim. The installed renderer passes the five-coded-choice sibling regression without automatic Continue, nested follow-ups, repeated occurrences, clear/error/unsupported controls and a five-step native browser-response session on Java 17. The actual installed Code pane passes seven Start/answer/completion/sibling-change/clear/reset/reopen steps through the real extension-host bridge. Screenshots were inspected.
 
 Evidence: tmp/release-6.4.28. Native plan/source/release reviews 899–902; external coverage unavailable after timeout and failed retry. Previous exact-6.4.27 Linux 17/21 and aggregate/typed controls are retained only for the explicitly compared unchanged runtime. Final exact-6.4.28 release-asset Linux, publication CI and registry identity are separate publication checks, recorded in the release receipts. Publication does not establish Spaces/GHE adoption or clinical acceptance.
+
+
+## 6.4.44 — concurrent native workers and compiled definitions
+
+The runtime release combines bounded reusable worker pools with content-keyed
+compiled-library/model reuse. Clinical inputs, repositories, evaluation results
+and terminology expansions remain request-local. A changed embedded definition
+invalidates the generation even at the same canonical/version and file path.
+The generic process default remains one worker. Nautilus selects six independent
+whole jobs; dependent steps in each session remain sequential. Its pipeline pin
+and image rollout are separate from CRL publication.
+
+The delivered complete Java17engine is
+`cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar`, SHA256
+`98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f`.
+Source/patch/module hashes and the full nested-JAR inventory are recorded under
+`patches/cqframework/normalized-library-cache` and `cli-build.json`. Only the
+LibraryManager class family changes; the other nested difference is a build
+timestamp. This is a modified maintainer build, not the unmodified upstream
+CQL5.3.0 binary. The committed Java17driver class is
+`d01ff0ad88ddadc8deaf6c0f9efbad53c9bee3fce8bce9643c19b5e3097b50fd`.
+Both engine and driver changes invalidate runtime-compatible failed-case retry;
+run the complete native suite after this upgrade.
+
+The earlier6.4.43and private069worker-pool native evidence cannot qualify these
+changed engine/driver bytes. The final release requires exact packaged NPM/VSIX
+installation, stagedMCP/kit identity, the normal bounded remoteLinux workflow,
+and complete frozen policy suites/sessions on the32GBtarget at six workers.
+Recorded source, audited-content and release revisions identify distinct stages;
+the kit stamp covers reviewed content before final packaging. The final release
+commit's delta is limited to the three version manifests and package lock.
+Publication additionally verifies the release-asset download and npmregistry
+runtime payload. Canonical receipts and run links accompany the GitHub release.
+This section records the integration contract and identities, not an unperformed
+installed qualification or deployment pass.

@@ -19,7 +19,7 @@ import {
   driverDir,
   driverReady,
 } from "../driver";
-import { MIN_JAVA_MAJOR } from "../spawn";
+import { ENGINE_JAR_SOURCE, MIN_JAVA_MAJOR } from "../spawn";
 
 const SRC_DRIVER_DIR = path.join(__dirname, "..", "driver");
 const read = (f: string): Buffer => readFileSync(path.join(SRC_DRIVER_DIR, f));
@@ -29,6 +29,7 @@ interface BuildMeta {
   javaSha256: string;
   classSha256: string;
   classFileMajor: number;
+  engineJarSha256: string;
   workerJavaSha256:string;workerClassSha256:string;
 }
 
@@ -52,6 +53,7 @@ describe("the committed driver binary", () => {
     expect(read("ApplyDriver.class").readUInt16BE(6)).toBe(EXPECTED_CLASS_MAJOR);
     expect(EXPECTED_CLASS_MAJOR).toBe(MIN_JAVA_MAJOR + 44);
     expect(meta.classFileMajor).toBe(EXPECTED_CLASS_MAJOR);
+    expect(meta.engineJarSha256).toBe(ENGINE_JAR_SOURCE.sha256);
   });
 
   it("ships every compiled worker/driver class with matching source provenance", () => {

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- This module was also published with a richer model, Gradle metadata,  -->
+  <!-- which should be used instead. Do not delete the following line which  -->
+  <!-- is to indicate to Gradle or any Gradle module metadata file consumer  -->
+  <!-- that they should prefer consuming it instead. -->
+  <!-- do_not_remove: published-with-gradle-metadata -->
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.cqframework</groupId>
+  <artifactId>cql-to-elm-jvm</artifactId>
+  <version>5.3.0</version>
+  <name>cql-to-elm</name>
+  <description>The cql-to-elm library for the Clinical Quality Language Java reference implementation</description>
+  <url>http://cqframework.org</url>
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>Bryn Rhodes</name>
+    </developer>
+    <developer>
+      <name>Chris Moesel</name>
+    </developer>
+    <developer>
+      <name>Rob Dingwell</name>
+    </developer>
+    <developer>
+      <name>Jason Walonoski</name>
+    </developer>
+    <developer>
+      <name>Marc Hadley</name>
+    </developer>
+    <developer>
+      <name>Jonathan Percival</name>
+    </developer>
+    <developer>
+      <name>Anton Vasetenkov</name>
+    </developer>
+    <developer>
+      <name>Luke deGruchy</name>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:git@github.com:cqframework/clinical_quality_language.git</connection>
+    <developerConnection>scm:git:git@github.com:cqframework/clinical_quality_language.git</developerConnection>
+    <url>git@github.com:cqframework/clinical_quality_language.git</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-io-core-jvm</artifactId>
+      <version>0.8.0</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-io-core-jvm</artifactId>
+      <version>0.8.0</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cqframework</groupId>
+      <artifactId>cql-jvm</artifactId>
+      <version>5.3.0</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cqframework</groupId>
+      <artifactId>elm-jvm</artifactId>
+      <version>5.3.0</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-stdlib</artifactId>
+      <version>2.3.10</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-serialization-json-jvm</artifactId>
+      <version>1.9.0</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jetbrains.kotlinx</groupId>
+      <artifactId>kotlinx-serialization-json-io-jvm</artifactId>
+      <version>1.9.0</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.oshai</groupId>
+      <artifactId>kotlin-logging-jvm</artifactId>
+      <version>8.0.01</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+</project>

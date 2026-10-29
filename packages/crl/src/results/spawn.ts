@@ -165,12 +165,12 @@ export async function resolveJavaAsync(
 // REFACTOR:grounded (#320, plan597): the delivered engine has a distinct identity and cache.
 /** Maintainer build with recorded dependency overrides and protocol 1 presentation-group generation. */
 export const ENGINE_JAR_SOURCE = {
-  buildId: "cqf-definition-dcac972f-presentation-groups-20261022",
+  buildId: "cqf-definition-dcac972f-normalized-cache-20261029",
   upstreamBase: "feature-definition-based-population",
   sourceCommit: "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-presentation-groups-20261022/cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
-  sha256: "781dd60bc1c8a065980a5a9a1c373b403c61c3cba3276f6d3f6a93100370c516",
-  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-definition-dcac972f-presentation-groups-20261022.jar",
+  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-20261029/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
+  sha256: "98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f",
+  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
 } as const;
 
 /** One identified cache location; never replace or discover an upstream Maven artifact. */

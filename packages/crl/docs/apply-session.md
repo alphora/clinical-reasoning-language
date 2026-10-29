@@ -6,7 +6,7 @@ Each call performs one native R4 PlanDefinition `$r5.apply`. The caller supplies
 
 The process-default pool starts with one reusable JVM. Independent jobs can run on
 multiple configured workers; each worker keeps its JVM warm across jobs. Each evaluation still constructs its own
-repository, settings, terminology/library caches and processor. A reservation keeps
+repository, evaluation settings, terminology expansion caches and processor. Compiled library/model definitions may be reused only for identical current definition content; changing an embedded definition invalidates the retained generation. Clinical values and evaluated results are never retained between calls. External library-content URLs and ambiguous nested knowledge use fresh compilation. A reservation keeps
 runtime fingerprinting and evaluation on the same runtime specification. Calls on one owner execute sequentially; cancelling queued work leaves active
 siblings untouched.
 An active timeout, cancellation or native failure retires the worker. The failed
