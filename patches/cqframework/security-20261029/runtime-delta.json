@@ -1,0 +1,28 @@
+{
+  "baselineSha256": "98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f",
+  "sha256": "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
+  "bytes": 216669859,
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
+  "removedLibraries": [
+    "checker-qual-3.42.0.jar",
+    "error_prone_annotations-2.38.0.jar",
+    "failureaccess-1.0.2.jar",
+    "guava-33.2.1-jre.jar"
+  ],
+  "addedLibraries": [
+    "checker-qual-3.37.0.jar",
+    "error_prone_annotations-2.50.0.jar",
+    "failureaccess-1.0.3.jar",
+    "guava-33.7.2-jre.jar",
+    "j2objc-annotations-3.1.jar",
+    "jspecify-1.0.1.jar"
+  ],
+  "changedLibraries": [],
+  "changedClasses": [],
+  "changedResources": [],
+  "changedOuterEntries": [
+    "BOOT-INF/classpath.idx",
+    "BOOT-INF/layers.idx"
+  ],
+  "normalizedCacheModuleUnchanged": true
+}

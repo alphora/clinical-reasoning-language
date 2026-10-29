@@ -1,5 +1,5 @@
 {
-  "bytes": 216643872,
+  "bytes": 216669859,
   "upstreamFixes": {
     "askedUnknown": "0ade9a9de6621eabb5adb6ff99cbf01ab67d725d",
     "sharedInputDeduplication": "dcac972fc38bc9a29aae2c662dfb5c4917d27234"
@@ -8,31 +8,33 @@
   "patchManifests": [
     "security-20261002/dependencies.patch",
     "presentation-choice-groups/groups.patch",
-    "normalized-library-cache/kotlin-runtime.patch"
+    "normalized-library-cache/kotlin-runtime.patch",
+    "security-20261029/dependencies.patch"
   ],
   "buildLauncherJdkMajor": 17,
   "upstreamRelease": false,
   "targetJavaMajor": 17,
-  "sha256": "98f7787af513275c7fe7c3a9b170e46e123a69718ae003060d13a3716355e56f",
+  "sha256": "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
   "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  "asset": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
-  "buildId": "cqf-definition-dcac972f-normalized-cache-20261029",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
+  "buildId": "cqf-definition-dcac972f-normalized-cache-security-20261029",
   "upstreamBase": "feature-definition-based-population",
   "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/dcac972fc38bc9a29aae2c662dfb5c4917d27234",
   "embeddedBuildVersion": "4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
   "license": "Apache-2.0",
   "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=1 --init-script <module-repository-init.gradle>",
-  "scope": "Complete maintainer-built CLI from dcac972f, inherited security and presentation-group patches, and source-built CQL5.3.0 LibraryManager normalized-identifier compilation-cache repair. Clinical computations and CRL emission unchanged.",
-  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-20261029/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-20261029.jar",
+  "scope": "Dependency-only security rebuild of the normalized-cache engine. Guava runtime33.7.2-jre; all application classes and the source-built CQL normalized-cache module are unchanged.",
+  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-security-20261029/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
   "dependencyPins": {
     "hl7Core": "6.9.12",
     "jacksonBom": "2.22.3",
-    "httpCore5": "5.4.4 constraint if requested; absent from resolved runtime"
+    "httpCore5": "5.4.4 constraint if requested; absent from resolved runtime",
+    "guavaRuntime": "33.7.2-jre; original compile API retained"
   },
   "patchSha256": "6afbc5d5bbbf295fca7fbc315f347cf62eb45e7183fd4d0f0bea9a4d41fd1739",
-  "nestedJarInventory": "normalized-library-cache/nested-jars.json",
+  "nestedJarInventory": "security-20261029/nested-jars.json",
   "runtimeDependencyInventory": "security-20261002/runtime-dependencies.json",
-  "resolvedGraphDelta": "security-20261002/runtime-delta.json",
+  "resolvedGraphDelta": "security-20261029/runtime-delta.json",
   "toolchainChange": "Inherited Java 17 build and dependency security overrides; presentation-group Java source changes listed in groups.patch.",
   "resolvedGraphChanges": {
     "removed": [
@@ -174,5 +176,5 @@
     "baselineModuleSha256": "34fe17f7c63e916270e927c94f138266ac073fb40db62a3d82fea4825a1db06f",
     "coordinateNote": "The private source-built module retains cql-to-elm-jvm5.3.0 and its translator version; it is not the published upstream binary. Compare baselineModuleSha256 with sourceBuiltModuleSha256."
   },
-  "scopeBoundary": "The modified CQL module is a private maintainer build, not unmodified upstream5.3.0. All other dependency bytes match the prior engine; other CQF library change is build timestamp only."
+  "scopeBoundary": "Only runtime dependency bytes and generated build metadata differ from normalized-cache-20261029. Compile-time Guava API is retained to avoid unrelated Kotlin nullability source changes. Runtime qualification and dated full-JAR vulnerability scan are separate recorded gates."
 }

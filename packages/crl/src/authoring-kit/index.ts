@@ -395,7 +395,8 @@ export type {
 // schemaVersion → "2.37": reusable native JVM and streaming CLI guidance.
 // schemaVersion → "2.38": bounded concurrent reusable JVM jobs, serial session ownership and case controls.
 // schemaVersion → "2.39": content-keyed compiled definitions, fresh clinical state and updated engine identity.
-const SCHEMA_VERSION = "2.39";
+// schemaVersion → "2.40": dependency-only security engine acquisition identity; semantics unchanged.
+const SCHEMA_VERSION = "2.40";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 

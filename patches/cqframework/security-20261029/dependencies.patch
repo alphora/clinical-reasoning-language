@@ -1,0 +1,21 @@
+--- a/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
++++ b/build-logic/src/main/kotlin/cqf.java-conventions.gradle.kts
+@@ -56,6 +56,18 @@
+         }
+     }
+ }
++
++// Keep the established compile API; only the distributed/test runtime changes.
++// New Guava nullability annotations otherwise require unrelated Kotlin source edits.
++configurations.matching { it.name == "runtimeClasspath" || it.name.endsWith("RuntimeClasspath") }
++    .configureEach {
++        resolutionStrategy.eachDependency {
++            if (requested.group == "com.google.guava" && requested.name == "guava") {
++                useVersion("33.7.2-jre")
++                because("CRL dependency-only security rebuild: patched Guava runtime")
++            }
++        }
++    }
+ 
+ tasks.withType<JavaCompile>().configureEach {
+     options.encoding = "UTF-8"
