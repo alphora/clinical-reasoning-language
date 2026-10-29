@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "a9724cb0fdabdeb52c05a5d8d2660ef76b39c5d6",
-  "auditedSchemaVersion": "2.38",
-  "auditedContentHash": "a40923e661e389ed6a49334f92d4bfcaf2470c70fee008b5db720dd8326a4417",
-  "scope": "Reviewed schema 2.38 bounded concurrent reusable native worker jobs and serial complete-session ownership through a9724cb0fdabdeb52c05a5d8d2660ef76b39c5d6. Owning queue, capacity, resize, cancellation, cleanup, producer and CLI controls are mapped in coverage.md. Native two-owner isolation and a frozen MED caller smoke pass. Language/clinical semantics are unchanged. Source audit, installed delivery, real-policy performance qualification and release remain separate tiers.",
+  "auditedRevision": "107bafb441ad1e4189831e19e79a8382f172c713",
+  "auditedSchemaVersion": "2.39",
+  "auditedContentHash": "0d83f69f861b4583d6c576103d1222034c0b8873749b07e32175882e48ed5faa",
+  "scope": "Reviewed schema 2.39 current-content compiled-definition reuse and fresh clinical state, bounded worker pool and pinned normalized-source cache engine. Owning source/cache/error controls and full change dispositions are mapped in coverage.md. This source audit does not certify final installed artifacts, complete clinical acceptance or deployment.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

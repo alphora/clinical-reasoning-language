@@ -2433,7 +2433,7 @@ Qualification-only follow-up to the 2.37 audit: `nativeWorker.native.test.ts` re
 
 ## Compiled-definition reuse and engine identity — schema2.39
 
-Prior completed audit a9724cb0fdabdeb52c05a5d8d2660ef76b39c5d6, schema2.38, contenthash a40923e661e389ed6a49334f92d4bfcaf2470c70fee008b5db720dd8326a4417. Preceding05489cf4642cb3b1c24776c59909dcd9dc0d664f inspected as audit/ledger metadata only. Reviewed content target is finalized in the separate metadata stamp after code review/owning checks. Newschema2.39/hash0d83f69f861b4583d6c576103d1222034c0b8873749b07e32175882e48ed5faa. No CRL/CEL syntax, emitter or clinical authoring rule changes.
+Prior completed audit a9724cb0fdabdeb52c05a5d8d2660ef76b39c5d6, schema2.38, contenthash a40923e661e389ed6a49334f92d4bfcaf2470c70fee008b5db720dd8326a4417. Preceding05489cf4642cb3b1c24776c59909dcd9dc0d664f inspected as audit/ledger metadata only. Reviewed content target 107bafb441ad1e4189831e19e79a8382f172c713, finalized in this separate metadata-only stamp after code review and owning checks. Newschema2.39/hash0d83f69f861b4583d6c576103d1222034c0b8873749b07e32175882e48ed5faa. No CRL/CEL syntax, emitter or clinical authoring rule changes.
 
 | Changed owner | Disposition and evidence |
 |---|---|
