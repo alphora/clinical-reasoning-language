@@ -1,0 +1,29 @@
+{
+  "revision": "9771168b4457e516e7bf2ef902b6c963fe0c05f4",
+  "source": "library \"L\".\nconcept \"C\":\n- type is Observation.\n- code is `c`.",
+  "target": {
+    "kind": "concept",
+    "name": "C"
+  },
+  "input": {
+    "tag": "open-fork",
+    "title": "Concern"
+  },
+  "flag": {
+    "schemaVersion": 1,
+    "id": "flag-1",
+    "category": "extraction",
+    "tag": "open-fork",
+    "gist": "Concern",
+    "status": "open",
+    "fields": {},
+    "anchor": {
+      "scope": "concept",
+      "name": "C",
+      "label": "C",
+      "library": "L"
+    },
+    "createdAt": "2026-11-01",
+    "dedupKey": "d-0a53c2726477c9bd99cb77eb59cefcfc12d61267"
+  }
+}

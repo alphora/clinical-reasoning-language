@@ -38,6 +38,7 @@ import { findProjectRoot } from "../imports/registry";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
+import { flagCreationRetry } from "../flags/buildFlagDraft";
 // #212 step 2 — the MCP flag tools write the `medical-validation/flags/` STORE (not `.crl` meta-tags): validate+build via the shared seam,
 // then dedup-check + save. `createFlag`/`setFlagStatus` (the `.crl` splicers) are no longer used here.
 import { validateAndBuildMvFlagDraft, flagStoreDir, hasLegacyFlagStore, loadFlags, saveFlag, isOpen, canonicalFlagTag, transitionMvFlag } from "../index";
@@ -1203,16 +1204,16 @@ export function createServer(): McpServer {
         "policy (used to VALIDATE the target exists AND to locate the store via the enclosing `src/`); inline `code` is NOT " +
         "supported (a store can't be located without a filesystem path). Plus the target + flag: `kind` is concept|decision|" +
         "library; `name` is that node's name (for library, the library name). `tag` must be a registered flag tag (aliases " +
-        "canonicalized); `title` is the preferred short title, with legacy `gist` accepted. If both are supplied their trimmed values must match. `description` holds source detail, reasoning, consequences and the review question. Description is plain text: outer whitespace trimmed, blank omitted; newlines, semicolons and backticks allowed. Use top-level `description`, never `fields.description`. Optional issue links use `fields.ref`. `fields` supplies " +
+        "canonicalized); `title` is the preferred short title, with legacy `gist` accepted. If both are supplied their trimmed values must match. `question` holds the succinct reviewer question; `sourceReference` and `sourceQuote` hold actual source citations. `description` holds supporting interpretation, alternatives and consequences; legacy descriptions remain readable. Description is plain text: outer whitespace trimmed, blank omitted; newlines, semicolons and backticks allowed. Use top-level `description`, never `fields.description`. Optional issue links use `fields.ref`. `fields` supplies " +
         "extra `; key value` fields — any registry-REQUIRED field (e.g. `@fidelity-defect` needs `direction`) is enforced and " +
         "enum fields are checked. To anchor the flag to a SPECIFIC decision node, pass its occurrence key as `fields.key` " +
         "(`<nodeId>~<signature>`) — it is NOT validated for placement, so a stale/wrong key just orphans to the policy. " +
         "`status` defaults to `open`. Returns { success:true, flag } on success — `flag` is the written MvFlag record (its " +
         "`id` selects it for set_flag_status; NOTE the shape: `tag`, `anchor.scope`, `status`, `fields` — there is NO `source`). " +
-        "IDEMPOTENT while OPEN: description is excluded from retry identity; rewording it returns the existing record without overwriting detail. A retry with the same anchor, tag, gist and fields returns the existing open record ({ success:true, flag, " +
+        "IDEMPOTENT while OPEN: structured question/source fields contribute to generated keys. A stored-key content mismatch or structured upgrade of an open legacy concern returns content-conflict with existing id, without overwrite/duplication. Description is excluded from retry identity; rewording it returns the existing record without overwriting detail. A retry with the same anchor, tag, gist and fields returns the existing open record ({ success:true, flag, " +
         "deduped:true }) rather than duplicating (a previously-RESOLVED same-content flag does NOT suppress a new open one). " +
         "On a domain failure: { success:false, reason, message } (reason: unknown-tag | missing-field | invalid-value | " +
-        "decl-not-found | parse-failed | store-warning). Bad tool args (missing fields, or `code`/no `path`, or a path outside " +
+        "decl-not-found | parse-failed | store-warning | content-conflict). Bad tool args (missing fields, or `code`/no `path`, or a path outside " +
         "a policy) come back as a tool error.",
       inputSchema: {
         ...inputSchema,
@@ -1223,6 +1224,9 @@ export function createServer(): McpServer {
         title: z.string().min(1).optional().describe("Short human-readable flag title. Supply title or legacy gist; at least one is required, and both must agree if supplied. Put the full explanation in description. Stored in the existing gist field."),
         gist: z.string().min(1).optional().describe("Compatibility alias for title. Supply title or gist; if both are supplied their trimmed values must match."),
         description: z.string().optional().describe("Plain-text Description shown in MV; outer whitespace is trimmed, internal formatting preserved. Not fields.description."),
+        question: z.string().optional().describe("Succinct question for the reviewer, displayed separately from supporting description."),
+        sourceReference: z.string().optional().describe("Actual source document/section/page reference, displayed immediately below the question."),
+        sourceQuote: z.string().optional().describe("Verbatim source quotation, as plain text. Disclose unavailable source in description; never invent a quotation."),
         fields: z.record(z.string(), z.string()).optional().describe("Extra `; key value` fields (e.g. { direction: 'over-reach', ref: '#203' }). Required fields for the tag are enforced."),
         status: z.enum(["open", "resolved"]).optional().describe("The `; status` (default `open`)."),
       },
@@ -1264,7 +1268,7 @@ export function createServer(): McpServer {
   return server;
 }
 
-type CreateFlagArgs = ToolArgs & { kind: CreateFlagTarget["kind"]; name: string; library?: string; tag: string; title?: string; gist?: string; description?: string; fields?: Record<string, string>; status?: FlagStatus };
+type CreateFlagArgs = ToolArgs & { kind: CreateFlagTarget["kind"]; name: string; library?: string; tag: string; title?: string; gist?: string; description?: string; question?: string; sourceReference?: string; sourceQuote?: string; fields?: Record<string, string>; status?: FlagStatus };
 type SetFlagStatusArgs = ToolArgs & { scope: MvFlagScope; name: string; library?: string; tag: string; key?: string; id?: string; status: FlagStatus };
 
 type ToolResponse = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
@@ -1309,12 +1313,13 @@ function runCreateFlag(args: CreateFlagArgs): ToolResponse {
   const refusal = legacyStoreRefusal(src.path);
   if (refusal) return refusal; // #230: don't add to the new store while old records sit hidden at `.crl/flags/`
   try {
-    const built = validateAndBuildMvFlagDraft(src.text, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, title: args.title, gist: args.gist, description: args.description, fields: args.fields, status: args.status });
+    const built = validateAndBuildMvFlagDraft(src.text, { kind: args.kind, name: args.name, library: args.library }, { tag: args.tag, title: args.title, gist: args.gist, description: args.description, question: args.question, sourceReference: args.sourceReference, sourceQuote: args.sourceQuote, fields: args.fields, status: args.status });
     if (!built.ok) return writeResult(built); // domain validation failure — no file written
     const loaded = loadFlags(src.storeDir);
     if (loaded.warning) return writeResult({ ok: false, reason: "store-warning", message: loaded.warning }); // don't write into a partially-unreadable store
-    const existing = loaded.flags.find((f) => f.dedupKey !== undefined && f.dedupKey === built.flag.dedupKey && isOpen(f));
-    if (existing) return writeResult({ ok: true, flag: existing, deduped: true }); // idempotent: an open flag with this dedupKey already exists
+    const retry = flagCreationRetry(loaded.flags, built.flag);
+    if (retry.state === "conflict") return writeResult({ ok: false, reason: "content-conflict", id: retry.flag.id, flag: retry.flag, message: retry.message });
+    if (retry.state === "deduped") return writeResult({ ok: true, flag: retry.flag, deduped: true });
     saveFlag(src.storeDir, built.flag);
     return writeResult({ ok: true, flag: built.flag });
   } catch (e) {

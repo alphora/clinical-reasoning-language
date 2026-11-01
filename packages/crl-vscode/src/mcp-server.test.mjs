@@ -10,6 +10,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import assert from "node:assert/strict";
 import { getAuthoringKit } from "../../crl/dist/authoring-kit/index.js";
+import { flagChangeSummaryJsonSchema } from "../../crl/dist/flags/changeSummary.js";
+import { keFlagContentRevision } from "./flagWorkflowStore.ts";
 import { isQaEditFlag } from "../../crl/dist/flags/mvFlagReview.js";
 import { renderAuthoringKitMarkdown } from "../../crl/dist/authoring-kit/export.js";
 import { readFileSync, mkdtempSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
@@ -65,6 +67,12 @@ const client = new Client({ name: "crl-test", version: "0.0.0" });
 
 // Explicit sequential (not relying on vitest's default in-file ordering): all checks drive the ONE shared client.
 const check = test.sequential;
+
+check('flag summary schema is bundled byte-semantically with the SDK contract and MCP exposes structured fields',async()=>{
+  assert.deepEqual(JSON.parse(readFileSync(resolve(here,'../dist/flag-change-summary.schema.json'),'utf8')),flagChangeSummaryJsonSchema);
+  const tool=(await client.listTools()).tools.find(t=>t.name==='create_flag');
+  for(const key of ['question','sourceReference','sourceQuote'])assert.ok(tool.inputSchema.properties[key]);
+});
 
 let connected = false;
 beforeAll(async () => {
@@ -172,8 +180,8 @@ check("authoring_kit full exports all 22 artifacts and determination guidance", 
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-  assert.equal(kit.schemaVersion, "2.40");
-  assert.equal(kit.contentHash, "d4664026afe0d21fffa422b1f7be954d9036bf99297c47551f54388fbc908cdc");
+  assert.equal(kit.schemaVersion, "2.41");
+  assert.equal(kit.contentHash, "194964e6020ba0e350a03727bc711eaf8a60a6dfc76d9ba4338a73862ca5b3b2");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);
@@ -620,7 +628,7 @@ check("title creation survives persisted reload, legacy retry, and conflict reje
   let modelFunction;
   function visit(n) { if (ts.isFunctionDeclaration(n) && n.name?.text === "flagActionViewModel") modelFunction = n.getText(source); ts.forEachChild(n, visit); }
   visit(source); assert.ok(modelFunction);
-  const context = vm.createContext({ flagDisplayNameOf: () => undefined, FLAG_VIEW_PLUMBING: new Set(), issueRefOf: () => undefined, gidsForFlag: () => ["target"], isAuthoringFlag, isQaEditFlag, flagsList: [disk], flagStoreWarning: false });
+  const context = vm.createContext({ keFlagContentRevision, flagDisplayNameOf: () => undefined, FLAG_VIEW_PLUMBING: new Set(), issueRefOf: () => undefined, gidsForFlag: () => ["target"], isAuthoringFlag, isQaEditFlag, flagsList: [disk], flagStoreWarning: false });
   vm.runInContext(transformSync(modelFunction, { loader: "ts", target: "es2022" }).code, context);
   assert.equal(disk.anchor.occurrenceKey, undefined, "bounded VM fixture has no occurrence helper dependency");
   const model = context.flagActionViewModel(disk); assert.equal(model.summary, title); assert.equal(model.description, description);

@@ -1408,7 +1408,7 @@ check("bulk-verdict: enumeration uses the SAME reachable gate + reviewable-case 
 // ── flag-action drawer foundation (design 354) — host wiring locks ─────────────────────────────────────────────────────
 check("flag-action drawer: postFlagDrawer is the one-slot dispatcher (create → edit → action → grid → empty)", () => {
   assert.match(COCKPIT_SRC, /flagDraft\s*\n\s*\?\s*renderFlagDrawer\(/, "create wins");
-  assert.match(COCKPIT_SRC, /:\s*flagActionView\s*\n\s*\?\s*renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag\)\)/, "…else the action drawer");
+  assert.match(COCKPIT_SRC, /:\s*flagActionView\s*\n\s*\?\s*renderFlagActionDrawer\(flagActionViewModel\(flagActionView\.flag,reporting\)\)/, "…else the action drawer with its supplied run reporting");
   // Todo 5: the bulk grid is the 4th mode — rendered FROM the snapshot (the one render authority), then an empty region.
   assert.match(COCKPIT_SRC, /reviewGridSnapshot\s*\n\s*\?\s*reviewGridHtml\(reviewGridViewModel\(reviewGridSnapshot\.items\), reviewGridSnapshot\.epoch\)\s*\n\s*:\s*"";/, "…else the grid, else an empty region");
 });
@@ -1612,7 +1612,7 @@ check("picker: flagPickItem colors the glyph by status via a ThemeIcon+ThemeColo
 
 // ── Todo 3 (disc 358): edit a flag from the drawer ────────────────────────────────────────────────────────────────────
 check("edit: the dispatcher renders create → edit → action → empty (edit reuses renderFlagDrawer with edit:true, prefilled)", () => {
-  const m = COCKPIT_SRC.match(/const editFlag = flagEditDraft\?\.flag;\s*\n\s*const html = flagDraft[\s\S]*?: "";/);
+  const m = COCKPIT_SRC.match(/const editFlag = flagEditDraft\?\.flag;[\s\S]*?\n\s*const html = flagDraft[\s\S]*?: "";/);
   assert.ok(m, "postFlagDrawer edit dispatch");
   assert.match(m[0], /: editFlag\s*\n?\s*\?[\s\S]*?renderFlagDrawer\(\{[^}]*edit: true[^}]*\}\)/);
   // the gist is newline-normalized at prefill (impl-review Claude #2 — the single-line input would otherwise concatenate words)
@@ -1771,8 +1771,33 @@ check('KE Answer and Ignore buttons dispatch distinct opaque intents', () => {
  const click = new Function('e', 'v', SCRIPT.slice(start, end));
  for (const [attribute, type] of [['data-flag-action-answer','flagActionAnswer'],['data-flag-action-ignore','flagActionIgnore']]) {
   const messages = [];
-  click({target:{closest:selector=>{assert.ok(selector.includes('['+attribute+']'));return {hasAttribute:value=>value===attribute};}},preventDefault(){},stopPropagation(){}},{postMessage:m=>messages.push(m)});
+  click({target:{closest:selector=>selector.includes('['+attribute+']')?{hasAttribute:value=>value===attribute}:null},preventDefault(){},stopPropagation(){}},{postMessage:m=>messages.push(m)});
   assert.deepEqual(messages,[{type}]);
   assert.ok(COCKPIT_SRC.includes('msg.type === "'+type+'"'));
  }
+});
+
+check('summary evidence click dispatches only an opaque key through the actual drawer listener',()=>{
+ const marker="fld.addEventListener('click',(e)=>{";
+ const start=SCRIPT.indexOf(marker)+marker.length,end=SCRIPT.indexOf('const ec=',start);
+ const click=new Function('e','v',SCRIPT.slice(start,end));const messages=[];
+ click({target:{closest:selector=>selector==='[data-flag-summary-evidence]'?{getAttribute:()=> 'opaque-key'}:null},preventDefault(){},stopPropagation(){}},{postMessage:m=>messages.push(m)});
+ assert.deepEqual(messages,[{type:'flagSummaryEvidence',key:'opaque-key'}]);
+});
+
+check('summary watcher refreshes only the read-only drawer and immediately clears stale links',()=>{
+ const text=COCKPIT_SRC.replace(/\r\n/g,'\n');
+ const start=text.indexOf('    if (src) {\n      const summaryCel = currentCel;');
+ const end=text.indexOf('    const pat =',start);assert.ok(start>=0&&end>start);
+ const events={};let clears=0,posts=0,pattern;const timers=new Set();const tick=()=>{for(const fn of [...timers]){timers.delete(fn);fn()}};
+ const make=new Function('vscode','src','flagChangeSummaries','postFlagDrawer','setTimeout','clearTimeout',`
+ let summaryDebounce,currentCel='policy',mode='medical-validation',flagActionView={},flagDraft,flagEditDraft,reviewGridSnapshot,flagSummaryWatcher;
+ ${text.slice(start,end)}
+ return {setDraft(v){flagDraft=v},setEdit(v){flagEditDraft=v},setPolicy(v){currentCel=v}};`);
+ const state=make({RelativePattern:class{constructor(base,glob){pattern={base,glob}}},workspace:{createFileSystemWatcher:()=>({onDidCreate:fn=>events.create=fn,onDidChange:fn=>events.change=fn,onDidDelete:fn=>events.delete=fn})}},'/artifact/src',{clear(){clears++}},()=>posts++,fn=>{timers.add(fn);return fn},fn=>timers.delete(fn));
+ assert.deepEqual(pattern,{base:'/artifact/src',glob:'medical-validation/change-summaries/*.json'});
+ events.create();events.change();assert.equal(posts,0);assert.equal(clears,2);assert.equal(timers.size,1);tick();assert.equal(posts,1);
+ state.setDraft({unsaved:true});events.change();tick();assert.equal(posts,1);assert.equal(clears,3);
+ state.setDraft(undefined);state.setEdit({unsaved:true});events.delete();tick();assert.equal(posts,1);
+ state.setEdit(undefined);state.setPolicy('other');const priorClears=clears;events.create();assert.equal(posts,1);assert.equal(clears,priorClears);
 });

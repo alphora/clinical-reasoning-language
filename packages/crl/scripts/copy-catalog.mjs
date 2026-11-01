@@ -7,11 +7,15 @@
 //
 // Single-threaded, sequential copy (E: Dev Drive I/O safety — no parallel
 // heavy writes).
-import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const here = dirname(fileURLToPath(import.meta.url));
+// Ship the producer contract with both the SDK and VSIX; do not assume a separate SDK install in a Codespace.
+const { flagChangeSummaryJsonSchema } = createRequire(import.meta.url)("../dist/flags/changeSummary.js");
+writeFileSync(join(here, "..", "dist", "flag-change-summary.schema.json"), JSON.stringify(flagChangeSummaryJsonSchema, null, 2) + "\n");
 const srcDir = join(here, "..", "src", "cql-emitter", "catalog");
 const dstDir = join(here, "..", "dist", "cql-emitter", "catalog");
 

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
 import {isAuthoringFlag} from './flagWorkflow.ts';
-import {performKeFlagAction,keFlagRevision,isKeAnswerSavedError} from './flagWorkflowStore.ts';
+import {performKeFlagAction,keFlagRevision,keFlagContentRevision,isKeAnswerSavedError} from './flagWorkflowStore.ts';
 import {summarizeFlagBadges} from './flagPlacement.ts';
 import {renderFlagActionDrawer} from './flagActionDrawerHtml.ts';
 import {flagCloseEligibility} from './flagCloseEligibility.ts';
@@ -63,7 +63,7 @@ function harness(category,confirm,options={}){
  let current={schemaVersion:1,id:'f',category,tag:'customer-confirmable',gist:'Flag',description:'Full description',status:'open',fields:{assumption:'Preserve this',ref:'docs/source.md'},dedupKey:'source-hash',anchor:{scope:'concept',library:'L',name:'Q',label:'Q',entityId:'q-id'},createdAt:'2026-09-12'};
  const captured=structuredClone(current),warnings=[],counts={save:0,remove:0,confirm:0},notes=[],answers=[],opened=[],edited=[];
  const noop=()=>{};
- const context=vm.createContext({mvEditBusy:!!options.busy,mvRecoveryBlock:options.recovery,HOST_FLAG_CORRELATION_FIELDS,Error,isAuthoringFlag,isQaEditFlag,mvReviewStatus,transitionMvFlag,renewMvFlag,keFlagRevision,isKeAnswerSavedError,flagCloseEligibility,indexVersion:1,currentCel:'policy.cel',mode:'medical-validation',flagActionBusy:false,flagStoreWarning:!!options.warning,
+ const context=vm.createContext({mvEditBusy:!!options.busy,mvRecoveryBlock:options.recovery,keFlagContentRevision,HOST_FLAG_CORRELATION_FIELDS,Error,isAuthoringFlag,isQaEditFlag,mvReviewStatus,transitionMvFlag,renewMvFlag,keFlagRevision,isKeAnswerSavedError,flagCloseEligibility,indexVersion:1,currentCel:'policy.cel',mode:'medical-validation',flagActionBusy:false,flagStoreWarning:!!options.warning,
   flagActionView:{flag:captured,ver:1,cel:'policy.cel'},flagEditDraft:{flag:captured,cel:'policy.cel',descriptionOnly:true},flagsList:[captured],flagEditDirty:false,
   flagStoreDir:()=>'/memory',loadStoredFlags:()=>({flags:current?[structuredClone(current)]:[],warning:options.warning}),
   applyKeFlagAction:(_dir,flag,action)=>performKeFlagAction({load:()=>({flags:current?[structuredClone(current),...answers]:[],warning:options.warning}),create:answer=>{if(options.createError)throw Error('create failed');answers.push(answer);},save:updated=>{if(options.writeError)throw Error('disk full');counts.save++;current=updated;}},flag,action),
@@ -220,6 +220,10 @@ test('relationship rows retain reverse answer history and distinguish unreadable
  assert.ok(!model.fields.some(f=>f.key==='Workflow'));
  h.context.flagsList.push({id:'older-answer',gist:'My answer',status:'resolved',fields:{'ke-flag':resolved.id}});
  model=h.context.flagActionViewModel(resolved);assert.match(model.fields.find(f=>f.key==='Earlier MV answers').value,/My answer \(resolved\)/);
+ h.context.flagsList.find(f=>f.id==='older-answer').fields['ke-content-revision']=keFlagContentRevision(resolved);
+ model=h.context.flagActionViewModel(resolved);assert.doesNotMatch(model.fields.find(f=>f.key==='Earlier MV answers').value,/Question changed/);
+ h.context.flagsList.find(f=>f.id==='older-answer').fields['ke-content-revision']='old-content';
+ model=h.context.flagActionViewModel(resolved);assert.match(model.fields.find(f=>f.key==='Earlier MV answers').value,/Question changed/);
  h.context.flagsList=[];h.context.flagStoreWarning=true;
  model=h.context.flagActionViewModel({...resolved,fields:{'mv-answer':'unreadable'}});
  assert.match(model.fields.find(f=>f.key==='MV answer').value,/unavailable/);

@@ -13,7 +13,8 @@
 // `displayName`d validation tags; the AI's finer authoring vocabulary, for the extraction tags). The optional `kind` on
 // validation-concern is AI-only finer metadata — descriptive, never gate/label-affecting.
 import type { FlagStatus, MvFlagCategory } from "./mvFlag";
-export const HOST_FLAG_CORRELATION_FIELDS = ["ke-flag", "ke-question-revision", "mv-answer"] as const;
+import { FLAG_CONTEXT_FIELDS, type FlagContext } from "./flagContext";
+export const HOST_FLAG_CORRELATION_FIELDS = ["ke-flag", "ke-question-revision", "ke-content-revision", "mv-answer"] as const;
 
 export type { FlagStatus } from "./mvFlag"; // re-home point: the flag surfaces import `FlagStatus` from the vocab (or the barrel)
 
@@ -61,7 +62,7 @@ export interface CreateFlagTarget {
 }
 
 /** The author-supplied flag draft (tag + gist + extra fields + status) the create seam validates. Re-homed from `createFlag`. */
-export interface CreateFlagInput {
+export interface CreateFlagInput extends FlagContext {
   tag: string;
   /** Short human-readable title. Stored as gist for record compatibility. */
   title?: string;
@@ -251,7 +252,7 @@ const BARE_IDENT = /^[a-z][a-z0-9-]*$/; // a field key is a bare lowercase ident
 export type FlagFieldsFailure = "unknown-tag" | "missing-field" | "invalid-value";
 
 export type ValidateFlagFieldsResult =
-  | { ok: true; canon: string; category: MvFlagCategory; gist: string; description?: string; status: FlagStatus; fields: Record<string, string> }
+  | ({ ok: true; canon: string; category: MvFlagCategory; gist: string; description?: string; status: FlagStatus; fields: Record<string, string> } & FlagContext)
   | { ok: false; reason: FlagFieldsFailure; message: string };
 
 /** Validate an author's flag draft (tag known+canonical / gist required+sanitized / required fields present / every provided
@@ -279,8 +280,19 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   if (input.description !== undefined && typeof input.description !== "string")
     return { ok: false, reason: "invalid-value", message: "description must be plain text" };
   const description = input.description?.trim();
+  const context: FlagContext = {};
+  for (const key of FLAG_CONTEXT_FIELDS) {
+    if (input[key] !== undefined && typeof input[key] !== "string")
+      return { ok: false, reason: "invalid-value", message: `${key} must be plain text` };
+    const text = input[key]?.trim();
+    if (text) context[key] = text;
+  }
 
   const provided = input.fields ?? {};
+  for (const key of Object.keys(provided)) {
+    const topLevel = FLAG_CONTEXT_FIELDS.find(name => name.toLowerCase() === key.replace(/[-_]/g, "").toLowerCase());
+    if (topLevel) return { ok: false, reason: "invalid-value", message: `use top-level ${topLevel}, not fields.${key}` };
+  }
   for (const key of HOST_FLAG_CORRELATION_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(provided, key))
       return { ok: false, reason: "invalid-value", message: `${key} is host-owned and cannot be authored in flag fields` };
@@ -326,5 +338,5 @@ export function validateFlagFields(input: CreateFlagInput): ValidateFlagFieldsRe
   if (status !== "open" && status !== "resolved") return { ok: false, reason: "invalid-value", message: "status must be one of: open, resolved" };
   if (def.category === "validation" && status === "resolved") return { ok: false, reason: "invalid-value", message: "New MV flags start Pending fix. Fixed changes are approved through Medical Review." };
 
-  return { ok: true, canon, category: def.category, gist, ...(description ? { description } : {}), status, fields };
+  return { ok: true, canon, category: def.category, gist, ...(description ? { description } : {}), ...context, status, fields };
 }

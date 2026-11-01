@@ -321,7 +321,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.40");
+    expect(kit.schemaVersion).toBe("2.41");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -676,8 +676,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.40");
-    expect(kit.contentHash).toBe("d4664026afe0d21fffa422b1f7be954d9036bf99297c47551f54388fbc908cdc");
+    expect(kit.schemaVersion).toBe("2.41");
+    expect(kit.contentHash).toBe("194964e6020ba0e350a03727bc711eaf8a60a6dfc76d9ba4338a73862ca5b3b2");
   });
 
   // @kit criterion:description-navigation
@@ -929,6 +929,13 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
     expect(text).toContain("STORE RECORD");
   });
 
+  // @kit review-flags:structured-context
+  it('teaches separate question/source fields, conflict handling and non-approving rerun reporting',()=>{
+    const text=JSON.stringify(rule);
+    for(const term of ['sourceReference','sourceQuote','content-conflict','change-summaries','SHA256','never mark human flags Fixed or Approved'])expect(text).toContain(term);
+    expect(text).toContain('create_flag is not an amend operation');
+  });
+
   // The former-flag-tag `- meta is` construction, anywhere (rule prose OR an example) — the structural regression signal.
   const FLAG_META_LINE =
     /-\s*meta is\s*`@(customer-confirmable|internal-inconsistency|open-fork|fidelity-defect|validation-concern)\b/;
@@ -963,6 +970,9 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
       "title",
       "gist",
       "description",
+      "question",
+      "sourceReference",
+      "sourceQuote",
       "fields",
       "status",
     ]);

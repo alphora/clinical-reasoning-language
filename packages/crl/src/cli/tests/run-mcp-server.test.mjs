@@ -191,6 +191,32 @@ try {
     assert.equal(invalid.isError, true, "MCP schema rejects nonstring input before domain validation");
   });
 
+  // @kit review-flags:structured-context
+  await check('create_flag structured context, exact retry, upgrade conflict and status preservation through real stdio',async()=>{
+    const {root,crlPath,storeDir}=mkPolicy();
+    const call=async a=>JSON.parse((await client.callTool({name:'create_flag',arguments:a})).content[0].text);
+    try {
+      const tool=(await client.listTools()).tools.find(t=>t.name==='create_flag');
+      for(const key of ['question','sourceReference','sourceQuote'])assert.ok(tool.inputSchema.properties[key]);
+      const args={path:crlPath,kind:'concept',name:'C',tag:'open-fork',title:'Structured concern',question:'Which option?',sourceReference:'Policy p.2',sourceQuote:'Actual `quote`;\nnext line',description:'Supporting context'};
+      const a=await call(args);assert.equal(a.success,true);assert.equal(a.flag.question,args.question);
+      const file=join(storeDir,a.flag.id+'.json'),before=readFileSync(file,'utf8');
+      assert.equal((await call(args)).deduped,true);assert.equal(readFileSync(file,'utf8'),before);
+      const changed=await call({...args,question:'A different question?'});assert.equal(changed.success,true);assert.notEqual(changed.flag.id,a.flag.id);
+      const edited={...a.flag,sourceQuote:'Changed externally'};writeFileSync(file,JSON.stringify(edited));
+      const retry=await call(args);assert.equal(retry.success,false);assert.equal(retry.reason,'content-conflict');assert.equal(retry.id,a.flag.id);assert.deepEqual(retry.flag,edited);
+      assert.deepEqual(JSON.parse(readFileSync(file,'utf8')),edited);
+      const legacyArgs={path:crlPath,kind:'concept',name:'C',tag:'open-fork',title:'Legacy concern'};
+      const legacy=await call(legacyArgs),upgrade=await call({...legacyArgs,question:'Now separated?'});
+      assert.equal(upgrade.success,false);assert.equal(upgrade.reason,'content-conflict');assert.equal(upgrade.id,legacy.flag.id);assert.deepEqual(upgrade.flag,legacy.flag);
+      const explicit=await call({...args,title:'Explicit concern',fields:{key:'explicit-test'}});
+      const conflict=await call({...args,title:'Explicit concern',fields:{key:'explicit-test'},sourceReference:'Different page'});
+      assert.equal(conflict.reason,'content-conflict');assert.equal(conflict.id,explicit.flag.id);
+      const status=JSON.parse((await client.callTool({name:'set_flag_status',arguments:{path:crlPath,scope:'concept',name:'C',tag:'open-fork',id:changed.flag.id,status:'resolved'}})).content[0].text);
+      assert.equal(status.success,true);assert.equal(status.flag.question,'A different question?');assert.equal(status.flag.sourceQuote,args.sourceQuote);
+    } finally {rmSync(root,{recursive:true,force:true});}
+  });
+
   await check("create_flag → writes a concept flag store record (MvFlag shape: tag/anchor.scope/status; NO source)", async () => {
     const { root, crlPath, storeDir } = mkPolicy();
     const r = await client.callTool({ name: "create_flag", arguments: { path: crlPath, kind: "concept", name: "C", tag: "validation-concern", gist: "looks off for the customer" } });
@@ -390,8 +416,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.40");
-    assert.equal(kit.contentHash, "d4664026afe0d21fffa422b1f7be954d9036bf99297c47551f54388fbc908cdc");
+    assert.equal(kit.schemaVersion, "2.41");
+    assert.equal(kit.contentHash, "194964e6020ba0e350a03727bc711eaf8a60a6dfc76d9ba4338a73862ca5b3b2");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);

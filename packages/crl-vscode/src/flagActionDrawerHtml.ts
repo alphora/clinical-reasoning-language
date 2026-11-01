@@ -6,6 +6,7 @@
 // Trusted-input discipline: the webview's controls carry OPAQUE, action-specific intents (`data-flag-action-*`) and NO flag
 // id — the host acts on its host-captured `flagActionView.flag`. Distinct from the create drawer's `data-flag-*` so the two
 // share the `#flagDrawer` region without their click listeners colliding.
+import type { FlagChangeDisplay } from './flagChangeSummaryStore';
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
@@ -38,6 +39,11 @@ export interface FlagActionView {
   summary: string;
   /** the "just enough" body (the flag `description`), possibly multiline; undefined → rendered as an em dash. */
   description?: string;
+  question?: string;
+  sourceReference?: string;
+  sourceQuote?: string;
+  changes?: FlagChangeDisplay[];
+  changeWarnings?: string[];
   /** extra registry fields (kind, direction, …) — already non-plumbing, in registry/stored order. */
   fields: FlagActionField[];
   /** the raw linked-issue ref string (e.g. `#42` or a URL) — shown in the Ref row even when non-numeric (not a link). */
@@ -70,6 +76,7 @@ function row(key: string, valueHtml: string, pre = false): string {
  *  Carries `data-flag-action-drawer`. */
 export function renderFlagActionDrawer(v: FlagActionView): string {
   const em = `<span class="fa-em">—</span>`;
+  const statusLabel = v.category === 'validation' ? v.status === 'fixed' ? 'Fixed' : v.status === 'approved' || v.status === 'resolved' ? 'Approved' : 'Pending fix' : v.status;
   // The header IS the summary now (disc 359 — the target label was too long + duplicated the Target row); an empty gist
   // (extraction/legacy flags) falls back to the Type so the header is never a bare "Flag —".
   const headerText = v.summary || v.typeLabel;
@@ -77,9 +84,12 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   // Mutable legacy flags use a description-only edit form. Ref, by
   // contrast, is NOT editable, so an empty Ref row is pure noise → omitted. Type/Origin/Status/Created always have a value.
   const rows =
+    (v.question?.trim() ? row("Question", escapeHtml(v.question), true) : "") +
+    (v.sourceReference?.trim() ? row("Source", escapeHtml(v.sourceReference), true) : "") +
+    (v.sourceQuote?.trim() ? row("Source quotation", escapeHtml(v.sourceQuote), true) : "") +
     row("Type", escapeHtml(v.typeLabel)) +
     row("Workflow", escapeHtml(v.category === "extraction" ? "KE" : v.category === "validation" ? "MV" : v.category)) +
-    row("Status", `<span class="fa-status fa-status-${v.status}">${v.category === "validation" ? v.status === "fixed" ? "Fixed" : v.status === "approved" || v.status === "resolved" ? "Approved" : "Pending fix" : v.status}</span>`) +
+    row("Status", `<span class="fa-status fa-status-${v.status}">${statusLabel}</span>`) +
     row("Description", v.description?.trim() ? escapeHtml(v.description) : em, true) + // .trim(): a whitespace-only value reads as empty (em-dash)
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
     (v.issueRef?.trim() ? row("Ref", escapeHtml(v.issueRef)) : "") +
@@ -98,6 +108,15 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     row("Target", `${escapeHtml(v.targetLabel)}<span class="fa-addr">${target}</span>`) +
     row("Id", escapeHtml(v.id)) +
     `</details>`;
+  const changes = (v.changes ?? []).map(change =>
+    `<section class="fa-change"><h3>Run-reported change</h3>` +
+    row('Run', escapeHtml(change.runId)) + row('Recorded at',escapeHtml(change.recordedAt.replace('T',' ').replace(/\.\d{3}Z$/, ' UTC'))) + row('Prior commit',escapeHtml(change.beforeCommit)) +
+    row('Before',escapeHtml(change.priorState),true) + row('Requested change',escapeHtml(change.requestedChange),true) +
+    row(change.implemented ? 'Change made' : 'Not implemented',escapeHtml(change.change),true) +
+    row('Affected nodes',escapeHtml(change.targets.join('\n')),true) +
+    change.evidence.map(e => `<div class="fa-row"><span class="fa-key">Evidence</span><button type="button" class="fa-btn" data-flag-summary-evidence="${escapeHtml(e.key)}" title="${escapeHtml(e.path)} — file hash checked on opening">${escapeHtml(e.label)}</button></div>`).join('') +
+    `<p class="fa-note">Run reporting does not change this flag’s review status (${escapeHtml(statusLabel)}).</p></section>`).join('');
+  const summaryWarnings = (v.changeWarnings ?? []).map(w => `<div class="fa-note">${escapeHtml(w)}</div>`).join('');
 
   const authoring = v.category === "extraction";
   const toggle = authoring && v.status === "open"
@@ -120,7 +139,7 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     `<div class="flag-drawer flag-action-drawer" data-flag-action-drawer>` +
     `<div class="flag-head"><span class="flag-title" title="${escapeHtml(headerText)}">Flag — ${escapeHtml(headerText)}</span>` +
     `<button type="button" class="flag-close" data-flag-action-close aria-label="Close">✕</button></div>` +
-    `<div class="fa-body">${rows}${details}</div>` +
+    `<div class="fa-body">${rows}${changes}${summaryWarnings}${details}</div>` +
     (v.qaEdit ? `<div class="fa-note">Use the pinned Question and Answer controls to review or change this request.</div>` : authoring || v.readOnly ? `<div class="fa-note">KE flag · Content read only</div>` : "") +
     `<div class="flag-actions">${v.qaEdit ? issue : authoring || v.readOnly ? issue+toggle : del+issue+edit+toggle}</div>` +
     `</div>`

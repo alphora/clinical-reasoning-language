@@ -4,6 +4,7 @@
 // validation to the PURE `validateFlagFields` (flagVocab), then builds the `MvFlag` DIRECTLY (no `.crl` write, no legacy
 // `FlagInstance` adapter). `createFlag` / `legacyToMvFlag` are no longer involved (deleted in 4b).
 import { createHash, randomUUID } from "node:crypto";
+import { flagContext, sameFlagContext } from "./flagContext";
 import { conceptIdentity } from "../meta/conceptIdentity";
 
 import type { CRL } from "../ast/types";
@@ -34,6 +35,8 @@ function contentDedupKey(flag: MvFlag): string {
     ? [a.scope, { entityId: a.entityId }]
     : [a.scope, a.name, a.library ?? "", a.occurrenceKey ?? ""];
   const content: unknown[] = [...identity, flag.tag, flag.gist, fields];
+  const context = flagContext(flag);
+  if (Object.keys(context).length) content.push(context);
   // Description is mutable detail, not retry identity; keep creation-time keys compatible.
   return "d-" + createHash("sha1").update(JSON.stringify(content)).digest("hex");
 }
@@ -118,8 +121,26 @@ export function validateAndBuildMvFlagDraft(
     createdAt: "", // host-stamped below
   };
   if (vf.description) base.description = vf.description;
+  Object.assign(base, flagContext(vf));
   if (suppliedDedup) base.dedupKey = suppliedDedup;
 
   const dedupKey = base.dedupKey ?? contentDedupKey(base);
   return { ok: true, flag: { ...base, dedupKey, id: id(), createdAt: now() } };
+}
+
+export type FlagCreationRetry = { state: "create" } | { state: "deduped"; flag: MvFlag } |
+  { state: "conflict"; flag: MvFlag; message: string };
+/** Never claim changed structured content was authored by returning an old record as success. */
+export function flagCreationRetry(flags: readonly MvFlag[], proposed: MvFlag): FlagCreationRetry {
+  const open = (f: MvFlag) => f.status !== "resolved" && f.status !== "approved";
+  let existing = flags.find(f => f.dedupKey && f.dedupKey === proposed.dedupKey && open(f));
+  if (!existing && Object.keys(flagContext(proposed)).length) {
+    const legacy = { ...proposed, question: undefined, sourceReference: undefined, sourceQuote: undefined };
+    const legacyKey = contentDedupKey(legacy);
+    existing = flags.find(f => f.dedupKey === legacyKey && open(f) && !Object.keys(flagContext(f)).length);
+  }
+  if (!existing) return { state: "create" };
+  if (sameFlagContext(existing, proposed)) return { state: "deduped", flag: existing };
+  return { state: "conflict", flag: existing,
+    message: `Flag ${existing.id} already represents this concern; its stored question/source content differs or is unstructured. Read and retain that existing record. create_flag cannot amend it: report the proposed revision for its owner to review. Do not resolve the flag merely to recreate it.` };
 }

@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { flagDisplayNameOf, flagCategoryOf, loadFlags, saveFlag } from '@smile-digital-health/crl';
-import { applyKeFlagAction, createFlagExclusive, keFlagRevision, performKeFlagAction } from './flagWorkflowStore.ts';
+import { applyKeFlagAction, createFlagExclusive, keFlagRevision, keFlagContentRevision, keAnswerDescription, performKeFlagAction } from './flagWorkflowStore.ts';
 
 const question = () => ({ schemaVersion: 1, id: 'ke', category: 'extraction', tag: 'customer-confirmable',
   gist: 'Original; `question`\n', description: 'Full original description\nSecond line', status: 'open',
@@ -16,6 +16,34 @@ function store() {
     save: f => { if (saveError) throw Error('resolve failed'); flags.set(f.id, structuredClone(f)); } };
   return { captured, flags, adapter, failSave: v => saveError = v, failCreate: v => createError = v };
 }
+
+test('structured KE answers retain the question, actual citation and supporting context once',()=>{
+ const s=store();Object.assign(s.captured,{question:'Which option?',sourceReference:'Policy p.2',sourceQuote:'Original quotation'});
+ s.flags.set(s.captured.id,structuredClone(s.captured));
+ const answer=performKeFlagAction(s.adapter,s.captured,'answer','later');
+ assert.equal(answer.description,'Question:\nWhich option?\n\nSource:\nPolicy p.2\n\nSource quotation:\nOriginal quotation\n\nSupporting context:\nFull original description\nSecond line\n\nAnswer:\n');
+ assert.equal(answer.fields['ke-content-revision'],keFlagContentRevision(s.captured));
+ assert.equal(keFlagContentRevision(s.flags.get('ke')),keFlagContentRevision(s.captured),'resolving and adding answer link do not stale content');
+ assert.notEqual(keFlagContentRevision({...s.captured,sourceQuote:'Changed'}),answer.fields['ke-content-revision']);
+ assert.equal(keFlagContentRevision({...s.captured,fields:{...s.captured.fields,ref:'#99'}}),answer.fields['ke-content-revision'],'issue linkage is not changed question content');
+});
+
+test('Answer copy handles mixed fields and retains the exact legacy description fallback',()=>{
+ const q=question();assert.equal(keAnswerDescription(q),`Question:\n${q.description}\n\nAnswer:\n`);
+ assert.equal(keAnswerDescription({...q,question:'Q',description:undefined}),'Question:\nQ\n\nAnswer:\n');
+ assert.equal(keAnswerDescription({...q,question:'Q',description:'D'}),'Question:\nQ\n\nSupporting context:\nD\n\nAnswer:\n');
+ assert.equal(keAnswerDescription({...q,description:undefined,sourceQuote:'Quote'}),`Question:\n${q.gist}\n\nSource quotation:\nQuote\n\nAnswer:\n`);
+ assert.equal(keAnswerDescription({...q,description:'D',sourceQuote:'Quote'}),`Question:\n${q.gist}\n\nSource quotation:\nQuote\n\nSupporting context:\nD\n\nAnswer:\n`);
+});
+
+test('a changed structured question or citation invalidates a pending Answer without resolving KE',()=>{
+ for(const key of ['question','sourceReference','sourceQuote']){
+  const s=store();Object.assign(s.captured,{[key]:'Before'});s.flags.set('ke',{...s.captured,[key]:'After'});
+  assert.notEqual(keFlagRevision(s.captured),keFlagRevision(s.flags.get('ke')));
+  assert.throws(()=>performKeFlagAction(s.adapter,s.captured,'answer'),/changed on disk/);
+  assert.equal(s.flags.size,1);assert.equal(s.flags.get('ke').status,'open');
+ }
+});
 
 test('disk reload adopts a resolved answer after original resolution failed without rewriting its content',()=>{
  const dir=mkdtempSync(join(tmpdir(),'mv-answer-retry-'));

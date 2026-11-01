@@ -1,7 +1,7 @@
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
-import { applyKeFlagAction, keFlagRevision, isKeAnswerSavedError } from './flagWorkflowStore';
+import { applyKeFlagAction, keFlagRevision, keFlagContentRevision, isKeAnswerSavedError } from './flagWorkflowStore';
 import { paintFlagBadges } from './flagBadgesWebview';
 import { summarizeFlagBadges } from './flagPlacement';
 import { createBranchQuestionnairePanel, nextQuestionnaireColumn } from "./branchQuestionnairePanel";
@@ -90,6 +90,7 @@ import { buildIssueUrl, githubIssuesBaseFromRemote, githubRepoFromRemote, issueR
 import { getGithubIssue, updateGithubIssue } from "./githubIssue";
 import { renderFlagDrawer } from "./flagDrawerHtml";
 import { renderFlagActionDrawer, type FlagActionField } from "./flagActionDrawerHtml";
+import { FlagChangeSummaryController } from './flagChangeSummaryStore';
 import { saveQuestionRequest, saveAnswerRequest, overlayQaRequests, changeQaRequest } from "./qaFlagEditing";
 import { computeFlagPlacement, conceptFlagTargetsForGids } from "./flagPlacement";
 import { flagCloseEligibility } from "./flagCloseEligibility";
@@ -251,9 +252,9 @@ const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.Vi
 // Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
 // actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
 const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", fhirQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
-// Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
+// Bound full source rendering; annotation-dense policies can exceed 2000 marks even with short source text.
 const MAX_SOURCE_CHARS = 200_000;
-const MAX_SOURCE_MARKS = 2000;
+const MAX_SOURCE_MARKS = 5000;
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
@@ -720,6 +721,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let paneOrder: Pane[] = normalizePaneOrder(undefined, COCKPIT_PANE_SPEC); // user layout (configSection(mode).paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
   let flagsWatcher: vscode.FileSystemWatcher | undefined; // #212 S2 (I6): the `medical-validation/flags/` store is OUTSIDE the src-scoped watcher
+  const flagChangeSummaries = new FlagChangeSummaryController();
+  let flagSummaryWatcher: vscode.FileSystemWatcher | undefined;
   let debounce: ReturnType<typeof setTimeout> | undefined;
   let dependencyWatchers:vscode.FileSystemWatcher[]=[],dependencyWatchKey='';
   function scheduleRebuild():void{
@@ -734,6 +737,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       watcher.onDidCreate(changed);watcher.onDidChange(changed);watcher.onDidDelete(changed);dependencyWatchers.push(watcher);}
   }
   let flagsDebounce: ReturnType<typeof setTimeout> | undefined;
+  let summaryDebounce: ReturnType<typeof setTimeout> | undefined;
   let orderDebounce: ReturnType<typeof setTimeout> | undefined;
 
   /** The column a pane opens in = its index among the OPEN panes in paneOrder (panels already created PLUS the one being
@@ -2239,7 +2243,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const textLen = model.anchor.text.length;
       const markCount = units.length + overlays.length;
       if (textLen > MAX_SOURCE_CHARS || markCount > MAX_SOURCE_MARKS) {
-        // Over the measured floor — STOP (per disc 118): post a navigation-only fallback rather than freeze the webview.
+        // Over the rendering budget: post a navigation-only fallback rather than freeze the webview.
         console.warn(
           `[crl.cockpit] Source inline render skipped: ${textLen} chars, ${markCount} marks (> ${MAX_SOURCE_CHARS}/${MAX_SOURCE_MARKS}). Navigate + Open Raw still work.`,
         );
@@ -3040,6 +3044,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void flagActionToggle(); // the action drawer's Resolve/Reopen (host acts on the host-captured flagActionView.flag — the msg carries no id)
     } else if (msg.type === "flagActionIssue") {
       void flagActionOpenIssue(); // the action drawer's Open-issue #N
+    } else if (msg.type === "flagSummaryEvidence" && typeof msg.key === 'string') {
+      void openFlagSummaryEvidence(msg.key);
     } else if (msg.type === "flagActionEdit") {
       openFlagEditDraft(); // Todo 3/3.5: the action drawer's Edit → the edit form (full for a human MV Type; description-only for AI)
     } else if (msg.type === "flagActionDelete") {
@@ -3465,10 +3471,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     watcher = undefined;
     flagsWatcher?.dispose();
     flagsWatcher = undefined;
+    flagSummaryWatcher?.dispose(); flagSummaryWatcher = undefined;
+    flagChangeSummaries.clear();
+    if (summaryDebounce) clearTimeout(summaryDebounce);
+    summaryDebounce = undefined;
     if (flagsDebounce) clearTimeout(flagsDebounce); // a retarget must cancel a pending flags-refresh scheduled for the OLD policy
     flagsDebounce = undefined;
     if (!currentCel) return;
     const src = findPolicySrc(currentCel);
+    if (src) {
+      const summaryCel = currentCel;
+      flagSummaryWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(src,'medical-validation/change-summaries/*.json'));
+      const onSummary = () => {
+        if (currentCel !== summaryCel) return;
+        flagChangeSummaries.clear();
+        if (summaryDebounce) clearTimeout(summaryDebounce);
+        summaryDebounce = setTimeout(() => {
+          summaryDebounce = undefined;
+          if (currentCel === summaryCel && mode === 'medical-validation' && flagActionView && !flagDraft && !flagEditDraft && !reviewGridSnapshot) postFlagDrawer();
+        },150);
+      };
+      flagSummaryWatcher.onDidCreate(onSummary); flagSummaryWatcher.onDidChange(onSummary); flagSummaryWatcher.onDidDelete(onSummary);
+    }
     const pat = src ? new vscode.RelativePattern(dirname(src), "{**/package.json,**/*.crl,src/provenance/*.provenance.json,src/anchor-source/*.txt,src/cel/**/*.cel,src/cql/**/*,src/fhir/**/*,src/medical-validation/*.json,tests/results/**/*}") : undefined;
     if (pat) {
       watcher = vscode.workspace.createFileSystemWatcher(pat);
@@ -4203,6 +4227,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  region is a sibling of `#root`, so this never re-renders the flowchart (no overlay loss) and the render handler never
    *  wipes the drawer (a same-policy rebuild leaves the user's typed text intact). */
   function postFlagDrawer(): void {
+    if (!flagActionView || flagDraft || flagEditDraft || reviewGridSnapshot) flagChangeSummaries.clear();
+    else flagChangeSummaries.clearLinks();
     const tree = views.get("tree");
     if (!tree) return;
     // Only the human MV "Type" tags (a `displayName`) are offered — the AI-authoring extraction tags are hidden from the drawer.
@@ -4210,6 +4236,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // One-slot dispatcher (design 354; Todo 3 adds edit): create → edit → action → empty. Never more than one set (each open
     // clears the others via the settle choke-point) — this precedence is just a total order for the "both somehow set" impossibility.
     const editFlag = flagEditDraft?.flag;
+    const summarySrc = !flagDraft && !editFlag && flagActionView && currentCel ? findPolicySrc(currentCel) : undefined;
+    const reporting = summarySrc && flagActionView ? flagChangeSummaries.render(dirname(summarySrc),flagActionView.flag.id,
+      flagStoreWarning ? undefined : new Set(flagsList.map(f=>f.id))) : {changes:[],warnings:[]};
     const html = flagDraft
       ? renderFlagDrawer({ targetLabel: flagDraft.target.shortLabel, targetTitle: flagDraft.target.label, tags: mvTypes, tag: flagDraft.tag, summary: flagDraft.summary, stub: flagDraft.stub, fields: flagDraft.fields, focus: flagDraft.focus })
       : editFlag
@@ -4219,7 +4248,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           // Todo 3.5: `descriptionOnly` (a mutable legacy flag) renders the trimmed description-only form instead of the full edit form.
           renderFlagDrawer({ targetLabel: editFlag.anchor.label, targetTitle: editFlag.anchor.label, tags: mvTypes, tag: editFlag.tag, summary: editFlag.gist.replace(/[\r\n]+/g, " "), stub: editFlag.description, fields: editFlag.fields, edit: true, descriptionOnly: flagEditDraft!.descriptionOnly })
         : flagActionView
-          ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag))
+          ? renderFlagActionDrawer(flagActionViewModel(flagActionView.flag,reporting))
           : // Todo 5 (disc 366): the bulk-verdict grid — the 4th mode. Renders FROM the snapshot (the one render authority, so the
             // dispatcher HTML and the apply-validation set can't diverge). INVARIANT: the grid HTML is posted exactly once per grid
             // session — no unconditional `postFlagDrawer` may re-post it (a re-post rebuilds the grid DOM, wiping the DOM-only picks;
@@ -4245,14 +4274,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** Build the read-only view model the action drawer renders from a stored `MvFlag`. Derives the display-only bits here (Type
    *  via `flagDisplayNameOf` with a raw-tag fallback, the occurrence signature via `parseOccurrenceKey`, the numeric issue no
    *  via `issueRefOf`) so the renderer stays pure. */
-  function flagActionViewModel(flag: MvFlag): Parameters<typeof renderFlagActionDrawer>[0] {
+  function flagActionViewModel(flag: MvFlag, reporting: ReturnType<FlagChangeSummaryController['render']> = {changes:[],warnings:[]}): Parameters<typeof renderFlagActionDrawer>[0] {
     const a = flag.anchor;
     const anchorAddress = `${a.scope}:${a.name}${a.library ? ` "${a.library}"` : ""}`;
     const occurrenceSignature = a.occurrenceKey ? parseOccurrenceKey(a.occurrenceKey).signature : undefined;
     const fields: FlagActionField[] = Object.entries(flag.fields)
       .filter(([k, v]) => !FLAG_VIEW_PLUMBING.has(k) && v !== "")
       .map(([key, value]) => ({ key, value }));
-    const answerLabel = (f: MvFlag) => `${f.gist || f.anchor.label || f.id} (${f.status})`;
+    const answerContext = (answer: MvFlag, question: MvFlag) => answer.fields['ke-content-revision']
+      ? answer.fields['ke-content-revision'] === keFlagContentRevision(question) ? '' : ' — Question changed since this answer'
+      : question.question || question.sourceReference || question.sourceQuote ? ' — Original question revision unavailable' : '';
+    const answerLabel = (f: MvFlag) => `${f.gist || f.anchor.label || f.id} (${f.status})${answerContext(f,flag)}`;
     const answers = flag.category === "extraction" ? flagsList.filter(f => f.fields["ke-flag"] === flag.id) : [];
     const earlier = answers.filter(f => f.id !== flag.fields["mv-answer"]);
     if (flag.fields["mv-answer"]) {
@@ -4265,7 +4297,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (earlier.length) fields.push({key:flag.status==='open'&&!flag.fields['mv-answer']?"Unlinked MV answers":"Earlier MV answers",value:earlier.map(answerLabel).join(", ")+(flag.status==='open'&&!flag.fields['mv-answer']?'; Retry Answer Flag to link this question. Open MV answers require review.':'')});
     if (flag.fields["ke-flag"]) {
       const related = flagsList.find(f => f.id === flag.fields["ke-flag"]);
-      fields.push({ key: "KE question", value: related ? related.gist || related.anchor.label || related.id : (flagStoreWarning
+      fields.push({ key: "KE question", value: related ? (related.question || related.gist || related.anchor.label || related.id)+answerContext(flag,related) : (flagStoreWarning
         ? "Question unavailable; repair the unreadable flag store" : "Question no longer present") });
     }
     const issueNoStr = issueRefOf(flag.fields.ref);
@@ -4279,6 +4311,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       occurrenceSignature,
       summary: flag.gist,
       description: flag.description,
+      question: flag.question,
+      sourceReference: flag.sourceReference,
+      sourceQuote: flag.sourceQuote,
+      changes: reporting.changes,
+      changeWarnings: reporting.warnings,
       fields,
       issueRef: flag.fields.ref,
       issueNo: issueNoStr ? Number(issueNoStr) : undefined,
@@ -4309,15 +4346,34 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** Close the action drawer (UI clear only — it carries no agent elicitation). No-op when already closed. */
   function closeFlagActionView(): void {
+    flagChangeSummaries.clear();
     if (!flagActionView) return;
     flagActionView = undefined;
     postFlagDrawer(); // empty region
+  }
+
+  async function openFlagSummaryEvidence(key: string): Promise<void> {
+    const view = flagActionView, cel = currentCel;
+    const src = cel ? findPolicySrc(cel) : undefined;
+    if (!view || !src || view.cel !== cel || mode !== 'medical-validation') return;
+    try {
+      const file = await flagChangeSummaries.resolve(key,dirname(src),view.flag.id);
+      if (flagActionView !== view || currentCel !== cel || mode !== 'medical-validation') return;
+      if (vscode.workspace.textDocuments.some(doc => {
+        if (!doc.isDirty || !['file','vscode-remote'].includes(doc.uri.scheme)) return false;
+        try { return relative(realpathSync(doc.uri.fsPath),file) === ''; } catch { return false; }
+      })) {
+        return flagNote('Save or revert unsaved changes to this evidence file before opening verified evidence.');
+      }
+      await vscode.commands.executeCommand('vscode.open',vscode.Uri.file(file));
+    } catch(error) { flagNote(error instanceof Error ? error.message : String(error)); }
   }
 
   /** The ENTRY toggle (disc 359): reclicking the flag whose drawer is already open CLOSES it; a different flag SWITCHES. Used by
    *  the node-badge + list entry paths ONLY — NOT `openFlagActionView` itself (Todo 3's Cancel→return-to-view calls that directly
    *  and must not toggle-close). (Todo 3: a "lose changes" guard will gate the switch/close when an edit has unsaved text.) */
   function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined): void {
+    flagChangeSummaries.clear();
     if (flagActionView && flagActionView.flag.id === flag.id) return closeFlagActionView();
     openFlagActionView(flag, ver, cel);
   }
@@ -5666,6 +5722,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         branchQuestionnaire.close();
         dependencyWatchers.forEach(w=>w.dispose());dependencyWatchers=[];dependencyWatchKey='';watcher?.dispose();
         flagsWatcher?.dispose();
+        flagSummaryWatcher?.dispose(); flagChangeSummaries.clear();
+        if (summaryDebounce) clearTimeout(summaryDebounce);
         snapshotCapture.settleEmpty(); // #(tree-snapshot): a pending capture must not outlive the cockpit
         if (debounce) clearTimeout(debounce); // a pending rebuild/reorder must not fire on disposed panels
         if (flagsDebounce) clearTimeout(flagsDebounce);
@@ -5974,6 +6032,8 @@ body:has(.flag-drawer) .flow-zoom{display:none}
 .flag-title{overflow:hidden;text-overflow:ellipsis;white-space:normal}
 /* Todo 3.5: the read-only summary context line in the description-only edit form (which AI finding you're annotating). */
 .flag-ctx{opacity:.7;font-size:.9em;font-style:italic;overflow-wrap:anywhere}
+.fa-change{border-top:1px solid var(--vscode-panel-border);margin-top:8px;padding-top:8px}
+.fa-change h3{font-size:inherit;margin:0 0 8px}
 .flag-close{cursor:pointer;background:none;border:none;color:inherit;font-size:1.1em;padding:0 4px}
 .flag-row{display:flex;align-items:center;gap:6px}
 .flag-col{display:flex;flex-direction:column;gap:2px;flex:1;min-height:60px}
@@ -6430,6 +6490,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(grp){for(const c of grp.querySelectorAll('[data-flag-field]')){const k=c.getAttribute('data-flag-field');const val=c.value;if(val&&val.trim()!=='')fields[k]=val;}}` +
   `return{tag:tg,summary:su?su.value:'',stub:st?st.value:'',fields:fields};}` +
   `fld.addEventListener('click',(e)=>{` +
+  `const se=e.target.closest&&e.target.closest('[data-flag-summary-evidence]');if(se){e.preventDefault();e.stopPropagation();v.postMessage({type:'flagSummaryEvidence',key:se.getAttribute('data-flag-summary-evidence')});return;}` +
   `const ac=e.target.closest&&e.target.closest('[data-flag-action-answer],[data-flag-action-ignore],[data-flag-action-toggle],[data-flag-action-issue],[data-flag-action-edit],[data-flag-action-delete],[data-flag-action-close]');` +
   `if(ac){e.preventDefault();e.stopPropagation();v.postMessage({type:ac.hasAttribute('data-flag-action-answer')?'flagActionAnswer':ac.hasAttribute('data-flag-action-ignore')?'flagActionIgnore':ac.hasAttribute('data-flag-action-toggle')?'flagActionToggle':ac.hasAttribute('data-flag-action-issue')?'flagActionIssue':ac.hasAttribute('data-flag-action-edit')?'flagActionEdit':ac.hasAttribute('data-flag-action-delete')?'flagActionDelete':'flagActionClose'});return;}` +
   // Todo 3: the edit form's Cancel/✕ + Save carry DISTINCT `data-flag-edit-*` intents (checked BEFORE the create close/insert,

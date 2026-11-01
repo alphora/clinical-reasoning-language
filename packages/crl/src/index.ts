@@ -421,6 +421,12 @@ export type { FlagTagInfo, FlagLabel, FieldRule, FlagStatus, CreateFlagTarget, C
 // #212 — the `medical-validation/flags/` STORE model (moved from crl-vscode so BOTH the cockpit AND the MCP flag tools share it). The
 // single home for review flags: a pure record model + per-flag JSON store + a navigation anchor resolver. See discussions/248.
 export { coerceFlag, coerceFlagStatus, isOpen, isValidFlagId } from "./flags/mvFlag";
+export { FLAG_CONTEXT_FIELDS, flagContext, sameFlagContext } from "./flags/flagContext";
+export type { FlagContext } from "./flags/flagContext";
+export { flagCreationRetry } from "./flags/buildFlagDraft";
+export type { FlagCreationRetry } from "./flags/buildFlagDraft";
+export { flagChangeSummarySchema, flagChangeEvidenceSchema, flagChangeSummaryJsonSchema, validateFlagChangeSummary } from "./flags/changeSummary";
+export type { FlagChangeSummary, FlagChangeItem, FlagChangeEvidence } from "./flags/changeSummary";
 export type { MvFlag, MvFlagAnchor, MvFlagStatus, MvFlagCategory, MvFlagScope } from "./flags/mvFlag";
 // REFACTOR:grounded (MV/KE workflow): desired-state flags and MV-owned lifecycle.
 export { coerceQaEditRequest, isQaSourcePath } from "./flags/qaEditRequest";

@@ -27,6 +27,25 @@ const OPEN_VIEW = {
   descriptionOnly: false,
 };
 
+test('structured Question and Source appear separately, in order, and are escaped',()=>{
+  const h=renderFlagActionDrawer({...OPEN_VIEW,question:'Which <option>?',sourceReference:'Policy <p.2>',sourceQuote:'<script>source</script>'});
+  assert.ok(h.indexOf('>Question<')<h.indexOf('>Source<'));
+  assert.ok(h.indexOf('>Source<')<h.indexOf('>Description<'));
+  assert.ok(h.includes('Which &lt;option&gt;?'));
+  assert.ok(!h.includes('<script>'));
+  const old=renderFlagActionDrawer(OPEN_VIEW);assert.ok(!old.includes('>Question<'));assert.ok(old.includes('line one\nline two'));
+});
+
+test('run reporting has no status mutation and evidence buttons carry opaque keys',()=>{
+  const h=renderFlagActionDrawer({...OPEN_VIEW,changes:[{runId:'run-1',recordedAt:'2026-11-01T12:00:00.000Z',beforeCommit:'a'.repeat(40),
+    priorState:'Old <wording>',requestedChange:'Please clarify',change:'Reworded',implemented:true,targets:['Question'],
+    evidence:[{label:'Report',path:'tests/results/report.json',key:'opaque-1'}]}]});
+  assert.ok(h.includes('Run-reported change'));assert.ok(h.includes('>Before<'));
+  assert.ok(h.includes('Old &lt;wording&gt;'));assert.ok(h.includes('review status (Pending fix)'));
+  assert.ok(h.includes('data-flag-summary-evidence="opaque-1"'));
+  assert.ok(!h.includes('data-path='));
+});
+
 test("renderFlagActionDrawer: the shell — data-flag-action-drawer + distinct action intents (NOT the create drawer's)", () => {
   const h = renderFlagActionDrawer(OPEN_VIEW);
   assert.match(h, /data-flag-action-drawer/);

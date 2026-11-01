@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { linkSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isValidFlagId, loadFlags, saveFlag, type FlagStoreLoad, type MvFlag } from '@smile-digital-health/crl';
+import { isValidFlagId, loadFlags, saveFlag, flagContext, HOST_FLAG_CORRELATION_FIELDS, type FlagStoreLoad, type MvFlag } from '@smile-digital-health/crl';
 
 export interface KeFlagActionStore {
   load(): FlagStoreLoad;
@@ -27,6 +27,24 @@ function canonical(value: unknown): string {
 
 export function keFlagRevision(flag: MvFlag): string {
   return createHash('sha256').update(canonical(flag)).digest('hex');
+}
+
+/** Question content identity independent of resolving/reopening and answer-link bookkeeping. */
+export function keFlagContentRevision(flag: MvFlag): string {
+  const fields = Object.fromEntries(Object.entries(flag.fields).filter(([key]) =>
+    key !== 'ref' && !(HOST_FLAG_CORRELATION_FIELDS as readonly string[]).includes(key)));
+  return createHash('sha256').update(canonical({tag:flag.tag,gist:flag.gist,description:flag.description,
+    ...flagContext(flag),anchor:flag.anchor,fields})).digest('hex');
+}
+
+export function keAnswerDescription(flag: MvFlag): string {
+  if (!Object.keys(flagContext(flag)).length)
+    return `Question:\n${flag.description || flag.gist || flag.anchor.label || flag.anchor.name}\n\nAnswer:\n`;
+  const parts = [`Question:\n${flag.question || flag.gist || flag.anchor.label || flag.anchor.name}`];
+  if (flag.sourceReference) parts.push(`Source:\n${flag.sourceReference}`);
+  if (flag.sourceQuote) parts.push(`Source quotation:\n${flag.sourceQuote}`);
+  if (flag.description) parts.push(`Supporting context:\n${flag.description}`);
+  return parts.join('\n\n')+'\n\nAnswer:\n';
 }
 
 /** Synchronous optimistic operation under the existing MV ownership boundary. It does not
@@ -62,8 +80,8 @@ export function performKeFlagAction(store: KeFlagActionStore, captured: MvFlag,
     } else {
       const title = (captured.gist || captured.anchor.label || captured.anchor.name).replace(/[`;\r\n]/g, ' ').trim();
       answer = { schemaVersion: 1, id, category: 'validation', tag: 'other', gist: `Answer: ${title || 'KE question'}`,
-        description: `Question:\n${captured.description || captured.gist || captured.anchor.label || captured.anchor.name}\n\nAnswer:\n`, status: 'open',
-        fields: { 'ke-flag': captured.id, 'ke-question-revision': revision },
+        description: keAnswerDescription(captured), status: 'open',
+        fields: { 'ke-flag': captured.id, 'ke-question-revision': revision, 'ke-content-revision': keFlagContentRevision(captured) },
         anchor: { ...captured.anchor }, createdAt: now };
       store.create(answer);
     }

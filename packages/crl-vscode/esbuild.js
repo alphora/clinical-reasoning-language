@@ -99,6 +99,7 @@ async function build() {
     if (imports.length) throw new Error("Session bundle has unbundled dependencies: " + imports.map(i => i.path).join(", "));
   }
   fs.copyFileSync(path.resolve(__dirname, "../crl/docs/apply-session.md"), path.resolve(__dirname, "dist/apply-session.md"));
+  fs.copyFileSync(path.resolve(__dirname, "../crl/dist/flag-change-summary.schema.json"), path.resolve(__dirname, "dist/flag-change-summary.schema.json"));
 
   // Gate 1: heavy/unused deps must not leak into the server bundle. Covers the
   // CRL CLI/transformer deps (fsh-sushi/prompts/cpx) AND the MCP SDK's HTTP/OAuth

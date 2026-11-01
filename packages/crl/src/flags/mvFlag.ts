@@ -10,6 +10,7 @@
 
 import { coerceQaEditRequest, type QaEditRequest } from "./qaEditRequest";
 import { isQaEditFlag, qaEditFlagId } from "./mvFlagReview";
+import { FLAG_CONTEXT_FIELDS, type FlagContext } from "./flagContext";
 export type MvFlagStatus = "open" | "fixed" | "approved" | "resolved";
 /** The status lifecycle a flag SURFACE (cockpit / MCP tool) types against — an alias of `MvFlagStatus`, re-homed here from the
  *  deleted `rewriteMetaStatus` (#212 step 4) so both callers keep the `FlagStatus` name without depending on `.crl` refactors. */
@@ -34,7 +35,7 @@ export interface MvFlagAnchor {
   label: string;
 }
 
-export interface MvFlag {
+export interface MvFlag extends FlagContext {
   // REFACTOR:grounded (MV/KE workflow): v2 carries specialized Q/A requests; legacy flags remain readable.
   schemaVersion: 1 | 2;
   editRequest?: QaEditRequest;
@@ -116,6 +117,10 @@ export function coerceFlag(parsed: unknown): MvFlag | undefined {
     createdAt,
   };
   if (str(o.description)) flag.description = o.description as string;
+  for (const key of FLAG_CONTEXT_FIELDS) {
+    if (o[key] != null && typeof o[key] !== "string") return undefined;
+    if (str(o[key])) flag[key] = o[key] as string;
+  }
   if (str(o.dedupKey)) flag.dedupKey = o.dedupKey as string;
   if (str(o.editedAt)) flag.editedAt = o.editedAt as string;
   if (category === "extraction" && (flag.status === "fixed" || flag.status === "approved")) return undefined;
