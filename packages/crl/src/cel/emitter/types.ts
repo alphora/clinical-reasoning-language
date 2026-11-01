@@ -50,7 +50,11 @@ export interface EmitDiagnostic {
   filePath?: string;
 }
 
+// REFACTOR:grounded (#328): typed Quantity admission errors are emitted, never skipped silently.
 export type EmitDiagnosticKind =
+  | "publication-invalid-quantity"
+  | "publication-quantity-unit-unsupported"
+  | "publication-quantity-precision-unsupported"
   | import("../validator/types").CELValidationErrorKind
   | "mv-off-path-data"
   | "publication-preparation-failed"

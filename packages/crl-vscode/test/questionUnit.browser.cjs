@@ -96,7 +96,7 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
       rows.push({entered:value,submission:submitted,result});
       if(value==='40')fs.writeFileSync(path.join(root,'quantity-unit-native-entry.png'),Buffer.from((await rpc('Page.captureScreenshot',{format:'png'})).data,'base64'));
     }
-    // Preserve a legitimate display-only source unit without fabricating a UCUM code/system on a passive submission.
+    // REFACTOR:grounded: explicit typed publication canonicalizes unit-only/styled values, without source renewal.
     const system=emitted.bundle.entry.map(e=>e.resource).find(r=>r.resourceType==='CodeSystem'&&r.concept?.some(c=>c.code==='bmi')).url;
     const original={resourceType:'Observation',id:'display-only-source',status:'final',subject:{reference:'Patient/p'},code:{coding:[{system,code:'bmi'}]},effectiveDateTime:'2026-10-01T00:00:00Z',valueQuantity:{value:40,unit:'kg/m2'}};
     const displayOnly=new InteractiveSession(emitted.bundle,plan.id,runner);
@@ -105,7 +105,7 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
     await post({type:'result',token:1,questionnaire:populated.questionnaire,response:populated.response,activities:populated.activities,subject:'Patient/p'});await mounted();
     await evaluate(`document.getElementById('continue').click()`);const untouched=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
     const exported=flatten(untouched.response.item).find(i=>i.answer?.some(a=>a.valueQuantity))?.answer[0]?.valueQuantity;
-    assert.deepEqual(exported,original.valueQuantity);
+    assert.deepEqual(exported,{value:40,unit:'kg/m2',code:'kg/m2',system:'http://unitsofmeasure.org'});
     const retained=await displayOnly.evaluate(untouched.response);assert.deepEqual(retained.activities,['Above']);assert.deepEqual(obs(retained),[original]);
     rows.push({entered:'untouched display-only source',submission:untouched,result:retained});
     const styledSource={...original,id:'styled-source',valueQuantity:{value:40,system:'http://unitsofmeasure.org',code:'kg/m2',unit:'kg/m²'}};
@@ -114,10 +114,10 @@ const flatten=items=>(items||[]).flatMap(i=>[i,...flatten(i.item),...(i.answer||
     const styledStart=await styled.evaluate();
     await post({type:'result',token:1,questionnaire:styledStart.questionnaire,response:styledStart.response,activities:styledStart.activities,subject:'Patient/p'});await mounted();
     await evaluate(`document.getElementById('continue').click()`);const styledExport=await evaluate(`window.sent.filter(m=>m.type==='continue').at(-1)`);
-    assert.deepEqual(flatten(styledExport.response.item).find(i=>i.answer?.some(a=>a.valueQuantity))?.answer[0]?.valueQuantity,styledSource.valueQuantity);
+    assert.deepEqual(flatten(styledExport.response.item).find(i=>i.answer?.some(a=>a.valueQuantity))?.answer[0]?.valueQuantity,{value:40,unit:'kg/m2',code:'kg/m2',system:'http://unitsofmeasure.org'});
     const styledRetained=await styled.evaluate(styledExport.response);assert.deepEqual(styledRetained.activities,['Above']);assert.deepEqual(obs(styledRetained),[styledSource]);
     rows.push({entered:'untouched source display',submission:styledExport,result:styledRetained});
-    fs.writeFileSync(path.join(root,'quantity-unit-browser-native.json'),JSON.stringify({passed:true,scope:'Shipped LForms and production InteractiveSession with actual candidate native Start/Continue/entry/change/clear and untouched display-only source',engine,rows},null,2));
+    fs.writeFileSync(path.join(root,'quantity-unit-browser-native.json'),JSON.stringify({passed:true,scope:'Shipped LForms and production InteractiveSession with actual candidate native Start/Continue/entry/change/clear',engine,rows},null,2));
     console.log(JSON.stringify({passed:true,cases:rows.map(r=>r.entered),output:root}));
   }finally{await shutdownNativeRuntime();}
 })().catch(async e=>{console.error(e);if(ws)try{console.error(await evaluate(`({text:document.body.innerText,html:document.getElementById('form').innerHTML.slice(0,1200),sent:window.sent})`));}catch{}process.exitCode=1}).finally(async()=>{if(ws)try{await rpc('Browser.close')}catch{};ws?.close();child?.kill();server?.close();});

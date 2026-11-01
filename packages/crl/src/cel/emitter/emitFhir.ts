@@ -1,3 +1,4 @@
+import { normalizePublicationQuantity } from "../../emit/publicationQuantity";
 import { isValidFhirTemporal } from "../temporal";
 import { answerTerminologyResolver } from "../../emit/answerDomain";
 import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
@@ -1223,6 +1224,18 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
         else resourceBody.valueString = v.value;
         break;
     }
+  }
+
+  // REFACTOR:grounded (#328): a locally asserted typed value must conform before profile stamping.
+  if (publication?.quantityUnit !== undefined) {
+    const normalized = normalizePublicationQuantity(resourceBody.valueQuantity, publication.quantityUnit);
+    if (normalized.kind === "error") {
+      ctx.publicationFailed = true;
+      ctx.diagnostics.push({ kind: normalized.code as "publication-invalid-quantity" | "publication-quantity-unit-unsupported" | "publication-quantity-precision-unsupported", severity: "error", message: normalized.message,
+        caseSlug: ctx.caseSlug, factName, filePath: ctx.graph.filePath });
+      return undefined;
+    }
+    if (normalized.quantity !== undefined) resourceBody.valueQuantity = normalized.quantity;
   }
 
   // Stage → intent for Request-shaped resources.

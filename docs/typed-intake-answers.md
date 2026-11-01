@@ -2,54 +2,38 @@
 
 <!-- REFACTOR:grounded (#328): owning parser, native, client and package evidence. -->
 
-## Quantity question units (source capability #328)
+## Declared Quantity units (#328, unreleased source capability)
 
-The owning default presentation can declare a fixed unit for fresh numeric entry:
+Declare the unit on the value type, once:
 
 ```crl
-presentation for "BMI":
+concept "Body Mass Index":
+- shape is Record.
+- type is Observation.
+- value type is Quantity 'kg/m2'.
+- code is `body-mass-index`.
+- shape reduction is most recent.
+presentation for "Body Mass Index":
 - question text is "Enter BMI".
-- question unit is 'kg/m2'.
 ```
 
-The concept must be a coded selected Record/Observation/Quantity. Scoped wording
-inherits this unit; scoped unit overrides are refused. The declaration is form
-presentation, not a resource constraint or a conversion rule. Comparisons and BMI
-roles reject incompatible declarations using the existing supported unit dimensions.
-Lexical checking rejects whitespace/control/empty codes; it does not validate the
-UCUM syntax or dictionary. The unit string is an author assertion: an unknown or
-mistyped code is emitted verbatim with the UCUM system and can enter fresh answer
-data. Verify the intended UCUM code. CEL facts and raw FHIR answers still carry their own units.
-Unitless raw numeric Quantities remain errors.
+REFACTOR:grounded: the unit belongs to the selected Record/Observation Quantity type. CQL and CRE normalize each local, source or computed contribution to that unit before final selection; original source resources, candidate identity, lineage and optional validity remain unchanged. CEL normalizes locally asserted values before claiming the concept profile. A unit declaration on another type or an unsupported publication form is an error. Presentations only supply wording. Changing a shared declared unit changes the library executable contract. Regenerate and deploy the affected include closure together; mixing new consumer artifacts with stale owner artifacts is unsupported.
 
-This source feature requires the protocol 1 question-unit engine and matching
-driver. The released CRL 6.4.45 engine does not support it. Local qualification
-uses an explicit candidate engine path/hash; production adoption awaits a qualified
-release. Validation emits a runtime-requirement warning; the driver refuses unsupported engines. Emitted CRL/CQL/FHIR does not vary
-with the expected engine. Shared clinical profiles and arithmetic are unchanged.
+The canonical unit applies to populated numeric values. Same-unit values keep the existing numeric admission rules; their unit/code/system are canonicalized rather than guaranteed byte-identical. Conversion currently supports m/cm and kg/g. Declaring a unit subjects cross-unit inputs to conversion bounds even for a concept used only for presence or display. Both the input and converted output must have magnitude at most 10^6 and at most eight decimal places; lossy conversions are errors, never rounded. Threshold and BMI arithmetic retain their own stricter supported domains. BMI consumes normalized operands and then applies its existing centimetre precision rule. An incompatible unit is an error during CEL emission or native evaluation. The authored unit code is an explicit UCUM assertion; lexical checking rejects empty/whitespace codes, but does not certify UCUM dictionary membership. No unit is guessed from prose or a threshold. The existing unit-only wire representation is a semantic unit assertion (as used by CEL); explicit type normalization writes the canonical UCUM identity from the authored declaration even for that representation. The original source is never recoded.
 
-The input carries a CRL-owned nonmodifier extension, with its fixed-version1.0.0
-definition emitted once per closure. Updated native apply maps it to standard
-`questionnaire-unitOption` on the Quantity answer leaf. Blank entry offers the
-declared unit. A populated alternate unit remains visibly selected, with options
-`[declared, populated]`; neither its number nor its identity is silently changed.
-The bundled LForms client uses the first option for blank entry and matches the
-populated answer's unit. FHIR unitOption itself specifies choices, not a default.
-A user changing only the selected unit deliberately changes the measurement as
-entered; the client does not convert its number. A clear removes the number, and a
-fresh blank entry uses the authored unit; the prior alternate is no longer offered. Raw unit-only unknown metadata retains
-its existing behavior. Display-only populated units remain display-only; unsupported
-units still cause arithmetic errors. An existing unmarked explicit option constraint
-conflicts rather than being silently widened. With our marker present, all standard
-unit options are derived display state: dropped, reordered or stale options are
-rebuilt. The raw UCUM code is the fresh unit label; there is no separate authored
-unit-label field. Exact optional code/system metadata from populated source values
-is preserved, even when that creates duplicate-looking choices. CQL still uses
-code over display; the form does not invent a missing system.
+Unknown/valueless Quantities pass through unchanged; comparators and invalid populated values remain errors. A raw unitless number remains an error. A clear creates no numeric measurement. No declaration keeps existing behavior, including comparison-time compatible-unit conversion.
 
-Owning checks are `questionUnit.test.ts`, the opt-in native interview/static
-producer tests, and `test/questionUnit.browser.cjs`. Browser/native results, raw
-data tests, package inventory and installed release checks are separate evidence.
+The concept StructureDefinition's Observation.value[x] carries standard `elementdefinition-allowedUnits` with a UCUM Coding in valueCodeableConcept. This is profile guidance and generation metadata; CQL/CRE enforce the executable type contract. The shared generator maps it to standard `questionnaire-unitOption` on the Quantity question. No CRL presentation extension is needed. `questionnaire-unit` applies to integer/decimal and is not used on Quantity items. No numeric default is invented.
+
+The released 6.4.45 engine lacks this mapping. The matching driver refuses such an engine for profiles with declared units. Source qualification uses an explicit candidate path and digest; installed/released acceptance requires a separately qualified engine release and VSIX pin. The bundled LForms client attaches the single offered UCUM unit when a respondent enters a number. Standard unitOption does not promise first-option defaults across all clients: qualify another renderer separately. Multiple offered units and presentation-specific display-unit conversion are outside this single-unit type contract.
+
+Native CQL normalization preserves Quantity primitive IDs/extensions consistently with CRE. The measured SDC population layer rebuilds response Quantities without primitive metadata, and HAPI JSON serialization omits id-only primitive metadata; a generated QR is not a lossless serialization of source-resource annotations. The original measurement value/unit is unchanged.
+
+InteractiveSession submits intentional edits and avoids renewing untouched answers. A stateless full-QR submission retains the existing extraction contract: populated responses can create a local answer with the response authored time. This differs from the edits-only client and must be qualified independently.
+
+The shared example `quantity-question-unit` and owning compiler, CEL/CRE, native session/static-result and shipped-browser checks cover emission and entered/change/clear behavior. Synthetic Above/Below activities are test outcomes, not clinical recommendations. Engine-source overlay evidence is not a production deployment claim.
+
+## Text answers and selected-value presence
 
 A free-text question is a normal selected Observation, with a separate presence predicate when a decision needs a Boolean:
 

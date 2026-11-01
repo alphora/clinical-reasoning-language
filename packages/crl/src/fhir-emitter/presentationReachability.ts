@@ -1,7 +1,6 @@
 import type { CRLError } from "../types/errors";
 import type { EmittedResource } from "./types";
 import { PRESENTATION_CHOICE_GROUP_URL, type PresentationExtension } from "./presentationGroups";
-import { QUESTION_UNIT_URL } from "../emit/questionUnit";
 
 type Action = {
   condition?: unknown[];
@@ -103,10 +102,8 @@ export function checkPresentationReachability(resources: readonly EmittedResourc
         continue;
       }
       for (const profile of input.profile ?? []) {
-      // REFACTOR:grounded (#328): unit is an owner-default invariant; scoped units are refused by the catalog.
       const wording = JSON.stringify([input.extension?.find(e => e.url === textUrl)?.valueString ?? profileNames.get(profile) ?? "",
-        input.extension?.find(e => e.url === descriptionUrl)?.valueMarkdown ?? "",
-        input.extension?.find(e => e.url === QUESTION_UNIT_URL)?.valueCoding?.code ?? ""]);
+        input.extension?.find(e => e.url === descriptionUrl)?.valueMarkdown ?? ""]);
       merge(result, { inputs: new Map([[profile, new Map([[wording, path]])]]), errors: new Map() }, true, path);
       }
     }

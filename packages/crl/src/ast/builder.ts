@@ -374,9 +374,8 @@ export class CRLAstBuilder
           ref: line.decisionReference() ? refFromRefContext(line.decisionReference()!) : refFromQualifiable(line.qualifiableReference()!),
           location: getLocation(line) });
       } else {
-        // REFACTOR:grounded (#328): retain a literal unit as form metadata, independently of wording.
-        const key = line.QUESTION_UNIT_IS() ? "questionUnit" : line.CHOICE_GROUP_IS() ? "choiceGroup" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
-        const value = (line.SINGLE_QUOTED_STRING()?.text ?? line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
+        const key = line.CHOICE_GROUP_IS() ? "choiceGroup" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
+        const value = (line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
         if (node[key] !== undefined || !value.trim()) this.reportError("AstError", line,
           { message: `Presentation ${key} must be nonempty and declared only once.` });
         else node[key] = value;
@@ -760,7 +759,7 @@ export class CRLAstBuilder
   private parseConceptTypes(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     _ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
-  ): { conceptType?: ConceptType; valueTypes: ConceptValueType[] } {
+  ): { conceptType?: ConceptType; valueTypes: ConceptValueType[]; quantityUnit?: string } {
     // disc 402: the concept body is order-independent, so every line accessor is now an ARRAY.
     // Take the FIRST occurrence as the effective value; a duplicate is rejected (fail-closed) by
     // checkConceptBodyCardinality. `[0]` (not just truthiness) matters: an empty array is TRUTHY.
@@ -788,7 +787,13 @@ export class CRLAstBuilder
       }
     }
 
-    return { conceptType, valueTypes };
+    // REFACTOR:grounded (#328): the unit belongs to one Quantity value type.
+    const declared = valueTypeLines.filter(line => line.SINGLE_QUOTED_STRING());
+    const quantityUnit = declared[0]?.SINGLE_QUOTED_STRING()?.text.slice(1, -1);
+    if (declared.length && (valueTypes.length !== 1 || valueTypes[0] !== "Quantity" || !/^[\x21-\x7e]+$/.test(quantityUnit ?? ""))) {
+      this.reportError("AstError", _ctx, { message: "A unit requires exactly one Quantity value type and a nonempty unit code without whitespace." });
+    }
+    return { conceptType, valueTypes, ...(quantityUnit === undefined ? {} : { quantityUnit }) };
   }
 
   /** The concept's declared `shape is <Scalar|Record|RecordSet>.` (#189).
@@ -1181,7 +1186,9 @@ export class CRLAstBuilder
         try {
           const tok = vtl.CONCEPT_VALUE_TYPE();
           // REFACTOR:grounded (#322): normalize the author alias once; emitted types remain FHIR types.
-        if (tok) valueTypes.push((tok.text === "text" ? "string" : tok.text) as ConceptValueType);
+          if (tok) valueTypes.push((tok.text === "text" ? "string" : tok.text) as ConceptValueType);
+          // REFACTOR:grounded (#328): do not discard a type facet on a representation line.
+          if (vtl.SINGLE_QUOTED_STRING()) this.reportError("AstError", vtl, { message: "Declare the Quantity unit on the concept value type, not on a source representation." });
         } catch {
           // skip malformed value-type line
         }
@@ -1271,7 +1278,7 @@ export class CRLAstBuilder
     }
 
     const types = this.parseConceptTypes(bodyCtx, ctx);
-    const { conceptType, valueTypes } = types;
+    const { conceptType, valueTypes, quantityUnit } = types;
     const meta = this.metaFrom(bodyCtx.metaLine());
     const evidence = this.parseEvidence(bodyCtx);
     const code = this.parseCode(bodyCtx);
@@ -1296,6 +1303,7 @@ export class CRLAstBuilder
       name,
       ...(conceptType ? { conceptType } : {}),
       valueTypes,
+      ...(quantityUnit === undefined ? {} : { quantityUnit }),
       shape,
       ...(shapeReduction ? { shapeReduction } : {}),
       ...(code !== undefined ? { code } : {}),

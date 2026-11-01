@@ -1,3 +1,4 @@
+import { quantityUnitExtension } from "../emit/questionUnit";
 /**
  * CRL decision case-feature concept → FHIR `StructureDefinition` (case-feature
  * profile) emit.
@@ -388,7 +389,7 @@ export function emitCaseFeatureStructureDefinition(
   localDomainId: string = metadata.name,
   // REFACTOR:grounded (#320): optional answer/time applies only to the admitted publication form.
   nullablePublication = false,
-  publicationIdentity?: { profileUrl: string; localCode: { system: string; code: string }; age?: boolean },
+  publicationIdentity?: { profileUrl: string; localCode: { system: string; code: string }; age?: boolean; quantityUnit?: string },
 ): { resource: EmittedResource | null; errors: CRLError[] } {
   if (target !== undefined && target.librarySuffix === "") {
     throw new Error(
@@ -482,6 +483,16 @@ export function emitCaseFeatureStructureDefinition(
     return { resource: null, errors };
   }
 
+  // REFACTOR:grounded (#328): standard unit facet lives on the concept profile answer element.
+  const differential = caseFeatureDifferential(caseFeatureProfile, { system, code, display: conceptName }, url, answerOptions, nullablePublication);
+  if (publicationIdentity?.quantityUnit !== undefined) {
+    const value = differential.find(e => e.path === "Observation.value[x]");
+    if (!value || caseFeatureProfile.value?.typeCode !== "Quantity") {
+      errors.push({ type: "Validation", kind: "emit-quantity-unit-no-answer-slot", message: `Declared Quantity unit for "${conceptName}" requires a Quantity answer element.` });
+      return { resource: null, errors };
+    }
+    value.extension = [...(value.extension as unknown[] ?? []), quantityUnitExtension(publicationIdentity.quantityUnit)];
+  }
   const resource: Record<string, unknown> = {
     resourceType: "StructureDefinition",
     id,
@@ -522,13 +533,7 @@ export function emitCaseFeatureStructureDefinition(
     baseDefinition: nullablePublication ? "http://hl7.org/fhir/StructureDefinition/Observation" : caseFeatureProfile.baseDefinition,
     derivation: "constraint",
     differential: {
-      element: [...caseFeatureDifferential(
-        caseFeatureProfile,
-        { system, code, display: conceptName },
-        url,
-        answerOptions,
-        nullablePublication,
-      ), ...(publicationIdentity?.age ? [{ id: "Observation.method", path: "Observation.method", min: 1, max: "1", type: [{ code: "CodeableConcept" }],
+      element: [...differential, ...(publicationIdentity?.age ? [{ id: "Observation.method", path: "Observation.method", min: 1, max: "1", type: [{ code: "CodeableConcept" }],
         defaultValueCodeableConcept: ageMethod("asserted") }] : [])],
     },
   };

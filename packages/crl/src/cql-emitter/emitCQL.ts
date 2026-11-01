@@ -1,3 +1,4 @@
+import { QUANTITY_TYPE_CQL, QUANTITY_TYPE_PREFIX, renderQuantityTypeHelpers } from "./renderQuantityType";
 import { GENDER_CQL_PREFIX, GENDER_CQL_PRODUCE, renderPublicationGenderHelpers } from "./renderPublicationGender";
 /**
  * CRL → CQL emitter (v0.2).
@@ -1246,7 +1247,7 @@ class Emitter {
     if (this.ast.statements.some((s) => s.type === "Concept" && s.__publication !== undefined && s.__publication.role !== "retrieve")) {
       for (const statement of this.ast.statements) {
         const name = (statement as { name?: string }).name;
-        if (name !== undefined && [PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, AGE_CQL_PREFIX, GENDER_CQL_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
+        if (name !== undefined && [QUANTITY_TYPE_PREFIX, PUBLICATION_SELECTION_CQL_PREFIX, PUBLICATION_ENVELOPE_PREFIX, PUBLICATION_PRODUCER_PREFIX, AGE_CQL_PREFIX, GENDER_CQL_PREFIX].some((prefix) => name.startsWith(prefix))) this.emitErrors.push({
           type: "Validation", kind: "publication-name-collision",
           line: statement.location?.start.line, column: statement.location?.start.column,
           message: `Declaration "${name}" uses the reserved publication helper namespace.`,
@@ -1255,6 +1256,7 @@ class Emitter {
       const quantities = this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "Quantity");
       sections.push(renderPublicationSelectionHelpers(), renderPublicationCandidateHelpers(quantities, this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "string"), this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.valueType === "dateTime")));
       if (quantities) sections.push(renderPublicationObservationHelpers("Quantity"));
+      if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.quantityUnit !== undefined)) sections.push(renderQuantityTypeHelpers());
       if (this.ast.statements.some(s => s.type === "Concept" && s.__publication?.descriptor.sources?.some(source => source.kind === "observationValue" && source.valueType === "CodeableConcept")))
         sections.push(renderPublicationObservationHelpers("CodeableConcept"));
       // REFACTOR:grounded (859): emit only the declared typed request projection helpers.
@@ -2523,6 +2525,8 @@ class Emitter {
       // Flatten preserves duplicate inputs for the selector's diagnostic; union could silently erase them.
       candidates = `Flatten({ ${candidates}, (({ ${produced} }) C where C is not null) })`;
     }
+    // REFACTOR:grounded (#328): every candidate is admitted in the declared Quantity type unit.
+    if (descriptor.quantityUnit !== undefined) candidates = `((${candidates}) C return all ${cqlIdent(QUANTITY_TYPE_CQL)}(C, ${cqlStringLiteral(descriptor.quantityUnit)}))`;
     if (hasAgeSource(descriptor)) candidates = `${cqlIdent(AGE_CQL.eligible)}(${candidates}, Today(), timezoneoffset from Now(), ${cqlStringLiteral(descriptor.conceptId)})`;
     const selected = `${cqlIdent(PUBLICATION_SELECTION_CQL_FUNCTIONS.select)}(${candidates}, ${cqlStringLiteral(descriptor.conceptId)}, ${cqlStringLiteral(descriptor.selector.equalTime)})`;
     return descriptor.valueDomain === undefined ? selected

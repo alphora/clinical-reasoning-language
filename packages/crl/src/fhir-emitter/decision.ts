@@ -1,5 +1,4 @@
 import type { PresentationCatalog } from "../emit/presentation";
-import { questionUnitExtension } from "../emit/questionUnit";
 import { choiceGroupExtension } from "./presentationGroups";
 /**
  * CRL Decision → cpg-strategydefinition / crmi-publishableplandefinition
@@ -799,7 +798,7 @@ function buildActionInputs(
       }));
       const wordings = resolutions.map((result) => result?.wording);
       const wording = wordings[0];
-      if (new Set(wordings.map((value) => JSON.stringify([value?.questionText ?? name, value?.questionDescription ?? "", value?.questionUnit ?? ""]))).size > 1) {
+      if (new Set(wordings.map((value) => JSON.stringify([value?.questionText ?? name, value?.questionDescription ?? ""]))).size > 1) {
         const message = `Question input "${name}" (${canonical}) has conflicting presentations in the same action of decision "${ctx.decisionName}".`;
         if (!ctx.errors.some((error) => error.kind === "presentation-overlap" && error.message === message)) {
           ctx.errors.push({ type: "Validation", kind: "presentation-overlap", message });
@@ -825,8 +824,6 @@ function buildActionInputs(
       const extensions = [
           ...(inputText ? [{ url: CPG_INPUT_TEXT_EXT, valueString: inputText }] : []),
           ...(wording?.questionDescription ? [{ url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: wording.questionDescription }] : []),
-          // REFACTOR:grounded (#328): the capture default belongs to the input presentation, not the clinical profile.
-          ...(wording?.questionUnit ? [questionUnitExtension(wording.questionUnit)] : []),
           ...(presentationGroup && catalog ? [choiceGroupExtension(presentationGroup, catalog, occurrenceContexts[0] === undefined ? undefined : { decision: ctx.decisionName, criteria: occurrenceContexts[0] })] : []),
         ];
       if (presentationGroup && catalog) for (const member of presentationGroup.members) {

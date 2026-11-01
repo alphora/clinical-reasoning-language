@@ -37,8 +37,6 @@ export interface Presentation extends ASTNode {
   contexts: { kind: "decision" | "criterion"; ref: ReferenceName; location: Location }[];
   questionText?: string;
   questionDescription?: string;
-  /** REFACTOR:grounded (#328): fresh form input's UCUM default, not a data constraint. */
-  questionUnit?: string;
   choiceGroup?: string;
 }
 
@@ -556,6 +554,8 @@ export interface ShapeReduction extends ASTNode {
 }
 
 export interface Concept extends ASTNode {
+  /** REFACTOR:grounded (#328): canonical unit of the declared Quantity value type. */
+  quantityUnit?: string;
   type: "Concept";
   name: string;
   conceptType?: ConceptType;

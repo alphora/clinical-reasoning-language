@@ -4,12 +4,12 @@ export function questionUnitSource(unit: string | null = "kg/m2"): string {
 concept "BMI":
 - shape is Record.
 - type is Observation.
-- value type is Quantity.
+- value type is Quantity${unit === null ? '' : ` '${unit}'`}.
 - code is \`bmi\`.
 - shape reduction is most recent.
 presentation for "BMI":
 - question text is "Enter BMI".
-${unit === null ? "" : `- question unit is '${unit}'.\n`}
+
 concept "Above Threshold":
 - shape is Record.
 - type is Observation.

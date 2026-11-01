@@ -76,7 +76,6 @@ presentationLine
            | PRESENTATION_CRITERION qualifiableReference
            | QUESTION_TEXT_IS (QUOTED_STRING | backtickString)
            | QUESTION_DESCRIPTION_IS (QUOTED_STRING | backtickString)
-           | QUESTION_UNIT_IS SINGLE_QUOTED_STRING
            | CHOICE_GROUP_IS QUOTED_STRING) DOT
     ;
 
@@ -470,8 +469,9 @@ valueElementLine
     : DASH VALUE_ELEMENT_IS VALUE_ELEMENT_PATH DOT
     ;
 
+// REFACTOR:grounded (#328): the optional unit is a Quantity type facet, validated by the builder.
 valueTypeLine
-    : DASH VALUE_TYPE_IS CONCEPT_VALUE_TYPE DOT
+    : DASH VALUE_TYPE_IS CONCEPT_VALUE_TYPE SINGLE_QUOTED_STRING? DOT
     ;
 
 // REFACTOR:grounded (#320, review 562): each union term retains its own qualified reference.
@@ -716,7 +716,7 @@ narrativeElement
     // ⚠ QUALIFYING and DISPLAY_IS are admitted here because the membership predicate is NARRATIVE:
     //   `- definition is "Patient Complaint" in qualifying.`
     // Without this the keyword would eat its own use site and the predicate could not parse.
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_GROUP | CHOICE_GROUP_IS | COLUMNS_IS | CONTROL_IS | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | QUESTION_UNIT_IS | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_GROUP | CHOICE_GROUP_IS | COLUMNS_IS | CONTROL_IS | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

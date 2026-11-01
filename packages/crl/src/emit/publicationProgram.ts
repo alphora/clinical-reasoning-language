@@ -14,7 +14,7 @@ import { readAgeProjection } from "./publicationAge";
 import { readPublicationBMI } from "./publicationBMI";
 import { readPublicationAnyMembership } from "../template-match/anyMembership";
 import { readPublicationQuantity, publicationQuantityThresholdError, publicationQuantityUnitsCompatible } from "./publicationQuantity";
-import { defaultQuestionUnit } from "./questionUnit";
+
 import {
   createPublicationContext,
   type PublicationContext,
@@ -35,6 +35,7 @@ export interface PublicationDescriptor {
   readonly profileUrl?: string;
   readonly resourceType: "Observation";
   readonly valueType: PublicationValueType;
+  readonly quantityUnit?: string;
   readonly valueElement: "value";
   readonly selector: { readonly kind: "mostRecent"; readonly equalTime: "error" | "preferLocal" };
   readonly valueDomain?: readonly PublicationCode[];
@@ -257,9 +258,9 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
   };
   // REFACTOR:grounded (#328): resolve the producer's actual operand owner, never a global same-name concept.
   const checkQuestionUnit = (owner: PublicationLibrary, operand: Readonly<Concept>, expected: string, consumer: string, location: Location): void => {
-    const declared = defaultQuestionUnit(owner.ast, operand.name);
+    const declared = operand.quantityUnit;
     if (declared !== undefined && !publicationQuantityUnitsCompatible(declared, expected))
-      fail(`Question unit '${declared}' for "${owner.libraryName}"."${operand.name}" is not supported for ${consumer}; requires units compatible with '${expected}'.`, location, "publication-question-unit-incompatible");
+      fail(`Quantity type unit '${declared}' for "${owner.libraryName}"."${operand.name}" is not supported for ${consumer}; requires units compatible with '${expected}'.`, location, "publication-quantity-unit-incompatible");
   };
   const finiteTerminology = (owner: string, ref: ReferenceName, location: Location): { key: string; codes: readonly PublicationCode[] } => {
     const hit = declarations.lookupTerminology(owner, ref, location);
@@ -495,6 +496,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         ...(localCode === undefined ? {} : { localCode, localContributorId: `${conceptId}/local`,
           ...(library.artifact.policyId === undefined ? {} : { profileUrl: caseFeatureUrlFromPolicyId(base!, library.artifact.localDomainId ?? library.artifact.policyId, concept.name) }) }),
         resourceType: "Observation", valueType: concept.valueTypes[0] as PublicationValueType, valueElement: "value",
+        ...(concept.quantityUnit === undefined ? {} : { quantityUnit: concept.quantityUnit }),
         selector: Object.freeze({ kind: "mostRecent", equalTime: concept.shapeReduction!.equalTime }),
         ...(valueDomain === undefined ? {} : { valueDomain }), ...(producer === undefined ? {} : { producer }),
         ...(answerOptions === undefined ? {} : { answerOptions }),
@@ -514,6 +516,11 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
   // REFACTOR:grounded (#320, plan595): prepared closures reject old BMI even when no publication was declared.
   for (const library of declarations.getLibraries()) for (const concept of library.ast.statements) {
     if (concept.type !== "Concept") continue;
+    // REFACTOR:grounded (#328): do not accept a unit facet on an unimplemented publication path.
+    if (concept.quantityUnit !== undefined && !/^[\x21-\x7e]+$/.test(concept.quantityUnit))
+      diagnostics.push(diagnostic("The Quantity type unit must be a nonempty code without whitespace.", concept.location, "publication-quantity-unit-type"));
+    if (concept.quantityUnit !== undefined && (concept.shape !== "Record" || concept.conceptType !== "Observation" || concept.valueTypes.length !== 1 || concept.valueTypes[0] !== "Quantity" || concept.shapeReduction === undefined))
+      diagnostics.push(diagnostic("A Quantity unit currently requires a selected Record/Observation/Quantity publication.", concept.location, "publication-quantity-unit-type"));
     const presenceError = publicationHasValueFormError(concept);
     if (presenceError !== undefined) { diagnostics.push(diagnostic(presenceError, concept.location, "publication-unsupported-form")); continue; }
     const retirement = bmiRetirementReason(concept);

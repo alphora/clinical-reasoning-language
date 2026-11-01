@@ -1,3 +1,4 @@
+import { normalizePublicationQuantity } from "../emit/publicationQuantity";
 import { produceGenderCandidate } from "../emit/publicationGender";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { produceBMICandidate } from "../emit/publicationBMI";
@@ -1007,6 +1008,14 @@ function evaluatePublication(entry: ConceptEntry, ctx: Ctx): ConceptEval {
       candidates.push(produced.candidate);
       factsByCandidate.set(produced.candidate.key, [...new Set(operandIds.flatMap(id => ctx.factsByConcept.get(id) ?? []))]);
     }
+  }
+  // REFACTOR:grounded (#328): normalize copies from every contribution arm before selection.
+  if (descriptor.quantityUnit !== undefined) for (let index = 0; index < candidates.length; index++) {
+    const candidate = candidates[index];
+    const normalized = normalizePublicationQuantity(candidate.resource.valueQuantity, descriptor.quantityUnit);
+    if (normalized.kind === "error") return fail(normalized.code, normalized.message);
+    candidates[index] = { ...candidate, resource: { ...candidate.resource,
+      ...(normalized.quantity === undefined ? {} : { valueQuantity: normalized.quantity }) } };
   }
   const eligible = hasAgeSource(descriptor) ? eligibleAgeCandidates(descriptor, candidates, ageClock(ctx.publicationNow)) : { kind: "eligible" as const, candidates };
   if (eligible.kind === "error") return fail(eligible.code, eligible.message);

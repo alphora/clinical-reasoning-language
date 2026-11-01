@@ -109,7 +109,7 @@ An authored presentation choice group collects independent selected Boolean ques
 
 <!-- REFACTOR:grounded (#328): explicit form unit, native/browser proof and source-only availability. -->
 
-A Quantity's owning default presentation may explicitly declare `question unit is 'kg/m2'.` for fresh numeric form entry. This presentation unit does not constrain or relabel source resources or change arithmetic. Existing answers retain their visible units; raw unitless numeric Quantities remain errors. Scoped wording inherits the unit. This source capability requires a supporting question-unit processor and matching driver; the released6.4.45 engine does not implement it. Standard unitOption describes the returned choices; first-option default selection is measured client behavior, not a universal SDC guarantee. See [typed intake answers](typed-intake-answers.md) for the bounded authoring, native and client contract.
+A Quantity may declare its canonical unit on its value type, for example `value type is Quantity 'kg/m2'.` The typed publication normalizes compatible values in CQL/CRE and CEL while preserving raw source evidence and actual validity; missing values remain unknown and raw unitless measurements are errors. The concept profile carries standard allowedUnits metadata and the qualified generator maps it to Quantity unitOption. See [typed intake answers](typed-intake-answers.md) for conversion bounds, supported shapes and runtime qualification.
 
 ### Case Features and the iterative SDC session
 

@@ -1,4 +1,4 @@
-"""Rebuild only three protocol-1 native classes against the exact released engine.
+"""Rebuild only standard Quantity profile unit mapping against the exact released engine.
 
 Usage: python rebuild.py <baseline-engine.jar> <patched-engine-source> <new-output-dir>
 All existing dependencies and unrelated entries are retained byte-for-byte.
@@ -14,8 +14,8 @@ import sys
 import zipfile
 
 BASE = '99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2'
-NAMES = ['PresentationQuestionUnitProcessor', 'ProcessAction', 'ApplyProcessor']
-PACKAGE = 'org/opencds/cqf/fhir/cr/plandefinition/apply/'
+NAMES = ['ItemGenerator']
+PACKAGE = 'org/opencds/cqf/fhir/cr/questionnaire/generate/'
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -37,7 +37,7 @@ def main():
         javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac.exe') if os.name == 'nt' else 'javac'
         subprocess.run([javac, '--release', '17', '-cp', str(libs / '*'), '-d', str(classes), *map(str, sources)], check=True)
         replacements = {p.relative_to(classes).as_posix(): p.read_bytes() for p in classes.rglob('*.class')}
-        assert set(replacements) == {PACKAGE + name + '.class' for name in [*NAMES, 'ApplyProcessor$1']}
+        assert set(replacements) == {PACKAGE + name + '.class' for name in [*NAMES, 'ItemGenerator$QuantityUnitException']}
         assert all(int.from_bytes(b[6:8], 'big') == 61 for b in replacements.values())
         nested = io.BytesIO()
         changed_classes = []

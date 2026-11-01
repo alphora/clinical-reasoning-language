@@ -28,7 +28,7 @@ const units: Record<string, { group: string; factor: bigint }> = {
 };
 /** REFACTOR:grounded (#328): reuse the actual comparison domain; metadata adds no conversions. */
 export function publicationQuantityUnitsCompatible(a: string, b: string): boolean {
-  return Object.prototype.hasOwnProperty.call(units, a) && Object.prototype.hasOwnProperty.call(units, b) && units[a].group === units[b].group;
+  return a === b || Object.prototype.hasOwnProperty.call(units, a) && Object.prototype.hasOwnProperty.call(units, b) && units[a].group === units[b].group;
 }
 /** Exact coefficient/rational comparison; no binary floating-point multiplication at thresholds. */
 export function publicationDecimal(value: number): { coefficient: bigint; scale: bigint } {
@@ -58,4 +58,26 @@ export function publicationQuantityAtLeast(value: unknown, threshold: { value: n
     return { kind: "error", code: "publication-quantity-unit-unsupported", message: "Quantity comparison requires compatible supported units." };
   const left = publicationDecimal(q.value), right = publicationDecimal(threshold.value);
   return { kind: "known", value: left.coefficient * a.factor * right.scale >= right.coefficient * b.factor * left.scale };
+}
+
+/** REFACTOR:grounded (#328): explicit type normalization never changes caller-owned raw data.
+ * Conversion requires both input and output in the exact supported decimal domain. Same-unit
+ * noncomparative values keep existing bounds; no unit is inferred for a bare FHIR number.
+ */
+export function normalizePublicationQuantity(value: unknown, unit: string):
+  { kind: "normalized"; quantity: unknown } | PublicationValueError {
+  const parsed = readPublicationQuantity(value);
+  if (parsed.kind === "error") return parsed;
+  if (parsed.kind === "unknown") return { kind: "normalized", quantity: value };
+  let number = parsed.value;
+  if (parsed.unit !== unit) {
+    if (!publicationQuantityUnitsCompatible(parsed.unit, unit)) return { kind: "error", code: "publication-quantity-unit-unsupported", message: "Quantity is incompatible with its declared type unit." };
+    if (!isPublicationComparisonDecimal(number)) return { kind: "error", code: "publication-quantity-precision-unsupported", message: "Quantity conversion input exceeds the exact decimal domain." };
+    const input = publicationDecimal(number), numerator = input.coefficient * units[parsed.unit].factor, denominator = input.scale * units[unit].factor;
+    const scaled = numerator * 100000000n;
+    if (scaled % denominator !== 0n || numerator > 1000000n * denominator || numerator < -1000000n * denominator)
+      return { kind: "error", code: "publication-quantity-precision-unsupported", message: "Quantity conversion result exceeds magnitude 10^6 or eight decimal places; rounding is forbidden." };
+    number = Number(scaled / denominator) / 100000000;
+  }
+  return { kind: "normalized", quantity: { ...(value as Record<string, unknown>), value: number, unit, code: unit, system: PUBLICATION_UCUM } };
 }

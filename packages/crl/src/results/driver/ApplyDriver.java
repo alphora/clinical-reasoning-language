@@ -142,20 +142,25 @@ public class ApplyDriver {
                 new String(Files.readAllBytes(Paths.get(repoFile)), StandardCharsets.UTF_8));
         boolean choiceGroups = false;
         boolean questionUnits = false;
-        for (var entry : bundle.getEntry()) {
-            if (entry.getResource() instanceof org.hl7.fhir.r4.model.PlanDefinition plan
-                    && hasChoiceGroups(plan.getAction())) choiceGroups = true;
-            if (entry.getResource() instanceof org.hl7.fhir.r4.model.PlanDefinition plan
-                    && hasQuestionUnits(plan.getAction())) questionUnits = true;
+        // REFACTOR:grounded (#328): check only profiles referenced by question inputs,
+        // including snapshot-only profiles. Unrelated standard profiles need no new capability.
+        var questionProfiles = new java.util.HashSet<String>();
+        for (var entry : bundle.getEntry()) if (entry.getResource() instanceof org.hl7.fhir.r4.model.PlanDefinition plan) {
+            if (hasChoiceGroups(plan.getAction())) choiceGroups = true;
+            collectQuestionProfiles(plan.getAction(), questionProfiles);
         }
+        for (var entry : bundle.getEntry()) if (entry.getResource() instanceof org.hl7.fhir.r4.model.StructureDefinition profile
+                && profile.hasUrl() && questionProfiles.contains(profile.getUrl().split("\\|", 2)[0])
+                && java.util.stream.Stream.concat(profile.getDifferential().getElement().stream(), profile.getSnapshot().getElement().stream())
+                    .anyMatch(element -> element.hasExtension("http://hl7.org/fhir/StructureDefinition/elementdefinition-allowedUnits"))) questionUnits = true;
 
         // REFACTOR:grounded (#328): refuse engines that would silently omit an authored form unit.
         if (questionUnits) {
             try {
-                Class<?> capability = Class.forName("org.opencds.cqf.fhir.cr.plandefinition.apply.PresentationQuestionUnitProcessor");
-                if (capability.getField("PROTOCOL").getInt(null) != 1) throw new ReflectiveOperationException("Unsupported protocol");
+                Class<?> capability = Class.forName("org.opencds.cqf.fhir.cr.questionnaire.generate.ItemGenerator");
+                if (capability.getField("QUANTITY_UNIT_PROTOCOL").getInt(null) != 1) throw new ReflectiveOperationException("Unsupported protocol");
             } catch (ReflectiveOperationException e) {
-                throw new IllegalArgumentException("CRL question units require the protocol 1 question-unit native runtime; this engine does not support them.", e);
+                throw new IllegalArgumentException("Declared Quantity units require a runtime with standard profile allowedUnits mapping; this engine does not support them.", e);
             }
         }
         if (choiceGroups) {
@@ -239,12 +244,13 @@ public class ApplyDriver {
         return false;
     }
 
-    private static boolean hasQuestionUnits(List<org.hl7.fhir.r4.model.PlanDefinition.PlanDefinitionActionComponent> actions) {
+    private static void collectQuestionProfiles(List<org.hl7.fhir.r4.model.PlanDefinition.PlanDefinitionActionComponent> actions,
+            java.util.Set<String> profiles) {
         for (var action : actions) {
-            for (var input : action.getInput()) if (input.hasExtension("http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-question-unit")) return true;
-            if (hasQuestionUnits(action.getAction())) return true;
+            for (var input : action.getInput()) for (var profile : input.getProfile())
+                if (profile.hasValue()) profiles.add(profile.getValueAsString().split("\\|", 2)[0]);
+            collectQuestionProfiles(action.getAction(), profiles);
         }
-        return false;
     }
 
     private static long writeSessionArtifact(FhirContext ctx, IBaseResource resource, String file,

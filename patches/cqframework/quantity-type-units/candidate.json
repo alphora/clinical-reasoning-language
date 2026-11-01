@@ -1,0 +1,26 @@
+{
+  "baselineSha256": "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
+  "engineSha256": "2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa",
+  "changedEntries": [
+    "BOOT-INF/lib/cqf-fhir-cr-4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT.jar"
+  ],
+  "changedClasses": [
+    {
+      "entry": "org/opencds/cqf/fhir/cr/questionnaire/generate/ItemGenerator.class",
+      "before": "deeabfbfab63e5b3322cdc350c83eda045b42b95b3a369a8c7a4d6c4bfae2d75",
+      "after": "bdb0b22cdd2ac13ed9c245a48973fb46c975119e65a41f8cbfbb4203208986d3"
+    },
+    {
+      "entry": "org/opencds/cqf/fhir/cr/questionnaire/generate/ItemGenerator$QuantityUnitException.class",
+      "before": null,
+      "after": "ab8302a13eeb23cf3c997a67056cba3a92aeb55b507cc940059b1fb1b6fb7031"
+    }
+  ],
+  "sources": [
+    {
+      "name": "ItemGenerator.java",
+      "sha256": "47a044be1c5ef867a96e685a3b57fadfabe8f5c402e487704cb2af98f0434833"
+    }
+  ],
+  "javaRelease": 17
+}

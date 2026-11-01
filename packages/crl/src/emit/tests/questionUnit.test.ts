@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildCRL } from "../../index";
 import { questionUnitSource } from "../../authoring-kit/questionUnitExample";
-import { createPresentationCatalog } from "../presentation";
 import { prepareSingleLibraryPublication } from "../publicationProgram";
 import { emitFhirDefFromPath } from "../../fhir-emitter/closureOrchestrator";
 import { emitCQLImports } from "../../imports/emit";
 import { QUESTION_UNIT_URL, QUESTION_UNIT_SYSTEM } from "../questionUnit";
+import { normalizePublicationQuantity } from "../publicationQuantity";
+import { emitCaseFeatureStructureDefinition } from "../../fhir-emitter/structureDefinition";
 import { planPresentationEdit } from "../../editing/presentationEdit";
 import { resolveCelImports } from "../../cel/imports";
 import { runCel } from "../../cre/run";
@@ -39,115 +40,95 @@ function objects(value: unknown): Record<string, any>[] {
 }
 
 // @kit text-answers:question-unit
-test("parses one default unit, preserves it in wording edits and inherits it into scoped wording", () => {
-  const source = questionUnitSource(), parsed = ast(source);
-  expect(parsed.presentations![0].questionUnit).toBe("kg/m2");
-  const edited = planPresentationEdit(source, { library: "Quantity Unit Intake", concept: "BMI", questionText: "Updated BMI question" });
-  expect(ast(edited.candidateSource).presentations![0].questionUnit).toBe("kg/m2");
-  const scoped = ast(source + '\npresentation for "BMI":\n- in decision "Assessment".\n- question text is "Scoped BMI".\n');
-  expect(createPresentationCatalog(scoped).resolve("BMI", { decision: "Assessment", criteria: new Set() })).toMatchObject({ questionText: "Scoped BMI", questionUnit: "kg/m2" });
+// REFACTOR:grounded (#328): typed units survive wording edits, not presentation inheritance.
+test("parses a Quantity unit and retains it through a presentation edit", () => {
+ const source=questionUnitSource();expect(ast(source).statements.find(s=>s.type==="Concept"&&s.name==="BMI")).toMatchObject({quantityUnit:"kg/m2",valueTypes:["Quantity"]});
+ const edited=planPresentationEdit(source,{library:"Quantity Unit Intake",concept:"BMI",questionText:"Updated BMI"});
+ expect(ast(edited.candidateSource).statements.find(s=>s.type==="Concept"&&s.name==="BMI")).toMatchObject({quantityUnit:"kg/m2"});
+ expect(ast(source).presentations![0]).not.toHaveProperty("questionUnit");
+});
+// @kit text-answers:question-unit
+test.each(["", " ", "kg m2"])("rejects invalid type unit %j", unit=>expect(buildCRL(questionUnitSource(unit)).success).toBe(false));
+// @kit text-answers:question-unit
+test("rejects a unit on a non-Quantity type and the retired presentation spelling",()=>{
+ expect(buildCRL(questionUnitSource().replace("Quantity 'kg/m2'","boolean 'kg/m2'")).success).toBe(false);
+ expect(buildCRL(questionUnitSource(null)+"\npresentation for \"BMI\": - question text is \"BMI\". - question unit is 'kg/m2'.").success).toBe(false);
+});
+// @kit text-answers:question-unit
+test("emits the standard profile facet and executable CQL type normalization",()=>{
+ const withUnit=fixture(),withoutUnit=fixture(questionUnitSource(null));const emitted=emitFhirDefFromPath(withUnit);
+ expect(emitted.success,JSON.stringify(emitted.errors)).toBe(true);
+ const metadata=objects(emitted.resources).filter(o=>o.url===QUESTION_UNIT_URL);expect(metadata).toEqual([{url:QUESTION_UNIT_URL,valueCodeableConcept:{coding:[{system:QUESTION_UNIT_SYSTEM,code:"kg/m2",display:"kg/m2"}]}}]);
+ expect(emitted.resources.some(r=>r.resource.type==="Extension")).toBe(false);
+ const cql=emitCQLImports(withUnit),old=emitCQLImports(withoutUnit);expect(cql.success,JSON.stringify(cql.errors)).toBe(true);
+ expect(cql.cqlByLibrary.map(l=>l.cql).join("\n")).toContain('__CRL_PublicationQuantityType_v1_Normalize');
+ expect(old.cqlByLibrary.map(l=>l.cql).join("\n")).not.toContain('__CRL_PublicationQuantityType_v1_Normalize');
+});
+// @kit text-answers:question-unit
+test.each(["kg","[lb_av]"])("refuses incompatible type %s for a BMI threshold",unit=>{
+ const prepared=prepareSingleLibraryPublication(ast(questionUnitSource(unit)),{canonicalBase:"https://example.org/quantity",policyId:"quantity"});
+ expect(prepared.diagnostics.some(d=>d.kind==="publication-quantity-unit-incompatible")).toBe(true);
+});
+// @kit text-answers:question-unit
+test.each([
+ [{value:1.8,unit:"m"},"cm",{value:180,unit:"cm",code:"cm",system:QUESTION_UNIT_SYSTEM}],
+ [{value:0,unit:"g"},"kg",{value:0,unit:"kg",code:"kg",system:QUESTION_UNIT_SYSTEM}],
+ [{value:1234567,unit:"1"},"1",{value:1234567,unit:"1",code:"1",system:QUESTION_UNIT_SYSTEM}],
+])("normalizes %j to %s without mutating raw input",(input,unit,expected)=>{
+ const before=structuredClone(input);expect(normalizePublicationQuantity(input,unit)).toEqual({kind:"normalized",quantity:expected});expect(input).toEqual(before);
+});
+// @kit text-answers:question-unit
+test.each([[{value:0.00000001,unit:"cm"},"m","publication-quantity-precision-unsupported"],[{value:1000000,unit:"m"},"cm","publication-quantity-precision-unsupported"],[{value:40},"kg/m2","publication-invalid-quantity"],[{value:1,unit:"kg"},"cm","publication-quantity-unit-unsupported"]])("rejects %j -> %s (%s)",(input,unit,code)=>expect(normalizePublicationQuantity(input,unit)).toMatchObject({kind:"error",code}));
+// @kit text-answers:question-unit
+test("unknown Quantity remains unknown and acquires no measurement",()=>{
+ expect(normalizePublicationQuantity(undefined,"cm")).toEqual({kind:"normalized",quantity:undefined});expect(normalizePublicationQuantity({unit:"m"},"cm")).toEqual({kind:"normalized",quantity:{unit:"m"}});
 });
 
 // @kit text-answers:question-unit
-test.each(["", " ", "kg/m2'.\n- question unit is 'kg/m2"])("refuses empty, whitespace-only or duplicate unit declarations: %j", unit => {
-  expect(buildCRL(questionUnitSource(unit)).success).toBe(false);
+// REFACTOR:grounded (#328): existing imported BMI fixture exercises typed operands and output.
+test.each([false,true])("CEL/CRE normalize imported typed BMI operands (explicit include=%s)",include=>{
+ const root=mkdtempSync(join(tmpdir(),"crl-quantity-owner-"));roots.push(root);cpSync(join(__dirname,"fixtures/publication-imports"),root,{recursive:true});
+ for(const [file,unit]of [["weight.crl","g"],["height.crl","m"],["bmi.crl","kg/m2"]]){
+  const p=join(root,file);writeFileSync(p,readFileSync(p,"utf8").replace('value type is Quantity.',`value type is Quantity '${unit}'.`));
+ }
+ if(include){const p=join(root,"policy.crl");writeFileSync(p,readFileSync(p,"utf8").replace('library "Policy".','library "Policy".\ninclude "BMI Library".'));}
+ const context=resolveCelImports(join(root,"cases.cel")),data=emitCelToFhir(context),run=runCel(context);
+ expect(data.diagnostics.filter(d=>d.severity==="error")).toEqual([]);expect(run.errors).toEqual([]);expect(run.runs.every(r=>r.status==="pass"),JSON.stringify(run)).toBe(true);
+ const height=join(root,"height.crl");writeFileSync(height,readFileSync(height,"utf8").replace("Quantity 'm'","Quantity 'kg'"));
+ expect(JSON.stringify(runCel(resolveCelImports(join(root,"cases.cel"))))).toContain("publication-quantity-unit-incompatible");
 });
 // @kit text-answers:question-unit
-test("diagnoses lexical, scoped and non-Quantity unit declarations", () => {
-  expect(createPresentationCatalog(ast()).diagnostics.some(d => d.kind === "presentation-question-unit-runtime-required" && d.severity === "warning")).toBe(true);
-  expect(createPresentationCatalog(ast(questionUnitSource("kg m2"))).diagnostics.some(d => d.kind === "presentation-question-unit-invalid")).toBe(true);
-  const scoped = questionUnitSource().replace('- question unit is', '- in decision "Assessment".\n- question unit is');
-  expect(createPresentationCatalog(ast(scoped)).diagnostics.some(d => d.kind === "presentation-question-unit-invalid")).toBe(true);
-  const boolean = questionUnitSource().replace('- value type is Quantity.', '- value type is boolean.');
-  expect(createPresentationCatalog(ast(boolean)).diagnostics.some(d => d.kind === "presentation-question-unit-target")).toBe(true);
+test("CEL emitted typed Quantity is canonical before claiming the profile",()=>{
+ const policy=fixture(questionUnitSource('cm').replaceAll('BMI','Height').replace("35.00000001 'kg/m2'","1 'm'"));const cel=join(policy,"..","case.cel");
+ writeFileSync(cel,`library "Cases". covers "Quantity Unit Intake".
+ fact "P": - defined by "Patient".
+ fact "H": - defined by "Quantity Unit Intake"."Height". - value is 1.8 'm'.
+ case "Tall": - subject is "P". - fact is "H". - result is "Assessment" is "Above".`);
+ const context=resolveCelImports(cel),data=emitCelToFhir(context);expect(data.diagnostics.filter(d=>d.severity==="error")).toEqual([]);
+ expect(JSON.stringify(data)).toContain('"value":180');expect(JSON.stringify(data)).toContain('"unit":"cm"');
+ expect(runCel(context).runs.every(r=>r.status==="pass")).toBe(true);
+ writeFileSync(cel,readFileSync(cel,"utf8").replace("1.8 'm'","1.8 'kg'"));expect(JSON.stringify(emitCelToFhir(resolveCelImports(cel)))).toContain('publication-quantity-unit-unsupported');
 });
-
-// @kit text-answers:question-unit
-test("does not package an unused unit definition when no emitted action input uses it", () => {
-  const unused = questionUnitSource(null) + '\nconcept "Unused":\n- shape is Record.\n- type is Observation.\n- value type is Quantity.\n- code is `unused`.\n- shape reduction is most recent.\npresentation for "Unused":\n- question text is "Unused number".\n- question unit is \'1\'.\n';
-  const emitted = emitFhirDefFromPath(fixture(unused));
-  expect(emitted.success, JSON.stringify(emitted.errors)).toBe(true);
-  expect(objects(emitted.resources).some(x => x.url === QUESTION_UNIT_URL)).toBe(false);
-});
-
-// @kit text-answers:question-unit
-test("emits declared non-constraining input metadata and its real extension definition, without changing clinical profiles or CQL", () => {
-  // Preserve line positions so source-location-derived branch identifiers are byte-comparable too.
-  const withUnit = fixture(), withoutUnit = fixture(questionUnitSource().replace("- question unit is 'kg/m2'.", ""));
-  const a = emitFhirDefFromPath(withUnit), b = emitFhirDefFromPath(withoutUnit);
-  expect(a.success, JSON.stringify(a.errors)).toBe(true); expect(b.success, JSON.stringify(b.errors)).toBe(true);
-  const descriptors = objects(a.resources).filter(x => x.url === QUESTION_UNIT_URL && x.valueCoding);
-  expect(descriptors.length).toBeGreaterThan(0);
-  expect(descriptors.every(x => x.valueCoding.system === QUESTION_UNIT_SYSTEM && x.valueCoding.code === "kg/m2")).toBe(true);
-  expect(a.resources.filter(r => r.resourceType === "StructureDefinition" && r.resource.url === QUESTION_UNIT_URL)).toHaveLength(1);
-  const clinical = (r: typeof a) => r.resources.filter(x => x.resourceType === "StructureDefinition" && x.resource.type !== "Extension").map(x => x.resource);
-  expect(clinical(a)).toEqual(clinical(b));
-  const cqlA = emitCQLImports(withUnit), cqlB = emitCQLImports(withoutUnit);
-  expect(cqlA.success, JSON.stringify(cqlA.errors)).toBe(true); expect(cqlB.success).toBe(true);
-  expect(cqlA.cqlByLibrary.map(l => l.cql)).toEqual(cqlB.cqlByLibrary.map(l => l.cql));
-  expect(objects(b.resources).some(x => x.url === QUESTION_UNIT_URL)).toBe(false);
-});
-
-// @kit text-answers:question-unit-package
-test("actual package includes the extension once with fixed canonical/version and matching IG inventory", async () => {
-  const policy = fixture(), root = join(policy, "..");
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "question-unit", packageId: "org.example.question-unit", version: "2.3.4", author: "Synthetic", description: "Quantity presentation test", crl: { canonicalBase: "https://example.org/question-unit", date: "2026-11-01", fhirDependencies: { "hl7.fhir.uv.cpg": "2.0.0", "hl7.fhir.uv.crmi": "2.0.0", "hl7.fhir.uv.sdc": "3.0.0", "hl7.fhir.uv.cql": "1.0.0", "hl7.terminology.r4": "6.0.2" } } }));
-  const emitted = emitCrlTwoLane(policy, { capability: "publishable" });
-  expect(emitted.success, JSON.stringify(emitted)).toBe(true); writeTwoLane(emitted, join(root, "src"));
-  const packed = await packageFhir({ projectRoot: root }); expect(packed.success, JSON.stringify(packed)).toBe(true);
-  mkdirSync(join(root, "unpacked")); await extract({ file: join(root, "output/package.tgz"), cwd: join(root, "unpacked") });
-  const index = JSON.parse(readFileSync(join(root, "unpacked/package/.index.json"), "utf8"));
-  expect(index.files.filter((f: any) => f.url === QUESTION_UNIT_URL)).toHaveLength(1);
-  expect(index.files.find((f: any) => f.url === QUESTION_UNIT_URL).version).toBe("1.0.0");
-  const ig = JSON.parse(readFileSync(join(root, "unpacked/package/ImplementationGuide-question-unit.json"), "utf8"));
-  expect(ig.definition.resource.filter((r: any) => r.reference?.reference === "StructureDefinition/presentation-question-unit")).toHaveLength(1);
-});
-
-// @kit text-answers:question-unit
-test.each([false, true])("checks BMI roles and output through actual imported CEL/CRE preparation (include=%s)", include => {
-  const root = mkdtempSync(join(tmpdir(), "crl-bmi-unit-")); roots.push(root);
-  cpSync(join(__dirname, "fixtures/publication-imports"), root, { recursive: true });
-  const declarations = [
-    ["weight.crl", "Weight Library", "Measurement", "kg"],
-    ["height.crl", "Height Library", "Measurement", "cm"],
-    ["bmi.crl", "BMI Library", "BMI", "kg/m2"],
-  ];
-  for (const [file,, name, unit] of declarations) {
-    const path = join(root, file);
-    writeFileSync(path, readFileSync(path, "utf8") + `\npresentation for "${name}":\n- question text is "${name}".\n- question unit is '${unit}'.\n`);
-  }
-  if (include) {
-    const path = join(root, "policy.crl");
-    writeFileSync(path, readFileSync(path, "utf8").replace('library "Policy".', 'library "Policy".\ninclude "BMI Library".'));
-  }
-  const execute = () => runCel(resolveCelImports(join(root, "cases.cel")));
-  const good = execute(); expect(good.errors).toEqual([]); expect(good.runs.every(r => r.status === "pass")).toBe(true);
-  expect(emitCelToFhir(resolveCelImports(join(root, "cases.cel"))).diagnostics.filter(d => d.severity === "error")).toEqual([]);
-  for (const [file, library,, unit] of declarations) {
-    const path = join(root, file), original = readFileSync(path, "utf8");
-    writeFileSync(path, original.replace(`question unit is '${unit}'`, `question unit is '${file === "weight.crl" ? "cm" : "kg"}'`));
-    const bad = execute();
-    expect(JSON.stringify(bad)).toContain("publication-question-unit-incompatible");
-    expect(JSON.stringify(bad)).toContain(library);
-    expect(bad.runs.some(r => r.status === "pass")).toBe(false);
-    writeFileSync(path, original);
-  }
-});
-
-// @kit text-answers:question-unit
-test.each(["kg", "[lb_av]"])("refuses incompatible/unsupported default unit %s before executing a BMI-unit threshold", unit => {
-  const p = prepareSingleLibraryPublication(ast(questionUnitSource(unit)), { canonicalBase: "https://example.org/question-unit", policyId: "question-unit" });
-  expect(p.diagnostics.some(d => d.kind === "publication-question-unit-incompatible" && d.message.includes('"BMI"'))).toBe(true);
-});
-
 // @kit text-answers:question-unit
 test("admits equivalent comparison units and checks the imported owner rather than a local same-name shadow", () => {
-  const shared = `library "Shared".\nconcept "Height":\n- shape is Record.\n- type is Observation.\n- value type is Quantity.\n- code is \`height\`.\n- shape reduction is most recent.\npresentation for "Height":\n- question text is "Height".\n- question unit is 'cm'.\n`;
-  const main = `library "Main".\nconcept "Height":\n- shape is Record.\n- type is Observation.\n- value type is Quantity.\n- code is \`shadow\`.\n- shape reduction is most recent.\npresentation for "Height":\n- question text is "Unrelated mass".\n- question unit is 'kg'.\nconcept "Tall":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- definition is "Shared"."Height" at least 1 'm'.\n- shape reduction is most recent.\nactivity "Review": - request CPGTaskRequest. - with \`REVIEW\`.\ndecision "D":\nfirst:\n- when "Tall" then recommend activity "Review".\n- otherwise then recommend activity "Review".\n`;
+  const shared = `library "Shared".\nconcept "Height":\n- shape is Record.\n- type is Observation.\n- value type is Quantity 'cm'.\n- code is \`height\`.\n- shape reduction is most recent.\npresentation for "Height":\n- question text is "Height".\n`;
+  const main = `library "Main".\nconcept "Height":\n- shape is Record.\n- type is Observation.\n- value type is Quantity 'kg'.\n- code is \`shadow\`.\n- shape reduction is most recent.\npresentation for "Height":\n- question text is "Unrelated mass".\nconcept "Tall":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- definition is "Shared"."Height" at least 1 'm'.\n- shape reduction is most recent.\nactivity "Review": - request CPGTaskRequest. - with \`REVIEW\`.\ndecision "D":\nfirst:\n- when "Tall" then recommend activity "Review".\n- otherwise then recommend activity "Review".\n`;
   const good = emitFhirDefFromPath(fixture(main, shared));
   expect(good.success, JSON.stringify(good.errors)).toBe(true);
-  expect(objects(good.resources).filter(x => x.url === QUESTION_UNIT_URL && x.valueCoding).map(x => x.valueCoding.code)).toContain("cm");
+  expect(objects(good.resources).filter(x => x.url === QUESTION_UNIT_URL && x.valueCodeableConcept).flatMap(x => x.valueCodeableConcept.coding.map((c: any) => c.code))).toContain("cm");
   const bad = emitFhirDefFromPath(fixture(main, shared.replace("'cm'", "'kg'")));
   expect(bad.success).toBe(false);
-  expect(bad.errors.some(d => d.kind === "publication-question-unit-incompatible" && d.message.includes('"Shared"."Height"'))).toBe(true);
+  expect(bad.errors.some(d => d.kind === "publication-quantity-unit-incompatible" && d.message.includes('"Shared"."Height"'))).toBe(true);
+});
+
+// @kit text-answers:question-unit
+test.each([
+ questionUnitSource()+"\nconcept \"Other\": - shape is Record. - type is Observation. - value type is Quantity 'cm'. - value type is Quantity. - code is `other`. - shape reduction is most recent.",
+ questionUnitSource().replace("- shape reduction is most recent.","- shape reduction is most recent.\n- source representation: - type is Observation. - value type is Quantity 'cm'."),
+])("refuses duplicate type declarations and units on representation lines",source=>expect(buildCRL(source).success).toBe(false));
+
+// @kit text-answers:question-unit
+test("a declared unit cannot silently disappear when the profile has no Quantity answer slot",()=>{
+ const emitted=emitCaseFeatureStructureDefinition("Invalid unit","test",{name:"unit-test",version:"0.0.0",canonicalBase:"https://example.org/unit-test"} as any,{},"Observation",undefined,undefined,undefined,undefined,true,{profileUrl:"https://example.org/unit-test/StructureDefinition/test",localCode:{system:"https://example.org/unit-test",code:"test"},quantityUnit:"cm"});
+ expect(emitted.resource).toBeNull();expect(emitted.errors.some(e=>e.kind==="emit-quantity-unit-no-answer-slot")).toBe(true);
 });

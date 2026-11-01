@@ -2,7 +2,6 @@ import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { checkPresentationReachability } from "./presentationReachability";
 import { createPresentationCatalog } from "../emit/presentation";
-import { questionUnitDefinition, hasQuestionUnitInput } from "../emit/questionUnit";
 import { publicationProducerOperands, supportsPublicationGuard } from "../emit/publicationProgram";
 /**
  * CRL → FHIR Definition emit — closure orchestrator (Todo 4 of #73).
@@ -2219,7 +2218,7 @@ export function emitFhirDefClosure(
       descriptor.title, descriptor.localCode.code, metadata, resolvedOpts, descriptor.resourceType,
       { librarySuffix: entry.libraryName, define: target.define, resultKind: "record" },
       { valueElement: descriptor.valueElement, datumValueType: descriptor.valueType }, descriptor.answerOptions,
-      undefined, true, { profileUrl: descriptor.profileUrl, localCode: descriptor.localCode, age: hasAgeSource(descriptor) },
+      undefined, true, { profileUrl: descriptor.profileUrl, localCode: descriptor.localCode, age: hasAgeSource(descriptor), quantityUnit: descriptor.quantityUnit },
     );
     if (result.resource) resources.push(result.resource);
     errors.push(...result.errors);
@@ -2238,10 +2237,6 @@ export function emitFhirDefClosure(
   // Gated on a NON-EMPTY closure: an empty closure is not a policy package, so it
   // ships nothing (preserves the "0-resources gracefully" contract and avoids
   // orphan catalog Libraries pointing at CQL files no policy emits).
-  // REFACTOR:grounded (#328): ship the actual non-constraining extension definition with annotated artifacts.
-  if (resources.some(resource => hasQuestionUnitInput(resource.resource))) resources.push({
-    resourceType: "StructureDefinition", relativePath: "StructureDefinition/presentation-question-unit.json", resource: questionUnitDefinition(),
-  });
   const emittedUrlsSoFar = new Set<string>();
   for (const r of resources) {
     const u = (r.resource as { url?: string }).url;
