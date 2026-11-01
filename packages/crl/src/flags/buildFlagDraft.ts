@@ -142,5 +142,5 @@ export function flagCreationRetry(flags: readonly MvFlag[], proposed: MvFlag): F
   if (!existing) return { state: "create" };
   if (sameFlagContext(existing, proposed)) return { state: "deduped", flag: existing };
   return { state: "conflict", flag: existing,
-    message: `Flag ${existing.id} already represents this concern; its stored question/source content differs or is unstructured. Read and retain that existing record. create_flag cannot amend it: report the proposed revision for its owner to review. Do not resolve the flag merely to recreate it.` };
+    message: `Flag ${existing.id} already represents this concern; its stored question/source content differs or is unstructured. Read and retain the existing record returned as flag. create_flag cannot amend it: report the proposed revision for its owner to review. Do not resolve the flag merely to recreate it.` };
 }

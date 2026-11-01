@@ -4344,7 +4344,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     postFlagDrawer();
   }
 
-  /** Close the action drawer (UI clear only — it carries no agent elicitation). No-op when already closed. */
+  /** Close the action drawer and release cached summaries, including when already closed. It carries no agent elicitation. */
   function closeFlagActionView(): void {
     flagChangeSummaries.clear();
     if (!flagActionView) return;

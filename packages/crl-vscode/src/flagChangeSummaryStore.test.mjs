@@ -60,6 +60,7 @@ test('a symlinked summary ancestor cannot import another artifact',()=>{
 test('entry count is bounded independently of JSON bytes',()=>{
  const f=fixture();for(let i=0;i<SUMMARY_ENTRY_LIMIT+1;i++)writeFileSync(join(f.dir,'small-'+i+'.txt'),'');
  assert.match(loadFlagChangeSummaries(f.root).warnings.join(' '),/too many entries/);
+ assert.match(new FlagChangeSummaryController().render(f.root,'mv-1').warnings[0],/some were not read/);
 });
 test('aggregate read budget retains valid summaries already read',()=>{
  const f=fixture();rmSync(join(f.dir,'run-1.json'));
