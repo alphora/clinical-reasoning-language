@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "0aaafaf28201c4b7a6ff417a8cbf77b5bcb4b154",
-  "auditedSchemaVersion": "2.40",
-  "auditedContentHash": "d4664026afe0d21fffa422b1f7be954d9036bf99297c47551f54388fbc908cdc",
-  "scope": "Reviewed schema 2.40 dependency-only normalized-cache security engine acquisition identity. Guava runtime33.7.2-jre, unchanged application/CQL-cache classes and source/kit identity controls are mapped in coverage.md. Final installed/native qualification and deployment remain separate release gates.",
+  "auditedRevision": "2685871c0ee154852016d7b368c391f98a715078",
+  "auditedSchemaVersion": "2.41",
+  "auditedContentHash": "194964e6020ba0e350a03727bc711eaf8a60a6dfc76d9ba4338a73862ca5b3b2",
+  "scope": "Reviewed schema 2.41 optional structured flag questions/source citations and technical artifact-local rerun reporting. Legacy behavior, actual MCP retries/conflicts, schema parity, Answer provenance and bounded UI evidence controls are mapped in coverage.md. No grammar, CQL/FHIR, engine or clinical change. Installed UI, release and pipeline packet qualification remain separate.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
