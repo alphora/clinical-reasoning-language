@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "a76ad3927f72f94552936599bda1bc8761c01b6a",
-  "auditedSchemaVersion": "2.42",
-  "auditedContentHash": "8e4591f12700e0223610f133f11bb78172f74f896b78c4ffe7e93660b2c32fb0",
-  "scope": "Reviewed schema 2.42 explicit Quantity question units: grammar, owner-aware arithmetic admission, input metadata and extension definition, protocol1 native/rendered/static forms and conditional source teaching. Engine candidate1a2d7d70 is locally qualified; released6.4.45 engine lacks support. No UCUM dictionary validation, generic shared-repository server, adaptive forms or installed production availability is claimed. Full prior flag contract unchanged; exact evidence and review dispositions in coverage.md/discussion1219.",
+  "auditedRevision": "c5966c5f80aad52ec582774766e7332a9bdaddf4",
+  "auditedSchemaVersion": "2.43",
+  "auditedContentHash": "0eb8c7e65c10a9c43e380971e782f04e71c4defa91e8a8025f515f85275db6a8",
+  "scope": "Reviewed schema 2.43 Quantity value-type units: grammar, CQL/CRE/CEL canonicalization and exact admission, standard allowedUnits profile/unitOption generation, input-profile differential/snapshot capability checks, native interview/static/stateless/metadata/error qualification and shipped-client entry/change/clear. R4 CodeableConcept mapping and direct CRL case-feature input route only. No UCUM dictionary, recalculation of opaque annotations, lossless SDC primitive-metadata serialization, installed release or production availability claim. Prior flag/summary contract unchanged. Exact source/tests/review dispositions in coverage.md and discussion1221.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
