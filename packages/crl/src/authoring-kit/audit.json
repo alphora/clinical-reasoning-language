@@ -1,5 +1,5 @@
 {
-  "auditedRevision": "2685871c0ee154852016d7b368c391f98a715078",
+  "auditedRevision": "ccf40e5fc590400ac4ff870ccd1f34fa30549633",
   "auditedSchemaVersion": "2.41",
   "auditedContentHash": "194964e6020ba0e350a03727bc711eaf8a60a6dfc76d9ba4338a73862ca5b3b2",
   "scope": "Reviewed schema 2.41 optional structured flag questions/source citations and technical artifact-local rerun reporting. Legacy behavior, actual MCP retries/conflicts, schema parity, Answer provenance and bounded UI evidence controls are mapped in coverage.md. No grammar, CQL/FHIR, engine or clinical change. Installed UI, release and pipeline packet qualification remain separate.",
