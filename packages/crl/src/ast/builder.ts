@@ -374,8 +374,9 @@ export class CRLAstBuilder
           ref: line.decisionReference() ? refFromRefContext(line.decisionReference()!) : refFromQualifiable(line.qualifiableReference()!),
           location: getLocation(line) });
       } else {
-        const key = line.CHOICE_GROUP_IS() ? "choiceGroup" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
-        const value = (line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
+        // REFACTOR:grounded (#328): retain a literal unit as form metadata, independently of wording.
+        const key = line.QUESTION_UNIT_IS() ? "questionUnit" : line.CHOICE_GROUP_IS() ? "choiceGroup" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
+        const value = (line.SINGLE_QUOTED_STRING()?.text ?? line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
         if (node[key] !== undefined || !value.trim()) this.reportError("AstError", line,
           { message: `Presentation ${key} must be nonempty and declared only once.` });
         else node[key] = value;

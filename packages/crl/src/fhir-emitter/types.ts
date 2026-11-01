@@ -72,6 +72,8 @@ import type { CRLError } from "../types/errors";
  */
 export const FHIR_DEF_WARNING_KINDS: ReadonlySet<string> = new Set([
   "presentation-question-text-missing",
+  // REFACTOR:grounded (#328): warn about runtime capability without blocking engine-independent definitions.
+  "presentation-question-unit-runtime-required",
   "answer-options-all-qualifying",
   "non-ascii-slug-fallback",
   "empty-terminology",

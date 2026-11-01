@@ -18,6 +18,8 @@ export interface PresentationExtension {
   valueInteger?: number;
   valueCanonical?: string;
   valueCode?: string;
+  // REFACTOR:grounded (#328): default Quantity units use standard Coding-valued presentation metadata.
+  valueCoding?: { system?: string; code?: string; display?: string };
   extension?: PresentationExtension[];
 }
 

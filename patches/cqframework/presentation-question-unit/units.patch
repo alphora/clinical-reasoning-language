@@ -1,0 +1,154 @@
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ProcessAction.java
+@@ -111,6 +111,9 @@
+     protected void addQuestionnaireItemForInput(ApplyRequest request, IPlanDefinitionActionAdapter action) {
+         try {
+             for (var input : action.getInputDataRequirement()) {
++                if (input.hasExtension(PresentationQuestionUnitProcessor.URL)
++                        && (input.getProfile().size() != 1 || input.hasExtension(PresentationChoiceGroupProcessor.URL)))
++                    throw new IllegalArgumentException("presentation-question-unit-invalid: Exactly one profile and no choice-group descriptor required");
+                 if (input.hasExtension(PresentationChoiceGroupProcessor.URL)) {
+                     PresentationChoiceGroupProcessor.process(request, input, repository, generateProcessor);
+                     continue;
+@@ -136,11 +139,13 @@
+                             request.addLaunchContextExtensions(item.getRight());
+                         }
+                     }
++                    PresentationQuestionUnitProcessor.process(request, input, profileUrl.getValueAsString());
+                 }
+             }
+         } catch (Exception e) {
+-            if (action.getInputDataRequirement().stream().anyMatch(input -> input.hasExtension(PresentationChoiceGroupProcessor.URL))) {
+-                throw new IllegalArgumentException("CRL presentation choice group generation failed", e);
++            if (action.getInputDataRequirement().stream().anyMatch(input -> input.hasExtension(PresentationChoiceGroupProcessor.URL)
++                    || input.hasExtension(PresentationQuestionUnitProcessor.URL))) {
++                throw new IllegalArgumentException("CRL presentation input generation failed: " + e.getMessage(), e);
+             }
+             var message = "An error occurred while generating Questionnaire items for action input: %s"
+                     .formatted(e.getMessage());
+--- a/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyProcessor.java
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/ApplyProcessor.java
+@@ -115,7 +115,9 @@
+         if (request.getQuestionnaireAdapter() != null
+                 && !request.getQuestionnaireAdapter().getItem().isEmpty()) {
+             addEntry(resultBundle, newEntryWithResource(request.getQuestionnaire()));
+-            addEntry(resultBundle, newEntryWithResource(populateProcessor.populate(request.toPopulateRequest())));
++            var populated = populateProcessor.populate(request.toPopulateRequest());
++            PresentationQuestionUnitProcessor.preservePopulatedUnits(request.getQuestionnaire(), populated);
++            addEntry(resultBundle, newEntryWithResource(populated));
+         }
+
+         return resultBundle;
+--- /dev/null
++++ b/cqf-fhir-cr/src/main/java/org/opencds/cqf/fhir/cr/plandefinition/apply/PresentationQuestionUnitProcessor.java
+@@ -0,0 +1,110 @@
++package org.opencds.cqf.fhir.cr.plandefinition.apply;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Objects;
++import org.hl7.fhir.instance.model.api.IBaseResource;
++import org.hl7.fhir.r4.model.Coding;
++import org.hl7.fhir.r4.model.Extension;
++import org.hl7.fhir.r4.model.Questionnaire;
++import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemComponent;
++import org.hl7.fhir.r4.model.Questionnaire.QuestionnaireItemType;
++import org.hl7.fhir.r4.model.QuestionnaireResponse;
++import org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseItemComponent;
++import org.hl7.fhir.r4.model.Quantity;
++import org.opencds.cqf.fhir.utility.adapter.IDataRequirementAdapter;
++
++/** REFACTOR:grounded (#328): input presentation only; never changes a clinical Quantity. */
++public final class PresentationQuestionUnitProcessor {
++    public static final int PROTOCOL = 1;
++    public static final String URL = "http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-question-unit";
++    private static final String OPTION = "http://hl7.org/fhir/StructureDefinition/questionnaire-unitOption";
++    private static final String UCUM = "http://unitsofmeasure.org";
++    private PresentationQuestionUnitProcessor() {}
++
++    public static void process(ApplyRequest request, IDataRequirementAdapter input, String profile) {
++        if (!input.hasExtension(URL)) return;
++        if (!(request.getQuestionnaire() instanceof Questionnaire q)) fail("FHIR R4 Questionnaire required");
++        var descriptors = input.getExtensionsByUrl(URL);
++        if (descriptors.size() != 1) fail("Exactly one input descriptor required");
++        Extension descriptor = input.getExtensionByUrl(URL);
++        Coding declared = declaredUnit(descriptor);
++        var matches = new ArrayList<QuestionnaireItemComponent>();
++        var definition = profile.split("\\|", 2)[0] + "#Observation.value[x]";
++        for (var item : flatten(((Questionnaire) request.getQuestionnaire()).getItem())) {
++            if (definition.equals(item.getDefinition())) matches.add(item);
++        }
++        if (matches.size() != 1 || matches.get(0).getType() != QuestionnaireItemType.QUANTITY)
++            fail("Exactly one Quantity answer item required for " + profile);
++        var item = matches.get(0);
++        var markers = item.getExtensionsByUrl(URL);
++        if (markers.size() > 1 || (!markers.isEmpty() && !markers.get(0).equalsDeep(descriptor)))
++            fail("Conflicting question-unit descriptor for " + profile + "; policy definitions or form metadata changed. Restart the interview with a fresh Questionnaire.");
++        if (markers.isEmpty()) {
++            if (item.hasExtension(OPTION)) fail("Existing explicit unit options conflict with declared default for " + profile);
++            item.addExtension(descriptor.copy());
++            item.addExtension(new Extension(OPTION, declared.copy()));
++        }
++        // A retained marker owns derived options; population rebuilds dropped/reordered/stale options.
++    }
++
++    /** Preserve actual populated unit identity in the form, without modifying response data. */
++    public static void preservePopulatedUnits(IBaseResource questionnaire, IBaseResource response) {
++        if (!(questionnaire instanceof Questionnaire q) || !(response instanceof QuestionnaireResponse qr)) return;
++        var responses = flattenResponses(qr.getItem());
++        for (var item : flatten(q.getItem())) {
++            var markers = item.getExtensionsByUrl(URL);
++            if (markers.isEmpty()) continue;
++            if (markers.size() != 1 || item.getType() != QuestionnaireItemType.QUANTITY) fail("Exactly one marker on a Quantity item required");
++            var declared = declaredUnit(markers.get(0));
++            // Each response owns its current choices; stale supplemental units are not accumulated.
++            item.getExtension().removeIf(e -> OPTION.equals(e.getUrl()));
++            var primary = declared.copy();
++            item.addExtension(new Extension(OPTION, primary));
++            for (var answerItem : responses) {
++                if (!Objects.equals(item.getLinkId(), answerItem.getLinkId())) continue;
++                for (var answer : answerItem.getAnswer()) {
++                    if (!(answer.getValue() instanceof Quantity quantity)) continue;
++                    var coding = new Coding();
++                    if (quantity.hasSystem()) coding.setSystem(quantity.getSystem());
++                    if (quantity.hasCode()) coding.setCode(quantity.getCode());
++                    if (quantity.hasUnit()) coding.setDisplay(quantity.getUnit());
++                    else if (quantity.hasCode()) coding.setDisplay(quantity.getCode());
++                    if (!coding.hasCode() && !coding.hasDisplay()) continue;
++                    if (sameUnit(declared, coding)) {
++                        if (coding.hasDisplay()) primary.setDisplay(coding.getDisplay());
++                        continue;
++                    }
++                    if (item.getExtensionsByUrl(OPTION).stream().noneMatch(e -> e.getValue() instanceof Coding c && sameUnit(c, coding)))
++                        item.addExtension(new Extension(OPTION, coding));
++                }
++            }
++        }
++    }
++
++    private static Coding declaredUnit(Extension descriptor) {
++        Coding declared = descriptor.hasValue() && descriptor.getValue() instanceof Coding c ? c : null;
++        if (declared == null || !UCUM.equals(declared.getSystem()) || !declared.hasCode()
++                || !declared.getCode().matches("[!-~]+") || descriptor.hasExtension()) fail("Invalid UCUM input descriptor or question marker");
++        return declared;
++    }
++
++    private static boolean sameUnit(Coding a, Coding b) {
++        return Objects.equals(a.getSystem(), b.getSystem()) && Objects.equals(a.getCode(), b.getCode())
++                && (a.hasCode() || Objects.equals(a.getDisplay(), b.getDisplay()));
++    }
++    private static List<QuestionnaireItemComponent> flatten(List<QuestionnaireItemComponent> items) {
++        var result = new ArrayList<QuestionnaireItemComponent>();
++        for (var item : items) { result.add(item); result.addAll(flatten(item.getItem())); }
++        return result;
++    }
++    private static List<QuestionnaireResponseItemComponent> flattenResponses(List<QuestionnaireResponseItemComponent> items) {
++        var result = new ArrayList<QuestionnaireResponseItemComponent>();
++        for (var item : items) {
++            result.add(item); result.addAll(flattenResponses(item.getItem()));
++            for (var answer : item.getAnswer()) result.addAll(flattenResponses(answer.getItem()));
++        }
++        return result;
++    }
++    private static void fail(String message) { throw new IllegalArgumentException("presentation-question-unit-invalid: " + message); }
++}

@@ -26,6 +26,10 @@ const units: Record<string, { group: string; factor: bigint }> = {
   kg: { group: "mass", factor: 1000n }, g: { group: "mass", factor: 1n },
   "kg/m2": { group: "bmi", factor: 1n },
 };
+/** REFACTOR:grounded (#328): reuse the actual comparison domain; metadata adds no conversions. */
+export function publicationQuantityUnitsCompatible(a: string, b: string): boolean {
+  return Object.prototype.hasOwnProperty.call(units, a) && Object.prototype.hasOwnProperty.call(units, b) && units[a].group === units[b].group;
+}
 /** Exact coefficient/rational comparison; no binary floating-point multiplication at thresholds. */
 export function publicationDecimal(value: number): { coefficient: bigint; scale: bigint } {
   const [mantissa, exponent = "0"] = value.toString().toLowerCase().split("e");

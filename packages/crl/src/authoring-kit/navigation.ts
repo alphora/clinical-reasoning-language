@@ -11,7 +11,7 @@ const ALIASES: Record<string, string[]> = {
   "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
   "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API", "--serve", "reusable JVM", "warm JVM", "NDJSON", "createNativeWorkerPool", "runJob", "setWorkerLimit", "worker pool", "independent sessions"],
   "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
-  "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start", "Quantity", "Number", "count", "sessions", "rate", "d/wk", "h/d"],
+  "text-answers": ["text", "string", "has a value", "answered", "intake", "free text", "primary diagnosis", "dateTime", "date", "temporal", "Treatment Start", "Quantity", "Number", "count", "sessions", "rate", "d/wk", "h/d", "question unit", "UCUM", "kg/m2", "unitOption"],
   "concept-form": ["concept", "case feature", "Scalar", "remove scalar", "Observation", "code is", "absence", "completeness", "evidence completeness"],
   "value-type": ["value type is", "boolean", "Quantity", "CodeableConcept"],
   "publication-selection": ["shape reduction is", "most recent", "override", "local external inferred", "recency"],
@@ -72,6 +72,7 @@ const RELATED: Record<string, string[]> = {
 /** Direct examples need their semantic guidance as well as runnable files/configuration. */
 const EXAMPLE_RULES: Record<string, string[]> = {
   "datetime-answer": ["text-answers", "value-type", "concept-form"],
+  "quantity-question-unit": ["text-answers", "concept-presentation", "publication-selection"],
   "source-field-order": ["concept-form"],
   "coded-observation-source": ["concept-form", "publication-selection", "named-answer-options"],
   "quantity-declaration": ["value-type", "concept-form"],

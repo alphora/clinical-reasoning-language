@@ -1,11 +1,11 @@
 import { conceptRefsOfConcept } from "../ast/conceptDependencies";
 import { getRefLibrary, getRefName, type BlockMember, type BranchCondition, type CRL, type Location, type Presentation, type ReferenceName } from "../ast/types";
 
-export interface PresentationText { questionText?: string; questionDescription?: string }
+export interface PresentationText { questionText?: string; questionDescription?: string; questionUnit?: string }
 export interface PresentationDiagnostic {
   filePath?: string;
   libraryName?: string;
-  kind: "presentation-reference" | "presentation-overlap" | "presentation-empty" | "presentation-override-unsupported" | "presentation-target-not-question-enabled" | "presentation-question-text-missing" | "presentation-group-invalid";
+  kind: "presentation-reference" | "presentation-overlap" | "presentation-empty" | "presentation-override-unsupported" | "presentation-target-not-question-enabled" | "presentation-question-text-missing" | "presentation-group-invalid" | "presentation-question-unit-invalid" | "presentation-question-unit-target" | "presentation-question-unit-runtime-required";
   severity: "error" | "warning";
   message: string;
   location: Location;
@@ -32,6 +32,15 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
     const name = getRefName(presentation.target);
     if (!concepts.has(name)) fail("presentation-reference", `Presentation target "${name}" must resolve to a concept.`, presentation.location);
     const target = concepts.get(name);
+    // REFACTOR:grounded (#328): one default capture unit; existing clinical values remain unconstrained.
+    if (presentation.questionUnit !== undefined) {
+      diagnostics.push({ kind: "presentation-question-unit-runtime-required", severity: "warning", filePath, libraryName: ast.library.name,
+        location: presentation.location, message: `Rendering question unit for "${ast.library.name}"."${name}" requires the protocol 1 question-unit native processor and matching driver; the released 6.4.45 engine does not support it. Emission does not select an engine.` });
+      if (presentation.contexts.length || !/^[\x21-\x7e]+$/.test(presentation.questionUnit))
+        fail("presentation-question-unit-invalid", `Question unit for "${ast.library.name}"."${name}" must be one nonblank UCUM code in its default presentation, without whitespace or control characters.`, presentation.location);
+      if (!target || target.shape !== "Record" || target.conceptType !== "Observation" || target.valueTypes.length !== 1 || target.valueTypes[0] !== "Quantity" || target.shapeReduction === undefined || !target.code)
+        fail("presentation-question-unit-target", `Question unit for "${ast.library.name}"."${name}" requires a coded, selected Record Observation with Quantity value.`, presentation.location);
+    }
     if (target?.type === "Concept" && !target.code) fail("presentation-target-not-question-enabled", `Presentation target "${name}" must declare code is to provide a local Case Feature answer.`, presentation.location);
     if (!presentation.questionText?.trim()) {
       fail("presentation-empty", `Presentation for "${name}" requires nonempty question text.`, presentation.location);
@@ -92,6 +101,7 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
   const fields = (p?: Presentation): PresentationText => p ? {
     ...(p.questionText !== undefined ? { questionText: p.questionText } : {}),
     ...(p.questionDescription !== undefined ? { questionDescription: p.questionDescription } : {}),
+    ...(p.questionUnit !== undefined ? { questionUnit: p.questionUnit } : {}),
   } : {};
   const resolveOccurrence = (name: string, context?: PresentationContext) => {
     const list = byTarget.get(name) ?? [];

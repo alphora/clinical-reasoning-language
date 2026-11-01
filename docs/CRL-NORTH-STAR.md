@@ -107,6 +107,10 @@ A presentation targets a concept with `code is`. Each declaration requires quest
 
 An authored presentation choice group collects independent selected Boolean questions together when native traversal first encounters any member. This explicit presentation collection can offer a later-branch member early; it does not alter concept values, clinical operands or branch predicates. The answerless, nonrepeating wrapper preserves each original profile's population/extraction and true/false/unknown states. Checkbox mode must distinguish unanswered from explicit false. See the same language contract for the protocol 1 runtime requirement and supported member shape.
 
+<!-- REFACTOR:grounded (#328): explicit form unit, native/browser proof and source-only availability. -->
+
+A Quantity's owning default presentation may explicitly declare `question unit is 'kg/m2'.` for fresh numeric form entry. This presentation unit does not constrain or relabel source resources or change arithmetic. Existing answers retain their visible units; raw unitless numeric Quantities remain errors. Scoped wording inherits the unit. This source capability requires a supporting question-unit processor and matching driver; the released6.4.45 engine does not implement it. Standard unitOption describes the returned choices; first-option default selection is measured client behavior, not a universal SDC guarantee. See [typed intake answers](typed-intake-answers.md) for the bounded authoring, native and client contract.
+
 ### Case Features and the iterative SDC session
 
 Operator-stated runtime contract (2026-09-06): in workflows using extraction, a concept with `code is`

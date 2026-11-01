@@ -141,9 +141,22 @@ public class ApplyDriver {
         Bundle bundle = parser.parseResource(Bundle.class,
                 new String(Files.readAllBytes(Paths.get(repoFile)), StandardCharsets.UTF_8));
         boolean choiceGroups = false;
+        boolean questionUnits = false;
         for (var entry : bundle.getEntry()) {
             if (entry.getResource() instanceof org.hl7.fhir.r4.model.PlanDefinition plan
                     && hasChoiceGroups(plan.getAction())) choiceGroups = true;
+            if (entry.getResource() instanceof org.hl7.fhir.r4.model.PlanDefinition plan
+                    && hasQuestionUnits(plan.getAction())) questionUnits = true;
+        }
+
+        // REFACTOR:grounded (#328): refuse engines that would silently omit an authored form unit.
+        if (questionUnits) {
+            try {
+                Class<?> capability = Class.forName("org.opencds.cqf.fhir.cr.plandefinition.apply.PresentationQuestionUnitProcessor");
+                if (capability.getField("PROTOCOL").getInt(null) != 1) throw new ReflectiveOperationException("Unsupported protocol");
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalArgumentException("CRL question units require the protocol 1 question-unit native runtime; this engine does not support them.", e);
+            }
         }
         if (choiceGroups) {
             try {
@@ -186,11 +199,11 @@ public class ApplyDriver {
 
         finishCompilation(ctx, result);
 
-        if (choiceGroups) {
+        if (choiceGroups || questionUnits) {
             for (var outcome : ctx.newTerser().getAllPopulatedChildElementsOfType(result, org.hl7.fhir.r4.model.OperationOutcome.class)) {
                 for (var issue : outcome.getIssue()) if (issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.ERROR
                         || issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.FATAL) {
-                    throw new IllegalStateException("CRL presentation choice group native execution failed: " + issue.getDiagnostics());
+                    throw new IllegalStateException("CRL presentation input native execution failed: " + issue.getDiagnostics());
                 }
             }
         }
@@ -222,6 +235,14 @@ public class ApplyDriver {
         for (var action : actions) {
             for (var input : action.getInput()) if (input.hasExtension("http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-choice-group")) return true;
             if (hasChoiceGroups(action.getAction())) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasQuestionUnits(List<org.hl7.fhir.r4.model.PlanDefinition.PlanDefinitionActionComponent> actions) {
+        for (var action : actions) {
+            for (var input : action.getInput()) if (input.hasExtension("http://clinicalreasoninglanguage.org/fhir/StructureDefinition/presentation-question-unit")) return true;
+            if (hasQuestionUnits(action.getAction())) return true;
         }
         return false;
     }

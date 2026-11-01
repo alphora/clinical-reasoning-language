@@ -13,7 +13,8 @@ import { readGenderProjection } from "./publicationGender";
 import { readAgeProjection } from "./publicationAge";
 import { readPublicationBMI } from "./publicationBMI";
 import { readPublicationAnyMembership } from "../template-match/anyMembership";
-import { readPublicationQuantity, publicationQuantityThresholdError } from "./publicationQuantity";
+import { readPublicationQuantity, publicationQuantityThresholdError, publicationQuantityUnitsCompatible } from "./publicationQuantity";
+import { defaultQuestionUnit } from "./questionUnit";
 import {
   createPublicationContext,
   type PublicationContext,
@@ -254,6 +255,12 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
   const fail = (message: string, location: Location | undefined, kind: string): never => {
     throw diagnostic(message, location, kind);
   };
+  // REFACTOR:grounded (#328): resolve the producer's actual operand owner, never a global same-name concept.
+  const checkQuestionUnit = (owner: PublicationLibrary, operand: Readonly<Concept>, expected: string, consumer: string, location: Location): void => {
+    const declared = defaultQuestionUnit(owner.ast, operand.name);
+    if (declared !== undefined && !publicationQuantityUnitsCompatible(declared, expected))
+      fail(`Question unit '${declared}' for "${owner.libraryName}"."${operand.name}" is not supported for ${consumer}; requires units compatible with '${expected}'.`, location, "publication-question-unit-incompatible");
+  };
   const finiteTerminology = (owner: string, ref: ReferenceName, location: Location): { key: string; codes: readonly PublicationCode[] } => {
     const hit = declarations.lookupTerminology(owner, ref, location);
     if (hit.kind !== "hit") return fail(`Value terminology cannot resolve in its owning scope: ${hit.kind}.`, location, "publication-domain-resolution");
@@ -460,6 +467,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         const thresholdError = publicationQuantityThresholdError(comparison.threshold);
         if (thresholdError !== undefined)
           return fail(thresholdError, comparison.location, "publication-quantity-unit-unsupported");
+        checkQuestionUnit(hit.library, hit.node, comparison.threshold.unit, `quantity threshold in "${library.libraryName}"."${concept.name}"`, comparison.location);
         producer = Object.freeze({ kind: "quantityThreshold", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["quantityThreshold", 0]]))}`,
           operand: operand.identity, threshold: Object.freeze(comparison.threshold) });
       }
@@ -467,17 +475,19 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
       const bmi = readPublicationBMI(concept);
       if (bmi !== undefined) {
         if (localCode !== undefined && !library.artifact.policyId) return fail("A coded producer requires an owning policy identity.", concept.location, "publication-producer-profile-identity-missing");
-        const operands = [bmi.weight, bmi.height].map(ref => {
+        const operands = [bmi.weight, bmi.height].map((ref, role) => {
           const dependency = declarations.lookupConcept(library.sourceIdentity, ref, bmi.location);
           if (dependency.kind !== "hit") return fail("A BMI operand cannot resolve.", bmi.location, "publication-reference-resolution");
           if (dependency.node.shapeReduction === undefined) return fail("BMI requires explicitly selected Record operands.", bmi.location, "publication-bmi-operand-unsupported");
           const prepared = prepare(dependency.library, dependency.node);
           if (prepared?.valueType !== "Quantity") return fail("BMI requires Quantity-valued publications.", bmi.location, "publication-bmi-operand-unsupported");
+          checkQuestionUnit(dependency.library, dependency.node, role === 0 ? "kg" : "m", `BMI ${role === 0 ? "weight" : "height"} input of "${library.libraryName}"."${concept.name}"`, bmi.location);
           return prepared.identity;
         }) as [QualifiedConceptIdentity, QualifiedConceptIdentity];
         const anchor = declarations.lookupConcept(library.sourceIdentity, bmi.validity, bmi.location);
         const index = anchor.kind === "hit" ? operands.findIndex(operand => operand.key === anchor.identity.key) : -1;
         if (index < 0) return fail("BMI validity must name one of its two operands.", bmi.location, "publication-bmi-validity-operand");
+        checkQuestionUnit(library, concept, "kg/m2", `BMI output "${library.libraryName}"."${concept.name}"`, bmi.location);
         producer = Object.freeze({ kind: "bodyMassIndex", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["bodyMassIndex", 0]]))}`,
           operands: Object.freeze(operands), validityOperand: index as 0 | 1 });
       }

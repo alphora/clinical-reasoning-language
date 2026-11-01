@@ -1,5 +1,56 @@
 # Typed intake answers
 
+<!-- REFACTOR:grounded (#328): owning parser, native, client and package evidence. -->
+
+## Quantity question units (source capability #328)
+
+The owning default presentation can declare a fixed unit for fresh numeric entry:
+
+```crl
+presentation for "BMI":
+- question text is "Enter BMI".
+- question unit is 'kg/m2'.
+```
+
+The concept must be a coded selected Record/Observation/Quantity. Scoped wording
+inherits this unit; scoped unit overrides are refused. The declaration is form
+presentation, not a resource constraint or a conversion rule. Comparisons and BMI
+roles reject incompatible declarations using the existing supported unit dimensions.
+Lexical checking rejects whitespace/control/empty codes; it does not validate the
+UCUM syntax or dictionary. The unit string is an author assertion: an unknown or
+mistyped code is emitted verbatim with the UCUM system and can enter fresh answer
+data. Verify the intended UCUM code. CEL facts and raw FHIR answers still carry their own units.
+Unitless raw numeric Quantities remain errors.
+
+This source feature requires the protocol 1 question-unit engine and matching
+driver. The released CRL 6.4.45 engine does not support it. Local qualification
+uses an explicit candidate engine path/hash; production adoption awaits a qualified
+release. Validation emits a runtime-requirement warning; the driver refuses unsupported engines. Emitted CRL/CQL/FHIR does not vary
+with the expected engine. Shared clinical profiles and arithmetic are unchanged.
+
+The input carries a CRL-owned nonmodifier extension, with its fixed-version1.0.0
+definition emitted once per closure. Updated native apply maps it to standard
+`questionnaire-unitOption` on the Quantity answer leaf. Blank entry offers the
+declared unit. A populated alternate unit remains visibly selected, with options
+`[declared, populated]`; neither its number nor its identity is silently changed.
+The bundled LForms client uses the first option for blank entry and matches the
+populated answer's unit. FHIR unitOption itself specifies choices, not a default.
+A user changing only the selected unit deliberately changes the measurement as
+entered; the client does not convert its number. A clear removes the number, and a
+fresh blank entry uses the authored unit; the prior alternate is no longer offered. Raw unit-only unknown metadata retains
+its existing behavior. Display-only populated units remain display-only; unsupported
+units still cause arithmetic errors. An existing unmarked explicit option constraint
+conflicts rather than being silently widened. With our marker present, all standard
+unit options are derived display state: dropped, reordered or stale options are
+rebuilt. The raw UCUM code is the fresh unit label; there is no separate authored
+unit-label field. Exact optional code/system metadata from populated source values
+is preserved, even when that creates duplicate-looking choices. CQL still uses
+code over display; the form does not invent a missing system.
+
+Owning checks are `questionUnit.test.ts`, the opt-in native interview/static
+producer tests, and `test/questionUnit.browser.cjs`. Browser/native results, raw
+data tests, package inventory and installed release checks are separate evidence.
+
 A free-text question is a normal selected Observation, with a separate presence predicate when a decision needs a Boolean:
 
 ```crl

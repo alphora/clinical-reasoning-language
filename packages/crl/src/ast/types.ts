@@ -37,6 +37,8 @@ export interface Presentation extends ASTNode {
   contexts: { kind: "decision" | "criterion"; ref: ReferenceName; location: Location }[];
   questionText?: string;
   questionDescription?: string;
+  /** REFACTOR:grounded (#328): fresh form input's UCUM default, not a data constraint. */
+  questionUnit?: string;
   choiceGroup?: string;
 }
 
