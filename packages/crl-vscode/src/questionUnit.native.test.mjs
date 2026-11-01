@@ -92,10 +92,10 @@ it.skipIf(!enabled)('normalizes source metres into declared centimetres and pres
 },240000);
 // @kit text-answers:question-unit-native-alternate
 it.skipIf(!enabled)('rejects lossy/out-of-range conversions and raw unitless values through actual CQL',async()=>{
- for(const [typeUnit,value,code,error]of [['m',0.00000001,'cm','publication-quantity-precision-unsupported'],['cm',1000000,'m','publication-quantity-precision-unsupported'],['cm',1.234567891,'m','publication-quantity-precision-unsupported'],['cm',1,'kg','publication-quantity-unit-unsupported'],['cm',40,null,'publication-invalid-quantity']]){
+ for(const [typeUnit,value,code,error,extra]of [['m',0.00000001,'cm','publication-quantity-precision-unsupported'],['cm',1000000,'m','publication-quantity-precision-unsupported'],['cm',1.234567891,'m','publication-quantity-precision-unsupported'],['cm',1,'kg','publication-quantity-unit-unsupported'],['cm',40,null,'publication-invalid-quantity'],['cm',1.8,'m','publication-invalid-quantity',{system:'urn:other-units',code:'m'}],['cm',1.8,'m','publication-invalid-quantity',{comparator:'<'}]]){
  const f=fixture(questionUnitSource(typeUnit).replaceAll('BMI','Height').replace("35.00000001 'kg/m2'","1 'm'"));try{
  const system=f.bundle.entry.map(e=>e.resource).find(r=>r.resourceType==='CodeSystem'&&r.concept?.some(c=>c.code==='bmi')).url;
- const q={value,...(code?{unit:code}:{} )};const raw={resourceType:'Observation',id:'raw',status:'final',subject:{reference:'Patient/p'},code:{coding:[{system,code:'bmi'}]},valueQuantity:q};
+ const q={value,...(code?{unit:code}:{} ),...extra};const raw={resourceType:'Observation',id:'raw',status:'final',subject:{reference:'Patient/p'},code:{coding:[{system,code:'bmi'}]},valueQuantity:q};
  const session=interview(f,'invalid-'+typeUnit+'-'+value,[raw]);await expect(session.evaluate()).rejects.toThrow('native-error');expect(JSON.stringify(session.qualificationReceipts.at(-1).diagnostics)).toContain(error);
  }finally{rmSync(f.root,{recursive:true,force:true});}
  }

@@ -128,7 +128,7 @@ test.each([
 ])("refuses duplicate type declarations and units on representation lines",source=>expect(buildCRL(source).success).toBe(false));
 
 // @kit text-answers:question-unit
-test("a declared unit cannot silently disappear when the profile has no Quantity answer slot",()=>{
- const emitted=emitCaseFeatureStructureDefinition("Invalid unit","test",{name:"unit-test",version:"0.0.0",canonicalBase:"https://example.org/unit-test"} as any,{},"Observation",undefined,undefined,undefined,undefined,true,{profileUrl:"https://example.org/unit-test/StructureDefinition/test",localCode:{system:"https://example.org/unit-test",code:"test"},quantityUnit:"cm"});
+test.each([undefined,{valueElement:"value",datumValueType:"boolean"}])("a declared unit cannot silently disappear with incompatible answer slot %j",valueDatum=>{
+ const emitted=emitCaseFeatureStructureDefinition("Invalid unit","test",{name:"unit-test",version:"0.0.0",canonicalBase:"https://example.org/unit-test"} as any,{},"Observation",undefined,valueDatum,undefined,undefined,true,{profileUrl:"https://example.org/unit-test/StructureDefinition/test",localCode:{system:"https://example.org/unit-test",code:"test"},quantityUnit:"cm"});
  expect(emitted.resource).toBeNull();expect(emitted.errors.some(e=>e.kind==="emit-quantity-unit-no-answer-slot")).toBe(true);
 });

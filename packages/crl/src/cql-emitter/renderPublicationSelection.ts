@@ -3,7 +3,7 @@
 import { cqlStringLiteral } from "./cqlStrings";
 import { PUBLICATION_OBSERVATION_STATUSES } from "../emit/publicationProgram";
 // Match ECMAScript trim's blank characters without changing the authored unit identity.
-const BLANK_QUANTITY_UNIT = cqlStringLiteral("^[\\x09-\\x0D\\x20\\xA0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]*$");
+export const BLANK_QUANTITY_UNIT = cqlStringLiteral("^[\\x09-\\x0D\\x20\\xA0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]*$");
 
 // v1 is the compiler-internal Observation-candidate ABI. A future resource type needs a
 // distinct typed ABI/version; these reserved names never imply polymorphic FHIR resources.

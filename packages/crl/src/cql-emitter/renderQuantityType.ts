@@ -1,13 +1,18 @@
 // REFACTOR:grounded (#328): emitted Quantity type admission and exact conversion.
-import { PUBLICATION_CANDIDATE_CQL_TYPE } from "./renderPublicationSelection";
+import { BLANK_QUANTITY_UNIT, PUBLICATION_CANDIDATE_CQL_TYPE } from "./renderPublicationSelection";
 export const QUANTITY_TYPE_PREFIX = "__CRL_PublicationQuantityType_v1_";
 export const QUANTITY_TYPE_CQL = "__CRL_PublicationQuantityType_v1_Normalize";
 export function renderQuantityTypeHelpers(): string {
   return `define function "__CRL_PublicationQuantityType_v1_Factor"(unit System.String):
   case unit when 'm' then 100.0 when 'cm' then 1.0 when 'kg' then 1000.0 when 'g' then 1.0 else null as System.Decimal end
 define function "__CRL_PublicationQuantityType_v1_Value"(Q FHIR.Quantity, unit System.String):
-  if Q.value.value is null then Q
-  else if Coalesce(Q.code.value, Q.unit.value) is null then
+  if Q.comparator.value is not null then
+    Message(null as FHIR.Quantity, true, 'publication-invalid-quantity', 'Error', 'A comparator Quantity is not an exact measurement')
+  else if Q.value.value is null then Q
+  else if Q.system.value is not null and Q.system.value != 'http://unitsofmeasure.org' then
+    Message(null as FHIR.Quantity, true, 'publication-invalid-quantity', 'Error', 'Quantity system must be UCUM when present')
+  else if (Q.system.value = 'http://unitsofmeasure.org' and Matches(Coalesce(Q.code.value, ''), ${BLANK_QUANTITY_UNIT}))
+    or Matches(Coalesce(Q.code.value, Q.unit.value, ''), ${BLANK_QUANTITY_UNIT}) then
     Message(null as FHIR.Quantity, true, 'publication-invalid-quantity', 'Error', 'A populated Quantity requires an explicit unit')
   else if Coalesce(Q.code.value, Q.unit.value) = unit then
     FHIR.Quantity { id: Q.id, extension: Q.extension, value: Q.value, comparator: Q.comparator,

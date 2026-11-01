@@ -677,7 +677,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
     expect(kit.schemaVersion).toBe("2.43");
-    expect(kit.contentHash).toBe("63eafcdef8e7f95267622a4a8b84663a5a02c89a292ea75313f47a78e42fa1b8");
+    expect(kit.contentHash).toBe("0eb8c7e65c10a9c43e380971e782f04e71c4defa91e8a8025f515f85275db6a8");
   });
 
   // @kit criterion:description-navigation
