@@ -3,7 +3,6 @@ import * as vscode from 'vscode'
 import { parseReleaseCatalog, releaseMediaFiles, releaseNotesAutoEligible, ReleaseNotesCoordinator, renderReleaseNotesHtml, validateReleaseMedia, type ReleaseCatalog } from './releaseNotes'
 
 export const RELEASE_NOTES_COMMAND = 'crl.showReleaseNotes'
-export const RELEASE_NOTES_TITLE = 'CRL: Release Notes'
 const SEEN_VERSION = 'crl.releaseNotes.seenVersion'
 const workspaceIdentity = (): string => JSON.stringify((vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.toString()))
 
