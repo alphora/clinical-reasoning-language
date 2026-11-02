@@ -2,6 +2,6 @@
   "auditedRevision": "881a24fd49baa35ee44809d1f0baaa68a688a470",
   "auditedSchemaVersion": "2.44",
   "auditedContentHash": "602ed0d30d328bcd8630ac29328b58423440f30523e1a4fede6cf550d1137212",
-  "scope": "Schema2.44 review-flags field roles, visible Before/After and complete agent reporting examples/discovery; baseline8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4. UI controls preserve manual review/status and JSON contracts. No clinical, emitter or runtime semantic change. See coverage.md for actual evidence and separate installed/release gates.",
+  "scope": "Schema 2.44 review-flags field roles, visible Before/After and complete agent reporting examples/discovery; baseline8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4. UI controls preserve manual review/status and JSON contracts. No clinical, emitter or runtime semantic change. See coverage.md for actual evidence and separate installed/release gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
