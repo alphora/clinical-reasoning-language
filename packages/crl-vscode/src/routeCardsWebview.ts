@@ -154,14 +154,30 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const value = document.createElement("div"); value.className = "route-card-value"; value.textContent = card.value; value.setAttribute("aria-label", "Answer: " + card.value); form.insertBefore(value, form.querySelector(".route-description-toggle"));
       if(card.answerChoices?.length || card.choicesFrom){
         const section=document.createElement('div');section.className='route-answer-section';form.append(section);
-        const toggle=document.createElement("button");toggle.className="route-choices-toggle";toggle.textContent="Answer choices"+(card.answerChoices?.length ? " ("+card.answerChoices.length+")" : "");toggle.setAttribute("aria-expanded",String(!!card.choicesOpen));
+        const toggle=document.createElement("button");toggle.className="route-choices-toggle";toggle.textContent="Answers"+(card.answerChoices?.length ? " ("+card.answerChoices.length+")" : "");toggle.setAttribute("aria-expanded",String(!!card.choicesOpen));
         toggle.onclick=()=>{card.choicesOpen=!card.choicesOpen;rerenderAtControl(toggle,card.id,ownerKey,'.route-choices-toggle');};
         const heading=document.createElement('div');heading.className='route-choice-heading';heading.append(toggle);
         if(card.choicesOpen && card.answerEditor?.editable){const add=iconButton('route-answer-create','Add answer','add');add.disabled=!!card.saving;add.onclick=()=>{card.editing=false;card.choicesOpen=true;card.answerDraft={operation:'create',system:card.answerEditor.systems?.[0]??'',code:'',display:'',description:'',qualifications:{}};sendDraft(card);render();root.querySelector<HTMLInputElement>('[data-card-id="'+card.id+'"] .route-answer-editor input')?.focus();};heading.append(add);}
         section.append(heading);
         if(card.choicesOpen){
+          // REFACTOR:grounded: each use keeps its own subsets; a group title previews a branch, not a patient result.
+          const node=Array.from(root.querySelectorAll<SVGGElement>('[data-flow-key]')).find(n=>n.dataset.flowKey===ownerKey);
+          const contributions=(card.answerContributions??[]).filter((r:any)=>standalone || !!node && !node.dataset.answerBlocked && r.ownerKey===node.dataset.flowWhen && !!node.dataset.answerCheck && r.checkId===node.dataset.answerCheck && String(r.negated)===node.dataset.answerNegated);
+          const uses=[...new Map(contributions.map((r:any)=>[JSON.stringify([r.ownerKey,r.checkId,r.negated]),r])).values()] as any[];
+          const unclassified=standalone?(card.unclassifiedAnswerUses??[]).map((u:any)=>({...u,blocked:true})):(node?.dataset.answerBlocked?[{blocked:true,checkLabel:node.dataset.answerBlocked}]:[]);
+          const views=uses.length||unclassified.length?[...uses,...unclassified]:[undefined];
+          for(const use of views){
+          if(use && (views.length>1 || standalone || use.blocked)){const heading=document.createElement('p');heading.className='route-answer-use';heading.textContent=use.checkLabel;section.append(heading);}
+          if(use?.blocked){const note=document.createElement('p');note.className='route-answer-readonly';note.textContent='Grouping unavailable for this check.';section.append(note);}
+          const rows=use&&!use.blocked?contributions.filter((r:any)=>r.ownerKey===use.ownerKey&&r.checkId===use.checkId&&r.negated===use.negated):[];
+          const complete=use && !use.blocked && rows.length===(card.answerChoices??[]).length && (card.answerChoices??[]).every((c:any)=>rows.some((r:any)=>r.system===c.system&&r.code===c.code));
+          const groups=complete?['left','right']:[undefined];
+          for(const branch of groups){
+          const choices=(card.answerChoices??[]).filter((c:any)=>!branch || rows.some((r:any)=>r.branch===branch&&r.system===c.system&&r.code===c.code));
+          if(branch&&!choices.length)continue;
+          if(branch){const preview=rows.find((r:any)=>r.branch===branch),heading=document.createElement('p');heading.className='route-answer-group route-answer-'+branch;heading.textContent=(branch==='left'?'← ':'→ ')+preview.label;heading.title=preview.explanation;section.append(heading);}
           const list=document.createElement("ul");list.className="route-answer-choices";
-          for(const choice of card.answerChoices ?? []){
+          for(const choice of choices){
             const row=document.createElement('li'),line=document.createElement('div'),label=document.createElement('span'),actions=document.createElement('span');line.className='route-answer-line';label.className='route-answer-label';label.textContent=choice.display;actions.className='route-answer-actions';line.append(label,actions);row.append(line);
             if(choice.pendingDelete){label.classList.add('route-answer-deleted');const mark=document.createElement('span');mark.className='route-choice-deletion';mark.textContent='Pending deletion';row.append(mark);}
             if(choice.request){const controls=requestControls(card,choice.request,ownerKey),badge=controls.querySelector('.route-request-flag');if(badge)actions.append(badge);row.append(controls);}
@@ -176,6 +192,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
           }
           if(!card.answerChoices?.length){const row=document.createElement("li");row.textContent="Choices from "+card.choicesFrom;list.append(row);}
           section.append(list);
+          }
+          }
           if(!card.answerEditor?.editable && card.answerEditor?.readOnlyReason){const reason=document.createElement('p');reason.className='route-answer-readonly';reason.textContent=card.answerEditor.readOnlyReason;section.append(reason);}
           if(card.answerDraft && card.answerEditor?.editable){
             const draft=card.answerDraft,editor=document.createElement('div');editor.className='route-answer-editor route-editor';
@@ -344,16 +362,13 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     };
     const widthFor = (n: SVGGElement) => n.classList.contains("flow-activity") || n.dataset.flowComponent === "collapsed" ? base.get(n)!.width : !n.dataset.flowOutline || n.dataset.flowQuestion ? nodeWidth : base.get(n)!.width;
     const widths=groups.map(group=>Math.max(nodeWidth,...group.flatMap(n=>descendants(n).map(c=>base.get(c)!.x-base.get(n)!.x+widthFor(c)+componentsOf(c).length*12))));
-    // REFACTOR:grounded: keep the same reserved connector lane in pinned layouts.
-    const connectorGap=root.querySelector('.flow-connector-answers') ? 354 : 90;
-    let right=40+widths.reduce((a,b)=>a+b+connectorGap,0),bottom=40;
+    let right=40+widths.reduce((a,b)=>a+b+90,0),bottom=40;
     let cursor=40;
     for(let row=0;row<Math.max(0,...groups.map(g=>g.length));row++) {
-      const halfBand=Math.max(0,...groups.map(g=>Number(g[row]?.dataset.answerBand ?? 0)/2));
-      const y=cursor+halfBand; let rowBottom=y+halfBand;
+      const y=cursor; let rowBottom=y;
       for(const [ci,group] of groups.entries()) {
         const n=group[row];if(!n)continue;
-        const box=base.get(n)!,x=40+widths.slice(0,ci).reduce((a,b)=>a+b+connectorGap,0);
+        const box=base.get(n)!,x=40+widths.slice(0,ci).reduce((a,b)=>a+b+90,0);
         positions.set(n,{x,y,width:widthFor(n),height:box.height});
         let childCursor=y+box.height+(!external?stackHeight(n):0)+24;
         const children=descendants(n);
@@ -487,6 +502,8 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
 }
 
 export const ROUTE_CARD_STYLE = `
+.route-answer-group{font-weight:600;margin:8px 0 3px}.route-answer-left{color:#00e676}.route-answer-right{color:#f14c4c}.route-answer-use{font-weight:600;margin:10px 0 4px}
+
 ${VERDICT_ICON_STYLE}
 .route-editor input,.route-editor select{display:block;box-sizing:border-box;width:100%;color:var(--vscode-input-foreground,#ddd);background:var(--vscode-input-background,#333);border:1px solid var(--vscode-input-border,#555);padding:4px}.route-answer-description{white-space:pre-wrap;font-size:11px;opacity:.9;margin:3px 0}.route-answer-readonly,.route-answer-impact{font-size:11px;color:var(--vscode-descriptionForeground,#aaa)}.route-editor{border-top:1px solid var(--vscode-panel-border,#555);margin-top:6px;padding-top:4px}.route-editor-title{margin:4px 0}.route-answer-impact summary{cursor:pointer}.route-answer-case-impact{white-space:pre-wrap;color:var(--vscode-errorForeground,#f99)}
 .route-verdict-badge.route-workflow-cue,.route-branch-nav.route-workflow-cue[aria-disabled=false]{filter:drop-shadow(0 0 3px #ffd54f) drop-shadow(0 0 6px #ffd54f)}

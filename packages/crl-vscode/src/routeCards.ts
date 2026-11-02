@@ -1,3 +1,4 @@
+import type { AnswerContribution } from "./answerContributions";
 // REFACTOR:grounded: construct cards only after walking a selected execution route.
 import type { CrlConceptNode, ConditionAnswerCheck, ScenarioViewModel } from "@smile-digital-health/crl";
 import type { QExpr, Questionnaire } from "./questionnaireModel";
@@ -11,6 +12,8 @@ export interface RouteCard {
   text: string; description: string; value: string; determination: string;
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
   questionRequest?: QaFlagView;
+  answerContributions?: AnswerContribution[];
+  unclassifiedAnswerUses?: {ownerKey:string;checkId:string;checkLabel:string}[];
   criteria: { lib: string; name: string }[];
   criterionPaths: { lib: string; name: string }[][];
   answerChoices: { system?: string; code: string; display: string; description?:string; editable?:boolean; readOnlyReason?:string; selected: boolean; request?:QaFlagView; pendingDelete?:boolean }[];
@@ -59,9 +62,10 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
   conditionFor: (lib: string, name: string) => ConditionAnswerCheck | undefined = () => undefined) {
   const cards: RouteCard[] = [], targets = new Map<string, WordingTarget>(), emitted = new Map<string, RouteCard>();
   const questionNumbers = new Map<string, number>();
-  const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: {lib: string; name: string}[], explanation: boolean, valueOnly = false, seen = new Set<string>(), checks: ConditionAnswerCheck[] = []) => {
+  const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: {lib: string; name: string}[], explanation: boolean, valueOnly = false, seen = new Set<string>(), checks: ConditionAnswerCheck[] = [], blockedBy?:ConditionAnswerCheck, subjectOf?:ConditionAnswerCheck) => {
     const identity = JSON.stringify([lib,name]);
     const ownCheck=conditionFor(lib,name);
+    blockedBy ??= !subjectOf && ownCheck && !['simple','aggregate'].includes(ownCheck.status)?ownCheck:undefined;
     if (ownCheck && !checks.some(c=>c.id===ownCheck.id)) checks=[...checks,ownCheck];
     if (seen.has(identity)) return;
     seen = new Set([...seen,identity]);
@@ -108,20 +112,22 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
       // another condition's criterion path with that owner.
       if (ownerKey===prior.ownerKey) prior.criterionPaths=owner.criterionPaths;
     }
+    if(answerable && blockedBy){const card=emitted.get(occurrence)!;card.unclassifiedAnswerUses??=[];
+      if(!card.unclassifiedAnswerUses.some(u=>u.ownerKey===ownerKey&&u.checkId===blockedBy!.id))card.unclassifiedAnswerUses.push({ownerKey,checkId:blockedBy.id,checkLabel:blockedBy.label});}
     for (const dependency of valueInputs(lib,name)) {
       const truth = sv.conceptTruth?.find(r => r.libraryName === dependency.lib && r.name === dependency.name)?.satisfied;
-      add(nodeId,dependency.name,dependency.lib,truth === true ? "yes" : truth === false ? "no" : "unknown", !!dependency.definitionKind, criteria, true, dependency.hasLocalCode, seen, checks);
+      add(nodeId,dependency.name,dependency.lib,truth === true ? "yes" : truth === false ? "no" : "unknown", !!dependency.definitionKind, criteria, true, dependency.hasLocalCode, seen, checks, blockedBy, ownCheck && ['simple','aggregate'].includes(ownCheck.status) && ownCheck.subjects.some(s=>s.key===dependency.nodeKey)?ownCheck:undefined);
     }
   };
-  const expand = (e: QExpr, nodeId: string, criteria: {lib: string; name: string}[]) => {
-    if (e.kind === "leaf") { add(nodeId, e.name, e.lib, e.answer, e.isInferred, criteria, true); if (e.composite) expand(e.composite, nodeId, criteria); }
-    else if (e.kind === "criterion") { if (e.body) expand(e.body, nodeId, [...criteria, {lib:e.lib, name:e.name}]); }
-    else if (e.kind === "not") expand(e.operand, nodeId, criteria);
-    else if (e.kind === "and" || e.kind === "or") e.operands.forEach(x => expand(x, nodeId, criteria));
+  const expand = (e: QExpr, nodeId: string, criteria: {lib: string; name: string}[], blockedBy?:ConditionAnswerCheck) => {
+    if (e.kind === "leaf") { const own=conditionFor(e.lib,e.name),blocked=blockedBy ?? (own && !['simple','aggregate'].includes(own.status)?own:undefined);add(nodeId, e.name, e.lib, e.answer, e.isInferred, criteria, true,false,new Set(),[],blocked); if (e.composite) expand(e.composite, nodeId, criteria,blocked); }
+    else if (e.kind === "criterion") { if (e.body) expand(e.body, nodeId, [...criteria, {lib:e.lib, name:e.name}],blockedBy); }
+    else if (e.kind === "not") expand(e.operand, nodeId, criteria,blockedBy);
+    else if (e.kind === "and" || e.kind === "or") e.operands.forEach(x => expand(x, nodeId, criteria,blockedBy));
   };
   for (const row of q.questions) {
     add(row.nodeId, row.conceptName, row.libraryName ?? sv.decision?.libraryName ?? "", row.answer, row.isInferred || row.rowKind === "guard", [], false);
-    if (row.expansion) expand(row.expansion, row.nodeId, []);
+    if (row.expansion) { const own=conditionFor(row.libraryName ?? sv.decision?.libraryName ?? "",row.conceptName);expand(row.expansion,row.nodeId,[],own && !['simple','aggregate'].includes(own.status)?own:undefined); }
   }
   return { cards, targets };
 }

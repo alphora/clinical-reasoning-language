@@ -1414,7 +1414,7 @@ check("defined-as wrapper is retained when its nested value helper has an unreso
 });
 
 check("resolved imported input is preserved when its local helper header is suppressed",()=>{
- const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['Imported:Q'],conditionAnswers:projectedCheck});
+ const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['Imported:Q'],conditionAnswers:{...projectedCheck,subjects:[{...projectedCheck.subjects[0],key:'Imported:Q'}]}});
  const question={...concept('Imported:Q','Imported question',{hasLocalCode:true}),lib:'Imported'};
  const opts={concepts:[helper,question],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',gleaf('Qualifies','c:H',{isSource:false,isInferred:true}))}]])};
  const expandedGuardWhens=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);

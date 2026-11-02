@@ -1,4 +1,4 @@
-import { installFlowConnectorAnswers } from "./flowConnectorAnswers";
+import { buildAnswerContributions, contributionsForOccurrences } from "./answerContributions";
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
@@ -2708,6 +2708,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const dirty = vscode.workspace.textDocuments.some(d => d.uri.fsPath === target.filePath && d.isDirty);
       return { ...target, editable: target.editable !== false && !foreign && !dirty, readOnlyReason: target.readOnlyReason ?? (foreign ? "Wording belongs to an imported library. Its CRL owner must edit the change." : dirty ? "Save or revert the unsaved CRL edits, then re-pin to edit wording." : undefined) };
     }, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answerOptions ?? [], definitionValueInputs(conceptLayer), (lib,name) => !!crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.hasLocalCode, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.answersFromTerminology, (lib,name) => crlMaps?.conceptByKey.get(nodeKey(conceptDeclRef(lib,name)))?.conditionAnswers);
+    const contributionIndex=buildAnswerContributions(crlStructure,conceptLayer,guardOutlines);
+    for(const card of built.cards){
+      const subjectKey=nodeKey(conceptDeclRef(card.library,card.concept));
+      card.answerContributions=contributionsForOccurrences(contributionIndex,card.occurrences,subjectKey);
+    }
     const answerTargets=new Map<string,AnswerTarget>(),answerSelection=currentCel && built.cards.some(c=>c.answerChoices?.length || c.choicesFrom)?resolveCelSuite(currentCel):undefined;
     for(const card of built.cards)if(card.answerChoices?.length || card.choicesFrom){
       try{
@@ -6165,10 +6170,9 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
   `let pinnedFlowKey='',pinnedRouteKeys=[],pinnedPathKeys=[],pinnedGroupKeys=[],pinnedGroupOutcomes=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
   // REFACTOR:grounded: component geometry follows live cards, collapse and zoom without changing route identities.
-  `const connectorAnswerUi=(${installFlowConnectorAnswers.toString()})(root);` +
   `const componentUi=(${installFlowComponentContainers.toString()})(root);` +
   `const logicUi=(${installFlowLogicHighlight.toString()})(root);` +
-  `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();logicUi.update();connectorAnswerUi.update();};` +
+  `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();logicUi.update();};` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
   `(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
@@ -6189,7 +6193,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();connectorAnswerUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();connectorAnswerUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();connectorAnswerUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
+  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion,routeToken:routeCardUi.token(),questionnaireOpen:routeCardUi.isExternal()});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted

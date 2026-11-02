@@ -1,5 +1,5 @@
+import { type AnswerContribution, buildAnswerContributions, partitionAnswerChoices } from "./answerContributions";
 import { VERDICT_ICON_STYLE } from "./branchVerdict";
-import { type ConnectorAnswerExpr, connectorAnswerExpression, connectorAnswerContent, connectorAnswerHeight, connectorAnswerMarkup, CONNECTOR_ANSWER_GAP, CONNECTOR_ANSWER_WIDTH, CONNECTOR_ANSWER_STYLE } from "./connectorAnswers";
 import {FLOW_LOGIC_STYLE} from "./flowLogicHighlight";
 // REFACTOR:grounded: connector truth, transparent fallbacks and upper-right pins follow the operator mockups.
 // CRL FLOW pane RENDERER (vscode-free, unit-tested) — the graphical decision-tree flowchart (T2, disc 132).
@@ -16,7 +16,7 @@ import {FLOW_LOGIC_STYLE} from "./flowLogicHighlight";
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { buildDefStruct, displayDetermination, topCriterion, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
+import { buildDefStruct, displayDetermination, topCriterion, type ConditionAnswerCheck, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 import { projectFlowStructure, type ProjectedFlowNode } from "./flowProjection";
 import { definitionValueInputs } from "./routeCards";
 
@@ -201,8 +201,10 @@ const LEAF_LABEL_MAX = 17;
 type FlowKind = "decision" | "when" | "otherwise" | "action" | "leaf";
 
 interface LaidNode {
-  answerExpr?: ConnectorAnswerExpr;
-  incomingAnswerHeight?: number;
+  answerCheckId?: string;
+  answerNegated?: boolean;
+  answerBranch?: "left"|"right";
+  answerBlockedBy?: string;
   visualElided?: boolean;
   choice?: { system?: string; code: string; display: string };
   choiceFor?: string;
@@ -246,7 +248,7 @@ interface LaidNode {
    *  toggle channel (chevron), an occurrence + collapsed-body flag rollup, but NOT an anchor/verdict target in 2a.
    *  `indent` drives x; `absX` is the precomputed left (indent-based). */
   outline?: boolean;
-  outlineRow?: "topor" | "op" | "leaf" | "external" | "more" | "crit" | "option";
+  outlineRow?: "topor" | "op" | "leaf" | "external" | "more" | "crit" | "option" | "answer-group";
   /** REFACTOR:grounded: owner text is display metadata, never a geometry/input dependency. */
   criterionDescription?: string;
   /** #233 Todo 2a: set on a `"crit"` outline row (a NON-ROOT criterion boundary) — the criterion IDENTITY (`lib`/`name`),
@@ -360,9 +362,8 @@ function buildLaid(
      *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
     answersFromByConcept?: Map<string, string>;
   } = {},
-): { roots: LaidNode[]; maxDepth: number; column: number } {
-  // REFACTOR:grounded: the connector owns a reserved answer lane, never a synthetic question.
-  let column = COL + ([...conceptMap.values()].some(c=>c.conditionAnswers) ? CONNECTOR_ANSWER_GAP : 0);
+): { roots: LaidNode[]; maxDepth: number; contributions:Map<string,AnswerContribution[]> } {
+  const contributions=buildAnswerContributions(structure,[...conceptMap.values()],opts.guardOutlines,true);
   let slot = 0;
   let maxDepth = 0;
   const outlineX = (whenLeft: number, indent: number): number => whenLeft + OUTLINE_BASE + indent * OUTLINE_INDENT;
@@ -381,7 +382,7 @@ function buildLaid(
   // the bottom of the branch-body band. Each visible row (op label / leaf / external / more) takes ONE compact row (DFS
   // pre-order: a header before its children) at an INDENT-based `absX`. `opPath` is the positional index path — the same
   // concept at two positions gets DISTINCT `leaf::` keys (no anchor/verdict collision). `topWhenKey` threads to every leaf.
-  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }, inputSeen = new Set<string>(), inCriterion = false): LaidNode => {
+  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }, inputSeen = new Set<string>(), inCriterion = false, checkContext?:ConditionAnswerCheck, negated=false, labelAsCheck=false, blockedContext?:ConditionAnswerCheck): LaidNode => {
     const base = { useDecision: false, outline: true as const, indent, absX: outlineX(whenLeft, indent), depth: 0, topWhenKey };
     const take = (): number => {
       const y = cursor.y;
@@ -392,12 +393,12 @@ function buildLaid(
       case "or":
       case "and": {
         const y = take();
-        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`, cursor, inputSeen, inCriterion));
+        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`, cursor, inputSeen, inCriterion, checkContext, negated, labelAsCheck, blockedContext));
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: s.kind === "or" ? "any of" : "all of", full: s.kind === "or" ? "any of" : "all of", y, children };
       }
       case "not": {
         const y = take();
-        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`, cursor, inputSeen, inCriterion);
+        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`, cursor, inputSeen, inCriterion, checkContext, !negated, labelAsCheck, blockedContext);
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: "not", full: "not", y, children: [child] };
       }
       case "external": {
@@ -412,18 +413,24 @@ function buildLaid(
       case "leaf": {
         const concept = conceptMap.get(s.nodeKey);
         const inputs = valueInputs(s.lib,s.name);
+        const ownCheck=concept?.conditionAnswers;
+        const admittedSubject=checkContext && ['simple','aggregate'].includes(checkContext.status) && checkContext.subjects.some(v=>v.key===s.nodeKey);
+        const blocked=blockedContext ?? (!admittedSubject && ownCheck && !['simple','aggregate'].includes(ownCheck.status)?ownCheck:undefined);
+        const proposedCheck=checkContext?(checkContext.subjects.some(v=>v.key===s.nodeKey)?checkContext:undefined):ownCheck;
+        const answerCheck=!blocked && proposedCheck && contributions.get(topWhenKey)?.some(r=>r.checkId===proposedCheck.id&&r.subjectKey===s.nodeKey&&r.negated===negated)?proposedCheck:undefined;
+        const representedCheck=!blocked && ownCheck && inputs.length===1 && contributions.get(topWhenKey)?.some(r=>r.checkId===ownCheck.id&&r.subjectKey===inputs[0].nodeKey&&r.negated===negated);
         // Project only fully represented helpers inside a Criterion with preserved review controls.
         const complete = (e: DefStructExpr): boolean => e.kind === "external" || e.kind === "more" ? false
           : e.kind === "leaf" ? !!conceptMap.get(e.nodeKey) && conceptMap.get(e.nodeKey)!.definitionRefs.every(k=>conceptMap.has(k)) && (!e.composite || complete(e.composite))
           : e.kind === "and" || e.kind === "or" ? e.operands.every(complete)
           : e.kind === "criterion" ? !e.elided && complete(e.operand) : e.kind === "not" && complete(e.operand);
         const visualElided = inCriterion && !s.isSource && !!concept && !concept.hasValueProjection && (
-          (!!concept.conditionAnswers && concept.definitionKind === "definition-is" && concept.definitionRefs.length === 1 && inputs.length === 1 && inputs[0].hasLocalCode) ||
-          (concept.definitionKind === "defined-as" && !!s.composite && complete(s.composite)));
+          (!!representedCheck && concept.definitionKind === "definition-is" && concept.definitionRefs.length === 1 && inputs.length === 1 && inputs[0].hasLocalCode) ||
+          (concept.definitionKind === "defined-as" && !concept.conditionAnswers && !!s.composite && complete(s.composite)));
         const y = visualElided ? cursor.y : take();
         const childIndent = indent + (visualElided ? 0 : 1);
-        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, childIndent, `${opPath}.c`, cursor, inputSeen, inCriterion)] : [];
-        children.push(...buildInputs(s.lib, s.name, whenLeft, topWhenKey, childIndent, `${opPath}.inputs`, cursor, inputSeen, inCriterion, visualElided));
+        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, childIndent, `${opPath}.c`, cursor, inputSeen, inCriterion, checkContext, negated, labelAsCheck, blocked)] : [];
+        children.push(...buildInputs(s.lib, s.name, whenLeft, topWhenKey, childIndent, `${opPath}.inputs`, cursor, inputSeen, inCriterion, visualElided, ownCheck, negated, blocked));
         // ⭐ #189: a concept with `value from:` options is a CODED QUESTION. Expanding it shows the answers,
         // POSITION-keyed like a criterion and default-COLLAPSED, so a wide option set never bloats the tree
         // until a reviewer asks for it. Reuses the criterion toggle channel with its own key prefix.
@@ -437,16 +444,21 @@ function buildLaid(
           optionsRow = { posKey, collapsed, count: answers.length };
           cursor.y += 24 / ROW;
           if (!collapsed) {
-            for (const [oi, o] of answers.entries()) {
+            const groups=partitionAnswerChoices(answers,answerCheck,s.nodeKey,negated);
+            for (const group of groups??[{branch:undefined,choices:answers}]) {
+            if(group.branch)children.push({...base,nodeKey:outlineKey(topWhenKey,`${opPath}.${group.branch}`,"answer-group"),kind:"leaf",outlineRow:"answer-group",indent:indent+1,absX:outlineX(whenLeft,indent+1),answerCheckId:answerCheck?.id,answerNegated:negated,answerBranch:group.branch,label:group.branch,full:"Answer branch contribution",y:take(),children:[]});
+            for (const [oi, o] of group.choices.entries()) {
               children.push({
                 ...base,
-                nodeKey: outlineKey(topWhenKey, `${opPath}.o${oi}`, "opt"),
+                nodeKey: outlineKey(topWhenKey, `${opPath}${group.branch?"."+group.branch:""}.o${oi}`, "opt"),
                 kind: "leaf", outlineRow: "option", indent: indent + 1,
                 absX: outlineX(whenLeft, indent + 1),
-                choice: o, choiceFor: JSON.stringify([s.lib,s.name]),
+                choice: o, choiceFor: JSON.stringify([s.lib,s.name]), answerCheckId:answerCheck?.id, answerNegated:negated,
                 label: o.display, full: `${o.display} — answer option \`${o.code}\``,
-                y: take(), children: [],
+                y: cursor.y, children: [],
               });
+              cursor.y += OUTLINE_ADVANCE;
+            }
             }
           }
         }
@@ -467,7 +479,8 @@ function buildLaid(
         }
         return {
           ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
-          label: s.name, full: `${s.name} — concept "${s.lib}"`,
+          label: checkContext && labelAsCheck ? checkContext.label : s.name, full: `${s.name} — concept "${s.lib}"`,
+          answerCheckId:answerCheck?.id, answerNegated:negated, answerBlockedBy:blocked?.label,
           conceptKey: s.nodeKey, conceptName: s.name, conceptLib: s.lib, isSource: s.isSource,
           visualElided, ...(optionsRow ? { optionsRow } : {}),
           y, children,
@@ -486,7 +499,7 @@ function buildLaid(
         const collapsed = !opts.expandAllCriteria && !(opts.expandedGuardWhens?.has(posKey) ?? false);
         const bodyConcepts: { lib: string; name: string }[] = [];
         collectLeafIdentities(s.operand, bodyConcepts);
-        const children = collapsed ? [] : [buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.b`, cursor, inputSeen, true)];
+        const children = collapsed ? [] : [buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.b`, cursor, inputSeen, true, checkContext, negated, labelAsCheck, blockedContext)];
         if (!collapsed) cursor.y += 12 / ROW; // cursor uses slots; reserve 12 pixels for the closing border
         return {
           ...base, nodeKey: posKey, kind: "leaf", outlineRow: "crit",
@@ -501,7 +514,7 @@ function buildLaid(
 
   // Value helpers have data dependencies, not Boolean operands. Keep those inputs
   // addressable at their own occurrence so their question never migrates to the helper.
-  const buildInputs = (lib: string, name: string, left: number, whenKey: string, indent: number, path: string, cursor: {y:number}, seen = new Set<string>(), inCriterion = false, transparent = false): LaidNode[] => {
+  const buildInputs = (lib: string, name: string, left: number, whenKey: string, indent: number, path: string, cursor: {y:number}, seen = new Set<string>(), inCriterion = false, transparent = false, checkContext?:ConditionAnswerCheck, negated=false, blockedContext?:ConditionAnswerCheck): LaidNode[] => {
     const key = JSON.stringify([lib,name]);
     if (seen.has(key)) return [];
     const inputs = valueInputs(lib,name);
@@ -519,34 +532,13 @@ function buildLaid(
     };
     inputs.forEach(collect);
     const y = cursor.y; if (!transparent) cursor.y += OUTLINE_ADVANCE;
-    const children = collapsed ? [] : inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+(transparent ? 0 : 1), `${path}.${i}`, cursor, new Set([...seen,key]), inCriterion));
+    const children = collapsed ? [] : inputs.map((c,i) => buildOutline({kind:"leaf",name:c.name,lib:c.lib,nodeKey:c.nodeKey,isSource:c.hasLocalCode,isInferred:!!c.definitionKind}, left, whenKey, indent+(transparent ? 0 : 1), `${path}.${i}`, cursor, new Set([...seen,key]), inCriterion, checkContext, negated, transparent, blockedContext));
     return [{visualElided:transparent,nodeKey:posKey,kind:"leaf",useDecision:false,outline:true,outlineRow:"op",indent,absX:outlineX(left,indent),depth:0,topWhenKey:whenKey,label:"input",full:"Input to this condition",y,children,...(!transparent ? {inputRow:{collapsed,count:inputs.length,bodyConcepts}} : {})}];
   };
 
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
     maxDepth = Math.max(maxDepth, depth);
-    const answerExpr = connectorAnswerExpression(n, conceptMap, opts.guardOutlines);
-    const shift = (node: LaidNode, delta: number): void => { node.y += delta; node.children.forEach(c=>shift(c,delta)); };
-    const structureChildren = n.children.map((c) => {
-      const start = slot;
-      const laid = layoutNode(c, depth + (n.kind === "otherwise" ? 0 : 1));
-      if (answerExpr) {
-        const targets = laid.kind === "otherwise" ? laid.children : [laid];
-        let next = start;
-        for (const target of targets) {
-          const outcome = laid.kind === "otherwise" ? "No" : target.incomingOutcome;
-          if (outcome !== "Yes" && outcome !== "No") continue;
-          const height = connectorAnswerHeight(connectorAnswerContent(answerExpr, outcome === "Yes"));
-          target.incomingAnswerHeight = Math.max(target.incomingAnswerHeight ?? 0, height);
-          const half = (height - NODE_H) / (2 * ROW);
-          const delta = Math.max(0, next + half - target.y);
-          if (delta) { shift(target, delta); slot += delta; }
-          next = target.y + (height + NODE_H) / (2 * ROW) + V_GAP / ROW;
-          slot = Math.max(slot, next);
-        }
-      }
-      return laid;
-    });
+    const structureChildren = n.children.map((c) => layoutNode(c, depth + (n.kind === "otherwise" ? 0 : 1)));
     // when → gating concept = refKeys[0]; action → guard concept = refKeys[1] when present. refKeysOf emits exactly
     // [target] or [target, guardConcept] for an action, so the guard is at index 1 (NOT "the last" — reading [1] makes an
     // unexpected 3-element array fail loudly rather than silently mis-peeking). Either ref may be unresolved (refKeys are
@@ -618,7 +610,7 @@ function buildLaid(
     // verdict overlay lights the criterion-body leaves exactly as it does a composite's. Mutually exclusive with the
     // single-concept path below: `guardOutline` is set ⇒ `conceptRef`/`cf.conceptName` were suppressed (see above).
     if (guardOutline && !collapsed) {
-      const whenLeft = PAD + depth * column - (depth > 0 ? column - COL : 0);
+      const whenLeft = PAD + depth * COL;
       const cursor = { y: nodeY + (NODE_H * 1.5) / ROW };
       // #233 Todo 2a ROOT-ABSORPTION: a guard whose TOP expr IS a criterion (the sole case) has that criterion absorbed
       // INTO the `when` box (its name/chevron/verdict live on the box via `criterionCollapse`), so we hang the criterion's
@@ -632,7 +624,7 @@ function buildLaid(
     } else if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
       const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
       if (entry?.hasDefinedAs && entry.body) {
-        const whenLeft = PAD + depth * column - (depth > 0 ? column - COL : 0);
+        const whenLeft = PAD + depth * COL;
         const cursor = { y: nodeY + (NODE_H * 1.5) / ROW }; // top-aligned: half a node of padding below the box
         if (cf.isSource) {
           const y = cursor.y;
@@ -647,7 +639,7 @@ function buildLaid(
     }
     if (!outlineRoots.length && cf.conceptName && cf.conceptLib) {
       const cursor = {y:nodeY + (NODE_H * 1.5) / ROW};
-      outlineRoots.push(...buildInputs(cf.conceptLib,cf.conceptName,PAD+depth*column-(depth>0?column-COL:0),n.nodeKey,0,"inputs",cursor));
+      outlineRoots.push(...buildInputs(cf.conceptLib,cf.conceptName,PAD+depth*COL,n.nodeKey,0,"inputs",cursor,new Set(),false,false,conceptMap.get(cf.conceptKey!)?.conditionAnswers));
       if (outlineRoots.length) slot = Math.max(slot,cursor.y);
     }
     // A direct concept guard already owns its question identity. Attach choices to that box;
@@ -660,7 +652,7 @@ function buildLaid(
         : undefined;
     if (outlineRoots.length === 0 && selfAnswersFrom) {
       // The pointer case on the canonical shape — one plain row under the `when`, no disclosure.
-      const whenLeft = PAD + depth * column - (depth > 0 ? column - COL : 0);
+      const whenLeft = PAD + depth * COL;
       outlineRoots.push({
         nodeKey: outlineKey(n.nodeKey, "self.vs", "opt"),
         kind: "leaf", useDecision: false, outline: true, outlineRow: "option",
@@ -672,23 +664,29 @@ function buildLaid(
       slot = Math.max(slot, nodeY + (NODE_H * 1.5) / ROW + OUTLINE_ADVANCE);
     }
     if (outlineRoots.length === 0 && selfAnswers && selfAnswers.length > 0) {
-      const whenLeft = PAD + depth * column - (depth > 0 ? column - COL : 0);
+      const whenLeft = PAD + depth * COL;
       const cursor = { y: nodeY + (NODE_H + 26) / ROW };
       const posKey = outlineKey(n.nodeKey, "self", "opts");
       const optCollapsed = !opts.expandAllCriteria && !(opts.expandedGuardWhens?.has(posKey) ?? false);
       optionsRow = { posKey, collapsed: optCollapsed, count: selfAnswers.length };
       const optChildren: LaidNode[] = [];
       if (!optCollapsed) {
-        for (const [oi, o] of selfAnswers.entries()) {
+        const proposed=conceptMap.get(cf.conceptKey!)?.conditionAnswers;
+        const answerCheck=proposed && contributions.get(n.nodeKey)?.some(r=>r.checkId===proposed.id&&r.subjectKey===cf.conceptKey)?proposed:undefined;
+        const groups=partitionAnswerChoices(selfAnswers,answerCheck,cf.conceptKey!);
+        for(const group of groups??[{branch:undefined,choices:selfAnswers}]) {
+        if(group.branch)optChildren.push({nodeKey:outlineKey(n.nodeKey,`self.${group.branch}`,"answer-group"),kind:"leaf",useDecision:false,outline:true,outlineRow:"answer-group",indent:1,absX:outlineX(whenLeft,1),topWhenKey:n.nodeKey,depth:0,answerCheckId:answerCheck?.id,answerNegated:false,answerBranch:group.branch,label:group.branch,full:"Answer branch contribution",y:cursor.y,children:[]}),cursor.y+=OUTLINE_ADVANCE;
+        for (const [oi, o] of group.choices.entries()) {
           optChildren.push({
-            nodeKey: outlineKey(n.nodeKey, `self.o${oi}`, "opt"),
+            nodeKey: outlineKey(n.nodeKey, `self${group.branch?"."+group.branch:""}.o${oi}`, "opt"),
             kind: "leaf", useDecision: false, outline: true, outlineRow: "option",
             indent: 1, absX: outlineX(whenLeft, 1),
-            choice: o, choiceFor: JSON.stringify([cf.conceptLib,cf.conceptName]),
+            choice: o, choiceFor: JSON.stringify([cf.conceptLib,cf.conceptName]), answerCheckId:answerCheck?.id, answerNegated:false,
             label: o.display, full: `${o.display} — answer option \`${o.code}\``,
             depth: 0, topWhenKey: n.nodeKey, y: cursor.y, children: [],
           });
           cursor.y += OUTLINE_ADVANCE;
+        }
         }
       }
       outlineRoots.push(...optChildren);
@@ -696,7 +694,9 @@ function buildLaid(
     }
     const children = [...structureChildren, ...outlineRoots];
     return {
-      nodeKey: n.nodeKey, kind: n.kind, answerExpr, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf, optionsRow,
+      nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display,
+      answerCheckId:cf.conceptKey && contributions.get(n.nodeKey)?.find(r=>r.subjectKey===cf.conceptKey)?.checkId, answerNegated:false,
+      answerBlockedBy:cf.conceptKey && conceptMap.get(cf.conceptKey)?.conditionAnswers && !['simple','aggregate'].includes(conceptMap.get(cf.conceptKey)!.conditionAnswers!.status)?conceptMap.get(cf.conceptKey)!.conditionAnswers!.label:undefined, full, depth, y: nodeY, children, ...cf, optionsRow,
       incomingOutcome: (n as ProjectedFlowNode).incomingOutcome,
       delegatedDecisionKey: useDecision ? n.refKeys[0] : undefined,
       ...(sole ? { criterionDescription: sole.description, criterionCollapse: { collapsed, lib: sole.lib, name: sole.name, bodyConcepts: critBodyConcepts } } : {}),
@@ -719,25 +719,7 @@ function buildLaid(
     });
     slot += FOREST_GAP; // next tree's leaves continue from here → disjoint vertical band per decision tree
   }
-  // REFACTOR:grounded: deep expanded criterion/input outlines also clear the answer lane.
-  if (column > COL) {
-    const nodes:LaidNode[]=[];
-    const visit=(n:LaidNode):void=>{nodes.push(n);n.children.forEach(visit);};roots.forEach(visit);
-    const byKey=new Map(nodes.map(n=>[n.nodeKey,n]));
-    const oldColumn=column;
-    for(const n of nodes) {
-      const owner=n.topWhenKey && byKey.get(n.topWhenKey);
-      if(!owner || n.absX===undefined)continue;
-      const origin=PAD+owner.depth*oldColumn-(owner.depth>0?oldColumn-COL:0);
-      const width=n.inputRow?INPUT_NODE_W:n.outlineRow==='op'||n.outlineRow==='topor'?60:OUTLINE_NODE_W;
-      column=Math.max(column,n.absX-origin+width+CONNECTOR_ANSWER_GAP+32);
-    }
-    for(const n of nodes) {
-      const owner=n.topWhenKey && byKey.get(n.topWhenKey);
-      if(owner && n.absX!==undefined)n.absX+=(column-oldColumn)*Math.max(0,owner.depth-1);
-    }
-  }
-  return { roots, maxDepth, column };
+  return { roots, maxDepth, contributions };
 }
 
 export function renderFlowPane(
@@ -777,7 +759,7 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth, column } = buildLaid(projectFlowStructure(structure), conceptMap, {
+  const { roots, maxDepth, contributions } = buildLaid(projectFlowStructure(structure), conceptMap, {
     traversalNavigation: opts.traversalNavigation,
     defExpr: opts.defExpr,
     guardOutlines: opts.guardOutlines,
@@ -803,14 +785,14 @@ export function renderFlowPane(
   const nodeW = (n: LaidNode): number =>
     n.kind === "otherwise" && n.label === "No" ? 42 : n.outline ? (n.inputRow ? (n.inputRow.collapsed ? INPUT_NODE_W : OUTLINE_NODE_W) : n.outlineRow === "op" || n.outlineRow === "topor" ? 60 : OUTLINE_NODE_W) : NODE_W;
   // left x: an OUTLINE row uses its precomputed INDENT-based `absX`; a structure node uses its depth column.
-  const left = (n: LaidNode): number => n.absX ?? PAD + n.depth * column - (n.depth>0?column-COL:0);
+  const left = (n: LaidNode): number => n.absX ?? PAD + n.depth * COL;
   const top = (n: LaidNode): number => Math.round(PAD + n.y * ROW); // node top y (rounded)
   const midY = (n: LaidNode): number => top(n) + nodeH(n) / 2; // node vertical center
 
   const maxY = all.reduce((m, n) => Math.max(m, n.y), 0);
   // EXTENT-based width — the outline's indent-based x is decoupled from the depth grid (`maxDepth` is NOT bumped for
   // outline rows), so width MUST come from the actual right edge of EVERY node (boxes + labels + stubs), not `maxDepth*COL`.
-  const rightEdge = all.reduce((m, n) => Math.max(m, left(n) + nodeW(n)), PAD + maxDepth * column - (maxDepth>0?column-COL:0) + NODE_W);
+  const rightEdge = all.reduce((m, n) => Math.max(m, left(n) + nodeW(n)), PAD + maxDepth * COL + NODE_W);
   // REFACTOR:grounded: nested component frames extend beyond their last descendant.
   const componentDepth = (n: LaidNode, depth = 0): number => {
     const component = n.criterionCollapse ?? n.critRow;
@@ -821,11 +803,11 @@ export function renderFlowPane(
   const width = Math.ceil(rightEdge + PAD + frameDepth * 8);
   // EXTENT-based height (#208) — the bottommost box may be a taller NODE_H or a shorter outline OUTLINE_H at a fractional
   // `y`, and the on-path RING extends ~3px beyond the box, so take the true max bottom + a ring margin, not `maxY*ROW+NODE_H`.
-  const bottomEdge = all.reduce((m, n) => Math.max(m, top(n) + nodeH(n), midY(n) + (n.incomingAnswerHeight ?? 0)/2), PAD + NODE_H);
+  const bottomEdge = all.reduce((m, n) => Math.max(m, top(n) + nodeH(n)), PAD + NODE_H);
   const height = Math.ceil(bottomEdge + 4 + PAD + frameDepth * 12);
 
   // Edges first (so node boxes paint over them). Edges are pure <path> — NEVER reveal targets.
-  let body = "", answerBody = "";
+  let body = "";
   for (const n of all) {
     if (n.kind === "otherwise" || n.visualElided) continue;
     const px = left(n) + nodeW(n);
@@ -842,12 +824,6 @@ export function renderFlowPane(
         const ex = left(c);
         const ey = midY(c);
         const mx = Math.round((px + ex) / 2);
-        const expr = n.answerExpr;
-        if (expr && (c.incomingOutcome === "Yes" || c.incomingOutcome === "No")) {
-          const outcome = c.incomingOutcome === "Yes", h = connectorAnswerHeight(connectorAnswerContent(expr, outcome));
-          answerBody += connectorAnswerMarkup(JSON.stringify([n.nodeKey,c.nodeKey,outcome]), n.nodeKey,c.nodeKey,outcome,expr,
-            ex - CONNECTOR_ANSWER_WIDTH - 20, ey - h/2);
-        }
         body += `<path class="flow-edge" data-flow-outcome="${c.incomingOutcome ?? ""}" data-flow-condition="${n.kind === "when" ? escapeHtml(n.nodeKey) : ""}" data-flow-from="${escapeHtml(n.nodeKey)}" data-flow-to="${escapeHtml(c.nodeKey)}" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
 
       }
@@ -898,6 +874,14 @@ export function renderFlowPane(
       continue;
     }
 
+    // REFACTOR:grounded: group headings preview branch destinations without asserting a code determines the criterion.
+    if(n.outline && n.outlineRow==="answer-group") {
+      const preview=contributions.get(n.topWhenKey!)?.find(r=>r.checkId===n.answerCheckId && r.negated===!!n.answerNegated && r.branch===n.answerBranch);
+      const label=(n.answerBranch==='left'?'← ':'→ ')+(preview?.label??'Unavailable');
+      body+=`<g id="${escapeHtml(gid)}" class="flow-outline flow-answer-group flow-answer-${n.answerBranch}" aria-label="${escapeHtml(preview?.explanation??'Answer branch preview unavailable')}"><title>${escapeHtml(preview?.explanation??'Answer branch preview unavailable')}</title>${labelMarkup(label,x,y,OUTLINE_H,OUTLINE_LABEL_MAX,9)}</g>`;
+      continue;
+    }
+
     // ⭐ #189: an ANSWER OPTION row — one coded answer a clinician is offered for the coded question
     // above it. Render-only and deliberately quiet: it is evidence about the question, not a node anyone
     // selects, flags or navigates to. A reviewer needs to SEE the seven alternatives; they do not need
@@ -905,7 +889,7 @@ export function renderFlowPane(
     if (n.outline && n.outlineRow === "option") {
       body +=
         `<g id="${escapeHtml(gid)}" class="flow-outline flow-opt"><title>${escapeHtml(n.full)}</title>` +
-        `<rect x="${x}" y="${y + 2}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H - 4}" rx="4"/>` +
+        `<rect x="${x}" y="${y + 2}" width="${OUTLINE_NODE_W}" height="${nodeH(n) - 4}" rx="4"/>` +
         labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
         `</g>`;
       continue;
@@ -949,8 +933,7 @@ export function renderFlowPane(
       const row=n.optionsRow;if(!row)return "";
       const toggleKey=`${prefix}o${gid}`;
       reveals[toggleKey]={criterionToggle:row.posKey};
-      const label = n.conceptKey && conceptMap.get(n.conceptKey)?.conditionAnswers ? 'All answers' : 'Answer choices';
-      return critToggle(x+8,y+height+13,row.collapsed,toggleKey,`${label} (${row.count})`).replace('<g ', '<g data-flow-choices-toggle="1" ').replace('</g>',`<text x="${x+20}" y="${y+height+17}">${label} (${row.count})</text></g>`);
+      return critToggle(x+8,y+height+13,row.collapsed,toggleKey,`Answers (${row.count})`).replace('<g ', '<g data-flow-choices-toggle="1" ').replace('</g>',`<text x="${x+20}" y="${y+height+17}">Answers (${row.count})</text></g>`);
     };
     // #187 Option-C: an OUTLINE LEAF row (a `defined as` concept operand). Its synthetic `leaf::` key (`n.nodeKey`,
     // path-bearing → collision-free) anchors it + joins the Todo-5 verdict overlay. #187 Todo 3: carries a hidden on-path
@@ -1119,7 +1102,8 @@ export function renderFlowPane(
     let groupDepth = 0;
     for (let p = logicParent(n); p; p=logicParent(p)) groupDepth++;
     const metadata = (n.visualElided ? ' display="none" data-flow-elided="1" aria-hidden="true"' : '') +
-      (n.incomingAnswerHeight ? ` data-answer-band="${n.incomingAnswerHeight}"` : '') +
+      (n.answerBlockedBy ? ` data-answer-blocked="${escapeHtml(n.answerBlockedBy)}"` : '') +
+      (n.answerCheckId ? ` data-answer-check="${escapeHtml(n.answerCheckId)}" data-answer-negated="${!!n.answerNegated}"` : '') +
       (n.optionsRow ? ' data-flow-has-choices="1"' : '') +
       (n.inputRow ? ` data-flow-input="${n.inputRow.collapsed ? "collapsed" : "expanded"}" aria-expanded="${!n.inputRow.collapsed}"` : "") +
       (n.inputRow?.collapsed ? ` data-flow-hidden-inputs="${escapeHtml(JSON.stringify(n.inputRow.bodyConcepts.map(c=>[c.lib,c.name])))}"` : "") +
@@ -1127,7 +1111,7 @@ export function renderFlowPane(
       (isLogic(n) ? ` data-flow-logic="${escapeHtml(n.nodeKey)}" data-flow-logic-parent="${escapeHtml(logicParent(n)?.nodeKey ?? "")}" data-flow-logic-depth="${groupDepth}" data-flow-logic-kind="${n.label === "any of" ? "any" : "all"}" role="button" tabindex="0" aria-pressed="false"` : '') +
       ` data-flow-key="${escapeHtml(n.nodeKey)}" data-flow-parent="${escapeHtml(parents.get(n.nodeKey) ?? "")}"` +
       (n.kind === 'action' && !n.useDecision ? ' data-flow-terminal="1"' : '') +
-      (n.outlineRow === "option" ? ' data-flow-decoration="choices"' : n.outlineRow === "op" && n.label === "input" ? ' data-flow-decoration="input"' : '') +
+      ((n.outlineRow === "option" || n.outlineRow === "answer-group") ? ' data-flow-decoration="choices"' : n.outlineRow === "op" && n.label === "input" ? ' data-flow-decoration="input"' : '') +
       (n.kind !== "otherwise" && (!n.outline || n.outlineRow === "leaf" || n.outlineRow === "crit" || n.inputRow) ? ` tabindex="-1" role="button" aria-label="${escapeHtml(n.inputRow ? `Inputs (${n.inputRow.count})` : n.label)}"` : "") +
       ` data-flow-when="${escapeHtml(n.topWhenKey ?? n.nodeKey)}"` +
       (n.criterionCollapse || n.critRow ? ` data-flow-component="${(n.criterionCollapse ?? n.critRow)!.collapsed ? "collapsed" : "expanded"}"` : "") +
@@ -1151,7 +1135,7 @@ export function renderFlowPane(
   }
   const svg =
     `<svg class="flow-svg" aria-label="Decision tree" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
-    body + answerBody +
+    body +
     `</svg>`;
   // A floating zoom control (fixed to the pane corner). The zoom LEVEL is webview-local state re-applied after every
   // render (applyZoom); this markup is stateless — the % is filled in by applyZoom. Ctrl+wheel / Ctrl +/-/0 also zoom.
@@ -1260,7 +1244,8 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 
 }
 
-export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE + CONNECTOR_ANSWER_STYLE +
+export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
+  `.flow-answer-group>text{font-size:12px;font-weight:600}.flow-answer-left>text{fill:#00e676}.flow-answer-right>text{fill:#f14c4c}` +
   `html:has(.flow-svg){overflow-anchor:none}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
   `body[data-mode="medical-validation"] #root:not(.flow-has-pin) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-show-all-pins:not(.flow-has-pin) .flow-activity>.flow-pin{display:inline}` +

@@ -54,61 +54,20 @@ export class SnapshotCapture {
 /** The maximum captured-DOM size we accept (a sanity bound on a webview→host payload; a real tree is well under this). */
 export const SNAPSHOT_MAX_BYTES = 8 * 1024 * 1024;
 
-// REFACTOR:grounded: allow only the inert connector disclosure vocabulary inside foreignObject.
-// Other foreignObjects (including editable pinned forms) remain outside the snapshot contract.
-function inertConnectorObject(markup: string): boolean {
-  const stack: string[] = [];
-  let cursor = 0;
-  for (const token of markup.matchAll(/<[^>]*>/g)) {
-    if (markup.slice(cursor, token.index).includes('<')) return false;
-    cursor = token.index! + token[0].length;
-    const closing = token[0].match(/^<\/([a-zA-Z]+)>$/);
-    if (closing) { if (stack.pop() !== closing[1].toLowerCase()) return false; continue; }
-    const open = token[0].match(/^<([a-zA-Z]+)((?:\s+[\w-]+="[^"<>]*")*)>$/);
-    if (!open) return false;
-    const tag = open[1].toLowerCase();
-    if (!['foreignobject','div','details','summary','p','ul','li','span','strong'].includes(tag)) return false;
-    if (!stack.length && tag !== 'foreignobject') return false;
-    if (stack.length && tag === 'foreignobject') return false;
-    const attrs = [...open[2].matchAll(/([\w-]+)="([^"<>]*)"/g)];
-    if (new Set(attrs.map(a=>a[1])).size !== attrs.length) return false;
-    for (const [,name,value] of attrs) {
-      if (tag === 'foreignobject') {
-        if (name === 'class' && value === 'flow-connector-answer-body') continue;
-        if (['x','y','width','height'].includes(name) && /^-?\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value))) continue;
-        return false;
-      }
-      if (name === 'class' && /^connector-answer-[a-z-]+$/.test(value)) continue;
-      if (name === 'title' && tag === 'li') continue;
-      if (name === 'open' && tag === 'details' && value === '') continue;
-      if (name === 'data-connector-disclosure' && tag === 'details') continue;
-      if (name === 'xmlns' && tag === 'div' && value === 'http://www.w3.org/1999/xhtml') continue;
-      return false;
-    }
-    if (tag === 'foreignobject' && (!attrs.some(a=>a[1]==='class') || !['x','y','width','height'].every(k=>attrs.some(a=>a[1]===k)))) return false;
-    stack.push(tag);
-  }
-  return stack.length === 0 && !markup.slice(cursor).includes('<');
-}
-
 /** Screen a captured-DOM string before it is wrapped into a self-contained file. The capture is our OWN `renderFlowPane`
  *  output re-serialized from the host-owned `#root` — but it crosses the (untrusted) webview→host channel into a file whose
  *  CSP allows inline script, so we reject a non-string, an oversized blob (UTF-8 bytes, not code units), or any element/
  *  attribute the renderer NEVER emits. Text nodes escape `<`→`&lt;`, so every `<tag` check is immune to false-positives on
  *  clinical label text; the event-handler check requires a QUOTED value (serialized attributes are always quoted) so text
  *  like "… ongoing = yes" won't trip it. Defense-in-depth behind the compromised-webview precondition. `{ok:false,reason}` on
- *  rejection. URL-bearing markup stays rejected; the sole foreignObject exception has a strict inert vocabulary.) */
+ *  rejection. (Encoded-URL / `srcdoc` vectors are moot: they only matter on `<a>/<iframe>/<foreignObject>`, all rejected here.) */
+// REFACTOR:grounded: SVG answer groups require no foreignObject exception to the active-content screen.
 export function screenCapturedDom(html: unknown): { ok: true; html: string } | { ok: false; reason: string } {
   if (typeof html !== "string") return { ok: false, reason: "the capture was not text" };
   if (Buffer.byteLength(html, "utf8") > SNAPSHOT_MAX_BYTES) return { ok: false, reason: "the captured tree is unexpectedly large" };
-  let invalidObject = false;
-  const screened = html.replace(/<foreignObject\b[\s\S]*?<\/foreignObject>/gi, value => {
-    if (!inertConnectorObject(value)) { invalidObject = true; return value; }
-    return '';
-  });
   if (
-    invalidObject || /<script/i.test(html) || // any <script (incl. `<script/x>` — a `/` is a valid attr separator)
-    /<(iframe|object|embed|foreignobject|base|meta|style|link|a|form|input)[\s/>]/i.test(screened) || // active-content elements the flow renderer never emits
+    /<script/i.test(html) || // any <script (incl. `<script/x>` — a `/` is a valid attr separator)
+    /<(iframe|object|embed|foreignobject|base|meta|style|link|a|form|input)[\s/>]/i.test(html) || // active-content elements the flow renderer never emits
     /[\s/"']on[a-z]+\s*=\s*["']/i.test(html) // an on<event>="…" handler attribute (quoted → no clinical-text false-positive)
   ) {
     return { ok: false, reason: "the capture contained unexpected active content" };

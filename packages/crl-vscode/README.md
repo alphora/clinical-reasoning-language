@@ -172,14 +172,12 @@ This release distributes the verified VSIX as a GitHub release asset. Marketplac
 
 For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see the [core README § Cutting a release](https://github.com/alphora/clinical-reasoning-language/blob/v5.3.0/packages/crl/README.md#cutting-a-release-build-both-artifacts--upload-to-github).
 
-## Answers on decision branches
+## Grouped answers in Medical Review
 
-<!-- REFACTOR:grounded: connector lists explain the existing condition; full question answers retain their own identity. -->
-Expand **View answers** on a branch connector to inspect its answer choices. Each connector opens independently. Opening a list keeps the tree viewport in place; long lists scroll within the panel.
+<!-- REFACTOR:grounded: code groups are occurrence-specific branch contributions, not individual case verdicts. -->
+Expand **Answers** on a question/check node to see its complete answer list split into green left and red right groups. Each colored heading previews that branch's next step: the terminal name, or **Continue** when another node follows. The colors and arrows identify contributions toward a branch; a code alone need not determine the whole criterion's result. Code descriptions retain their normal text color.
 
-For a criterion containing several checks, the explanation keeps the **ALL OF / ANY OF** grouping and names each check and its question. Two checks of the same question retain their separate subsets. The two connectors describe the criterion's overall result; the explanation does not imply that every listed answer independently determines that result.
-
-**All answers** on a question shows its complete answer list. Connector lists are views of existing logic, so editing question answers still applies to the full question. When an exact subset cannot be established from the source, the connector shows the condition and an explanation instead of inventing a list.
+Two checks of the same question keep their own names and subsets. Existing ALL OF, ANY OF and NOT structure remains visible. The source question, answer editing and flag ownership remain unchanged. Attached and detached question cards show the same per-use groups. When exact classification is unavailable, the full answer list remains available without invented grouping. No additional ValueSets or questions are authored.
 
 ## Medical Review answer editing
 
