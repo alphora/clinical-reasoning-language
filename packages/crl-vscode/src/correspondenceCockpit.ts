@@ -1,4 +1,8 @@
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
+import {prepareStructuralSave,structuralEditsPending,setStructuralEditsPending,hasStructuralEditHistory,validateStructuralCandidate} from './structureEditing';
+import {pinnedMovePlans,movedOccurrenceKey,type PinnedMovePlan,type MoveAddress} from './pinnedMove';
+import {installPinnedMove,PINNED_MOVE_STYLE} from './pinnedMoveWebview';
+import {runKeUpdates} from './keQaApply';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
 import { applyKeFlagAction, keFlagRevision, keFlagContentRevision, isKeAnswerSavedError } from './flagWorkflowStore';
@@ -559,6 +563,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // all its occurrences + cases); the live render's `criterionOccurrences` + `guardOutlines` supply the bodyHash for staleness.
   let criterionVerdicts: Record<string, PersistedCriterionVerdict> = {};
   let mvEditBusy = false, mvDeferredRebuild = false, mvRecoveryBlock: string | undefined, mvSaveNotice: string | undefined;
+  let treeEditsPending=false,treeEditHistory=false;
   const definitionFreshness = new MvDefinitionFreshness();
   let currentDefinitions: DefinitionFreshness = {state:'checking',message:'Checking current policy definitions.'};
   let modelDefinitionDigest:string|undefined;
@@ -567,17 +572,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(currentCel)interactiveQuestionnaire.definitionsChanged(currentCel);
   }
   function reviewDefinitionsCurrent():boolean{
-    return !mvDefinitionRevision || currentDefinitions.state==='current' && currentDefinitions.digest===modelDefinitionDigest;
+    return !treeEditsPending && (!(mvDefinitionRevision||treeEditHistory) || currentDefinitions.state==='current' && currentDefinitions.digest===modelDefinitionDigest);
   }
   function definitionStatusMessage():string|undefined{
     if(mvEditBusy)return 'Saving policy edit...';
     if(mvRecoveryBlock)return mvRecoveryBlock;
     if(mvSaveNotice)return mvSaveNotice;
+    if(treeEditsPending)return 'CRL tree edits saved. Generated questionnaires and results are stale. Run Updates, then review the cases again.';
     if(!reviewDefinitionsCurrent())return currentDefinitions.state==='current'?'Definitions changed; refresh the reviewed tree before completing review.':currentDefinitions.message;
   }
   function verifyDefinitionsAtApproval():boolean{
     if(mode!=='medical-validation'||!currentCel)return false;
-    if(!mvDefinitionRevision)return true; // Existing review workflows do not inherit direct-edit layout restrictions.
+    if(treeEditsPending)return false;
+    if(!mvDefinitionRevision&&!treeEditHistory)return true; // Existing review workflows do not inherit direct-edit layout restrictions.
     try{
       const selected=resolveCelSuite(currentCel);if(!selected.ok||!selected.suite.policyPath)throw new Error('Current policy owner is unavailable.');
       const root=selected.suite.projectRoot;
@@ -1155,7 +1162,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const questionnaires=mode==='medical-validation'?`<div class="fc-toggle">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn${interactiveQuestionnaire.isOpen?" fc-active":""}" data-interactive-questionnaire aria-pressed="${interactiveQuestionnaire.isOpen}">Interactive FHIR Questionnaire</button></div>`:'';
     const definitionMessage=definitionStatusMessage();
     const definitionStatus=mode==='medical-validation' && definitionMessage?`<div role="status" class="fc-gaps">${escapeHtml(definitionMessage)}</div>`:'';
-    return definitionStatus + progress + toggle + diverterToggle + exportBtn + reviewVerdictsBtn + questionnaires + (mode==='medical-validation'?'<div class="fc-toggle"><button class="fc-toggle-btn" data-mv-edit-action="history">Review edit history</button><button class="fc-toggle-btn" data-mv-edit-action="recovery">Edit recovery</button></div>':'') + banner + flowLegendChrome(mode);
+    return definitionStatus + progress + toggle + diverterToggle + exportBtn + reviewVerdictsBtn + questionnaires + (mode==='medical-validation'?'<div class="fc-toggle"><button class="fc-toggle-btn" data-mv-edit-action="updates">Run Updates</button><button class="fc-toggle-btn" data-mv-edit-action="history">Review edit history</button><button class="fc-toggle-btn" data-mv-edit-action="recovery">Edit recovery</button></div>':'') + banner + flowLegendChrome(mode);
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the
@@ -1163,6 +1170,27 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function renderTreeChrome(): void {
     const tree = views.get("tree");
     if (tree) void tree.panel.webview.postMessage({ type: "fcChrome", html: buildTreeChromeHtml() });
+  }
+
+  // Structural changes save authored CRL immediately. KELP owns the external
+  // scope lifecycle; the native rebuild runs only on explicit user invocation.
+  async function runTreeUpdates():Promise<void>{
+    if(!currentCel||mode!=='medical-validation')return;
+    if(mvEditBusy)throw Error('An update is already running.');
+    assertMvWriteAllowed();
+    const cel=currentCel,selected=resolveCelSuite(cel);if(!selected.ok||!selected.suite.policyPath)throw Error('The policy and MV case suite could not be resolved.');
+    const root=selected.suite.projectRoot;
+    if(vscode.workspace.textDocuments.some(d=>d.isDirty&&!relative(root,d.uri.fsPath).startsWith('..')&&/\.(crl|cel)$/.test(d.uri.fsPath)))throw Error('Save open CRL and CEL edits before running updates.');
+    mvEditBusy=true;mvSaveNotice=undefined;renderTreeChrome();
+    try{
+      await vscode.window.withProgress({location:vscode.ProgressLocation.Notification,title:'Updating policy artifacts and static questionnaires',cancellable:false},async()=>{
+        await runKeUpdates({schemaVersion:1,operation:'rebuild',artifactRoot:root},{storageRoot:editStorage(root),crlVersion:context.extension.packageJSON.version});
+      });
+      setStructuralEditsPending(root,false,selected.suite.policyPath);
+      definitionFreshness.invalidate();
+      if(currentCel===cel){treeEditsPending=false;await vscode.commands.executeCommand('crl.invalidateProjectCache');rebuild();}
+      void vscode.window.showInformationMessage('Policy artifacts and static questionnaires updated. Review the cases before approving.');
+    }finally{mvEditBusy=false;renderTreeChrome();}
   }
 
   // ── #203 Todo 4 / #212 S3: the review-flag surface ───────────────────────────────────
@@ -2343,7 +2371,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           // Left to LForms these degrade quietly (empty dropdown, absent widget), which is the one failure shape
           // this pane must not have.
           const unrenderable = q === undefined ? [] : unrenderableQuestionnaireFeatures(q);
-          const definitionState=stale || currentDefinitions.state==='drift'?'changed':currentDefinitions.state;
+          const definitionState=treeEditsPending || stale || currentDefinitions.state==='drift'?'changed':currentDefinitions.state;
           const effectiveStale=definitionState==='changed';
           void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key: key && `${key}::${createHash("sha256").update(JSON.stringify({q,qr,stale:effectiveStale,definitionState,definitions:currentDefinitions.digest})).digest("hex")}`, label, q, qr, lookedFor, unrenderable, stale:effectiveStale, definitionState });
         };
@@ -2621,7 +2649,58 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // REFACTOR:grounded: the host owns pin identity and proposal targets; webview never supplies paths.
   let wordingSources: ReturnType<typeof graphWordingSources> = new Map();
   let disclosureFocus: { gen: number; token: string } | undefined;
-  let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; traversalKey: string; traversal: TreeTraversal; verdictCaseIds: string[]; payload: any; targets: Map<string, WordingTarget>; answerTargets:Map<string,AnswerTarget> } | undefined;
+  let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; traversalKey: string; traversal: TreeTraversal; verdictCaseIds: string[]; payload: any; targets: Map<string, WordingTarget>; answerTargets:Map<string,AnswerTarget>;moveFocus?:MoveAddress } | undefined;
+  let focusedMove:{pin:NonNullable<typeof pinnedCards>;key:string;plans:{up?:PinnedMovePlan;down?:PinnedMovePlan}}|undefined;
+  const moveSources=new Map<string,string>();
+  function focusPinnedMove(msg:{token?:unknown;key?:string}):void{
+    const pin=pinnedCards,view=views.get('tree');
+    if(!pin||!view||pin.epoch!==indexVersion||msg.token!==pin.token||!msg.key||!currentCel||mode!=='medical-validation'||mvEditBusy)return;
+    try{
+      const selected=resolveCelSuite(currentCel);if(!selected.ok)return;
+      const plans=pinnedMovePlans(selected.suite.projectRoot,moveSources,crlStructure,view.focusNodes??{},pin.traversal,pin.payload.pathNodeKeys,msg.key);
+      focusedMove={pin,key:msg.key,plans};
+      void view.panel.webview.postMessage({type:'pinnedMoveControls',gen:view.gen,token:pin.token,key:msg.key,up:!!plans.up,down:!!plans.down});
+    }catch{focusedMove=undefined;void view.panel.webview.postMessage({type:'pinnedMoveControls',gen:view.gen,token:pin.token,key:msg.key,up:false,down:false});scheduleRebuild();}
+  }
+  function restorePinnedMoveFocus():void{
+    const pin=pinnedCards,view=views.get('tree'),address=pin?.moveFocus;if(!pin||!view||!address)return;
+    const owner=movedOccurrenceKey(crlStructure,address);
+    const candidates=address.path===undefined?(owner?[owner]:[]):Object.entries(view.focusNodes??{}).filter(([,n])=>n.owner===owner&&n.path===address.path&&n.outline&&!n.logic&&!n.choice).map(([key])=>key);
+    if(candidates.length===1)void view.panel.webview.postMessage({type:'pinnedMoveRestore',gen:view.gen,token:pin.token,key:candidates[0]});
+  }
+  async function movePinnedItem(msg:{token?:unknown;key?:string;dir?:string}):Promise<void>{
+    const captured=focusedMove,pin=pinnedCards,cel=currentCel,view=views.get('tree');
+    if(!pin||!view||!cel||mvEditBusy||mode!=='medical-validation'||pin.epoch!==indexVersion||msg.token!==pin.token||captured?.pin!==pin||captured.key!==msg.key||!['up','down'].includes(msg.dir??''))return;
+    const plan=captured.plans[msg.dir as 'up'|'down'];if(!plan)return;
+    let saved=false,ownsBusy=false;
+    try{
+      assertMvWriteAllowed();
+      if(pin.payload.cards.some((c:any)=>c.editing||c.answerDraft))throw Error('Save or cancel the open Q/A edit before moving this item.');
+      const selected=resolveCelSuite(cel);if(!selected.ok||!selected.suite.policyPath||!mvSidecarPath)throw Error('The policy source is unavailable.');
+      const doc=await vscode.workspace.openTextDocument(vscode.Uri.file(plan.file));
+      if(mvEditBusy||pinnedCards!==pin||currentCel!==cel||pin.epoch!==indexVersion)throw Error('The pinned branch changed. Focus the item again.');
+      if(doc.isDirty||doc.getText()!==plan.before.replace(/^\uFEFF/,'')||readFileSync(plan.file,'utf8')!==plan.before)throw Error('CRL changed. Refocus the item before moving it.');
+      validateStructuralCandidate(selected.suite.projectRoot,selected.suite.policyPath,plan.file,plan.after);
+      mvEditBusy=true;ownsBusy=true;treeEditsPending=true;treeEditHistory=true;
+      prepareStructuralSave(selected.suite.projectRoot,mvSidecarPath);reloadPublishedReviewSidecar();
+      const edit=new vscode.WorkspaceEdit();edit.replace(doc.uri,new vscode.Range(doc.positionAt(0),doc.positionAt(doc.getText().length)),plan.after.replace(/^\uFEFF/,''));
+      if(!await vscode.workspace.applyEdit(edit)||!await doc.save())throw Error('The move could not be saved to disk. The source buffer is retained.');
+      saved=true;focusedMove=undefined;
+      if(currentCel!==cel)return;
+      markDefinitionsUnverified();snapshotCapture.settleEmpty();
+      await vscode.commands.executeCommand('crl.invalidateProjectCache');
+      if(debounce){clearTimeout(debounce);debounce=undefined;}mvDeferredRebuild=false;
+      rebuild();
+      const anchor=movedOccurrenceKey(crlStructure,plan.anchor),oldEnd=pin.traversal.route.nodeKeys.at(-1),terminal=oldEnd===plan.oldAnchorKey?anchor:oldEnd;
+      const candidates=routesForCase(pin.caseId).filter(r=>!!anchor&&r.nodeKeys.includes(anchor)&&r.nodeKeys.at(-1)===terminal);
+      if(candidates.length!==1)throw Error('CRL saved, but the selected branch could not be restored uniquely. Pin the branch again.');
+      pinCards(pin.caseId,candidates[0].terminalId,undefined,pin.payload.showQuestions);
+      if(pinnedCards){pinnedCards.moveFocus=plan.focus;restorePinnedMoveFocus();}
+    }catch(error){
+      void vscode.window.showWarningMessage((saved?'Move saved. ':'')+(error instanceof Error?error.message:String(error)));
+      const live=views.get('tree');if(live)void live.panel.webview.postMessage({type:'pinnedMoveFailed',gen:live.gen});
+    }finally{if(ownsBusy){mvEditBusy=false;renderTreeChrome();if(mvDeferredRebuild){mvDeferredRebuild=false;scheduleRebuild();}}}
+  }
   const branchQuestionnaire = createBranchQuestionnairePanel(message => {
     if (!pinnedCards || pinnedCards.epoch!==indexVersion || mode!=="medical-validation" || message.token!==pinnedCards.token) return;
     if(message.type==='routeCardSave' || message.type==='routeCardAnswerSave')void saveCard(message);
@@ -2757,8 +2836,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const paint=treeFocusPaint([traversal],route.nodeKeys.at(-1)!,view.focusNodes ?? {});
     const payload = { token, pathNodeKeys:paint.nodeKeys, pathGroupKeys:paint.groupKeys, pathGroupOutcomes:paint.groupOutcomes, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:neighbors.index+1,total:neighbors.total}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
       pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
-    pinnedCards = { token, epoch: indexVersion, caseId, routeId, traversalKey:selectedTraversalKey, traversal, verdictCaseIds, payload, targets: built.targets, answerTargets };
+    pinnedCards = { token, epoch: indexVersion, caseId, routeId, traversalKey:selectedTraversalKey, traversal, verdictCaseIds, payload, targets: built.targets, answerTargets,
+      moveFocus:priorPin?.caseId===caseId&&priorPin.routeId===routeId?priorPin.moveFocus:undefined };
     void view.panel.webview.postMessage({ type: "routeCards", gen: view.gen, ...payload, focusRequest });
+    restorePinnedMoveFocus();
     if(branchQuestionnaire.isOpen)branchQuestionnaire.update(payload);
     driveLeafMarks();
   }
@@ -2897,6 +2978,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(msg.type==='openInteractiveQuestionnaire' && mode==='medical-validation' && currentCel){interactiveQuestionnaire.toggle(currentCel);return;}
       if (msg.type === "routeCardSave" || msg.type === "routeCardAnswerSave") { void saveCard(msg); return; }
       if (msg.type === "qaRequestAction") { qaRequestAction(msg);return; }
+      if (msg.type === 'pinnedMoveFocus') { focusPinnedMove(msg);return; }
+      if (msg.type === 'pinnedMove') { void movePinnedItem(msg);return; }
+      if (msg.type === 'mvRunUpdates') { void runTreeUpdates().catch(error=>void vscode.window.showErrorMessage(String(error)));return; }
       if (msg.type === "mvEditHistory") { void showEditHistory(); return; }
       if (msg.type === "mvEditRecovery") { void recoverPolicyEdit(); return; }
       if (msg.type === "routeCardSource" && pinnedCards && pinnedCards.token === msg.token && pinnedCards.epoch === indexVersion) {
@@ -3281,6 +3365,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     try {
       const selected = resolveCelSuite(currentCel);
       if (!selected.ok) { resetToEmpty(selected.diagnostics.map(d => d.message).join("\n")); return; }
+      treeEditHistory=hasStructuralEditHistory(selected.suite.projectRoot);
+      treeEditsPending=structuralEditsPending(selected.suite.projectRoot,selected.suite.policyPath);
+      if(treeEditsPending&&!structuralEditsPending(selected.suite.projectRoot)){
+        const sidecar=medicalValidationSidecarPath(currentCel);
+        if(!sidecar)throw Error('Cannot invalidate approvals for changed CRL.');
+        prepareStructuralSave(selected.suite.projectRoot,sidecar);
+      }
       const cm = buildSuiteExecutionModel(selected.suite);
       if (!cm) { resetToEmpty("0 MV cases — nothing to review"); return; }
       const graph = selected.suite.files[0].graph;
@@ -3301,6 +3392,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(previousDefinitions.digest!==currentDefinitions.digest || previousDefinitions.state==='current'&&currentDefinitions.state!=='current')interactiveQuestionnaire.definitionsChanged(currentCel);
       setupDefinitionDependencyWatchers(selected.suite.projectRoot);
       crlStructure = cm.crlStructure;
+      moveSources.clear();for(const d of crlStructure)if(!moveSources.has(d.location.filePath))moveSources.set(d.location.filePath,readFileSync(d.location.filePath,'utf8'));
       conceptLayer = cm.conceptLayer;
       conceptShape = cm.conceptShape; // #187 Todo 3
       defExpr = cm.defExpr; // #187 Option-3
@@ -6104,7 +6196,7 @@ body:has(.flag-drawer) .flow-zoom{display:none}
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
+${CORR_STYLE}${PINNED_MOVE_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
@@ -6174,14 +6266,14 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const logicUi=(${installFlowLogicHighlight.toString()})(root);` +
   `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();logicUi.update();};` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
-  `(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
+  `const moveUi=(${installPinnedMove.toString()})(root,v,()=>gen);(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
   `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
   `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
   `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
-  `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
+  `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();moveUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
   // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
@@ -6193,14 +6285,14 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
+  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();moveUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion,routeToken:routeCardUi.token(),questionnaireOpen:routeCardUi.isExternal()});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
   // overlay classes are on the rows). Strip the EPHEMERAL rings (selection `.current`/`.this-node`, agent `.node-focus`) off a
   // CLONE via classList (exact — never rewrites label text) so a customer artifact doesn't carry them; keep verdict/flag/
   // review state. Echoes the token so the host coordinator matches it; the host still SCREENS the payload (trust boundary).
-  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}(${sanitizeCriterionDescriptionSnapshot.toString()})(_c);(${sanitizeUnpinnedTreeFocusSnapshot.toString()})(_c);v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
+  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);for(const el of _c.querySelectorAll('.pinned-move-controls'))el.remove();var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}(${sanitizeCriterionDescriptionSnapshot.toString()})(_c);(${sanitizeUnpinnedTreeFocusSnapshot.toString()})(_c);v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
@@ -6279,7 +6371,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}}` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;moveUi.pin(m.token);treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}}` +
+  `else if(m.type==='pinnedMoveControls'){if(m.gen===gen)moveUi.show(m);}` +
+  `else if(m.type==='pinnedMoveRestore'){if(m.gen===gen)moveUi.restore(m);}` +
+  `else if(m.type==='pinnedMoveFailed'){if(m.gen===gen)moveUi.failed();}` +
   `else if(m.type==='unpinnedTreeFocus'){treeFocusUi.show(m);}` +
   `else if(m.type==='clearTreeFocus'){if(m.gen===gen)treeFocusUi.reset();}` +
   `else if(m.type==='branchQuestionnaireState'){if(m.gen===gen)routeCardUi.questionnaireState(m.open,m.focusToken,m.requestId);}` +
@@ -6473,7 +6568,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const xs=e.target.closest&&e.target.closest('[data-export-snapshot]');` +
   `if(xs){v.postMessage({type:'exportSnapshot'});return;}` +
   // #(bulk-verdict) Todo 2b: the in-pane "Review verdicts" button → open the bulk grid.
-  `const edit=e.target.closest&&e.target.closest('[data-mv-edit-action]');if(edit){v.postMessage({type:edit.dataset.mvEditAction==='history'?'mvEditHistory':'mvEditRecovery'});return;}` +
+  `const edit=e.target.closest&&e.target.closest('[data-mv-edit-action]');if(edit){v.postMessage({type:({history:'mvEditHistory',recovery:'mvEditRecovery',updates:'mvRunUpdates'})[edit.dataset.mvEditAction],gen});return;}` +
   `const rv=e.target.closest&&e.target.closest('[data-review-verdicts]');` +
   `if(rv){v.postMessage({type:'openReviewGrid'});return;}` +
   // #203 Todo 4: the flag badge / mvComplete gate → open the review-flag list.

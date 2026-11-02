@@ -1052,6 +1052,8 @@ export function renderFlowPane(
     parent: parents.get(n.nodeKey) ?? '', owner: n.topWhenKey ?? n.nodeKey,
     outline: !!n.outline, terminal: n.kind === 'action' && !n.useDecision,
     choice: n.outlineRow === 'option',
+    question: !!n.isSource,
+    singleInputPredicate: !!n.visualElided && !!n.conceptKey && conceptMap.get(n.conceptKey)?.definitionKind === 'definition-is',
     criterion: !!(n.criterionCollapse || n.critRow),
     logic: n.outlineRow === 'topor' || (n.outlineRow === 'op' && ['all of','any of','not'].includes(n.label)),
     path: n.outline ? JSON.parse(n.nodeKey.slice(LEAF_KEY.length))[1] as string : '0',

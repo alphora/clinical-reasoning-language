@@ -15,7 +15,7 @@ import { readEditTree,editTreeIdentity,assertOrdinaryEditPath,MvEditTransaction,
 import {retainStaticQuestionDescriptions} from './keStaticPresentation';
 
 export interface KeUpdateSelection {id:string;revision:string}
-export interface KeUpdateInput {schemaVersion:1;operation:'discover'|'preview'|'apply'|'recover';artifactRoot:string;requests?:KeUpdateSelection[]}
+export interface KeUpdateInput {schemaVersion:1;operation:'discover'|'preview'|'apply'|'recover'|'rebuild';artifactRoot:string;requests?:KeUpdateSelection[]}
 export interface KeApplyServices {storageRoot:string;crlVersion:string;produce?:(request:ProduceRequest)=>Promise<ProduceOutcome>;boundary?:EditBoundary}
 const scopes=['crl','cql','fhir','cel','tests'];
 const equal=(a:unknown,b:unknown)=>canonicalMvValue(a)===canonicalMvValue(b);
@@ -117,7 +117,7 @@ function preservePlaceholders(before:EditTree,after:EditTree):EditTree {
   return {...after,files};
 }
 export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices){
-  const root=resolve(input.artifactRoot);if(input.schemaVersion!==1 || !['discover','preview','apply','recover'].includes(input.operation))throw Error('Unsupported KE Updates request.');
+  const root=resolve(input.artifactRoot);if(input.schemaVersion!==1 || !['discover','preview','apply','recover','rebuild'].includes(input.operation))throw Error('Unsupported KE Updates request.');
   assertOrdinaryEditPath(root);if(!existsSync(join(root,'package.json')))throw Error('Select the owning artifact package.');
   assertOrdinaryEditPath(services.storageRoot);
   if(inside(root,resolve(services.storageRoot)) || relative(root,resolve(services.storageRoot))==='')throw Error('KE temporary storage must be outside the artifact.');
@@ -131,11 +131,16 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
     return {ok:true,schemaVersion:1,state:'recovered',requiredScopes:scopes,changedPaths};
   }
   if(incomplete.length || recovery.errors.length)throw Error('An interrupted KE update needs recovery. Invoke recover before applying another update.');
-  const selected=selectedRequests(root,input.requests),suite=resolveCelSuite(root);if(!suite.ok || !suite.suite.policyPath)throw Error('The artifact has no unique policy and MV case suite.');
+  const selected=input.operation==='rebuild'?[]:selectedRequests(root,input.requests),suite=resolveCelSuite(root);if(!suite.ok || !suite.suite.policyPath)throw Error('The artifact has no unique policy and MV case suite.');
   const policy=suite.suite.policyPath,publication=mvPublicationOptions(root);assertSingleLocalPolicy(root,policy,publication);
   mkdirSync(services.storageRoot,{recursive:true});
   const scratch=mkdtempSync(join(services.storageRoot,'ke-updates-')),stage=join(scratch,basename(root));
   try {
+    const inputIdentity=()=>{
+      const graph=resolveImports(policy),paths=[join(root,'package.json'),...new Set([...graph.resolvedLibraries,...graph.localLibraries,...graph.registry?.byNamePackage.values()??[]].flatMap(e=>[e.filePath,join(findProjectRoot(e.filePath)!,'package.json')]))];
+      return canonicalMvValue({files:paths.sort().map(file=>[file,createHash('sha256').update(readFileSync(file)).digest('hex')]),cel:editTreeIdentity(readEditTree(join(root,'src/cel')))});
+    };
+    const sourceIdentity=inputIdentity();
     copySources(root,stage,policy);const stagedPolicy=join(stage,relative(root,policy));
     const sourcePlan=applySourceRequests(stage,stagedPolicy,selected),cleared=clearDeletedSelections(stage,sourcePlan.deleted);
     const emitted=emitCrlTwoLane(stagedPolicy,publication);if(!emitted.success)throw Error('The requested policy definitions did not emit successfully.');
@@ -170,7 +175,9 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
     }
     units.push({path:join(root,'tests/results'),after:preservePlaceholders(readEditTree(join(root,'tests/results')),readEditTree(join(stage,'tests/results')))});
     // KELP locks the scopes; this checks the selected intent remains the one the KE explicitly invoked.
-    selectedRequests(root,input.requests);
+    if(input.operation==='rebuild'){
+      if(inputIdentity()!==sourceIdentity)throw Error('Source inputs changed while updates were running. Saved CRL is retained; run updates again.');
+    }else selectedRequests(root,input.requests);
     const changes=changed();if(changes.some(u=>!/^(?:src\/(?:crl|cel|cql|fhir)(?:\/|$)|tests\/)/.test(relative(root,u.path).replace(/\\/g,'/'))))throw Error('The candidate contains a non-KE write.');
     if(changes.length)MvEditTransaction.prepare({artifactRoot:root,storageRoot:recoveryRoot,units:changes,boundary:services.boundary}).publish();
     return {ok:true,schemaVersion:1,state:changes.length?'changed':'no-op',requiredScopes:scopes,changedPaths:changes.map(u=>relative(root,u.path).replace(/\\/g,'/')),clearedCases:cleared,...(cleared.length?{message:'Deleted selections were cleared. Review the listed cases and their unchanged expected outcomes.'}:{})};

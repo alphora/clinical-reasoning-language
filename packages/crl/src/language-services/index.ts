@@ -35,6 +35,8 @@ export * from "./catalog";
 export * from "../editing/presentationEdit";
 export * from "../editing/presentationFile";
 export * from "../editing/terminologyEdit";
+export * from "../editing/structureEdit";
+export * from "../editing/pathMove";
 export { answerTerminologyResolver, readFiniteAnswerMembers } from "../emit/answerDomain";
 export {readPublicationMembership} from "../emit/publicationProgram";
 export {readPublicationAnyMembership} from "../template-match/anyMembership";

@@ -12,6 +12,8 @@ export interface FocusNode {
   logic?: boolean;
   path?: string;
   concept?: [string, string];
+  question?: boolean;
+  singleInputPredicate?: boolean;
 }
 export interface FocusOperand { owner: string; path: string; concept: [string, string]; result: FocusTruth }
 export interface TreeTraversal {

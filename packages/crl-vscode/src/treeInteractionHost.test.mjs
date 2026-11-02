@@ -46,7 +46,7 @@ test('pin reveals actual question INPUT before marking and sends cards against t
   renderPane:(...args)=>{calls.push(['render',...args]);tree.gen++;tree.leafConcepts={fresh:true};},
   leafBucketsFromQuestionnaire:(_q,_r,_truth,leaves)=>{assert.equal(leaves,tree.leafConcepts);assert.ok(leaves.fresh);calls.push(['marks']);return {yesKeys:[],noKeys:[]};},
   conditionTruthKeys:()=>[],randomUUID:()=> 'pin-token',branchNeighbors:()=>({index:0,total:1}),caseIdsThroughReviewNode:()=>['case'],pinnedVerdict:()=>{},indexVersion:3,
-  branchQuestionnaire:{isOpen:false},driveLeafMarks:()=>calls.push(['drive']),pinnedCards:undefined});
+  branchQuestionnaire:{isOpen:false},driveLeafMarks:()=>calls.push(['drive']),restorePinnedMoveFocus:()=>{},pinnedCards:undefined});
  vm.runInContext(transformSync(bodies.get('pinCards'),{loader:'ts'}).code,c);
  c.pinCards('case','result','initial-click',true);
  assert.deepEqual(calls.map(x=>x[0]),['clear','render','marks','post','drive']);assert.deepEqual(calls[1],['render','tree',undefined,undefined,'initial-click']);
