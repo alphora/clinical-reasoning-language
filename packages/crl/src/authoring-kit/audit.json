@@ -1,5 +1,5 @@
 {
-  "auditedRevision": "2f3c7ec085382b3028843082e945668f6f68ca43",
+  "auditedRevision": "bcfbdc5b82ea0f82dd1cbf4df224165d2bde117a",
   "auditedSchemaVersion": "2.44",
   "auditedContentHash": "e75cae86a9517c56e4d0b277595aa66cd072ec9b257cfc4fdec27234f6892f1d",
   "scope": "Schema 2.44 review-flags field roles, visible Before/After and complete agent reporting examples/discovery; baseline8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4. UI controls preserve manual review/status and JSON contracts. No clinical, emitter or runtime semantic change. See coverage.md for actual evidence and separate installed/release gates.",
