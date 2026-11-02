@@ -1,3 +1,4 @@
+// REFACTOR:grounded: extracted pin visibility uses the production disclosure-only helper.
 // Production renderer, pin controller and extracted webview handlers in disposable Edge.
 // No installed extension or CDP-enabled user session is required.
 const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert/strict'),{spawn}=require('child_process'),esbuild=require('esbuild');
@@ -13,6 +14,7 @@ const pinApply=source.slice(source.indexOf('const applyFlowPin='),source.indexOf
 const clearOverlay=source.slice(source.indexOf('const clrRO='),source.indexOf('const clrTN='));
 const renderPrefix=handler('render').slice(0,handler('render').indexOf('root.innerHTML=m.html'));
 const script=esbuild.buildSync({stdin:{contents:`
+ import {addUncertaintyDisclosureKeys} from './packages/crl-vscode/src/uncertaintyGuardDisplay';
  import {installFlowPinVisibility} from './packages/crl-vscode/src/flowPinVisibility';
  import {paintPinnedTraversal} from './packages/crl-vscode/src/unpinnedTreeFocusWebview';
  import {installFlowLogicHighlight} from './packages/crl-vscode/src/flowLogicHighlight';
@@ -21,7 +23,7 @@ const script=esbuild.buildSync({stdin:{contents:`
  const pinVisibility=installFlowPinVisibility(root),gen=1,criterionDescriptionUi={refresh(){},beforeRender(){}};
  const logicUi=installFlowLogicHighlight(root);
  let pinnedFlowKey='',pinnedRouteKeys=[],pinnedPathKeys=[],pinnedGroupKeys=[],pinnedGroupOutcomes=[],pinnedRouteLabel='',currentRouteLabel='';
- const pinnedTraversalPaint=paintPinnedTraversal;
+ const pinnedTraversalPaint=paintPinnedTraversal,uncertaintyVisibility=addUncertaintyDisclosureKeys;let uncertaintyDisclosures={};
  ${pinApply}
  ${clearOverlay}
  window.mark=m=>{${handler('markReviewOverlay')}};

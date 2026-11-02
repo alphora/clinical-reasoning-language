@@ -71,6 +71,7 @@ presentation for "B":
 // If a derived result competes with other candidates, its anchor affects selection;
 // it is not automatically the latest contributing answer's date.
 concept "Current G A B Answers Include Uncertainty":
+- meta is \`@tree-uncertainty-guard: Terminal uncertainty check; pass false\`.
 - shape is Record.
 - type is Observation.
 - value type is boolean.

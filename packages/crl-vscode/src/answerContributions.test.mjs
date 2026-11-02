@@ -118,3 +118,15 @@ test('scoped wording variants receive only their paired criterion contributions'
  assert.ok(one.every(r=>r.checkId==='Treatment1'));assert.ok(two.every(r=>r.checkId==='Treatment2'));
  assert.equal(contributionsForOccurrences(index,[{ownerKey:'w',criterionPaths:[[]]}],'q').length,0);
 });
+
+// REFACTOR:grounded: compact display cannot shortcut an actual guard in the contribution preview.
+test('answer previews use the unfolded successor even when a terminal uncertainty check is hidden',()=>{
+ const guard=n('u','when','Explicit uncertainty check',['uncertainty'],[terminal('u-yes','not-certify.Unmet')],{uncertaintyGuard:{passWhen:false}});
+ const source=[{...tree[0],children:[n('w','when','Treatment1',['c1'],[guard,n('u-fallback','otherwise','otherwise',[],[terminal('u-no')])])]}];
+ const opts={concepts,answerOptionsByConcept:new Map([['q',options]])};
+ const open=new Set();const rendered=uncertaintyDisplay=>{let r;for(let i=0;i<4;i++){r=renderFlowPane(source,{...opts,expandedGuardWhens:open,...(uncertaintyDisplay?{uncertaintyDisplay}:{})});Object.values(r.reveals).forEach(hit=>{if(hit.criterionToggle)open.add(hit.criterionToggle);});}return r;};
+ const full=rendered(),compact=rendered({});
+ assert(full.anchors.u);assert(!compact.anchors.u);assert(compact.anchors['u-no']);
+ for(const r of [full,compact])assert.match(r.html,/flow-answer-group flow-answer-left[^>]*>[\s\S]*?data-flow-label="Continue ↱"/);
+ assert.equal(buildAnswerContributions(source,concepts).get('w').find(r=>r.code==='a').label,'Continue');
+});

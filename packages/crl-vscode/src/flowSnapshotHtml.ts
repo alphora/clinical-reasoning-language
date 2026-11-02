@@ -75,12 +75,13 @@ export function renderFlowSnapshotDocument(opts: FlowSnapshotOptions): string {
     `html,body{margin:0;padding:0}` +
     `body{background:var(--vscode-editor-background,#1e1e1e);color:var(--vscode-foreground,#cccccc);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}` +
     `.snap-caption{position:sticky;top:0;z-index:8;padding:6px 14px;font-size:12px;background:var(--vscode-editorWidget-background,#252526);border-bottom:1px solid var(--vscode-panel-border,#454545)}` +
-    `#flowroot .flow-row,#flowroot .flow-guard-tab,#flowroot .flow-crit-toggle,#flowroot .flow-logic-label{cursor:grab}` +
+    `#flowroot .flow-row,#flowroot .flow-guard-tab,#flowroot .flow-crit-toggle,#flowroot .flow-logic-label,#flowroot .flow-uncertainty-toggle{cursor:grab}` +
     `#flowroot [data-flow-open-decision]{display:none}` +
     opts.styleCss +
     `</style>` +
     `</head><body>` +
-    `<div class="snap-caption">${title}</div>` +
+    `<div class="snap-caption">${title}` +
+    (opts.flowHtml.includes('data-flow-uncertainty-collapsed="1"') ? `<p>Uncertainty checks are hidden in this snapshot. Show them in the tree before exporting to include them.</p>` : '') + `</div>` +
     `<div id="flowroot">${opts.flowHtml}</div>` +
     `<script>${SNAPSHOT_SCRIPT}</script>` +
     `</body></html>`

@@ -53,8 +53,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview).not.toHaveProperty("rules");
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
-    // Keep the complete index bounded; Quantity intake adds two paired artifacts and discovery terms.
-    expect(JSON.stringify(overview).length).toBeLessThan(38000);
+    // Keep the complete index bounded; uncertainty guard display adds one entry. Quantity intake adds two paired artifacts and discovery terms.
+    expect(JSON.stringify(overview).length).toBeLessThan(39000);
     const fullSize = JSON.stringify(query({ view: "full" })).length;
     for (const id of ["rule:criterion", "rule:decision-composition"]) {
       expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);
@@ -288,4 +288,20 @@ it('an agent entering through KE Updates gets complete flag reporting instructio
  expect(report.content.rule).toContain('notImplementedReason');
  expect(report.content.rule).toContain('```json');
  expect(report.content.rule).toContain('never mark human flags Fixed or Approved');
+});
+
+// REFACTOR:grounded: a new agent can retrieve the display contract without peer instructions.
+// @kit uncertainty-guard-display:discovery
+it('uncertainty guard discovery carries the optional marker, polarity and original shared example',()=>{
+ const search:any=query({view:'search',query:'hide uncertainty guard'});
+ expect(JSON.stringify(search)).toContain('rule:uncertainty-guard-display');
+ const entry:any=query({view:'entry',id:'rule:uncertainty-guard-display'});
+ const rule=entry.entries.find((e:any)=>e.id==='rule:uncertainty-guard-display');
+ expect(rule.content.rule).toContain('@tree-uncertainty-guard:');
+ expect(rule.content.rule).toContain('pass false');
+ expect(rule.content.rule).toContain('pass true');
+ expect(rule.content.rule.toLowerCase()).toContain('optional');
+ expect(entry.entries.some((e:any)=>e.id==='artifact:uncertainty-reference.crl')).toBe(true);
+ const artifact=entry.entries.find((e:any)=>e.id==='artifact:uncertainty-reference.crl');
+ expect(JSON.stringify(artifact.content)).toContain('@tree-uncertainty-guard:');
 });

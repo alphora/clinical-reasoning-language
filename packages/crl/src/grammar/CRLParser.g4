@@ -117,7 +117,8 @@ decisionStatement
 // unparenthesized `... "Lib"."X".` tail would be ambiguous. The KE authoring house
 // style parenthesizes regardless.
 criterionStatement
-    : CRITERION criterionIdentifier COLON criterionDescription? DASH WHEN LPAREN branchCondition RPAREN DOT
+    // REFACTOR:grounded: annotation order does not change the required Boolean body.
+    : CRITERION criterionIdentifier COLON (criterionDescription | metaLine)* DASH WHEN LPAREN branchCondition RPAREN DOT
     ;
 
 // REFACTOR:grounded: one optional description; never part of the Boolean body.

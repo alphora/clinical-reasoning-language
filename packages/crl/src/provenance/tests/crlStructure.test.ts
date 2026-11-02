@@ -482,3 +482,41 @@ function collect(nodes: CrlStructureNode[], acc: Map<string, CrlStructureNode>):
     collect(n.children, acc);
   }
 }
+
+
+// REFACTOR:grounded: display roles belong to the complete owner-qualified guard, never a nested operand.
+describe("explicit uncertainty guard display metadata", () => {
+  const marker = '- meta is `@tree-uncertainty-guard: Terminal check; pass false`.';
+  const concept = `concept "Check": - shape is Record. - type is Observation. - value type is boolean. ${marker} - shape reduction is most recent.`;
+  const activity = 'activity "X": - request CPGTaskRequest. - with `X`.';
+  const nodes = (declarations: string, condition: string) => buildCrlStructure(graphFrom(`library "T". ${declarations} ${activity} decision "D": - when ${condition} then recommend activity "X".`, CEL))[0].children;
+  // @kit uncertainty-guard-display:occurrence-polarity
+  it.each([[ '"Check"', false ],[ 'not "Check"', true ],[ 'not not "Check"', false ]] as const)("adjusts the entire %s occurrence polarity", (condition, passWhen) => {
+    expect(nodes(concept,condition)[0].uncertaintyGuard).toEqual({ passWhen, target: { lib: "T", name: "Check", kind: "concept" } });
+  });
+  it("does not infer the role from a name or a marked operand within a compound guard", () => {
+    expect(nodes(concept.replace(marker,''),'"Check"')[0]).not.toHaveProperty('uncertaintyGuard');
+    expect(nodes(concept+'concept "Other": - value type is boolean.','("Check" and "Other")')[0]).not.toHaveProperty('uncertaintyGuard');
+  });
+  it("reads criterion-owned annotation without promoting a marked concept through an unmarked criterion", () => {
+    const declarations=concept+`criterion "Group": ${marker} - when ("Check").`;
+    const graph=graphFrom(`library "T". ${declarations} ${activity} decision "D": - when "Group" then recommend activity "X".`,CEL);
+    graph.coversTarget!.ast = classifyCriterionRefs(graph.coversTarget!.ast);
+    expect(buildCrlStructure(graph)[0].children[0].uncertaintyGuard).toEqual({passWhen:false,target:{lib:'T',name:'Group',kind:'criterion'}});
+    graph.coversTarget!.ast.statements.filter(s=>s.type==='Criterion').forEach(s=>{if(s.type==='Criterion')delete s.meta;});
+    expect(buildCrlStructure(graph)[0].children[0]).not.toHaveProperty('uncertaintyGuard');
+  });
+  // @kit uncertainty-guard-display:source-owner
+  it("uses an imported owner's annotation and refuses competing owners", () => {
+    const shared=entry(`library "Shared". ${concept}`, 'shared.crl','local');
+    const graph=graphFrom(`library "T". ${activity} decision "D": - when "Shared"."Check" then recommend activity "X".`,CEL,[shared]);
+    expect(buildCrlStructure(graph)[0].children[0].uncertaintyGuard?.target.lib).toBe('Shared');
+    graph.crlRegistry!.byNamePackage.set('Shared',{...shared,filePath:'package/shared.crl',origin:'package'});
+    expect(buildCrlStructure(graph)[0].children[0]).not.toHaveProperty('uncertaintyGuard');
+  });
+  it("does not admit invalid, duplicate or nonBoolean metadata", () => {
+    for(const declarations of [concept.replace('pass false','pass maybe'),concept.replace(marker,marker+marker),concept.replace('value type is boolean','value type is string')]){
+      expect(nodes(declarations,'"Check"')[0]).not.toHaveProperty('uncertaintyGuard');
+    }
+  });
+});

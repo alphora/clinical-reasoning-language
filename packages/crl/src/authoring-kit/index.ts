@@ -399,8 +399,9 @@ export type {
 // schemaVersion → "2.40": dependency-only security engine acquisition identity; semantics unchanged.
 // schemaVersion → "2.41": structured review questions/source citations and artifact-local rerun reports.
 // REFACTOR:grounded (#328): schemaVersion → "2.43": source-qualified Quantity form units, distinct from released runtime availability.
-// CONTENT schemaVersion → "2.44": self-contained KE flags, visible Before/After reports and complete retrieval examples.
-const SCHEMA_VERSION = "2.44";
+// REFACTOR:grounded: explicit display metadata is discoverable independently of clinical uncertainty policy.
+// CONTENT schemaVersion → "2.45": optional uncertainty-guard display role, polarity and view limitations.
+const SCHEMA_VERSION = "2.45";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -567,6 +568,19 @@ const RULES: KitRule[] = [
       }
     ],
     "ref": "src/emit/tests/publicationRequest.test.ts; src/cre/tests/publicationRequest.test.ts; docs/interactive-questionnaire.md"
+  },
+  {
+    "id": "uncertainty-guard-display",
+    "applicability": "An already-authored uncertainty guard whose Medical Validation tree should be compact",
+    "category": "process",
+    "rule": "Optionally mark the owning Boolean Concept or Criterion with - meta is `@tree-uncertainty-guard: Terminal uncertainty check; pass false`. The pass field names the target Boolean value for its ordinary path: use `pass false` for a predicate detecting uncertainty, `pass true` for a predicate establishing no uncertainty. The marker is display metadata, not a clinical check, answer type or evaluation rule. Preserve the actual authored predicate and its source basis.",
+    "clauses": [
+      { "text": "The tag is optional, unique per target, and requires exactly one pass field with value true or false on a Boolean Concept or Criterion. On a Criterion, meta and optional description precede its required when clause. No question text or local answer code is required for the annotation. Occurrence NOT reverses the ordinary branch at that use. Invalid or duplicate metadata is rejected.", "force": "validator-enforced" },
+      { "text": "Mark only a real authored uncertainty guard when compact MV display is desired. Names, answer labels, terminology membership and any available value syntax do not identify the role. Do not introduce uncertainty answers or clinical checks into a policy that does not call for them merely to obtain this display behavior. The complete synthetic uncertainty-reference pair demonstrates pass false; its unchanged clinical assertions remain separately qualified.", "force": "default" },
+      { "text": "A compatible viewer refuses ambiguous source ownership and collapses only a whole marked direct guard (optionally negated) with one unguarded terminal on each branch. A small U reveals the original guard and both alternatives. Other topologies and unmarked policies keep their complete tree. Actual nonpassing, paused, invalidated or error evidence, or review flags that folding would conceal, keep the full guard visible. Color and branch arrows still describe the authored path, independent of terminal names. This annotation does not modify emitted CQL/FHIR or native runtime behavior.", "force": "default" },
+      { "text": "Snapshot exports remain static captures. A collapsed snapshot discloses that uncertainty checks are hidden; show them in the live tree before export to include the full branches. Source capability does not upgrade already installed viewers; inspect the rendered view after deploying compatible tooling. This example is not a customer uncertainty requirement or clinical approval.", "force": "default" }
+    ],
+    "ref": "artifact:uncertainty-reference.crl; artifact:uncertainty-reference.cel; src/meta/uncertaintyGuard.test.ts; src/provenance/tests/crlStructure.test.ts; src/fhir-emitter/tests/uncertaintyGuardDisplay.test.ts"
   },
   {
     "id": "selected-answer-aggregate",

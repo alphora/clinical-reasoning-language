@@ -177,6 +177,8 @@ export interface Decision extends ASTNode {
 export interface Criterion extends ASTNode {
   type: "Criterion";
   name: string;
+  /** REFACTOR:grounded: owner-authored metadata is independent of the Boolean condition. */
+  meta?: MetaEntry[];
   /** REFACTOR:grounded: explanatory wording owned by this group, not an answer or predicate. */
   description?: string;
   condition: BranchCondition;

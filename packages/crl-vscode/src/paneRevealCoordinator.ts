@@ -6,6 +6,8 @@
 export interface SemanticTarget {
   kind: "unit" | "crlNode" | "celCase";
   id: string;
+  /** REFACTOR:grounded: explicit navigation may disclose a folded guard; paint replay may not. */
+  expandUncertainty?: boolean;
 }
 export type PaneCapability = "renderable" | "placeholder";
 

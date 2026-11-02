@@ -13,7 +13,8 @@ export function installUnpinnedTreeFocus(root: HTMLElement, bridge: { postMessag
   let selected: UnpinnedFocusMessage | undefined;
   let pendingFocus: {gen:number;token:string;key:string;dir?:string} | undefined;
   doc.addEventListener('focusin',()=>{pendingFocus=undefined;});
-  const controls = '[data-flow-pin],[data-toggle-crit],[data-criterion-info],[data-criterion-verdict],[data-mv-flag-badge],[data-flow-open-decision],[data-flow-logic],input,textarea,select,button,a,summary';
+  // REFACTOR:grounded: U discloses structure; it does not select its enclosing route.
+  const controls = '[data-flow-uncertainty-toggle],[data-flow-pin],[data-toggle-crit],[data-criterion-info],[data-criterion-verdict],[data-mv-flag-badge],[data-flow-open-decision],[data-flow-logic],input,textarea,select,button,a,summary';
   const strip = () => {
     root.querySelectorAll('.flow-edge.tree-focus-true,.flow-edge.tree-focus-false').forEach(edge=>edge.classList.remove('flow-condition-true','flow-condition-false'));
     root.querySelectorAll('.tree-focus-node,.tree-focus-selected,.tree-focus-operand,.tree-focus-true,.tree-focus-false,.tree-focus-unknown').forEach(node => node.classList.remove('tree-focus-node','tree-focus-selected','tree-focus-operand','tree-focus-true','tree-focus-false','tree-focus-unknown'));

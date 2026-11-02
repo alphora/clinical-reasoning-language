@@ -419,11 +419,16 @@ export class CRLAstBuilder
     const name = ctx.criterionIdentifier().text.slice(1, -1);
     const condition = this.branchConditionFrom(ctx.branchCondition());
     // REFACTOR:grounded: use the question-presentation literal contract; preserve authored text.
-    const desc = ctx.criterionDescription();
+    const descriptions = ctx.criterionDescription();
+    const desc = descriptions[0];
+    if (descriptions.length > 1) this.reportError("AstError", descriptions[1],
+      { message: "Criterion description may be declared only once." });
     const description = (desc?.QUOTED_STRING()?.text ?? desc?.backtickString()?.text)?.slice(1, -1);
     if (description !== undefined && !description.trim()) this.reportError("AstError", desc!,
       { message: "Criterion description must be nonempty." });
-    return { type: "Criterion", name, condition, ...(description !== undefined ? { description } : {}), location: getLocation(ctx) };
+    const meta = this.metaFrom(ctx.metaLine());
+    return { type: "Criterion", name, condition, ...(description !== undefined ? { description } : {}),
+      ...(meta.length ? { meta } : {}), location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {

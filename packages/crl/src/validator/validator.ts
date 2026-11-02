@@ -75,6 +75,7 @@ export type ValidationErrorKind =
   | "meta-invalid-field"
   | "meta-duplicate-field"
   | "meta-cardinality"
+  | "meta-invalid-target"
   | "open-flag"
   // #215 / #257 T2 — an age predicate that is NOT sanctioned: an unsupported comparator
   // (`less than`, …) or an unsanctioned unit (day/week — NOT years/months). Sanctioned:
@@ -280,6 +281,7 @@ export interface MetaDiagnostic extends ValidationErrorBase {
     | "meta-invalid-field"
     | "meta-duplicate-field"
     | "meta-cardinality"
+    | "meta-invalid-target"
     | "open-flag";
 }
 

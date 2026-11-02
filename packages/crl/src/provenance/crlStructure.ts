@@ -13,6 +13,7 @@
  */
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
 import type { ActionStatement, BlockQualifier, BranchCondition, OtherwiseBlock, ReferenceName, WhenBlock } from "../ast/types";
+import { supportsUncertaintyGuardMetadata, uncertaintyGuardMetadata } from "../meta/uncertaintyGuard";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { describeBranchCondition } from "../ast/branchCondition";
 import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
@@ -45,6 +46,8 @@ export interface CrlStructureNode {
   children: CrlStructureNode[];
   /** Mode of this node's child block, not the mode of its enclosing block. */
   childrenQualifier?: BlockQualifier;
+  /** REFACTOR:grounded: explicit owner display metadata; passWhen includes this occurrence's NOT polarity. */
+  uncertaintyGuard?: { passWhen: boolean; target: { lib: string; name: string; kind: "concept" | "criterion" } };
 }
 
 export interface CrlDecisionStructure {
@@ -178,6 +181,30 @@ export function buildCrlStructure(
   const { libs, coversName } = collectLibs(graph, opts);
   if (!coversName) return []; // no policy anchor → empty (defensive, mirrors the index)
 
+  // REFACTOR:grounded: a name with competing source owners never licenses hiding a branch.
+  const owners = new Map<string, Set<string>>();
+  for (const entry of [graph.coversTarget, ...(graph.crlRegistry?.byNameLocal.values() ?? []), ...(graph.crlRegistry?.byNamePackage.values() ?? [])]) {
+    if (!entry?.name) continue;
+    const paths = owners.get(entry.name) ?? new Set<string>();
+    paths.add(entry.filePath); owners.set(entry.name, paths);
+  }
+  const displayGuard = (condition: BranchCondition, owner: string): CrlStructureNode["uncertaintyGuard"] => {
+    let negated = false;
+    while (condition.type === "BranchConditionNot") { negated = !negated; condition = condition.operand; }
+    if (condition.type !== "BranchConditionRef" && condition.type !== "BranchConditionCriterionRef") return;
+    const lib = getRefLibrary(condition.ref) ?? owner, name = getRefName(condition.ref);
+    if (owners.get(lib)?.size !== 1) return;
+    const candidates = libs.get(lib)?.entry.ast.statements.filter(statement =>
+      (statement.type === "Concept" || statement.type === "Criterion") && statement.name === name) ?? [];
+    if (candidates.length !== 1) return;
+    const target = candidates[0];
+    if (!supportsUncertaintyGuardMetadata(target)) return;
+    if ((condition.type === "BranchConditionCriterionRef") !== (target.type === "Criterion")) return;
+    const metadata = uncertaintyGuardMetadata(target.meta);
+    if (metadata.kind !== "guard") return;
+    return { passWhen: metadata.passWhen !== negated, target: { lib, name, kind: target.type === "Criterion" ? "criterion" : "concept" } };
+  };
+
   const out: CrlDecisionStructure[] = [];
   for (const [lib, info] of libs) {
     // #224 ii.1c / #236 — the lib's criterion INDEX, so a `when` guard's criterion refs bridge to
@@ -197,6 +224,7 @@ export function buildCrlStructure(
       for (const sn of decisionSpine(s)) {
         const location = lsLoc(info.entry.filePath, sn.node.location);
         if (!location) continue; // mirror the indexer's per-sub-node skip
+        const uncertaintyGuard = sn.kind === "when" ? displayGuard((sn.node as WhenBlock).condition, lib) : undefined;
         flat.push({
           nodeKey: nodeKey(decisionSubNodeRef(lib, name, sn.nodeId)),
           nodeId: sn.nodeId,
@@ -209,6 +237,7 @@ export function buildCrlStructure(
           ...(sn.kind === "when"
             ? { sigLabel: conditionSigLabel((sn.node as WhenBlock).condition, lib) }
             : {}),
+          ...(uncertaintyGuard ? { uncertaintyGuard } : {}),
           location,
           children: [],
           ...(sn.kind !== "action" && (sn.node as WhenBlock | OtherwiseBlock).body.type === "BlockBody"

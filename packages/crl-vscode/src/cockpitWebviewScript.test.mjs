@@ -655,7 +655,7 @@ check("#214 filter: shouldWidenFilterForSelection (pure) — a NEW filtered case
 check("#214 filter: dispatch widens via shouldWidenFilterForSelection + re-renders the worklist BEFORE the applyReveal loop", () => {
   assert.ok(/shouldWidenFilterForSelection\(prevCaseId, nextCid, v, worklistFilter\)[\s\S]*worklistFilter\.add\(v\);[\s\S]*renderPane\("worklist"\)/.test(COCKPIT_SRC), "the widen uses the pure predicate + re-renders");
   // CRITICAL ordering: the widen re-render must precede the reveal effects (else the reveal hits the pre-widen anchors).
-  assert.ok(COCKPIT_SRC.indexOf('renderPane("worklist"); // re-render with the widened filter') < COCKPIT_SRC.indexOf("for (const e of effects) applyReveal(e);"), "the widen renderPane precedes applyReveal in dispatch");
+  assert.ok(COCKPIT_SRC.indexOf('renderPane("worklist"); // re-render with the widened filter') < COCKPIT_SRC.indexOf("for (const e of effects) applyReveal(e, replay);"), "the widen renderPane precedes applyReveal in dispatch");
 });
 check("#214 filter: the webview chip click posts worklistFilterToggle{state}, BEFORE the [data-reveal] branch (controls first)", () => {
   assert.ok(/type:'worklistFilterToggle',state:wf\.getAttribute\('data-worklist-filter'\)/.test(SCRIPT), "a chip click posts worklistFilterToggle{state}");

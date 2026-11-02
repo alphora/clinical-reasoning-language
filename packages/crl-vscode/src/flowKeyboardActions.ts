@@ -8,7 +8,8 @@ export function installFlowKeyboardActions(root: HTMLElement) {
   root.addEventListener('pointerdown',()=>root.classList.add('flow-pointer-interaction'),{capture:true,signal:events.signal});
   root.addEventListener('keydown',()=>root.classList.remove('flow-pointer-interaction'),{capture:true,signal:events.signal});
   const nodeSelector = '[data-flow-key][tabindex="-1"]';
-  const buttonSelector = "[data-flow-pin],.route-layout-toggle,.route-branch-nav,.route-verdict-badge,[data-criterion-verdict],[data-node-flag-gid],[data-toggle-crit],[data-flow-logic],[data-criterion-info]";
+  // REFACTOR:grounded: uncertainty disclosure uses the same pointer/keyboard activation path.
+  const buttonSelector = "[data-flow-pin],[data-flow-uncertainty-toggle],.route-layout-toggle,.route-branch-nav,.route-verdict-badge,[data-criterion-verdict],[data-node-flag-gid],[data-toggle-crit],[data-flow-logic],[data-criterion-info]";
   const visible = (n: Element) => win.getComputedStyle(n).display !== "none" && n.getClientRects().length > 0;
   const nodeOf = (n: Element) => n.closest<SVGGElement>(nodeSelector);
   const nativeControl = (n: Element) => !!n.closest('input,textarea,select,button,a,[contenteditable="true"]');

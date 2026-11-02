@@ -178,7 +178,8 @@ import { inspectScopeOperations } from './mvScopeCoordinator';
 import { reconcileScopeOperation } from './mvEditRecovery';
 import { inspectMvEdits } from './mvEditTransaction';
 import { MvDefinitionFreshness, type DefinitionFreshness } from './mvDefinitionFreshness';
-import { conditionTruthKeys } from "./flowProjection";
+import { conditionTruthKeys, projectFlowStructure } from "./flowProjection";
+import { forcedUncertaintyVisibility, uncertaintyGuardCandidates, sanitizeUncertaintySnapshot, addUncertaintyDisclosureKeys, flaggedUncertaintyGuards } from "./uncertaintyGuardDisplay";
 import { executionRoutes, routeScenario, buildRouteQuestionnaire, type ExecutionRoute } from "./executionRoutes";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
 import {
@@ -507,6 +508,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // not persisted (reload → all-collapsed-with-verdict is the desired steady state). NodeKeys are case-independent, so
   // this survives Prev/Next re-renders; reset on doc change like the other render state.
   let expandedGuardWhens: Set<string> = new Set();
+  // REFACTOR:grounded: model-scoped view state; source predicates, pins and flags stay authoritative.
+  let expandedUncertaintyGuards = new Set<string>();
+  let forcedUncertaintyGuards = new Map<string, 'case' | 'flag' | 'evidence'>();
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -855,7 +859,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // (applyVerdict's re-select, restore-highlight after a re-render — :2457/:2960/:3128), which must NOT spam the emitter.
     // MV-only (a cel selection is MV-only in practice; guard anyway). `getAppState` reads live state, so no payload here.
     if (mode === "medical-validation" && prevCaseId !== nextCid) cockpitAgentBridge.notifyChanged();
-    for (const e of effects) applyReveal(e);
+    for (const e of effects) applyReveal(e, replay);
     onNav.fire(undefined);
     reflectSelectionToTree();
     // #173 T3: drive the failed-criterion overlay for the (now-settled) selection. MUST run AFTER applyReveal so the
@@ -905,10 +909,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  function applyReveal(e: Effect): void {
+  function applyReveal(e: Effect, replay = false): void {
     const v = views.get(e.pane);
     if (!v) return;
-    coord.queueReveal(e.pane, e.target, indexVersion);
+    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay }, indexVersion);
     // Steady-state flush ONLY when the pane's CURRENT render is acked AND is for the current index. During a rebuild
     // the global indexVersion has advanced past the still-acked old render, so this is skipped and the reveal waits for
     // the new render's ack (avoiding a flush against the about-to-be-replaced DOM that would also drop the new reveal).
@@ -957,6 +961,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const v = views.get(pane);
     if (!v || !crlMaps) return;
     const m = crlMaps;
+    // REFACTOR:grounded: explicit source/CRL navigation discloses; ACK/selection replay only paints.
+    if (pane === 'tree' && target.expandUncertainty && mode === 'medical-validation') {
+      const targetKeys = target.kind === 'unit' ? crlAnchorsForUnits([target.id], m) : target.kind === 'crlNode' ? [target.id] : [];
+      const owning = [...uncertaintyGuardCandidates(projectFlowStructure(crlStructure)).values()]
+        .filter(candidate => targetKeys.some(key => candidate.omittedKeys.includes(key)) && !expandedUncertaintyGuards.has(candidate.guardKey) && !forcedUncertaintyGuards.has(candidate.guardKey));
+      if (owning.length) {
+        owning.forEach(candidate => expandedUncertaintyGuards.add(candidate.guardKey));
+        renderPane('tree'); coord.queueReveal('tree', target, indexVersion); return;
+      }
+    }
     // The TREE (flowchart) pane highlights in lockstep with the CRL pane: it anchors the SAME structure nodeKeys, so it
     // reuses the crl anchor-key sets verbatim. (The crl sets also include concept-row keys; the flow pane has no concept
     // anchors, so those simply no-op in highlightRows — the structure rows light up, which is the intent.)
@@ -1816,6 +1830,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void tree.panel.webview.postMessage({ type: "flagBadges", gen: tree.gen, flaggableGids: tree.flaggableGids, gids: [], startNodeGid: tree.startNodeGid, open: 0, resolved: 0, flagError: false, unplaced: 0 });
       return;
     }
+    refreshUncertaintyVisibility();
     const open = flagsList.filter((f) => isOpen(f)); // the blocking set (matches openFlags / the gate)
     // Todo 2 (disc 356/357): the flag->node placement, extracted PURE (flagPlacement.ts) so the reverse-map assembly is
     // unit-tested. `flagsByGid` (WHICH flags belong to each gid) drives the node-filtered entry; `gids` LIGHT the per-node badges.
@@ -2154,6 +2169,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void tree.panel.webview.postMessage({ type: "clearLeaves" }); // teardown only (no MV mark races this)
       return;
     }
+    refreshUncertaintyVisibility();
     const sv = focusedScenario();
     if (!sv || sv.status === "error") {
       markLeaves(tree, [], []); // empty gen-stamped (steady-state clear-effect)
@@ -2215,7 +2231,48 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   // ── render a pane ──
-  function renderPane(pane: Pane, disclosureToken?: string, treeFocusToken?: string, pinFocusRequest?: string): void {
+  function treeRenderOptions(gen: number): Parameters<typeof renderFlowPane>[1] {
+    return { traversalNavigation: mode === 'medical-validation', revealPrefix: `g${gen}_`, concepts: conceptLayer,
+      defExpr: buildDefExprResolver(), guardOutlines, expandedGuardWhens,
+      answerOptionsByConcept: answerOptionsForDisplay(conceptLayer), answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer) };
+  }
+
+  /** REFACTOR:grounded: actual inspected evidence and original flag placement prevent misleading omission. */
+  function computeForcedUncertainty(tree: PaneView): Map<string, 'case' | 'flag' | 'evidence'> {
+    const candidates = uncertaintyGuardCandidates(projectFlowStructure(crlStructure));
+    if (mode !== 'medical-validation' || !candidates.size) return new Map();
+    const pin = pinnedCards?.epoch === indexVersion ? pinnedCards : undefined;
+    const sv = pin ? scenarioByCaseId.get(pin.caseId) : focusedScenario();
+    const route = pin ? routesForCase(pin.caseId).find(route => route.terminalId === pin.routeId) : undefined;
+    const forced = new Map<string, 'case' | 'flag' | 'evidence'>(forcedUncertaintyVisibility(candidates, sv ? {
+      tree: sv.tree, status: sv.status, resolve: whenKeyResolver(sv),
+      ...(route ? { routeNodeIds: new Set(route.nodeIds) } : {}),
+    } : undefined));
+    if (flagStateError || (pin && (!sv || !route))) for (const key of candidates.keys()) forced.set(key, 'evidence');
+    const relatedFlags = flagsList.filter(flag => flag.anchor.scope === 'concept' || (flag.anchor.scope === 'decision' && !!flag.anchor.occurrenceKey));
+    if (relatedFlags.length) {
+      const complete = renderFlowPane(crlStructure, treeRenderOptions(tree.gen));
+      const fullView: PaneView = { ...tree, ...complete };
+      const flaggedGids = new Set(flagPlacementFor(fullView, relatedFlags).gids);
+      for (const key of flaggedUncertaintyGuards(candidates, flaggedGids, complete.flagOwnerKeys ?? {})) forced.set(key, 'flag');
+    }
+    return forced;
+  }
+
+  function refreshUncertaintyVisibility(): void {
+    const tree = views.get('tree');
+    if (!tree || mode !== 'medical-validation') return;
+    const next = computeForcedUncertainty(tree);
+    if (next.size === forcedUncertaintyGuards.size && [...next].every(([key, reason]) => forcedUncertaintyGuards.get(key) === reason)) return;
+    // Store before rendering/selection replay so ACK-driven paint cannot recursively re-render.
+    forcedUncertaintyGuards = next;
+    renderPane('tree');
+    const previousOrigin = scrollSuppressPane; scrollSuppressPane = 'tree';
+    try { if (state.selection) dispatch({ type: 'select', selection: state.selection }, true); }
+    finally { scrollSuppressPane = previousOrigin; }
+  }
+
+  function renderPane(pane: Pane, disclosureToken?: string, treeFocusToken?: string, pinFocusRequest?: string, uncertaintyFocusKey?: string): void {
     const v = views.get(pane);
     if (!v) return;
     v.preserveTreeViewport = pane === 'tree' && v.gen > 0 && (v.preserveNextTreeViewport === true || v.indexVersion === indexVersion);
@@ -2288,19 +2345,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // tree — the graphical decision-tree flowchart (T2 renderer). Same structure + concept inputs as the CRL pane; its
       // reveal shapes are IDENTICAL ({nodeKey} | {conceptNodeKey}), so clicks route through the existing onWebviewMessage
       // path with no new hit kinds, and it highlights in lockstep with the CRL pane (postReveal's crl|tree arms).
-      const r = renderFlowPane(crlStructure, {
-        traversalNavigation: mode === 'medical-validation',
-        revealPrefix: `g${gen}_`,
-        concepts: conceptLayer,
-        defExpr: buildDefExprResolver(), // #187 Option-C: composite → the ANY OF / ALL OF operator OUTLINE (shared builder)
-        guardOutlines, // #224 ii.3 Todo 3: a criterion-when hangs its criterion-body outline (no more dead-end)
-        expandedGuardWhens, // #224 ii.3 Slice 2: which single-criterion whens are expanded (default: all collapsed)
-        // ⭐ #189: the answers to show per concept nodeKey. ONE HOP, deliberately: the concept that OWNS
-        // `value from:` is usually not the one on screen — a decision tree shows the BOOLEAN defined over it,
-        // because that is what a `when` guards on. Resolved in core so the rule is testable.
-        answerOptionsByConcept: answerOptionsForDisplay(conceptLayer),
-        answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer),
-      });
+      forcedUncertaintyGuards = computeForcedUncertainty(v);
+      const r = renderFlowPane(crlStructure, { ...treeRenderOptions(gen),
+        ...(mode === 'medical-validation' ? { uncertaintyDisplay: { expanded: expandedUncertaintyGuards, forced: forcedUncertaintyGuards } } : {}) });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       v.focusNodes = r.focusNodes;
@@ -2309,7 +2356,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.criterionOccurrences = r.criterionOccurrences; // #224 ii.3 Slice 2b: the criterion-verdict substrate (captured atomically)
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode, disclosureToken, treeFocusToken, pinFocusRequest, preserveViewport: v.preserveTreeViewport });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode, disclosureToken, treeFocusToken, pinFocusRequest, uncertaintyFocusKey,
+        uncertaintyDisclosures: r.uncertaintyDisclosures ?? {}, preserveViewport: v.preserveTreeViewport });
     } else if (pane === "fhirQuestionnaire") {
       // The $apply-driven pane (LForms). Per the integration design it receives DATA ONLY — never `html` — so
       // there is no innerHTML swap for the mounted form to survive and no dead-script trap (scripts inserted via
@@ -2911,7 +2959,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const target = coord.ready(pane, v.gen, v.indexVersion);
       if (target) {
         const previousOrigin=scrollSuppressPane;
-        if(v.preserveTreeViewport)scrollSuppressPane='tree';
+        // REFACTOR:grounded: deliberate navigation still scrolls after a disclosure render; replay preserves manual pan.
+        if(v.preserveTreeViewport && !target.expandUncertainty)scrollSuppressPane='tree';
         try { postReveal(pane, target); } finally { scrollSuppressPane=previousOrigin; }
       }
       // #173 T3: a fresh tree render starts with an empty #fcChrome — re-post the toggle + gap banner on ack so they
@@ -2976,6 +3025,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
     } else if (msg.type === "nodeVerdictMenu" && typeof msg.key === "string") {
       void nodeMenu(msg.key); // #217 + #203 Todo 4b Slice B: right-click a flow node (MV) — combined menu (verdict / add-flag); a non-flaggable node routes straight to the verdict pick
+    } else if (msg.type === 'toggleUncertaintyGuard' && typeof msg.key === 'string' && pane === 'tree' && mode === 'medical-validation' && msg.gen === v.gen) {
+      const candidates = uncertaintyGuardCandidates(projectFlowStructure(crlStructure));
+      if (!candidates.has(msg.key) || computeForcedUncertainty(v).has(msg.key)) return;
+      if (expandedUncertaintyGuards.has(msg.key)) expandedUncertaintyGuards.delete(msg.key); else expandedUncertaintyGuards.add(msg.key);
+      renderPane('tree', undefined, undefined, undefined, msg.key);
+      const previousOrigin = scrollSuppressPane; scrollSuppressPane = 'tree';
+      try { if (state.selection) dispatch({ type: 'select', selection: state.selection }, true); }
+      finally { scrollSuppressPane = previousOrigin; }
     } else if (msg.type === "toggleCriterion" && typeof msg.key === "string" && pane === "tree" && msg.gen === v.gen) {
       // #224 ii.3 Slice 2: the criterion `▸`/`▾` disclosure. Resolve the opaque reveal key → the collapse key (trusted
       // lookup, never a webview-supplied path), then flip its state + re-render the tree (layout change). #233 Todo 2a:
@@ -3324,6 +3381,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       resetToEmpty(`Failed to build CRL/CEL model: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
+    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     indexVersion += 1;
     lastClicked = undefined;
     // #173 T3: the runtime-ref → CRL-row-nodeKey join (pure, off crlStructure). A prior peek's gap list is stale now.
@@ -3423,6 +3481,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     defExpr = new Map();
     guardOutlines = new Map();
     criterionIdentities = new Map();
+    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     expandedGuardWhens = new Set();
     crlMaps = undefined;
     scenarios = undefined;
@@ -3461,6 +3520,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     caseKeyNumbers = {};
     conceptKeyNumbers = {};
     lastClicked = undefined;
+    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: { version: indexVersion, anchorFilePath: "", steps: [], sourceCycleIds: [], crlNav: [], celNav: [] } });
@@ -3638,6 +3698,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     currentCel = celPath;
     interactiveQuestionnaire.policyChanged(currentCel);
     flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
+    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     expandedGuardWhens = new Set(); // #224 ii.3 Slice 2: a retarget starts the new policy's criteria all-collapsed (nodeKeys aren't policy-qualified beyond lib/decision, so carry-over could pre-expand a same-named branch)
     cockpitAgentBridge.notifyChanged(); // refresh the agent chip for the new mode/policy (getAppState reads live state)
     const uri = vscode.Uri.file(celPath);
@@ -6168,6 +6229,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // the focused case. (The host re-drives per focused case: it clears in lockstep with the questionnaire when no case is
   // focused — the this-node/diverter lifecycle, driven by focusedScenario — NOT the case-independent done-overlay one.)
   `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no,.flow-condition-true,.flow-condition-false,.flow-condition-unknown')){el.classList.remove('flow-leaf-yes','flow-leaf-no','flow-condition-true','flow-condition-false','flow-condition-unknown');}};` +
+  `let uncertaintyDisclosures={};const uncertaintyVisibility=(${addUncertaintyDisclosureKeys.toString()});` +
   `let pinnedFlowKey='',pinnedRouteKeys=[],pinnedPathKeys=[],pinnedGroupKeys=[],pinnedGroupOutcomes=[],currentRouteKeys=[],currentRouteLabel='',pinnedRouteLabel='',pinEpoch,currentRouteCase='',currentRouteId='';` +
   // REFACTOR:grounded: component geometry follows live cards, collapse and zoom without changing route identities.
   `const componentUi=(${installFlowComponentContainers.toString()})(root);` +
@@ -6178,7 +6240,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
-  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)document.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
+  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)document.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);uncertaintyVisibility(keep,pinnedRouteKeys,uncertaintyDisclosures);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
   `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
   `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
   `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
@@ -6193,14 +6255,14 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);` +
+  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');uncertaintyDisclosures=m.uncertaintyDisclosures||{};root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);if(m.uncertaintyFocusKey){const u=[...root.querySelectorAll('[data-flow-uncertainty-toggle]')].find(n=>n.dataset.flowUncertaintyToggle===m.uncertaintyFocusKey);u?.focus({preventScroll:true});}` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion,routeToken:routeCardUi.token(),questionnaireOpen:routeCardUi.isExternal()});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
   // overlay classes are on the rows). Strip the EPHEMERAL rings (selection `.current`/`.this-node`, agent `.node-focus`) off a
   // CLONE via classList (exact — never rewrites label text) so a customer artifact doesn't carry them; keep verdict/flag/
   // review state. Echoes the token so the host coordinator matches it; the host still SCREENS the payload (trust boundary).
-  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}(${sanitizeCriterionDescriptionSnapshot.toString()})(_c);(${sanitizeUnpinnedTreeFocusSnapshot.toString()})(_c);v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
+  `else if(m.type==='requestSnapshot'){var _c=root.cloneNode(true);var _r=_c.querySelectorAll('.current,.this-node,.node-focus,.flag-current');for(var _i=0;_i<_r.length;_i++){_r[_i].classList.remove('current');_r[_i].classList.remove('this-node');_r[_i].classList.remove('node-focus');_r[_i].classList.remove('flag-current');}(${sanitizeUncertaintySnapshot.toString()})(_c);(${sanitizeCriterionDescriptionSnapshot.toString()})(_c);(${sanitizeUnpinnedTreeFocusSnapshot.toString()})(_c);v.postMessage({type:'snapshotDom',token:m.token,html:_c.innerHTML});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
@@ -6402,6 +6464,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(wf){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistFilterToggle',state:wf.getAttribute('data-worklist-filter')});return;}` +
   // #203 Todo 4b Slice A: a click on a per-node ⚑ flag badge — intercepted BEFORE [data-reveal] ("controls first") since
   // the badge <g> is nested inside the row's data-reveal; opens the flag list (the same channel as the chrome badge).
+  `const ut=e.target.closest&&e.target.closest('[data-flow-uncertainty-toggle]');if(ut){e.preventDefault();e.stopPropagation();if(ut.getAttribute('aria-disabled')!=='true')v.postMessage({type:'toggleUncertaintyGuard',key:ut.dataset.flowUncertaintyToggle,gen});return;}` +
   `const fb=e.target.closest&&e.target.closest('[data-mv-flag-badge]');` +
   // Todo 2 (disc 356): a PER-NODE badge carries data-node-flag-gid (read off the MATCHED badge <g>, NOT a second closest — the
   // start pill is its SIBLING in the same row) → node-filtered; the start-count pill has none → the whole-policy list.

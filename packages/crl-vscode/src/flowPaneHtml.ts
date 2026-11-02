@@ -18,6 +18,7 @@ import {FLOW_LOGIC_STYLE} from "./flowLogicHighlight";
 // (closest('[data-reveal]')) resolve to one element.
 import { buildDefStruct, displayDetermination, topCriterion, type ConditionAnswerCheck, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type GuardOutline, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 import { projectFlowStructure, type ProjectedFlowNode } from "./flowProjection";
+import { foldUncertaintyGuards, type UncertaintyDisplayState } from "./uncertaintyGuardDisplay";
 import { definitionValueInputs } from "./routeCards";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
@@ -47,6 +48,10 @@ export interface FlowAnchor {
 }
 export interface RenderedFlow {
   html: string;
+  /** Visibility-only pin exceptions; these keys never become executed path membership. */
+  uncertaintyDisclosures?: Record<string, string[]>;
+  /** REFACTOR:grounded: review ownership includes non-anchor Criterion/INPUT proxy rows. */
+  flagOwnerKeys?: Record<string, string>;
   focusNodes: Record<string, import('./unpinnedTreeFocus').FocusNode>;
   /** structure nodeKey (decision/when/otherwise/action) → its <g> (highlight target). CONTRACT: no CONCEPT nodeKey is
    *  EVER an anchor key. The cockpit highlights the tree by REUSING the CRL pane's anchor-key sets (crlAnchorsForUnits /
@@ -361,9 +366,10 @@ function buildLaid(
     /** #189 — for a question whose answers live in a pure-REFERENCE terminology we cannot expand: the
      *  terminology NAME, rendered as one plain row and NEVER a chevron. See `answersFromTerminology`. */
     answersFromByConcept?: Map<string, string>;
+    answerContributions?: Map<string, AnswerContribution[]>;
   } = {},
 ): { roots: LaidNode[]; maxDepth: number; contributions:Map<string,AnswerContribution[]> } {
-  const contributions=buildAnswerContributions(structure,[...conceptMap.values()],opts.guardOutlines,true);
+  const contributions=opts.answerContributions ?? buildAnswerContributions(structure,[...conceptMap.values()],opts.guardOutlines,true);
   let slot = 0;
   let maxDepth = 0;
   const outlineX = (whenLeft: number, indent: number): number => whenLeft + OUTLINE_BASE + indent * OUTLINE_INDENT;
@@ -727,6 +733,8 @@ export function renderFlowPane(
   opts: {
     /** Reserve count/arrow space above unpinned MV terminals, including their guard tabs. */
     traversalNavigation?: boolean;
+    /** REFACTOR:grounded: opt-in display projection, independent of source/evaluation structure. */
+    uncertaintyDisplay?: UncertaintyDisplayState;
     revealPrefix?: string;
     concepts?: CrlConceptNode[];
     /** #187 Option-C: a composite `when`'s `defined as` OPERATOR tree — the SAME shared builder the Questionnaire uses. */
@@ -759,7 +767,11 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth, contributions } = buildLaid(projectFlowStructure(structure), conceptMap, {
+  const unfolded = projectFlowStructure(structure);
+  const uncertainty = opts.uncertaintyDisplay ? foldUncertaintyGuards(unfolded, opts.uncertaintyDisplay) : undefined;
+  const { roots, maxDepth, contributions } = buildLaid(uncertainty?.structure ?? unfolded, conceptMap, {
+    // The actual next node, not a visual shortcut, owns each answer contribution preview.
+    answerContributions: buildAnswerContributions(unfolded, concepts, opts.guardOutlines, true),
     traversalNavigation: opts.traversalNavigation,
     defExpr: opts.defExpr,
     guardOutlines: opts.guardOutlines,
@@ -831,12 +843,25 @@ export function renderFlowPane(
   }
 
   // Nodes. Generated counter ids (NOT nodeKey-derived) for both `id` and the reveal key.
+  const flagOwnerKeys: Record<string, string> = {};
   let idx = 0;
   for (const n of all) {
     const gid = `${prefix}flow${idx++}`;
+    flagOwnerKeys[gid] = n.topWhenKey ?? n.nodeKey;
     const key = `${prefix}k${gid}`;
     const x = left(n);
     const y = top(n);
+    const uncertaintyControl = uncertainty?.controls.get(n.nodeKey);
+    const uncertaintyTitle = uncertaintyControl?.forced === 'flag' ? 'Shown because this check has review flags'
+      : uncertaintyControl?.forced === 'evidence' ? 'Shown because this check cannot safely be hidden'
+      : uncertaintyControl?.forced ? 'Shown for the inspected case'
+      : uncertaintyControl?.expanded ? 'Hide uncertainty check' : 'Show uncertainty check';
+    const uncertaintyMarkup = uncertaintyControl ?
+      `<g class="flow-uncertainty-toggle" data-flow-uncertainty-toggle="${escapeHtml(uncertaintyControl.guardKey)}"` +
+      `${uncertaintyControl.expanded ? '' : ' data-flow-uncertainty-collapsed="1"'} role="button" tabindex="${uncertaintyControl.forced ? -1 : 0}"` +
+      ` aria-expanded="${uncertaintyControl.expanded}" aria-disabled="${!!uncertaintyControl.forced}" aria-label="${uncertaintyTitle}">` +
+      `<title>${uncertaintyTitle}</title><rect x="${x + NODE_W + 6}" y="${y + 25}" width="20" height="18" rx="4"/>` +
+      `<text x="${x + NODE_W + 16}" y="${y + 38}" text-anchor="middle">U</text></g>` : '';
     // ROW CATEGORY gates the anchor/reveal surface: a structure node and an OUTLINE LEAF are addressable (anchor + reveal);
     // an operator / top-OR / external / more row is RENDER-ONLY (no anchor, no reveal — a click resolves to nothing).
     const addressable = !n.outline || n.outlineRow === "leaf";
@@ -1073,6 +1098,7 @@ export function renderFlowPane(
       allPassBadge +
       flagBadgeMarkup +
       startFlagMarkup +
+      uncertaintyMarkup +
       (canOpenDecision
         ? `<g data-flow-open-decision="${escapeHtml(n.delegatedDecisionKey!)}" role="button" tabindex="0" aria-label="Go to shared decision"><title>Go to shared decision</title><rect x="${x+NODE_W-24}" y="${y+8}" width="20" height="22" rx="3"/><text x="${x+NODE_W-20}" y="${y+24}">↗</text></g>` : "") +
       (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + NODE_W + 6}" y="${y - 18}" width="22" height="22" rx="4"/><path d="M${x + NODE_W + 12} ${y - 13} h10 l-2 6 l3 3 h-12 l3-3 z M${x + NODE_W + 17} ${y - 4} v5"/></g>` : "") +
@@ -1197,7 +1223,8 @@ export function renderFlowPane(
       }).join("") +
       `</dd></div>`).join("") +
     `</dl></details>`;
-  return { html: `<div class="flow-wrap">${svg}</div>${descriptionHtml}${zoom}`, focusNodes, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid };
+  return { html: `<div class="flow-wrap">${svg}</div>${descriptionHtml}${zoom}`, focusNodes, anchors, reveals, leafConcepts, conceptOccurrences, criterionOccurrences, flaggableGids, startNodeGid, flagOwnerKeys,
+    ...(uncertainty ? { uncertaintyDisclosures: uncertainty.disclosures } : {}) };
 }
 
 // Bottom-right flag: grey adds, yellow opens unresolved MV flags, green opens resolved MV flags. Rollup-only badges remain hidden until
@@ -1245,6 +1272,7 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 }
 
 export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
+  `.flow-uncertainty-toggle{cursor:pointer}.flow-uncertainty-toggle>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-uncertainty-toggle>text{fill:var(--vscode-foreground,#ccc);font-size:12px}.flow-uncertainty-toggle:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}.flow-uncertainty-toggle[aria-disabled=true]{cursor:default}` +
   `.flow-answer-group>text{font-size:12px;font-weight:600}.flow-answer-left>text{fill:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}.flow-answer-right>text{fill:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `html:has(.flow-svg){overflow-anchor:none}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
