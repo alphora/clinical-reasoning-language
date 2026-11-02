@@ -121,6 +121,9 @@ describe("one authoring kit: discovery and complete guidance", () => {
     ["explicit false", "rule:branch-guards"],
     ["completeness", "rule:concept-form"],
     ["narrative completeness", "rule:review-flags"],
+    ["KE flags", "rule:review-flags"],
+    ["MV change report", "rule:review-flags"],
+    ["Before After", "rule:review-flags"],
   ])("%s discovers %s, not an isolated warning or old template", (text, id) => {
     const result = query({ view: "search", query: text });
     expect(result.results[0]).toMatchObject({ id, status: "current" });
@@ -274,4 +277,15 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(audit).not.toHaveProperty("currentRevision");
     expect(audit).not.toHaveProperty("repositoryAudited");
   });
+});
+
+// @kit review-flags:reporting-discovery
+it('an agent entering through KE Updates gets complete flag reporting instructions and examples',()=>{
+ const entry:any=query({view:'entry',id:'rule:mv-wording-patches'});
+ const report=entry.entries.find((e:any)=>e.id==='rule:review-flags');
+ expect(report).toBeDefined();
+ expect(report.content.rule).toContain('deliver a change report linked to their actual flagIds');
+ expect(report.content.rule).toContain('notImplementedReason');
+ expect(report.content.rule).toContain('```json');
+ expect(report.content.rule).toContain('never mark human flags Fixed or Approved');
 });

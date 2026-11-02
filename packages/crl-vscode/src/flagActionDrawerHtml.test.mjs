@@ -27,10 +27,14 @@ const OPEN_VIEW = {
   descriptionOnly: false,
 };
 
-test('structured Question and Source appear separately, in order, and are escaped',()=>{
+// @kit review-flags:reader-layout
+test('Question and quotation stay visible, with source reference only in Details, and all are escaped',()=>{
   const h=renderFlagActionDrawer({...OPEN_VIEW,question:'Which <option>?',sourceReference:'Policy <p.2>',sourceQuote:'<script>source</script>'});
-  assert.ok(h.indexOf('>Question<')<h.indexOf('>Source<'));
-  assert.ok(h.indexOf('>Source<')<h.indexOf('>Description<'));
+  const main=h.slice(0,h.indexOf('<details'));
+  assert.ok(main.indexOf('>Question<')<main.indexOf('>Source quotation<'));
+  assert.ok(main.indexOf('>Source quotation<')<main.indexOf('>Description<'));
+  assert.ok(!main.includes('Policy &lt;p.2&gt;'));
+  assert.ok(h.slice(h.indexOf('<details')).includes('Policy &lt;p.2&gt;'));
   assert.ok(h.includes('Which &lt;option&gt;?'));
   assert.ok(!h.includes('<script>'));
   const old=renderFlagActionDrawer(OPEN_VIEW);assert.ok(!old.includes('>Question<'));assert.ok(old.includes('line one\nline two'));
@@ -40,8 +44,15 @@ test('run reporting has no status mutation and evidence buttons carry opaque key
   const h=renderFlagActionDrawer({...OPEN_VIEW,changes:[{runId:'run-1',recordedAt:'2026-11-01T12:00:00.000Z',beforeCommit:'a'.repeat(40),
     priorState:'Old <wording>',requestedChange:'Please clarify',change:'Reworded',implemented:true,targets:['Question'],
     evidence:[{label:'Report',path:'tests/results/report.json',key:'opaque-1'}]}]});
-  assert.ok(h.includes('Run-reported change'));assert.ok(h.includes('>Before<'));
-  assert.ok(h.includes('Old &lt;wording&gt;'));assert.ok(h.includes('review status (Pending fix)'));
+  const main=h.slice(0,h.indexOf('<details'));
+  assert.ok(main.includes('<h3>Changes — '));assert.ok(main.includes('>Before<'));
+  assert.ok(main.includes('>After<'));assert.ok(main.includes('Reworded'));
+  assert.ok(!h.includes('>Run<')&&!main.includes('run-1'));
+  assert.ok(h.slice(h.indexOf('<details')).includes('run-1.json'));
+  assert.ok(!h.includes('Requested change')&&!h.includes('Change made'));
+  assert.ok(!main.includes('a'.repeat(40)));assert.ok(h.includes('a'.repeat(40)));
+  assert.ok(main.includes('Old &lt;wording&gt;'));assert.ok(!h.includes('Run reporting does not change'));
+  assert.ok(main.includes('Pending fix'));assert.ok(main.includes('>Affected nodes<'));assert.ok(main.includes('>Evidence<'));
   assert.ok(h.includes('data-flag-summary-evidence="opaque-1"'));
   assert.ok(!h.includes('data-path='));
 });
@@ -69,15 +80,19 @@ test("renderFlagActionDrawer: the HEADER is the summary (disc 359), not the targ
   assert.ok(!/>Target<\/span>/.test(body), "Target is not a top-level body row — it's in Details");
 });
 
-test("renderFlagActionDrawer: empty gist → the header falls back to the Type (never a bare 'Flag —')", () => {
+test("renderFlagActionDrawer: empty gist → the header falls back to the question or target (never a bare 'Flag —')", () => {
   const h = renderFlagActionDrawer({ ...OPEN_VIEW, summary: "" });
-  assert.match(h, /Flag — CRL vs customer intent</);
+  assert.match(h, /Flag — this condition</);
+  assert.match(renderFlagActionDrawer({...OPEN_VIEW,summary:"",question:"Which option?"}), /Flag — Which option\?</);
 });
 
-test("renderFlagActionDrawer: the visible body rows — Type, Workflow, Status, Description, extra fields, Ref, timestamps", () => {
+test("renderFlagActionDrawer: visible user content and technical Type/Workflow only inside Details", () => {
   const h = renderFlagActionDrawer(OPEN_VIEW);
-  assert.match(h, />Type<\/span><span class="fa-val[^"]*">CRL vs customer intent</);
-  assert.match(h, />Workflow<\/span><span class="fa-val[^"]*">MV</);
+  const main=h.slice(0,h.indexOf("<details"));
+  assert.ok(!main.includes(">Type<")&&!main.includes(">Workflow<"));
+  const details=h.slice(h.indexOf("<details"));
+  assert.match(details, />Type<\/span><span class="fa-val[^"]*">CRL vs customer intent</);
+  assert.match(details, />Workflow<\/span><span class="fa-val[^"]*">MV</);
   assert.match(h, /fa-status fa-status-open">Pending fix</);
   assert.match(h, /line one\nline two/); // multiline description preserved (fa-pre → pre-wrap)
   assert.match(h, />kind<\/span><span class="fa-val[^"]*">intent-divergence</);
@@ -130,7 +145,7 @@ test("renderFlagActionDrawer: absent optional data (no signature / description /
     targetPresent: true,
     descriptionOnly: true, // an extraction flag (fidelity-defect) → "Edit description"
   });
-  assert.match(min, /Flag — fidelity-defect</); // empty gist → Type in the header
+  assert.match(min, /Flag — the concept &quot;x&quot;</); // internal type stays out of the header
   assert.match(min, /fa-status-open/);
   assert.ok(!min.includes("guard→"), "no occurrence signature");
   assert.ok(!min.includes(">Edited<"), "no Edited row when editedAt absent");
@@ -202,10 +217,30 @@ test('Open KE flags offer Answer and Ignore, while closed KE flags offer Reopen'
  }
 });
 
-console.log("flagActionDrawerHtml.test: ok");
-
 test('manual Fixed -> Approve and Q/A generic drawer has no mutation actions',()=>{
  const fixed=renderFlagActionDrawer({...OPEN_VIEW,status:'fixed'});assert.match(fixed,/Fixed<\/span>/);assert.match(fixed,/data-flag-action-toggle>Approve flag/);
  const approved=renderFlagActionDrawer({...OPEN_VIEW,status:'approved'});assert.match(approved,/Approved<\/span>/);assert.match(approved,/Reopen flag/);
  for(const status of ['open','fixed','approved']){const special=renderFlagActionDrawer({...OPEN_VIEW,qaEdit:true,status});assert.doesNotMatch(special,/data-flag-action-(toggle|edit|delete|answer|ignore)/);assert.match(special,/pinned Question and Answer controls/);}
+});
+
+// @kit review-flags:reader-layout
+test('historical implementation and deferral outcomes remain visible with their dates',()=>{
+ const original={runId:'internal-token',recordedAt:'2026-11-02T12:00:00.000Z',beforeCommit:'b'.repeat(40),
+  priorState:'Separate questions',requestedChange:'Combine them',change:'One question now accepts either activity',implemented:true,targets:['Activity question'],evidence:[]};
+ const html=renderFlagActionDrawer({...OPEN_VIEW,changes:[original,{...original,recordedAt:'2026-11-01T12:00:00.000Z',change:'Source clarification is needed',implemented:false}]});
+ const main=html.slice(0,html.indexOf('<details'));
+ for(const text of ['>Before<','>After<','One question now accepts either activity','>Not implemented<','Source clarification is needed','2026-11-02','2026-11-01'])assert.ok(main.includes(text),text);
+ assert.equal((main.match(/<h3>Changes — /g)||[]).length,2);
+ assert.ok(!main.includes('internal-token'));
+ assert.ok(html.slice(html.indexOf('<details')).includes('internal-token.json'));
+ const sameTime=renderFlagActionDrawer({...OPEN_VIEW,description:undefined,changes:[original,{...original,change:'Waiting for clarification',implemented:false}]});
+ const sameMain=sameTime.slice(0,sameTime.indexOf('<details'));
+ assert.ok(sameMain.includes('From latest change report:'));
+ assert.ok(!main.includes('From latest change report:'));
+ for(const text of ['Combine them','One question now accepts either activity','Waiting for clarification','>Not implemented<'])assert.ok(sameMain.includes(text),text);
+ const legacy=renderFlagActionDrawer(OPEN_VIEW);assert.ok(!legacy.includes('<h3>Changes — '));assert.ok(!legacy.includes('>After<'));
+});
+
+test("degraded empty legacy labels have a readable header without a technical identifier",()=>{
+ const h=renderFlagActionDrawer({...OPEN_VIEW,summary:undefined,targetLabel:" ",question:" "});assert.match(h,/Flag — Review flag</);
 });

@@ -7,13 +7,16 @@ import { interactiveQuestionnaireHtml } from "./interactiveQuestionnaireHtml";
 import { nextQuestionnaireColumn } from "./branchQuestionnairePanel";
 import { interactiveQuestionnaireDependencies } from "./interactiveQuestionnaireDependencies";
 
-export function createInteractiveQuestionnairePanel(context: vscode.ExtensionContext, inspectQuestionnaire: (q: unknown) => string[] = () => [], publication: (cel:string)=>DefinitionPublicationOptions = ()=>({})) {
+export function createInteractiveQuestionnairePanel(context: vscode.ExtensionContext, inspectQuestionnaire: (q: unknown) => string[] = () => [], publication: (cel:string)=>DefinitionPublicationOptions = ()=>({}), onOpenChanged: () => void = () => {}) {
   let current: vscode.WebviewPanel | undefined, owner: string | undefined, session: InteractiveSession | undefined;
   let token = 0, markStale: (()=>void)|undefined;
-  const close = () => { markStale=undefined;++token;session?.cancel(); session = undefined; const old = current; current = undefined; owner = undefined; old?.dispose(); };
+  const close = () => { markStale=undefined;++token;session?.cancel(); session = undefined; const old = current; current = undefined; owner = undefined; old?.dispose(); if(old)onOpenChanged(); };
   context.subscriptions.push({ dispose: close });
   return {
     close,
+    get isOpen() { return !!current; },
+    isOpenFor(cel: string | undefined) { return !!current && !!cel && owner===cel; },
+    toggle(cel: string) { if(this.isOpenFor(cel))close();else this.open(cel); },
     definitionsChanged(cel: string) { if(owner===cel)markStale?.(); },
     policyChanged(cel: string | undefined) { if (current && owner !== cel) close(); },
     open(cel: string) {
@@ -96,10 +99,11 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
         } catch (e) { if (current === panel && mine === token) post({ type: "error", message: String(e) }); }
         finally { if (current === panel && mine === token) busy = false; }
       });
-      panel.onDidDispose(() => { listener.dispose(); if (current === panel) { session?.cancel(); session = undefined; current = undefined; owner = undefined; markStale=undefined;++token; } });
+      panel.onDidDispose(() => { listener.dispose(); if (current === panel) { session?.cancel(); session = undefined; current = undefined; owner = undefined; markStale=undefined;++token;onOpenChanged(); } });
       const root = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
       panel.webview.html = interactiveQuestionnaireHtml(randomUUID(), panel.webview.cspSource,
         name => panel.webview.asWebviewUri(vscode.Uri.joinPath(root, name)).toString(), inspectQuestionnaire);
+      onOpenChanged();
     },
   };
 }

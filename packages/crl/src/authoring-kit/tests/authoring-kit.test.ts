@@ -3,6 +3,9 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { validateFlagChangeSummary, flagChangeSummaryJsonSchema } from "../../flags/changeSummary";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv";
+
 import { parseInput } from "../../ast/tests/parseInput";
 import { buildCRL } from "../../index";
 import { buildCEL } from "../../cel";
@@ -321,7 +324,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.43");
+    expect(kit.schemaVersion).toBe("2.44");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -676,8 +679,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.43");
-    expect(kit.contentHash).toBe("3335e25050a9b4c5c9621780cac1838cc52c30ba2aa80e1b58d536f15ae6c8f9");
+    expect(kit.schemaVersion).toBe("2.44");
+    expect(kit.contentHash).toBe("602ed0d30d328bcd8630ac29328b58423440f30523e1a4fede6cf550d1137212");
   });
 
   // @kit criterion:description-navigation
@@ -930,10 +933,35 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
   });
 
   // @kit review-flags:structured-context
-  it('teaches separate question/source fields, conflict handling and non-approving rerun reporting',()=>{
+  it('teaches separate question/source fields, conflict handling and visible Before/After reporting',()=>{
     const text=JSON.stringify(rule);
     for(const term of ['sourceReference','sourceQuote','content-conflict','change-summaries','SHA256','never mark human flags Fixed or Approved'])expect(text).toContain(term);
     expect(text).toContain('create_flag is not an amend operation');
+    expect(text).toContain('nurses and informaticists');
+    expect(text).toContain('Changes shows Before and After');
+    expect(text).toContain('requestedChange summarizes the selected request');
+    expect(text).not.toContain('technical Before / Requested change / Change made');
+    expect(text).not.toContain('source detail, reasoning, consequences and review question in');
+    expect(rule!.clauses![0].text).toContain('a separate succinct `question`');
+    expect(text).toContain('Completion messages do not replace the change report');
+    const validate = new AjvJsonSchemaValidator().getValidator(flagChangeSummaryJsonSchema as never);
+    const reports=[...(rule!.rule.matchAll(/```json\n([\s\S]*?)\n```/g))].map(m=>JSON.parse(m[1]));
+    expect(reports).toHaveLength(2);
+    for(const report of reports){expect(validateFlagChangeSummary(report).success).toBe(true);expect(validate(report).valid).toBe(true);}
+    const invalidBaseline=structuredClone(reports[0]);invalidBaseline.beforeCommit='not-a-git-sha';
+    const invalidEvidence=structuredClone(reports[0]);invalidEvidence.items[0].evidence=[{label:'Temporary file',path:'tmp/report.json',sha256:'b'.repeat(64)}];
+    for(const report of [invalidBaseline,invalidEvidence]){expect(validateFlagChangeSummary(report).success).toBe(false);expect(validate(report).valid).toBe(false);}
+    expect(reports[0].items[0].implementedChange).toBeDefined();
+    expect(reports[1].items[0].notImplementedReason).toBeDefined();
+    for(const id of ['open-fork-flag','fidelity-defect-flag','library-flag']) {
+      const example=kit.examples.find(e=>e.id===id)!;
+      for(const field of ['question:', 'sourceReference:', 'sourceQuote:', 'description:'])expect(example.snippet).toContain(field);
+      expect(example.snippet).toContain('Fictional policy');
+    }
+    const patches=kit.rules.find(r=>r.id==='mv-wording-patches')!;
+    expect(patches.rule).toContain('without rerunning an authoring agent');
+    expect(patches.rule).toContain('follow review-flags');
+    expect(JSON.stringify(patches)).not.toContain('out-of-band completion messages are sufficient');
   });
 
   // The former-flag-tag `- meta is` construction, anywhere (rule prose OR an example) — the structural regression signal.

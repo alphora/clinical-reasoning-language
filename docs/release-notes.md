@@ -39,3 +39,7 @@ Give Spaces extension ID `smiledigitalhealth.crl-language-support`, retained flo
 Previously authored user settings or keybindings referencing the removed CRL reader may remain unknown/unresolved in VS Code. CRL does not rewrite user configuration or retain deprecated producer contributions; Spaces owns the replacement command and automatic-opening preference. Old CRL notes history was extension globalState, not a contributed user setting, and remains inert.
 
 Maintainer compilation validates the source catalog, media and generated README; finish the catalog edit and run `npm run notes:write -w crl-language-support` before compiling. This deliberate authoring-time gate does not run in the installed producer extension. To export with the npm shortcut, use `npm run notes:export -w crl-language-support -- <output-directory>` (append `--mode dry-run` for rehearsal). Record the actual base64-expanded portable HTML size. Before adding a video, verify the file contains no audio track as well as the supported codec and actual playback.
+
+## Editorial audience
+
+Write user feature descriptions for nurses and informaticists. Explain the visible task and benefit in plain language. Keep runtime/build/security-dependency identities and deployment mechanics in maintainer evidence. Do not announce the notes feature in the notes. Explicit operator curation can remove irrelevant historical entries; version gaps are allowed and do not change actual deployment receipts or the retained floor. Past published releases remain immutable.

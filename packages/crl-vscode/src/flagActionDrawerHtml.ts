@@ -77,20 +77,19 @@ function row(key: string, valueHtml: string, pre = false): string {
 export function renderFlagActionDrawer(v: FlagActionView): string {
   const em = `<span class="fa-em">—</span>`;
   const statusLabel = v.category === 'validation' ? v.status === 'fixed' ? 'Fixed' : v.status === 'approved' || v.status === 'resolved' ? 'Approved' : 'Pending fix' : v.status;
-  // The header IS the summary now (disc 359 — the target label was too long + duplicated the Target row); an empty gist
-  // (extraction/legacy flags) falls back to the Type so the header is never a bare "Flag —".
-  const headerText = v.summary || v.typeLabel;
+  // Legacy flags may have no title. Keep their header meaningful without exposing an internal tag.
+  const headerText = v.summary?.trim() || v.question?.trim() || v.targetLabel?.trim() || "Review flag";
+  // Older flags may omit Description. A delivered report still retains the request; never amend the saved flag here.
+  const reportedRequest = !v.description?.trim() && v.changes?.[0]?.requestedChange;
+  const description = reportedRequest || v.description;
   // Description is always shown (an em-dash when empty), including read-only authoring flags.
   // Mutable legacy flags use a description-only edit form. Ref, by
-  // contrast, is NOT editable, so an empty Ref row is pure noise → omitted. Type/Origin/Status/Created always have a value.
+  // contrast, is NOT editable, so an empty Ref row is omitted. Internal classifications belong in Details.
   const rows =
     (v.question?.trim() ? row("Question", escapeHtml(v.question), true) : "") +
-    (v.sourceReference?.trim() ? row("Source", escapeHtml(v.sourceReference), true) : "") +
     (v.sourceQuote?.trim() ? row("Source quotation", escapeHtml(v.sourceQuote), true) : "") +
-    row("Type", escapeHtml(v.typeLabel)) +
-    row("Workflow", escapeHtml(v.category === "extraction" ? "KE" : v.category === "validation" ? "MV" : v.category)) +
     row("Status", `<span class="fa-status fa-status-${v.status}">${statusLabel}</span>`) +
-    row("Description", v.description?.trim() ? escapeHtml(v.description) : em, true) + // .trim(): a whitespace-only value reads as empty (em-dash)
+    row("Description", description?.trim() ? `${reportedRequest ? '<span class="fa-em">From latest change report:</span><br>' : ''}${escapeHtml(description)}` : em, true) +
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
     (v.issueRef?.trim() ? row("Ref", escapeHtml(v.issueRef)) : "") +
     row("Created", escapeHtml(v.createdAt)) +
@@ -105,17 +104,22 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   const details =
     `<details class="fa-details"${v.targetPresent ? "" : " open"}><summary>Details</summary>` +
     missingNote +
+    row("Type", escapeHtml(v.typeLabel)) +
+    row("Workflow", escapeHtml(v.category === "extraction" ? "KE" : v.category === "validation" ? "MV" : v.category)) +
+    (v.sourceReference?.trim() ? row("Source reference", escapeHtml(v.sourceReference), true) : "") +
     row("Target", `${escapeHtml(v.targetLabel)}<span class="fa-addr">${target}</span>`) +
     row("Id", escapeHtml(v.id)) +
+    (v.changes ?? []).map(change => `<section class="fa-change"><h3>${escapeHtml(change.recordedAt)}</h3>` +
+      row("Report file", escapeHtml(`${change.runId}.json`)) +
+      row("Prior source revision", escapeHtml(change.beforeCommit)) + `</section>`).join("") +
     `</details>`;
   const changes = (v.changes ?? []).map(change =>
-    `<section class="fa-change"><h3>Run-reported change</h3>` +
-    row('Run', escapeHtml(change.runId)) + row('Recorded at',escapeHtml(change.recordedAt.replace('T',' ').replace(/\.\d{3}Z$/, ' UTC'))) + row('Prior commit',escapeHtml(change.beforeCommit)) +
-    row('Before',escapeHtml(change.priorState),true) + row('Requested change',escapeHtml(change.requestedChange),true) +
-    row(change.implemented ? 'Change made' : 'Not implemented',escapeHtml(change.change),true) +
+    `<section class="fa-change"><h3>Changes — ${escapeHtml(change.recordedAt.replace('T',' ').replace(/\.\d{3}Z$/, ' UTC'))}</h3>` +
+    row('Before',escapeHtml(change.priorState),true) +
+    row(change.implemented ? 'After' : 'Not implemented',escapeHtml(change.change),true) +
     row('Affected nodes',escapeHtml(change.targets.join('\n')),true) +
     change.evidence.map(e => `<div class="fa-row"><span class="fa-key">Evidence</span><button type="button" class="fa-btn" data-flag-summary-evidence="${escapeHtml(e.key)}" title="${escapeHtml(e.path)} — file hash checked on opening">${escapeHtml(e.label)}</button></div>`).join('') +
-    `<p class="fa-note">Run reporting does not change this flag’s review status (${escapeHtml(statusLabel)}).</p></section>`).join('');
+    `</section>`).join('');
   const summaryWarnings = (v.changeWarnings ?? []).map(w => `<div class="fa-note">${escapeHtml(w)}</div>`).join('');
 
   const authoring = v.category === "extraction";

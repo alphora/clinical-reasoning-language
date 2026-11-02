@@ -1,75 +1,47 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.47.
+Updates since CRL 6.4.41 through 6.4.48.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
 
-## 6.4.47 — Release notes for the combined KALM view
+## 6.4.48 — Simpler review flags
 
-### One combined place to see what changed
+### Focus on the review question
 
-CRL supplies versioned release notes and local illustrations for the combined KALM AI: What's New view\. This view is available in images that include the compatible Spaces launcher, which manages opening and skipped\-release history\. CRL no longer opens a separate notes tab\. Downloadable HTML and Markdown remain available from the release\.
+The flag view keeps the question, policy quotation, description and review status in view\. Internal classifications and technical identifiers are tucked into Details\.
 
-## 6.4.46 — See what's new in CRL
+![Example review flag showing its question, policy quotation and description with Details collapsed\.](flag-context.png)
 
-### Quantity questions carry their unit
+A fictional example of a question for the reviewer\.
 
-Declare a unit once on the CRL value type, for example: value type is Quantity 'kg/m2'\. CQL evaluation and the emitted FHIR input profile use that declared unit; the matching $apply engine carries it into the Questionnaire\. Enter a number in the Interactive Questionnaire and the client submits a Quantity in that unit\. Change and clear remain available\. Existing questions without a declared unit keep their prior behavior\.
+### Compare Before and After
 
-![Synthetic BMI question in the real Interactive FHIR Questionnaire, with 40 entered and kg/m2 provided by the form\.](quantity-entry.png)
+Changes shows Before and After beside the flag's description, without repeating the request in another field\. If a request has not been implemented, the reason stays visible\. Affected questions and evidence links remain available\.
 
-Synthetic runtime example\. Raw unitless measurements from clients that ignore the unit contract are still rejected; the clinical threshold is authored separately\.
+![Example review flag with its description, visible Before and After, and affected question\.](flag-summary.png)
 
-### Read the question and source separately
+The request and the resulting change stay together for review\.
 
-KE flags can now carry a succinct question, source reference and source quotation in separate fields\. The flag view displays those fields above the description so reviewers can distinguish the question from its supporting text\. Legacy descriptions remain readable\. The KE pipeline must populate the new fields to benefit\.
+### Open and close the interactive questionnaire
 
-![Actual CRL flag drawer renderer showing a synthetic question, source reference and source quotation in separate labeled rows\.](flag-context.png)
+The Interactive FHIR Questionnaire button turns blue while its tab is open\. Click it again to close the tab, just as you can with FHIR Questionnaire\.
 
-Synthetic display example using the shipped flag renderer; customer policy content is not shown\.
+## 6.4.46 — Clearer questions and review flags
 
-### See what a rerun reports changing
+### Measurement questions supply their unit
 
-A rerun can supply structured Before, Requested change, Change made and Affected nodes information, with evidence links\. CRL verifies the referenced artifact evidence when opening it\. These summaries report technical changes and do not automatically approve a flag or establish clinical correctness; the pipeline supplies the report\.
+When a measurement question has a specified unit, such as BMI in kg/m2, enter the number and the form supplies the unit\. You can change or clear the answer\.
 
-![Actual CRL flag drawer renderer showing a synthetic run\-reported change with before state, requested change and change made\.](flag-summary.png)
+![Example BMI question with 40 entered and the unit kg/m2 supplied by the form\.](quantity-entry.png)
 
-Synthetic display example\. Existing flag review status remains under human control\.
+Illustrative BMI question; no patient information is shown\.
 
-### Bundled illustrated Release Notes
+### Read the review question separately
 
-CRL 6\.4\.46 introduced bundled illustrated Release Notes, skipped\-release history and offline media\. Downloadable HTML and Markdown provide the same authored content\.
+A knowledge engineer can provide a short question and a quotation from the policy separately from the supporting explanation, making it easier to see what needs your review\.
 
-### Use the matching Quantity\-capable engine
+### See what changed after a review request
 
-CRL 6\.4\.46 selects engine build cqf\-definition\-dcac972f\-normalized\-cache\-quantity\-units\-20261101, SHA256 2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa\. Declared\-unit questions require this generator support\. Deployment images must include the matching JAR; explicit runtime overrides must be updated for the new feature\. The normal runtime verifies its configured or cached engine and does not download it\.
-
-## 6.4.45 — Engine dependency security update
-
-### Updated engine dependencies
-
-The normalized\-cache engine updates its packaged Guava runtime to 33\.7\.2\-jre\. Application behavior, the normalized\-cache implementation and driver/worker bytecode remain unchanged\. The release includes a dated full\-JAR dependency scan and immutable engine identity\.
-
-## 6.4.44 — Concurrent evaluation and compilation reuse
-
-### Run independent jobs concurrently
-
-The native runtime supports a configurable pool of reusable JVMs\. Complete sessions keep one owner and execute their steps in sequence\. Nautilus can select six workers; the generic default remains one\. Compilation reuse checks definition content and invalidates on changed artifacts, while clinical evaluation state remains fresh\.
-
-## 6.4.43 — Faster repeated native evaluations
-
-### Reuse the native runtime
-
-Repeated $apply calls in one CRL tool process reuse an owned JVM while clinical repositories and per\-call state remain fresh\. Streaming CLI sessions also support reuse\. Cancellation, timeout or worker failure triggers cleanup before later work; failed evaluations are not replayed automatically\.
-
-## 6.4.42 — Grouped choices in questionnaires
-
-### Present related choices together
-
-Group ordinary Boolean questions under one shared prompt, choose columns and checkbox or radio controls, and retain separate Yes, No and unanswered answers\. Clearing one answer preserves the others\. The same emitted CQL/FHIR gives older supported engines a meaningful prompt for each independent question\. See the synthetic presentation\-choice demo for an optional explanatory description\.
-
-### Use package identity from the manifest
-
-Declare packageId at the package\.json root\. An explicit tool override takes precedence; the older crl\.packageId field remains a fallback when the root field is absent\.
+A flag can include a summary of the earlier wording and the change made, with links to supporting evidence\. You can review the result before marking the flag Fixed or Approved\.
 
 Images and demonstrations use sample artifacts.

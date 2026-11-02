@@ -3,91 +3,47 @@
   "deployedBaselineVersion": "6.4.41",
   "releases": [
     {
-      "version": "6.4.42",
-      "title": "Grouped choices in questionnaires",
-      "features": [
-        {
-          "title": "Present related choices together",
-          "description": "Group ordinary Boolean questions under one shared prompt, choose columns and checkbox or radio controls, and retain separate Yes, No and unanswered answers. Clearing one answer preserves the others. The same emitted CQL/FHIR gives older supported engines a meaningful prompt for each independent question. See the synthetic presentation-choice demo for an optional explanatory description."
-        },
-        {
-          "title": "Use package identity from the manifest",
-          "description": "Declare packageId at the package.json root. An explicit tool override takes precedence; the older crl.packageId field remains a fallback when the root field is absent."
-        }
-      ]
-    },
-    {
-      "version": "6.4.43",
-      "title": "Faster repeated native evaluations",
-      "features": [
-        {
-          "title": "Reuse the native runtime",
-          "description": "Repeated $apply calls in one CRL tool process reuse an owned JVM while clinical repositories and per-call state remain fresh. Streaming CLI sessions also support reuse. Cancellation, timeout or worker failure triggers cleanup before later work; failed evaluations are not replayed automatically."
-        }
-      ]
-    },
-    {
-      "version": "6.4.44",
-      "title": "Concurrent evaluation and compilation reuse",
-      "features": [
-        {
-          "title": "Run independent jobs concurrently",
-          "description": "The native runtime supports a configurable pool of reusable JVMs. Complete sessions keep one owner and execute their steps in sequence. Nautilus can select six workers; the generic default remains one. Compilation reuse checks definition content and invalidates on changed artifacts, while clinical evaluation state remains fresh."
-        }
-      ]
-    },
-    {
-      "version": "6.4.45",
-      "title": "Engine dependency security update",
-      "features": [
-        {
-          "title": "Updated engine dependencies",
-          "description": "The normalized-cache engine updates its packaged Guava runtime to 33.7.2-jre. Application behavior, the normalized-cache implementation and driver/worker bytecode remain unchanged. The release includes a dated full-JAR dependency scan and immutable engine identity."
-        }
-      ]
-    },
-    {
       "version": "6.4.46",
-      "title": "See what's new in CRL",
+      "title": "Clearer questions and review flags",
       "features": [
         {
-          "title": "Quantity questions carry their unit",
-          "description": "Declare a unit once on the CRL value type, for example: value type is Quantity 'kg/m2'. CQL evaluation and the emitted FHIR input profile use that declared unit; the matching $apply engine carries it into the Questionnaire. Enter a number in the Interactive Questionnaire and the client submits a Quantity in that unit. Change and clear remain available. Existing questions without a declared unit keep their prior behavior.",
+          "title": "Measurement questions supply their unit",
+          "description": "When a measurement question has a specified unit, such as BMI in kg/m2, enter the number and the form supplies the unit. You can change or clear the answer.",
           "image": "quantity-entry.png",
-          "alt": "Synthetic BMI question in the real Interactive FHIR Questionnaire, with 40 entered and kg/m2 provided by the form.",
-          "caption": "Synthetic runtime example. Raw unitless measurements from clients that ignore the unit contract are still rejected; the clinical threshold is authored separately."
+          "alt": "Example BMI question with 40 entered and the unit kg/m2 supplied by the form.",
+          "caption": "Illustrative BMI question; no patient information is shown."
         },
         {
-          "title": "Read the question and source separately",
-          "description": "KE flags can now carry a succinct question, source reference and source quotation in separate fields. The flag view displays those fields above the description so reviewers can distinguish the question from its supporting text. Legacy descriptions remain readable. The KE pipeline must populate the new fields to benefit.",
-          "image": "flag-context.png",
-          "alt": "Actual CRL flag drawer renderer showing a synthetic question, source reference and source quotation in separate labeled rows.",
-          "caption": "Synthetic display example using the shipped flag renderer; customer policy content is not shown."
+          "title": "Read the review question separately",
+          "description": "A knowledge engineer can provide a short question and a quotation from the policy separately from the supporting explanation, making it easier to see what needs your review."
         },
         {
-          "title": "See what a rerun reports changing",
-          "description": "A rerun can supply structured Before, Requested change, Change made and Affected nodes information, with evidence links. CRL verifies the referenced artifact evidence when opening it. These summaries report technical changes and do not automatically approve a flag or establish clinical correctness; the pipeline supplies the report.",
-          "image": "flag-summary.png",
-          "alt": "Actual CRL flag drawer renderer showing a synthetic run-reported change with before state, requested change and change made.",
-          "caption": "Synthetic display example. Existing flag review status remains under human control."
-        },
-        {
-          "title": "Bundled illustrated Release Notes",
-          "description": "CRL 6.4.46 introduced bundled illustrated Release Notes, skipped-release history and offline media. Downloadable HTML and Markdown provide the same authored content."
-        },
-        {
-          "title": "Use the matching Quantity-capable engine",
-          "description": "CRL 6.4.46 selects engine build cqf-definition-dcac972f-normalized-cache-quantity-units-20261101, SHA256 2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa. Declared-unit questions require this generator support. Deployment images must include the matching JAR; explicit runtime overrides must be updated for the new feature. The normal runtime verifies its configured or cached engine and does not download it."
+          "title": "See what changed after a review request",
+          "description": "A flag can include a summary of the earlier wording and the change made, with links to supporting evidence. You can review the result before marking the flag Fixed or Approved."
         }
       ]
     },
     {
-      "version": "6.4.47",
-      "title": "Release notes for the combined KALM view",
+      "version": "6.4.48",
+      "title": "Simpler review flags",
       "features": [
         {
-          "title": "One combined place to see what changed",
-          "description": "CRL supplies versioned release notes and local illustrations for the combined KALM AI: What's New view. This view is available in images that include the compatible Spaces launcher, which manages opening and skipped-release history. CRL no longer opens a separate notes tab. Downloadable HTML and Markdown remain available from the release."
+          "title": "Focus on the review question",
+          "description": "The flag view keeps the question, policy quotation, description and review status in view. Internal classifications and technical identifiers are tucked into Details.",
+          "image": "flag-context.png",
+          "alt": "Example review flag showing its question, policy quotation and description with Details collapsed.",
+          "caption": "A fictional example of a question for the reviewer."
+        },
+        {
+          "title": "Compare Before and After",
+          "description": "Changes shows Before and After beside the flag's description, without repeating the request in another field. If a request has not been implemented, the reason stays visible. Affected questions and evidence links remain available.",
+          "image": "flag-summary.png",
+          "alt": "Example review flag with its description, visible Before and After, and affected question.",
+          "caption": "The request and the resulting change stay together for review."
+        },
+        {
+          "title": "Open and close the interactive questionnaire",
+          "description": "The Interactive FHIR Questionnaire button turns blue while its tab is open. Click it again to close the tab, just as you can with FHIR Questionnaire."
         }
       ]
     }
