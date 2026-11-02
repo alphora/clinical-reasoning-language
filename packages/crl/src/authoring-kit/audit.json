@@ -1,5 +1,5 @@
 {
-  "auditedRevision": "d22f29c06dfd8c3ffe2294f01bece3104e351d08",
+  "auditedRevision": "8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4",
   "auditedSchemaVersion": "2.43",
   "auditedContentHash": "3335e25050a9b4c5c9621780cac1838cc52c30ba2aa80e1b58d536f15ae6c8f9",
   "scope": "Reviewed schema 2.43 Quantity type units and structured flags/summaries; baseline c5966c5f80aad52ec582774766e7332a9bdaddf4. Canonical delta: engine identity only. Release Notes UI is outside authoring guidance. R4/direct-profile/exact-admission limits retained; coverage.md has evidence. Installed release/deployment are separate gates.",
