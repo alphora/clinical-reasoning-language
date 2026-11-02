@@ -1464,7 +1464,7 @@ check("flag-action drawer: openFlagList doesn't open a GHOST — clean deletion 
   assert.ok(m, "openFlagList body");
   assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === pick\.flag\.id\);/);
   assert.match(m[1], /if \(!live && !flagStoreWarning\) return flagNote\("the flag changed on disk/);
-  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel\);/); // disc 359: reclick-same closes, different switches
+  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel, true\);/); // disc 359: reclick-same closes, different switches
 });
 
 check("flag-action drawer: the flag list opens the drawer (ends the loop) with a post-pick stale guard; no re-entrant action QuickPick", () => {
@@ -1472,7 +1472,7 @@ check("flag-action drawer: the flag list opens the drawer (ends the loop) with a
   assert.ok(m, "openFlagList body");
   assert.ok(!/for \(;;\)/.test(m[1]), "no re-entrant loop");
   assert.match(m[1], /if \(indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return flagNote\("policy changed/, "post-pick stale guard");
-  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel\);/); // disc 359: reclick-same closes, different switches
+  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel, true\);/); // disc 359: reclick-same closes, different switches
 });
 
 check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMenu removed)", () => {
@@ -1540,7 +1540,7 @@ check("node-filter: the per-node message routes to openNodeFlags(gid); the start
 
 // ── Todo 2.5 (disc 359) — drawer UX revision: gold node-link, toggle, picker glyph color ──────────────────────────────
 check("gold-link: driveFlagNodeHighlight posts the OPEN DRAWER's target gids (create OR action), mirroring the postFlagDrawer precedence, driven from the choke-point + driveFlagBadges re-drive", () => {
-  const m = COCKPIT_SRC.match(/function driveFlagNodeHighlight\(\): void \{([\s\S]*?)\n  \}/);
+  const m = COCKPIT_SRC.match(/function driveFlagNodeHighlight\(reveal = false\): void \{([\s\S]*?)\n  \}/);
   assert.ok(m, "driveFlagNodeHighlight body");
   // disc 361: create draft wins (its target), else the action drawer's flag, else clear — MIRRORS the postFlagDrawer dispatcher.
   assert.match(m[1], /const gids = flagDraft[\s\S]*?\?\s*gidsForTargetChoice\(flagDraft\.target\)[\s\S]*?:\s*flagActionView[\s\S]*?\?\s*gidsForFlag\(flagActionView\.flag\)[\s\S]*?:\s*\[\];/);
@@ -1554,17 +1554,19 @@ check("gold-link: driveFlagNodeHighlight posts the OPEN DRAWER's target gids (cr
   assert.match(COCKPIT_SRC, /function gidsForTargetChoice\(target: FlagTargetChoice\): string\[\] \{[\s\S]*?scope: target\.kind,[\s\S]*?flagPlacementFor\(tree, \[synthetic\]\)\.gids/);
 });
 
-check("gold-link: the flagHl webview handler is gen-guarded, clears via querySelectorAll, adds to gids, scrolls only when the HOST says (m.scroll)", () => {
+check("gold-link: only explicit policy-wide list selection reveals a flag target", () => {
   assert.match(SCRIPT, /else if\(m\.type==='flagHl'\)\{if\(m\.gen!==gen\)return;/);
-  assert.match(SCRIPT, /for\(const fe of document\.querySelectorAll\('\.flag-current'\)\)fe\.classList\.remove\('flag-current'\);/); // clear (no flaggableGids needed)
-  assert.match(SCRIPT, /el\.classList\.add\('flag-current'\);if\(!ffn\)ffn=el;/); // add + remember the first
-  // disc 360 [critical]: scroll ONLY when the host flags it (open/switch), NOT on a re-render/ack (gids are gen-prefixed, so a
-  // webview set-comparison couldn't tell them apart → a rebuild would yank the viewport). The host `flagHlScrollPending` gates it.
-  assert.match(SCRIPT, /if\(m\.scroll&&ffn&&ffn\.scrollIntoView\)ffn\.scrollIntoView\(/);
-  assert.ok(!/let fhl=/.test(SCRIPT), "the defeated fhl set-comparison heuristic is gone");
-  // host side: only openFlagActionView sets the pending scroll; driveFlagNodeHighlight consumes it (posts scroll + clears)
-  assert.match(COCKPIT_SRC, /flagHlScrollPending = true; \/\/ an OPEN\/SWITCH scrolls/);
-  assert.match(COCKPIT_SRC, /const scroll = flagHlScrollPending;[\s\S]*?flagHlScrollPending = false;[\s\S]*?type: "flagHl", gen: tree\.gen, gids, scroll/);
+  assert.match(SCRIPT, /for\(const fe of document\.querySelectorAll\('\.flag-current'\)\)fe\.classList\.remove\('flag-current'\);/);
+  const body = SCRIPT.slice(SCRIPT.indexOf("else if(m.type==='flagHl')"), SCRIPT.indexOf("else if(m.type==='criterionVerdicts')"));
+  assert.match(body, /el\.classList\.add\('flag-current'\)/);
+  assert.match(body, /if\(m\.reveal===true&&flagTarget\)/);
+  assert.doesNotMatch(body, /m\.scroll\b|focus\(/);
+  assert.match(COCKPIT_SRC, /if \(reveal\) driveFlagNodeHighlight\(true\);/);
+  assert.equal((COCKPIT_SRC.match(/driveFlagNodeHighlight\(true\)/g) ?? []).length, 1);
+  assert.match(COCKPIT_SRC, /openFlagActionView\(flag, ver, cel\);\s*if \(reveal\) driveFlagNodeHighlight\(true\);/);
+  const nodes = COCKPIT_SRC.slice(COCKPIT_SRC.indexOf('async function openNodeFlags'), COCKPIT_SRC.indexOf('function resolveIssueBase'));
+  assert.doesNotMatch(nodes, /toggleFlagActionView\([^;]*true/);
+  assert.doesNotMatch(COCKPIT_SRC, /flagHlScrollPending/);
   // the channel is NEVER touched by highlight/clearHighlight (survives selection) — clearHighlight only strips `.current`
   const ch = SCRIPT.match(/m\.type==='clearHighlight'\)\{([\s\S]*?)\}/);
   assert.ok(ch && !/flag-current/.test(ch[1]), "clearHighlight must not touch .flag-current");
@@ -1599,7 +1601,7 @@ check("drawer gold accent (disc 361): the GOLD header accent is on `.flag-drawer
 check("toggle: reclicking the same flag closes; a different flag switches (entry paths only, NOT openFlagActionView)", () => {
   const m = COCKPIT_SRC.match(/function toggleFlagActionView\([^)]*\): void \{([\s\S]*?)\n  \}/);
   assert.ok(m, "toggleFlagActionView body");
-  assert.match(m[1], /if \(flagActionView && flagActionView\.flag\.id === flag\.id\) return closeFlagActionView\(\);/); // reclick same → close
+  assert.match(m[1], /if \(!reveal && flagActionView && flagActionView\.flag\.id === flag\.id\) return closeFlagActionView\(\);/); // reclick same → close
   assert.match(m[1], /openFlagActionView\(flag, ver, cel\);/); // else open/switch
 });
 

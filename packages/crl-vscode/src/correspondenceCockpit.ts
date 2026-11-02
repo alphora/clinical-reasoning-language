@@ -629,11 +629,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let flagEditDraft: { flag: MvFlag; cel: string | undefined; descriptionOnly: boolean } | undefined;
   let flagEditDirty = false;
   let flagActionBusy = false; // single-flight for the drawer's async actions (a rapid 2nd click must not overlap a write / stale open-issue)
-  // disc 359/360: request a ONE-TIME scroll of the gold-linked node into view — set ONLY by a genuine drawer OPEN/SWITCH
-  // (`openFlagActionView`), consumed by the next `driveFlagNodeHighlight`. A rebuild/ack/refresh re-drive never sets it, so a
-  // re-render can't yank the viewport (the impl-review [critical]: gids are gen-prefixed, so a webview set-comparison can't tell
-  // an open from a re-render). Off = no scroll.
-  let flagHlScrollPending = false;
   // #210 (disc 239) — the AGENT elicitation resolver for a BLOCKING open_flag_drawer. Installed ONLY by beginFlagDrawer;
   // settled EXACTLY ONCE by `settleDrawer` on every terminal (Insert-filed / Cancel / token / retarget / dispose / replace).
   // Idempotent: `settleDrawer` nulls it before resolving, so a Stop racing an Insert can't double-resolve. No-op when a human
@@ -1317,7 +1312,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // over the dead snapshot — note + return. A store WARNING (state unknown) → keep the snapshot (matches refreshFlagActionDrawer).
     const live = flagsList.find((f) => f.id === pick.flag.id);
     if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
-    toggleFlagActionView(live ?? pick.flag, ver, cel); // disc 359: reclicking the same flag closes; a different one switches
+    toggleFlagActionView(live ?? pick.flag, ver, cel, true); // whole-policy list explicitly navigates; disc 359: reclicking the same flag closes; a different one switches
   }
 
   /** Todo 2 (disc 356): the per-node ⚑ badge entry — open the ACTION DRAWER filtered to THIS node's flags. `gid` is a
@@ -1893,10 +1888,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** Paint the GOLD node-link for the OPEN drawer's target (disc 359; disc 361: create drawer too) — a class-toggle channel
    *  (gen-guarded, survives a re-render via the tree ack) modeled on `driveFlagBadges`. Driven ONLY from `postFlagDrawer` (every
-   *  drawer mutation funnels through it) + the tree ack — so no drive site can be missed. Precedence MIRRORS the postFlagDrawer
+   *  drawer mutation funnels through it) + the tree ack. The explicit policy-wide list selection also requests reveal. Precedence MIRRORS the postFlagDrawer
    *  dispatcher (create wins, then action) so the highlighted node is always the drawer that's actually showing. Empty gids when
    *  no drawer is open → clears. Gold means "this drawer's target", regardless of a filed flag's open/resolved status. */
-  function driveFlagNodeHighlight(): void {
+  function driveFlagNodeHighlight(reveal = false): void {
     const tree = views.get("tree");
     if (!tree) return; // no tree webview to highlight (the drawer lives in it; a fresh render starts classless + the ack re-drives)
     const gids = flagDraft
@@ -1906,9 +1901,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         : flagActionView
           ? gidsForFlag(flagActionView.flag)
           : []; // Todo 5 (D6): the bulk grid has no single target node → no gold link (falls through here, grid mode is mutually exclusive with the three above)
-    const scroll = flagHlScrollPending; // true ONLY for a genuine open/switch — a re-render/ack/refresh drive never scrolls
-    flagHlScrollPending = false;
-    void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, scroll });
+    void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, ...(reveal ? { reveal: true } : {}) });
   }
 
   /** #224 ii.3 Slice 2b / #233 Todo 2b — the LIVE criterion identities: `{lib,name}` → `{bodyHash, elided}`. The gate set is
@@ -3885,7 +3878,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     reviewGridSnapshot = { items, sidecarPath: mvSidecarPath, mode, cel: currentCel, revision: mvRevision, epoch: ++reviewGridEpoch };
     reviewGridApplying = false;
     reviewGridDirty = false;
-    flagHlScrollPending = false; // the grid has no gold target node
     postFlagDrawer();
   }
 
@@ -4345,7 +4337,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagEditDirty = false;
     clearReviewGridState(); // Todo 5: …and the bulk grid (one slot). The list/node paths that reach here already ran guardDrawerDiscard.
     flagActionView = { flag, ver, cel };
-    flagHlScrollPending = true; // an OPEN/SWITCH scrolls the gold-linked node into view once (postFlagDrawer→driveFlagNodeHighlight consumes it)
     postFlagDrawer();
   }
 
@@ -4377,10 +4368,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The ENTRY toggle (disc 359): reclicking the flag whose drawer is already open CLOSES it; a different flag SWITCHES. Used by
    *  the node-badge + list entry paths ONLY — NOT `openFlagActionView` itself (Todo 3's Cancel→return-to-view calls that directly
    *  and must not toggle-close). (Todo 3: a "lose changes" guard will gate the switch/close when an edit has unsaved text.) */
-  function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined): void {
+  function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined, reveal = false): void {
     flagChangeSummaries.clear();
-    if (flagActionView && flagActionView.flag.id === flag.id) return closeFlagActionView();
+    if (!reveal && flagActionView && flagActionView.flag.id === flag.id) return closeFlagActionView();
     openFlagActionView(flag, ver, cel);
+    if (reveal) driveFlagNodeHighlight(true);
   }
 
   /** Enter the EDIT form for a validation flag. A human MV Type edits the
@@ -4400,7 +4392,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     clearReviewGridState(); // Todo 5: Edit is reached only from the action view (grid can't be open) — belt-and-braces one-slot exclusion
     flagEditDirty = false;
     flagEditDraft = { flag: view.flag, cel: view.cel, descriptionOnly };
-    flagHlScrollPending = true; // keep the target scrolled into view on the mode switch
     postFlagDrawer();
   }
 
@@ -6034,6 +6025,9 @@ function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string):
 .flag-drawer{position:fixed;top:0;right:0;bottom:0;width:min(360px,70%);z-index:8;display:flex;flex-direction:column;gap:6px;padding:8px;box-sizing:border-box;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border-left:1px solid var(--vscode-panel-border,#454545);box-shadow:-2px 0 6px rgba(0,0,0,.25);overflow-y:auto}
 /* …and while the drawer is open, hide the zoom entirely (you don't zoom the tree while authoring a flag; the drawer covers it). */
 body:has(.flag-drawer) .flow-zoom{display:none}
+/* Reserve manual pan room at every zoom, including when the drawer is closed. Toggling it never changes the canvas extent.
+ * vw includes any scrollbar gutter, so this allowance is at least the drawer's percentage width plus 24px. */
+body[data-mode="medical-validation"] .flow-svg{box-sizing:content-box;padding-right:calc(min(360px,70vw) + 24px)}
 .flag-head{display:flex;align-items:center;justify-content:space-between;font-weight:bold;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
 .flag-title{overflow:hidden;text-overflow:ellipsis;white-space:normal}
 /* Todo 3.5: the read-only summary context line in the description-only edit form (which AI finding you're annotating). */
@@ -6178,7 +6172,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
-  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
+  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)document.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
   `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
   `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
   `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
@@ -6239,17 +6233,14 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `for(const id of (m.allPassLeaves||[])){const el=document.getElementById(id);if(el)el.classList.add('leaf-allpass');}pinVisibility.update();}` +
   // Status and authoring markers are painted together without rebuilding the tree.
   `else if(m.type==='flagBadges'){if(m.gen!==gen)return;(${paintFlagBadges.toString()})(document,m);}` +
-  // disc 359/360: the GOLD node-link for the open action drawer's flag — its own class-toggle channel (NEVER touched by
-  // highlight/clearHighlight, so it survives a selection change). Clear via querySelectorAll (the webview has no flaggableGids
-  // list), then add to the posted gids. Scroll the FIRST node into view ONLY when the HOST says so (`m.scroll` — a genuine
-  // open/switch); a re-render/ack/refresh drive posts scroll=false so it can't yank the viewport (gids are gen-prefixed, so a
-  // webview set-comparison couldn't tell an open from a re-render — impl-review [critical]). UNIQUE var names (post the 4.97.0
-  // `ng` collision — the `new Function(SCRIPT)` guard also parses this).
+  // The gold node-link is normally highlight-only. Only an explicit whole-policy
+  // flag-list selection requests reveal; node clicks, edits and refreshes keep the viewport.
+  // A target wider than the visible strip is left-aligned; revealing never changes zoom.
   `else if(m.type==='flagHl'){if(m.gen!==gen)return;` +
   `for(const fe of document.querySelectorAll('.flag-current'))fe.classList.remove('flag-current');` +
-  `var ffn=null;` +
-  `for(const id of (m.gids||[])){const el=document.getElementById(id);if(el){el.classList.add('flag-current');if(!ffn)ffn=el;}}` +
-  `if(m.scroll&&ffn&&ffn.scrollIntoView)ffn.scrollIntoView({block:'center',inline:'center'});}` +
+  `var flagTarget=null,flagVisible=[];for(const id of (m.gids||[])){const el=document.getElementById(id);if(el){el.classList.add('flag-current');if(el.getClientRects().length){flagVisible.push(el);if(!flagTarget)flagTarget=el;}}}` +
+  `if(m.reveal===true){document.querySelector('.flag-target-note')?.remove();if(!flagTarget&&(m.gids||[]).some(id=>document.getElementById(id))&&root.classList.contains('flow-has-pin')){const panel=document.querySelector('.flag-drawer');if(panel){const note=document.createElement('p');note.className='flag-target-note';note.setAttribute('role','status');note.textContent='This flag is on another result. Unpin the current result to see it.';panel.prepend(note);}}}` +
+  `if(m.reveal===true&&flagTarget){const panel=document.querySelector('.flag-drawer'),right=panel?panel.getBoundingClientRect().left:document.documentElement.clientWidth,alreadyVisible=flagVisible.some(el=>{const r=el.getBoundingClientRect();return r.left>=12&&r.right<=right-12&&r.top>=0&&r.bottom<=window.innerHeight;});if(!alreadyVisible){flagTarget.scrollIntoView({block:'center',inline:'center'});const rect=flagTarget.getBoundingClientRect(),left=Math.max(12,(right-rect.width)/2);document.scrollingElement.scrollLeft+=rect.left-left;}}}` +
   // #224 ii.3 Slice 2b: the model-level criterion VERDICT chips. Bulk-CLEAR the 4 crit-* classes off every criterion gid
   // (a verdict change must un-paint prior state), then add `crit-<state>` per byState. `unreviewed` gids are in allGids but
   // no byState list → they end bare. Gen-guarded + class-toggle only (no re-render), the flagBadges idiom.
