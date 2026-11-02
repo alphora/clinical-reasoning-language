@@ -59,13 +59,11 @@ describe('Release Notes content and selection', () => {
 })
 
 describe('Release Notes automatic eligibility', () => {
-  const input = { state: 'ready', enabled: true, trusted: true, production: true, autoOpen: true, version: '0.14.13' }
-  it.each(['checking', 'no-project', 'disabled', 'untrusted', 'no-workspace', 'boundary', 'refusal', 'multi'])('does not consume history on %s', state => {
-    expect(releaseNotesAutoEligible({ ...input, state })).toBe(false)
-  })
+  const input = { ready: true, trusted: true, production: true, autoOpen: true, version: '0.14.13' }
+  it('requires actual settled CRL readiness', () => { expect(releaseNotesAutoEligible({ ...input, ready: false })).toBe(false) })
   it('requires a stable installed version, production mode, trust, enabled setting and the opt-in default', () => {
     expect(releaseNotesAutoEligible(input)).toBe(true)
-    for (const field of ['enabled', 'trusted', 'production', 'autoOpen']) expect(releaseNotesAutoEligible({ ...input, [field]: false })).toBe(false)
+    for (const field of ['ready', 'trusted', 'production', 'autoOpen']) expect(releaseNotesAutoEligible({ ...input, [field]: false })).toBe(false)
     expect(releaseNotesAutoEligible({ ...input, version: '0.14.13-dev+abc.dirty' })).toBe(false)
   })
 })
@@ -157,4 +155,9 @@ describe('CRL version identity and persistence boundaries', () => {
     const huge = new Uint8Array(5 * 1024 * 1024 + 1); huge.set([137,80,78,71,13,10,26,10])
     expect(() => validateReleaseMedia(c, new Map([['sample.png', huge]]))).toThrow('budget')
   })
+})
+
+it('rejects a caption with no image or video, keeping HTML and Markdown equivalent', () => {
+  const input = raw(); Object.assign(input.releases[0]!.features[0]!, { caption: 'Orphan' })
+  expect(() => parseReleaseCatalog(input)).toThrow('orphaned')
 })

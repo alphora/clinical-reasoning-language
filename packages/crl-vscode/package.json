@@ -474,7 +474,8 @@
         "crl.releaseNotes.autoOpen": {
           "type": "boolean",
           "default": true,
-          "description": "Open CRL Release Notes once after a stable update in this profile, when a trusted CRL workspace is ready."
+          "description": "Open CRL Release Notes once after a stable update in this profile, when a trusted CRL workspace is ready.",
+          "scope": "application"
         }
       }
     }

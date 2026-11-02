@@ -41,7 +41,7 @@ export async function validateReleaseNotes(releaseVersion, { allowFuture = false
   if (releaseVersion && !allowFuture && notes.catalog.releases.at(-1).version !== releaseVersion) throw new Error(`Release Notes need a latest entry for ${releaseVersion}.`)
   return notes
 }
-export async function exportReleaseNotes(outDir, version, { mode = 'publish', repository = process.env.GITHUB_REPOSITORY ?? 'alphora/clinical-reasoning-language', notesDir = NOTES_DIR } = {}) {
+export async function renderReleaseExport(version, { mode = 'publish', repository = process.env.GITHUB_REPOSITORY ?? 'alphora/clinical-reasoning-language', notesDir = NOTES_DIR } = {}) {
   if (mode !== 'publish' && mode !== 'dry-run') throw new Error('Release Notes export mode must be publish or dry-run.')
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error('Release Notes repository is invalid.')
   const { api, catalog, media } = await validateReleaseNotes(version, { allowFuture: mode === 'dry-run', notesDir })
@@ -52,11 +52,16 @@ export async function exportReleaseNotes(outDir, version, { mode = 'publish', re
   // Private GitHub raw-media URLs cannot be relied on even for signed-in readers. Link the portable HTML.
   const illustratedUrl = `https://github.com/${repository}/releases/download/v${version}/${htmlName}`
   const markdown = api.renderReleaseNotesMarkdown(view, { mediaUrl: () => illustratedUrl, embedImages: false })
-  mkdirSync(outDir, { recursive: true })
-  writeFileSync(join(outDir, htmlName), html)
-  writeFileSync(join(outDir, mdName), markdown)
   return { htmlName, mdName, html, markdown }
 }
+export async function exportReleaseNotes(outDir, version, options = {}) {
+  const result = await renderReleaseExport(version, options)
+  mkdirSync(outDir, { recursive: true })
+  writeFileSync(join(outDir, result.htmlName), result.html)
+  writeFileSync(join(outDir, result.mdName), result.markdown)
+  return result
+}
+
 async function main() {
   const args = process.argv.slice(2)
   if (args.length === 1 && args[0] === '--write') {
@@ -65,9 +70,18 @@ async function main() {
     return
   }
   const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
-  if (args[0] === '--export' && (args.length === 2 || args.length === 4 && args[2] === '--mode')) await exportReleaseNotes(resolve(args[1]), version, { mode: args[3] ?? 'publish' })
+  if (args[0] === '--body' && args.length === 3) {
+    const result = await renderReleaseExport(version)
+    const body = releaseBody(args[1], result.markdown)
+    const target = resolve(args[2]); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, body)
+    console.log('Release body: ' + target)
+  }
+  else if (args[0] === '--export' && (args.length === 2 || args.length === 4 && args[2] === '--mode')) {
+    const result = await exportReleaseNotes(resolve(args[1]), version, { mode: args[3] ?? 'publish' })
+    console.log('Release downloads: ' + join(resolve(args[1]), result.htmlName) + ', ' + join(resolve(args[1]), result.mdName))
+  }
   else if (args.length === 0 || args.length === 1 && args[0] === '--release') await validateReleaseNotes(args[0] === '--release' ? version : undefined)
-  else throw new Error('Usage: release-notes.mjs [--write | --release | --export <directory> [--mode publish|dry-run]]')
+  else throw new Error('Usage: release-notes.mjs [--write | --release | --export <directory> [--mode publish|dry-run] | --body <source-SHA> <body-file>]')
   console.log('Release Notes verified.')
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(error => { console.error('release-notes:', error.message); process.exitCode = 1 })

@@ -48,3 +48,11 @@ describe('CRL release export gates', () => {
     expect(() => releaseBody('main', hostile)).toThrow('immutable')
   })
 })
+
+it('contributes the exact reopen command and profile preference with an explicit media inclusion', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
+  expect(manifest.contributes.commands).toContainEqual({ command: 'crl.showReleaseNotes', title: 'CRL: Release Notes' })
+  expect(manifest.contributes.configuration.properties['crl.releaseNotes.autoOpen']).toMatchObject({ default: true, scope: 'application' })
+  const ignore = readFileSync(new URL('../../.vscodeignore', import.meta.url), 'utf8')
+  expect(ignore.trimEnd().endsWith('!media/release-notes/**')).toBe(true)
+})

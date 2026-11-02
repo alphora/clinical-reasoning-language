@@ -18,17 +18,14 @@ export function createReleaseNotes(context: vscode.ExtensionContext, log: (messa
   let disposed = false
   let loadIdentity: string | undefined
   let assets: Promise<{ catalog: ReleaseCatalog; videos: Map<string, string> }> | undefined
-  const eligible = (): boolean => !disposed && readyIdentity === workspaceIdentity() && releaseNotesAutoEligible({
-    state: 'ready', enabled: true, trusted: vscode.workspace.isTrusted,
+  const eligible = (): boolean => !disposed && releaseNotesAutoEligible({
+    ready: readyIdentity === workspaceIdentity(), trusted: vscode.workspace.isTrusted,
     production: context.extensionMode === vscode.ExtensionMode.Production,
     autoOpen: vscode.workspace.getConfiguration('crl.releaseNotes').get<boolean>('autoOpen', true), version: runningVersion,
   })
   const loadAssets = (): Promise<{ catalog: ReleaseCatalog; videos: Map<string, string> }> => assets ??= (async () => {
     const catalog = parseReleaseCatalog(JSON.parse(Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(root, 'catalog.json'))).toString('utf8')))
     const names = releaseMediaFiles(catalog)
-    const expected = ['README.md', 'catalog.json', ...names].sort()
-    const actual = (await vscode.workspace.fs.readDirectory(root)).map(([name]) => name).sort()
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('Packaged Release Notes files do not match the catalog.')
     const files = new Map(await Promise.all(names.map(async name => [name, await vscode.workspace.fs.readFile(vscode.Uri.joinPath(root, name))] as const)))
     validateReleaseMedia(catalog, files)
     const videos = new Map(names.filter(name => name.endsWith('.webm')).map(name => [name, 'data:video/webm;base64,' + Buffer.from(files.get(name)!).toString('base64')]))

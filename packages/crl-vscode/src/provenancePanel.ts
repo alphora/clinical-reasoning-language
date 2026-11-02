@@ -111,12 +111,14 @@ class ProvenanceTreeProvider implements vscode.TreeDataProvider<Node> {
 export function registerProvenancePanel(context: vscode.ExtensionContext, beginDiscovery?: () => (ready: boolean) => void): void {
   // One shared content-readiness signal for the views and informational Release Notes.
   let discovery = 0;
+  let contextActive = false;
   function discoverContent(): void {
     const current = ++discovery;
     const settled = beginDiscovery?.();
     void Promise.resolve(vscode.workspace.findFiles("**/*.{crl,cel}", "**/node_modules/**", 1)).then(async (hits) => {
       if (current !== discovery) return;
-      await vscode.commands.executeCommand("setContext", "crl.active", hits.length > 0);
+      contextActive ||= hits.length > 0;
+      await vscode.commands.executeCommand("setContext", "crl.active", contextActive);
       if (current === discovery) settled?.(hits.length > 0);
     }).catch(() => { if (current === discovery) settled?.(false); });
   }
@@ -192,7 +194,9 @@ export function registerProvenancePanel(context: vscode.ExtensionContext, beginD
       return;
     }
     currentCel = ed.document.uri.fsPath;
-    // Ensure the view is revealed even if the workspace had no .crl/.cel at activation (the gate's findFiles is one-shot).
+    // A manually opened loose CEL keeps the existing view context active; invalidate pending discovery.
+    ++discovery;
+    contextActive = true;
     void vscode.commands.executeCommand("setContext", "crl.active", true);
     beginDiscovery?.()(true);
     setupWatcher();

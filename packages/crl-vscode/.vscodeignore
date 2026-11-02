@@ -12,3 +12,6 @@ dist/highlight.js
 *.vsix
 test/**
 scripts/**
+
+# Release Notes media is an explicit shipped payload. Keep this inclusion after broader exclusions.
+!media/release-notes/**

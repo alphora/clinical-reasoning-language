@@ -8,11 +8,12 @@ const tick = () => new Promise(resolve => setImmediate(resolve))
 function setup(findFiles: any, executeCommand: any) {
   let changed: () => void = () => {}
   const ready: ReturnType<typeof vi.fn>[] = []
-  const sdk = { EventEmitter: class { event = () => ({ dispose() {} }); fire() {} }, commands: { executeCommand, registerCommand: () => ({ dispose() {} }) }, window: { createTreeView: () => ({ dispose() {}, message: '' }) }, workspace: { findFiles, onDidChangeWorkspaceFolders: (callback: () => void) => { changed = callback; return { dispose() {} } }, onDidSaveTextDocument: () => ({ dispose() {} }) } }
+  const commands = new Map<string, Function>()
+  const sdk = { EventEmitter: class { event = () => ({ dispose() {} }); fire() {} }, commands: { executeCommand, registerCommand: (id: string, callback: Function) => { commands.set(id, callback); return { dispose() {} } } }, window: { activeTextEditor: { document: { uri: { scheme: 'file', fsPath: '/synthetic-standalone/loose.cel' } } }, createTreeView: () => ({ dispose() {}, message: '' }) }, workspace: { findFiles, onDidChangeWorkspaceFolders: (callback: () => void) => { changed = callback; return { dispose() {} } }, onDidSaveTextDocument: () => ({ dispose() {} }) } }
   const m = { exports: {} as any }
   new Function('require', 'module', 'exports', built.outputFiles[0]!.text)((id: string) => id === 'vscode' ? sdk : require(id), m, m.exports)
   m.exports.registerProvenancePanel({ subscriptions: [] }, () => { const fn = vi.fn(); ready.push(fn); return fn })
-  return { ready, changed: () => changed() }
+  return { ready, changed: () => changed(), show: () => commands.get('crl.showProvenance')!() }
 }
 describe('actual provenance discovery / notes readiness wiring', () => {
   it.each(['find', 'context'])('settles a %s rejection as ineligible without unhandled rejection', async failure => {
@@ -27,4 +28,18 @@ describe('actual provenance discovery / notes readiness wiring', () => {
     completions[0]!(); await tick(); expect(h.ready[0]).not.toHaveBeenCalled()
     completions[1]!(); await tick(); expect(h.ready[1]).toHaveBeenCalledWith(true)
   })
+})
+
+it('keeps an established view context active when folder discovery later finds no CRL content', async () => {
+  const find = vi.fn().mockResolvedValueOnce([{}]).mockResolvedValueOnce([]), execute = vi.fn(async () => {})
+  const h = setup(find, execute); await tick(); h.changed(); await tick()
+  expect(execute).toHaveBeenLastCalledWith('setContext', 'crl.active', true)
+  expect(h.ready[1]).toHaveBeenCalledWith(false)
+})
+it('manual loose-CEL readiness invalidates the older pending discovery', async () => {
+  let finish!: (hits: unknown[]) => void
+  const h = setup(vi.fn(() => new Promise(resolve => { finish = resolve })), vi.fn(async () => {}))
+  h.show(); finish([]); await tick()
+  expect(h.ready[0]).not.toHaveBeenCalled()
+  expect(h.ready[1]).toHaveBeenCalledWith(true)
 })

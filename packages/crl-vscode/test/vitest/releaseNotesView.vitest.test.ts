@@ -82,8 +82,19 @@ describe('independent CRL Release Notes host', () => {
     if (change === 'setting') h.settings.autoOpen = false
     else if (change === 'trust') h.sdk.workspace.isTrusted = false
     else { h.sdk.workspace.workspaceFolders[0]!.uri = { path: '/changed', toString: () => '/changed' }; h.events.get('folders')!() }
-    const manual = h.show(); finish(); await manual
+    finish(); await flush(); await flush()
+    if (change === 'setting') h.settings.autoOpen = true
+    else if (change === 'trust') h.sdk.workspace.isTrusted = true
+    h.events.get('config')!({ affectsConfiguration: () => true }); h.ready(); await flush()
+    expect(h.panels).toHaveLength(0)
+    await h.show()
     expect(h.panels).toHaveLength(1); expect(h.panels[0].showOptions.preserveFocus).toBe(false)
     expect(h.sdk.window.showErrorMessage).not.toHaveBeenCalled()
   })
+})
+
+it('reads only referenced media at runtime and tolerates unrelated installed sidecars', async () => {
+  const h = host(); h.sdk.workspace.fs.readDirectory.mockResolvedValue([['desktop.ini',1]])
+  await h.show(); expect(h.panels).toHaveLength(1)
+  expect(h.sdk.workspace.fs.readDirectory).not.toHaveBeenCalled()
 })

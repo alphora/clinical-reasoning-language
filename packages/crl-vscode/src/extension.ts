@@ -185,6 +185,7 @@ function registerLanguageFeatures(
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  const releaseNotes = createReleaseNotes(context, message => getOutputChannel().appendLine(message));
   // Reclaim-and-discard any cockpit/MV pane tab VS Code restored from the previous window. MUST run during
   // activate, before restoration is attempted, and must cover every pane view type — an unregistered view type
   // comes back as a tab the panel does not own and can never dispose, which reads as the paneOrder setting
@@ -286,7 +287,6 @@ export function activate(context: vscode.ExtensionContext): void {
   registerPresentationEditor(context);
   registerKeUpdates(context);
   registerKeApp(context);
-  const releaseNotes = createReleaseNotes(context, message => getOutputChannel().appendLine(message));
   registerProvenancePanel(context, releaseNotes.beginDiscovery);
   registerCorrespondenceCockpit(context);
   // DEV-HOST ONLY. The CSP harness is an instrument, not a feature: it answered the LForms policy question and

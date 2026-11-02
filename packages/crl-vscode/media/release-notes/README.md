@@ -34,6 +34,10 @@ Synthetic display example. Existing flag review status remains under human contr
 
 CRL now bundles its own Release Notes with the extension. After a stable update they open once in this profile when a trusted CRL workspace is ready, preserving your keyboard focus. Reopen them with CRL: Release Notes, or disable automatic opening in the CRL settings. Skipped-release history, illustrations and the downloadable HTML remain available without fetching media from another service.
 
+### Use the matching Quantity-capable engine
+
+CRL6.4.46 selects engine build cqf-definition-dcac972f-normalized-cache-quantity-units-20261101, SHA256 2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa. Declared-unit questions require this generator support. Deployment images must include the matching JAR; explicit runtime overrides must be updated for the new feature. The normal runtime verifies its configured or cached engine and does not download it.
+
 ## 6.4.45 — Engine dependency security update
 
 ### Updated engine dependencies

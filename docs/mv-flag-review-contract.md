@@ -1,6 +1,6 @@
 # Flag questions and rerun change summaries
 
-This is the source implementation contract. Released CRL 6.4.45 does not provide these additions. Pipeline producers must use a subsequently qualified release whose actual MCP schema and SDK exports include them; a package version string alone is not a capability check.
+CRL 6.4.46 introduces these additions. Pipeline producers must check that their pinned toolchain’s actual MCP schema and SDK exports include them; a package version string alone is not a capability check. CRL 6.4.45 does not provide this contract.
 
 ## Structured questions
 
