@@ -175,7 +175,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
           for(const branch of groups){
           const choices=(card.answerChoices??[]).filter((c:any)=>!branch || rows.some((r:any)=>r.branch===branch&&r.system===c.system&&r.code===c.code));
           if(branch&&!choices.length)continue;
-          if(branch){const preview=rows.find((r:any)=>r.branch===branch),heading=document.createElement('p');heading.className='route-answer-group route-answer-'+branch;heading.textContent=(branch==='left'?'← ':'→ ')+preview.label;heading.title=preview.explanation;section.append(heading);}
+          if(branch){const preview=rows.find((r:any)=>r.branch===branch),heading=document.createElement('p');heading.className='route-answer-group route-answer-'+branch;heading.textContent=preview.label+(branch==='left'?' ↱':' ↴');heading.title=preview.explanation;section.append(heading);}
           const list=document.createElement("ul");list.className="route-answer-choices";
           for(const choice of choices){
             const row=document.createElement('li'),line=document.createElement('div'),label=document.createElement('span'),actions=document.createElement('span');line.className='route-answer-line';label.className='route-answer-label';label.textContent=choice.display;actions.className='route-answer-actions';line.append(label,actions);row.append(line);

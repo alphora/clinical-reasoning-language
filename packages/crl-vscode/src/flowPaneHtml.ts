@@ -877,7 +877,7 @@ export function renderFlowPane(
     // REFACTOR:grounded: group headings preview branch destinations without asserting a code determines the criterion.
     if(n.outline && n.outlineRow==="answer-group") {
       const preview=contributions.get(n.topWhenKey!)?.find(r=>r.checkId===n.answerCheckId && r.negated===!!n.answerNegated && r.branch===n.answerBranch);
-      const label=(n.answerBranch==='left'?'← ':'→ ')+(preview?.label??'Unavailable');
+      const label=(preview?.label??'Unavailable')+(n.answerBranch==='left'?' ↱':' ↴');
       body+=`<g id="${escapeHtml(gid)}" class="flow-outline flow-answer-group flow-answer-${n.answerBranch}" aria-label="${escapeHtml(preview?.explanation??'Answer branch preview unavailable')}"><title>${escapeHtml(preview?.explanation??'Answer branch preview unavailable')}</title>${labelMarkup(label,x,y,OUTLINE_H,OUTLINE_LABEL_MAX,9)}</g>`;
       continue;
     }
