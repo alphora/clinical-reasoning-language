@@ -1329,9 +1329,12 @@ check("supporting coded inputs get their own question occurrence under direct an
   const collapsed=renderFlowPane(tree,opts);
   assert.match(collapsed.html,/data-flow-hidden-criterion="\[&quot;Pol&quot;,&quot;Check&quot;\]"/);
   assert.ok(!collapsed.html.includes('data-flow-question='));
-  const expanded=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H'])});
+  const retained=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H'])});
+  assert.ok(!retained.html.includes('data-flow-elided'),'uninterpreted helper remains explicit');
+  const nestedInput=Object.values(retained.reveals).find(h=>h.criterionToggle?.endsWith('"inputs"]')).criterionToggle;
+  const expanded=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H',nestedInput])});
   assert.match(expanded.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
-  const options=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H']),answerOptionsByConcept:new Map([['c:Q',ANSWERS]])});
+  const options=renderFlowPane(tree,{...opts,expandedGuardWhens:new Set(['w:H',nestedInput]),answerOptionsByConcept:new Map([['c:Q',ANSWERS]])});
   assert.match(options.html,/data-flow-question="\[&quot;Pol&quot;,&quot;Question&quot;\]"/);
   assert.equal(optRows(options.html),0,'collapsed answer options do not hide the question');
 });
@@ -1377,8 +1380,10 @@ check("expanding a criterion opens nested criteria but not answers, preserving m
  const openParent=toggleCriterionExpansion(foldedParent,'w:crit',tree,opts);assert.equal(optRows(renderFlowPane(tree,{...opts,expandedGuardWhens:openParent}).html),1,'previously opened answers stay open');
  const closeChoices=toggleCriterionExpansion(openParent,choicesKey,tree,opts);assert.ok(closeChoices.has('w:crit'));assert.equal(optRows(renderFlowPane(tree,{...opts,expandedGuardWhens:closeChoices}).html),0);
 });
+// REFACTOR:grounded: helper suppression requires its predicate to survive on connector disclosures.
+const projectedCheck={id:'helper',label:'Qualifies',expression:'Question in A',status:'simple',subjects:[{key:'c:Q',label:'Question',matches:[{system:'urn:test',code:'a',display:'A'}],nonmatches:[]}]};
 check("helper projection retains distinct truth anchors, actual input, original flag identity and one choice list",()=>{
- const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['c:Q']});
+ const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['c:Q'],conditionAnswers:projectedCheck});
  const question=concept('c:Q','Question',{hasLocalCode:true});
  const opts={concepts:[helper,question],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',gleaf('Qualifies','c:H',{isSource:false,isInferred:true}))}]]),answerOptionsByConcept:new Map([['c:H',[{code:'a',display:'A'}]],['c:Q',[{code:'a',display:'A'}]]])};
  const expandedGuardWhens=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);
@@ -1409,7 +1414,7 @@ check("defined-as wrapper is retained when its nested value helper has an unreso
 });
 
 check("resolved imported input is preserved when its local helper header is suppressed",()=>{
- const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['Imported:Q']});
+ const helper=concept('c:H','Qualifies',{definitionKind:'definition-is',definitionRefs:['Imported:Q'],conditionAnswers:projectedCheck});
  const question={...concept('Imported:Q','Imported question',{hasLocalCode:true}),lib:'Imported'};
  const opts={concepts:[helper,question],guardOutlines:new Map([['w:crit',{expr:gcrit('Outer',gleaf('Qualifies','c:H',{isSource:false,isInferred:true}))}]])};
  const expandedGuardWhens=toggleCriterionExpansion(new Set(),'w:crit',critStruct(),opts);

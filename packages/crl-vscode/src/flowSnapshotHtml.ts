@@ -17,6 +17,7 @@
  *  (0.25–3, read from the viewBox so it's idempotent), pans by grab-drag (document scroll, 4px threshold like the cockpit),
  *  zooms via the `[data-zoom]` control + Ctrl-wheel (bound to `document` so a short tree has no dead zone). `applyZoom()` runs
  *  on load to normalize any zoom baked into the captured DOM back to 100%; it no-ops on a missing/zero-size SVG (never 0px). */
+// REFACTOR:grounded: native answer disclosures keep their own clicks and scrolling in exported trees.
 const SNAPSHOT_SCRIPT =
   `(function(){` +
   `var root=document.getElementById('flowroot');if(!root)return;` +
@@ -26,7 +27,7 @@ const SNAPSHOT_SCRIPT =
   `document.addEventListener('click',function(e){var zb=e.target.closest&&e.target.closest('[data-zoom]');if(!zb)return;e.preventDefault();var a=zb.getAttribute('data-zoom');setZoom(a==='in'?treeZoom*1.2:a==='out'?treeZoom/1.2:1);});` +
   `document.addEventListener('wheel',function(e){if(!e.ctrlKey)return;if(!root.querySelector('.flow-svg'))return;e.preventDefault();setZoom(treeZoom*(e.deltaY<0?1.1:1/1.1));},{passive:false});` +
   `var fpPan=false,fpMoved=false,fpX=0,fpY=0,fpL=0,fpT=0;var fpSc=function(){return document.scrollingElement||document.documentElement;};` +
-  `root.addEventListener('pointerdown',function(e){if(e.button!==0||!(e.target.closest&&e.target.closest('.flow-svg')))return;fpPan=true;fpMoved=false;fpX=e.clientX;fpY=e.clientY;var s=fpSc();fpL=s.scrollLeft;fpT=s.scrollTop;});` +
+  `root.addEventListener('pointerdown',function(e){if(e.target.closest&&e.target.closest('foreignObject'))return;if(e.button!==0||!(e.target.closest&&e.target.closest('.flow-svg')))return;fpPan=true;fpMoved=false;fpX=e.clientX;fpY=e.clientY;var s=fpSc();fpL=s.scrollLeft;fpT=s.scrollTop;});` +
   `window.addEventListener('pointermove',function(e){if(!fpPan)return;var dx=e.clientX-fpX,dy=e.clientY-fpY;if(!fpMoved&&Math.abs(dx)+Math.abs(dy)<4)return;fpMoved=true;document.body.style.cursor='grabbing';var s=fpSc();s.scrollLeft=fpL-dx;s.scrollTop=fpT-dy;e.preventDefault();});` +
   `window.addEventListener('pointerup',function(){if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
   `applyZoom();` +

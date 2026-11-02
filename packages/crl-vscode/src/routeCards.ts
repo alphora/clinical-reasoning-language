@@ -1,5 +1,5 @@
 // REFACTOR:grounded: construct cards only after walking a selected execution route.
-import type { CrlConceptNode, ScenarioViewModel } from "@smile-digital-health/crl";
+import type { CrlConceptNode, ConditionAnswerCheck, ScenarioViewModel } from "@smile-digital-health/crl";
 import type { QExpr, Questionnaire } from "./questionnaireModel";
 import type { WordingTarget } from "./presentationProposal";
 import type { QaFlagView } from "./qaFlagEditing";
@@ -7,7 +7,7 @@ import type { QaFlagView } from "./qaFlagEditing";
 export interface RouteCard {
   id: string; ownerKey: string; concept: string; library: string;
   questionNumber: number;
-  occurrences: { ownerKey: string; criterionPaths: { lib: string; name: string }[][] }[];
+  occurrences: { ownerKey: string; criterionPaths: { lib: string; name: string }[][]; checks?: ConditionAnswerCheck[] }[];
   text: string; description: string; value: string; determination: string;
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
   questionRequest?: QaFlagView;
@@ -55,11 +55,14 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
   optionsFor: (lib: string, name: string) => { system?: string; code: string; display: string; description?:string }[] = () => [],
   valueInputs: (lib: string, name: string) => CrlConceptNode[] = () => [],
   questionEnabled?: (lib: string, name: string) => boolean,
-  choicesFromFor: (lib: string, name: string) => string | undefined = () => undefined) {
+  choicesFromFor: (lib: string, name: string) => string | undefined = () => undefined,
+  conditionFor: (lib: string, name: string) => ConditionAnswerCheck | undefined = () => undefined) {
   const cards: RouteCard[] = [], targets = new Map<string, WordingTarget>(), emitted = new Map<string, RouteCard>();
   const questionNumbers = new Map<string, number>();
-  const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: {lib: string; name: string}[], explanation: boolean, valueOnly = false, seen = new Set<string>()) => {
+  const add = (nodeId: string, name: string, lib: string, answer: string | null, inferred: boolean, criteria: {lib: string; name: string}[], explanation: boolean, valueOnly = false, seen = new Set<string>(), checks: ConditionAnswerCheck[] = []) => {
     const identity = JSON.stringify([lib,name]);
+    const ownCheck=conditionFor(lib,name);
+    if (ownCheck && !checks.some(c=>c.id===ownCheck.id)) checks=[...checks,ownCheck];
     if (seen.has(identity)) return;
     seen = new Set([...seen,identity]);
     const ownerKey = keyFor(nodeId);
@@ -88,7 +91,7 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
     if (!questionNumbers.has(identity)) questionNumbers.set(identity, questionNumbers.size + 1);
     const id = `card-${cards.length}`;
     cards.push({ id, ownerKey, concept: name, library: lib, text: target?.questionText ?? name,
-      questionNumber: questionNumbers.get(identity)!, occurrences: [{ownerKey, criterionPaths:[criteria]}],
+      questionNumber: questionNumbers.get(identity)!, occurrences: [{ownerKey, criterionPaths:[criteria], ...(checks.length?{checks:[...checks]}:{})}],
       description: target?.questionDescription ?? "", value,
       answerChoices: options.map(o=>({...o, selected: selectedChoices.has(o)})),
       choicesFrom: choicesFromFor(lib,name),
@@ -100,13 +103,14 @@ export function buildRouteCards(q: Questionnaire, sv: ScenarioViewModel, keyFor:
       let owner = prior.occurrences.find(o=>o.ownerKey===ownerKey);
       if (!owner) { owner={ownerKey,criterionPaths:[]};prior.occurrences.push(owner); }
       if (!owner.criterionPaths.some(p=>JSON.stringify(p)===JSON.stringify(criteria))) owner.criterionPaths.push(criteria);
+      if (checks.length) owner.checks=[...new Map([...(owner.checks??[]),...checks].map(c=>[c.id,c])).values()];
       // Compatibility fields describe the primary owner only; never cross-pair
       // another condition's criterion path with that owner.
       if (ownerKey===prior.ownerKey) prior.criterionPaths=owner.criterionPaths;
     }
     for (const dependency of valueInputs(lib,name)) {
       const truth = sv.conceptTruth?.find(r => r.libraryName === dependency.lib && r.name === dependency.name)?.satisfied;
-      add(nodeId,dependency.name,dependency.lib,truth === true ? "yes" : truth === false ? "no" : "unknown", !!dependency.definitionKind, criteria, true, dependency.hasLocalCode, seen);
+      add(nodeId,dependency.name,dependency.lib,truth === true ? "yes" : truth === false ? "no" : "unknown", !!dependency.definitionKind, criteria, true, dependency.hasLocalCode, seen, checks);
     }
   };
   const expand = (e: QExpr, nodeId: string, criteria: {lib: string; name: string}[]) => {

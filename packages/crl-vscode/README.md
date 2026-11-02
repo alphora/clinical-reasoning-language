@@ -172,6 +172,15 @@ This release distributes the verified VSIX as a GitHub release asset. Marketplac
 
 For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see the [core README § Cutting a release](https://github.com/alphora/clinical-reasoning-language/blob/v5.3.0/packages/crl/README.md#cutting-a-release-build-both-artifacts--upload-to-github).
 
+## Answers on decision branches
+
+<!-- REFACTOR:grounded: connector lists explain the existing condition; full question answers retain their own identity. -->
+Expand **View answers** on a branch connector to inspect its answer choices. Each connector opens independently. Opening a list keeps the tree viewport in place; long lists scroll within the panel.
+
+For a criterion containing several checks, the explanation keeps the **ALL OF / ANY OF** grouping and names each check and its question. Two checks of the same question retain their separate subsets. The two connectors describe the criterion's overall result; the explanation does not imply that every listed answer independently determines that result.
+
+**All answers** on a question shows its complete answer list. Connector lists are views of existing logic, so editing question answers still applies to the full question. When an exact subset cannot be established from the source, the connector shows the condition and an explanation instead of inventing a list.
+
 ## Medical Review answer editing
 
 Pin a route and show Questions in the tree, or open its CRL questionnaire. Expand Answer choices and use the pencil to edit or the trash icon to delete; the plus beside the expanded Answer choices adds an answer. Question and answer editors use matching fields and Save change / Cancel controls. Opening either editor closes the other. Save updates the associated local CRL terminology and regenerates its FHIR ValueSet and local CodeSystem along with the affected executable artifacts. Local Save works without KELP; when available, KELP lock, Save and unlock are best effort and do not block file writes; no KE-agent run is needed.

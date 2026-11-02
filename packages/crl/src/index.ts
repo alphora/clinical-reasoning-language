@@ -686,3 +686,6 @@ export { packageFhir, type PackageFhirOptions, type PackageFhirResult } from "./
 // Bounded native scheduling; request and clinical state remain explicit.
 export {createNativeWorkerPool,setNativeWorkerLimit,nativeWorkerPoolStatus,shutdownNativeRuntime} from "./results/nativeWorker";
 export type {NativeWorkerPool,NativeWorkerPoolStatus} from "./results/nativeWorker";
+
+// REFACTOR:grounded: read-only condition metadata shares prepared execution semantics with consumers.
+export type { ConditionAnswerCheck, ConditionAnswerSubject, ConditionAnswerMember } from "./provenance/conditionAnswers";

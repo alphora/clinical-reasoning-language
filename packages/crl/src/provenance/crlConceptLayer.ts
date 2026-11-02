@@ -1,3 +1,4 @@
+import { buildConditionAnswerChecks, type ConditionAnswerCheck } from './conditionAnswers';
 import { conceptIdentity } from "../meta/conceptIdentity";
 import { readFiniteAnswerMembers } from "../emit/answerDomain";
 import { createPresentationCatalog, type PresentationText } from "../emit/presentation";
@@ -8,7 +9,7 @@ import { createPresentationCatalog, type PresentationText } from "../emit/presen
  * unit citing concept X joins X's node exactly like it joins a decision row today. Pure + headless; reveal maps (Slice 2)
  * + rendering (Slice 3) build on this.
  *
- * `buildCrlConceptLayer` carries RAW structural signals only (definitionKind / hasLocalCode / hasRepresentations); the
+ * `buildCrlConceptLayer` carries structural signals and optional prepared condition-answer display metadata; the
  * ADR-0001 layer classification (asserted/inferred + the orthogonal origin/code-domain markers) lives in the pure
  * `classifyConcept` below (added Slice 3a — kept headless + reusable rather than in the renderer). `definitionRefs` are
  * DIRECT edges only (defined-as operands + definition-is narrative refs); the transitive closure + cycle guard belong to
@@ -74,6 +75,8 @@ export interface CrlConceptNode {
   hasValueProjection: boolean;
   /** The concept nodeKeys this concept is DIRECTLY defined in terms of (deduped, source order). Direct edges only. */
   definitionRefs: string[];
+  /** Read-only prepared interpretation; the complete offered domain stays in answerOptions. */
+  conditionAnswers?: ConditionAnswerCheck;
 }
 
 // Exhaustive over the ConceptDefinition union → adding a definition kind is a compile error here, not a silent miss.
@@ -202,6 +205,9 @@ export function buildCrlConceptLayer(
       });
     }
   }
+  // REFACTOR:grounded: per-check interpretation cannot replace question identity or its offered choices.
+  const checks = buildConditionAnswerChecks(graph, out);
+  for (const n of out) if (checks.has(n.nodeKey)) n.conditionAnswers = checks.get(n.nodeKey);
   return out;
 }
 

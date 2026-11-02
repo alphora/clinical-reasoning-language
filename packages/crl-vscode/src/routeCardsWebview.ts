@@ -344,13 +344,16 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     };
     const widthFor = (n: SVGGElement) => n.classList.contains("flow-activity") || n.dataset.flowComponent === "collapsed" ? base.get(n)!.width : !n.dataset.flowOutline || n.dataset.flowQuestion ? nodeWidth : base.get(n)!.width;
     const widths=groups.map(group=>Math.max(nodeWidth,...group.flatMap(n=>descendants(n).map(c=>base.get(c)!.x-base.get(n)!.x+widthFor(c)+componentsOf(c).length*12))));
-    let right=40+widths.reduce((a,b)=>a+b+90,0),bottom=40;
+    // REFACTOR:grounded: keep the same reserved connector lane in pinned layouts.
+    const connectorGap=root.querySelector('.flow-connector-answers') ? 354 : 90;
+    let right=40+widths.reduce((a,b)=>a+b+connectorGap,0),bottom=40;
     let cursor=40;
     for(let row=0;row<Math.max(0,...groups.map(g=>g.length));row++) {
-      const y=cursor; let rowBottom=y;
+      const halfBand=Math.max(0,...groups.map(g=>Number(g[row]?.dataset.answerBand ?? 0)/2));
+      const y=cursor+halfBand; let rowBottom=y+halfBand;
       for(const [ci,group] of groups.entries()) {
         const n=group[row];if(!n)continue;
-        const box=base.get(n)!,x=40+widths.slice(0,ci).reduce((a,b)=>a+b+90,0);
+        const box=base.get(n)!,x=40+widths.slice(0,ci).reduce((a,b)=>a+b+connectorGap,0);
         positions.set(n,{x,y,width:widthFor(n),height:box.height});
         let childCursor=y+box.height+(!external?stackHeight(n):0)+24;
         const children=descendants(n);
