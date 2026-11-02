@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
+import { execFileSync } from 'node:child_process'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const NOTES_DIR = join(ROOT, 'media/release-notes')
@@ -71,6 +72,15 @@ async function main() {
   }
   const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
   if (args[0] === '--body' && args.length === 3) {
+    assertSourceRevision(args[1])
+    // This maintainer-only command binds the source checkout enclosing the extension package.
+    let head, dirty
+    try {
+      head = execFileSync('git', ['rev-parse', '--verify', 'HEAD^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim()
+      dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { cwd: ROOT, encoding: 'utf8' }).trim()
+    } catch { throw new Error('--body requires a Git checkout of the release source with an existing HEAD.') }
+    if (args[1] !== head) throw new Error('Release body source must equal the current immutable Git HEAD.')
+    if (dirty) throw new Error('Commit the release source before generating its publication body.')
     const result = await renderReleaseExport(version)
     const body = releaseBody(args[1], result.markdown)
     const target = resolve(args[2]); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, body)
@@ -87,7 +97,10 @@ async function main() {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(error => { console.error('release-notes:', error.message); process.exitCode = 1 })
 
 /** The first marker is publisher-owned even if authored text contains another marker. */
-export function releaseBody(sourceRevision, markdown) {
+function assertSourceRevision(sourceRevision) {
   if (!/^[a-f0-9]{40}$/.test(sourceRevision)) throw new Error('Expected immutable source revision.')
+}
+export function releaseBody(sourceRevision, markdown) {
+  assertSourceRevision(sourceRevision)
   return `<!-- crl-release-source: ${sourceRevision} -->\n\n${markdown}`
 }

@@ -33,8 +33,8 @@
     "guavaRuntime": "33.7.2-jre; original compile API retained"
   },
   "patchSha256": "6afbc5d5bbbf295fca7fbc315f347cf62eb45e7183fd4d0f0bea9a4d41fd1739",
-  "nestedJarInventory": "security-20261029/nested-jars.json",
-  "runtimeDependencyInventory": "security-20261029/runtime-dependencies.json",
+  "nestedJarInventory": "quantity-type-units/nested-jars.json",
+  "runtimeDependencyInventory": "quantity-type-units/runtime-dependencies.json",
   "resolvedGraphDelta": "security-20261029/runtime-delta.json",
   "toolchainChange": "Inherited Java 17 build and dependency security overrides; presentation-group Java source changes listed in groups.patch.",
   "resolvedGraphChanges": {
@@ -177,7 +177,7 @@
     "baselineModuleSha256": "34fe17f7c63e916270e927c94f138266ac073fb40db62a3d82fea4825a1db06f",
     "coordinateNote": "The private source-built module retains cql-to-elm-jvm5.3.0 and its translator version; it is not the published upstream binary. Compare baselineModuleSha256 with sourceBuiltModuleSha256."
   },
-  "scopeBoundary": "Only ItemGenerator and its internal QuantityUnitException differ from the 20261029 security baseline. Existing normalized cache implementation and all132 runtime dependency hashes are preserved. The full-JAR security scan and actual installed/native qualification are separate gates.",
+  "scopeBoundary": "Only ItemGenerator and its internal QuantityUnitException differ from the 20261029 security baseline inside one CQF-CR application JAR. All132 dependency coordinates/versions are unchanged; the other131 nested JARs are byte-identical. The normalized-cache CQL module is unchanged. Current complete hashes are in the Quantity-type-unit inventory.",
   "quantityTypeUnits": {
     "recipe": "quantity-type-units/rebuild.py",
     "receipt": "quantity-type-units/candidate.json",

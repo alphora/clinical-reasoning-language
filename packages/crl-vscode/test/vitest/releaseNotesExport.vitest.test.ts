@@ -1,5 +1,7 @@
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, copyFileSync, cpSync, symlinkSync, unlinkSync } from 'node:fs'
+import { join, dirname, resolve, sep } from 'node:path'
+import { createRequire } from 'node:module'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { describe, it, expect } from 'vitest'
 // @ts-expect-error shared publisher script uses the production TypeScript renderer via esbuild
@@ -56,3 +58,53 @@ it('contributes the exact reopen command and profile preference with an explicit
   const ignore = readFileSync(new URL('../../.vscodeignore', import.meta.url), 'utf8')
   expect(ignore.trimEnd().endsWith('!media/release-notes/**')).toBe(true)
 })
+
+it('executes the real body CLI with clean HEAD binding, rejecting a wrong SHA and dirty source', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'crl-notes-cli-')), repo = join(dir, 'repo'), pkg = join(repo, 'packages/crl-vscode')
+  let media: string | undefined
+  const link = join(pkg, 'node_modules/esbuild'), script = join(pkg, 'scripts/release-notes.mjs'), hooks = join(dir, 'empty-hooks')
+  const require = createRequire(import.meta.url)
+  try {
+    media = await fixture()
+  mkdirSync(join(pkg, 'scripts'), { recursive: true }); mkdirSync(join(pkg, 'src'), { recursive: true }); mkdirSync(join(pkg, 'node_modules')); mkdirSync(hooks)
+    copyFileSync(new URL('../../scripts/release-notes.mjs', import.meta.url), script)
+    copyFileSync(new URL('../../src/releaseNotes.ts', import.meta.url), join(pkg, 'src/releaseNotes.ts'))
+    cpSync(media, join(pkg, 'media/release-notes'), { recursive: true })
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ version: '1.0.3', type: 'module' }))
+    writeFileSync(join(repo, '.gitignore'), '**/node_modules/\n')
+    symlinkSync(dirname(require.resolve('esbuild/package.json')), link, 'junction')
+    const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim()
+    git('init', '--quiet')
+    git('add', '.gitignore', 'packages/crl-vscode/package.json', 'packages/crl-vscode/scripts', 'packages/crl-vscode/src', 'packages/crl-vscode/media')
+    git('-c', 'user.name=CRL CLI test', '-c', 'user.email=crl-test@example.invalid', '-c', 'commit.gpgSign=false', '-c', 'core.hooksPath=' + hooks, 'commit', '--quiet', '-m', 'Synthetic release-body fixture')
+    const sha = git('rev-parse', 'HEAD'), body = join(dir, 'body.md')
+    const cli = (source: string) => execFileSync(process.execPath, [script, '--body', source, body], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
+    expect(cli(sha)).toContain('Release body:')
+    expect(readFileSync(body, 'utf8')).toMatch(new RegExp('^<!-- crl-release-source: ' + sha + ' -->'))
+    expect(readFileSync(body, 'utf8')).toContain('## 1.0.3')
+    const fails = (source: string, diagnostic: string) => {
+      let error: unknown
+      try { cli(source) } catch (caught) { error = caught }
+      expect(error).toBeDefined()
+      expect(String((error as { stderr?: unknown } | undefined)?.stderr)).toContain(diagnostic)
+    }
+    fails('f'.repeat(40), 'current immutable Git HEAD')
+    fails('not-a-sha', 'Expected immutable source revision')
+    writeFileSync(join(repo, '.gitignore'), '**/node_modules/\n# uncommitted comment\n')
+    fails(sha, 'Commit the release source')
+    writeFileSync(join(repo, '.gitignore'), '**/node_modules/\n')
+    writeFileSync(join(pkg, 'untracked.txt'), 'Untracked release scratch')
+    fails(sha, 'Commit the release source')
+    rmSync(join(pkg, 'untracked.txt'))
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ version: '1.0.2', type: 'module' }))
+    const run = (...args: string[]) => execFileSync(process.execPath, [script, ...args], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
+    expect(run()).toContain('Release Notes verified.') // ordinary development check permits future entries
+    expect(() => run('--release')).toThrow() // public preflight rejects a latest-version mismatch
+  } finally {
+    // Remove the explicitly created junction before recursive cleanup; never traverse its dependency target.
+    try { unlinkSync(link) } catch {}
+    expect(resolve(dir).startsWith(resolve(tmpdir()) + sep)).toBe(true)
+    rmSync(dir, { recursive: true, force: true })
+    if (media) { expect(resolve(media).startsWith(resolve(tmpdir()) + sep)).toBe(true); rmSync(media, { recursive: true, force: true }) }
+  }
+}, 30000)

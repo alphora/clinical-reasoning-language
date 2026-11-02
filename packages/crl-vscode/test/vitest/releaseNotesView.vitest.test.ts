@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 const require = createRequire(import.meta.url)
 const built = await build({ entryPoints: [fileURLToPath(new URL('../../src/releaseNotesView.ts', import.meta.url))], platform: 'node', format: 'cjs', bundle: true, write: false, external: ['vscode'], logLevel: 'silent' })
 const flush = () => new Promise(resolve => setImmediate(resolve))
-function host(version = '6.4.46', mode = 1) {
+function host(version = '6.4.46', mode = 1, failRegistration = false) {
   const commands = new Map<string, () => Promise<void>>(), state = new Map<string, unknown>(), events = new Map<string, Function>()
   const settings = { autoOpen: true }, panels: any[] = []
   const uri = (path: string) => ({ path, toString: () => path })
@@ -28,7 +28,8 @@ function host(version = '6.4.46', mode = 1) {
   const context = { extensionUri: uri('/installed-extension'), extension: { packageJSON: { version } }, extensionMode: mode, subscriptions: [] as any[], globalState: { get: (key: string) => state.get(key), update: vi.fn(async (key: string, value: unknown) => { state.set(key, value) }) } }
   const module = { exports: {} as any }
   new Function('require', 'module', built.outputFiles[0]!.text)((key: string) => key === 'vscode' ? sdk : require(key), module)
-  const log = vi.fn(), notes = module.exports.createReleaseNotes(context, log)
+  if (failRegistration) sdk.workspace.onDidGrantWorkspaceTrust = () => { throw new Error('Listener registration failed') }
+  const log = vi.fn(), notes = failRegistration ? module.exports.registerReleaseNotes(context, log) : module.exports.createReleaseNotes(context, log)
   return { sdk, context, settings, state, notes, panels, log, events, ready: () => notes.beginDiscovery()(true), show: () => commands.get('crl.showReleaseNotes')!() }
 }
 describe('independent CRL Release Notes host', () => {
@@ -93,8 +94,15 @@ describe('independent CRL Release Notes host', () => {
   })
 })
 
-it('reads only referenced media at runtime and tolerates unrelated installed sidecars', async () => {
-  const h = host(); h.sdk.workspace.fs.readDirectory.mockResolvedValue([['desktop.ini',1]])
+it('loads referenced assets without enumerating unrelated directory entries', async () => {
+  const h = host()
   await h.show(); expect(h.panels).toHaveLength(1)
   expect(h.sdk.workspace.fs.readDirectory).not.toHaveBeenCalled()
+})
+
+it('keeps a useful reopen command when informational startup registration fails', async () => {
+  const h = host('6.4.46', 1, true)
+  expect(h.notes).toBeUndefined(); expect(h.log).toHaveBeenCalledWith(expect.stringContaining('registration failed'))
+  await h.show(); expect(h.panels).toHaveLength(0)
+  expect(h.sdk.window.showErrorMessage).toHaveBeenCalledWith(expect.stringContaining('could not start in this window'))
 })

@@ -525,7 +525,8 @@
     "notes:write": "node scripts/release-notes.mjs --write",
     "notes:check": "node scripts/release-notes.mjs",
     "notes:release": "node scripts/release-notes.mjs --release",
-    "notes:export": "node scripts/release-notes.mjs --export"
+    "notes:export": "node scripts/release-notes.mjs --export",
+    "package:release": "npm run notes:release && vsce package --no-dependencies"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

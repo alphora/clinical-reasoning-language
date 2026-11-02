@@ -107,11 +107,11 @@ unexecuted — exactly how 4.114.0’s missing driver stayed invisible through a
       require `audit.contentMatchesAudit === true` and equality with this export's canonical content,
       schema, content hash and audited revision. Do not certify a release using an unstamped kit.
 
-Build both published artifacts and **look inside them as archives**:
+Build both published artifacts and **look inside them as archives**. The versioned VSIX produced here is the one installed in Gate C and published in §7; copy verified bytes if needed, never rebuild a second untested upload:
 
 ```bash
-cd packages/crl-vscode && npx vsce package --no-dependencies -o /tmp/verify.vsix
-# pass the WINDOWS path -- git-bash /tmp is not the path python sees
+npm run package:release -w crl-language-support
+# Inspect the actual versioned VSIX produced above; pass its absolute filesystem path.
 python3 -c "import zipfile,sys;n=zipfile.ZipFile(sys.argv[1]).namelist();print(len(n));print(chr(10).join(n))" <abs-path-to.vsix>
 npm pack -w @smile-digital-health/crl --dry-run --json   # inspect .files[]
 ```
@@ -230,7 +230,7 @@ partial release that looks complete.
 
 | product | how it reaches a user | who publishes it |
 |---|---|---|
-| **vsix** (extension + bundled MCP server + catalog + `$apply` driver) | GitHub release ASSET — users download and install | **you, by hand** (`npm run package:extension`) |
+| **vsix** (extension + bundled MCP server + catalog + `$apply` driver) | GitHub release ASSET — users download and install | **you, by hand** (`npm run package:release -w crl-language-support`) |
 | **npm tarball** `@smile-digital-health/crl` (core + CLI + driver) | `npm install` | `release.yml` on `release: published` |
 | **catalog + CRLCommon.cql + pattern catalog md** | GitHub release assets | **you, by hand** |
 
@@ -244,7 +244,8 @@ own is a product nothing checks.
    against these exact bytes.
 2. Generate the illustrated downloads from CRL's catalog using §Release Notes below, then run
    `node packages/crl-vscode/scripts/release-notes.mjs --body <source-SHA> tmp/RELEASE_NOTES_vX.Y.Z.md`.
-   Keep that generated GitHub body in `tmp/`, never the repository root; pass that exact file to step6's
+   The CLI requires clean committed source and binds the supplied SHA to current HEAD. Regenerate if
+   HEAD moves. Keep that body in `tmp/`, never the repository root; pass that exact file to step6's
    `--notes-file`. Other release outputs stay on the operator's designated storage drive.
    Publish that generated copy as canonical; do not maintain a second handwritten feature list.
 3. Before tagging, **check the in-scope issues are actually closed**: `Closes #N` auto-closes only on
@@ -290,6 +291,7 @@ Follow `docs/release-notes.md`. CRL owns this implementation; KELP is only a pin
 - Author this version's concise user-facing entries in `packages/crl-vscode/media/release-notes/catalog.json`, with actual synthetic CRL screenshots and useful short silent videos where motion adds value. Keep prior entries/media so skipped versions are included. Verify no customer data and no audio requirement; video needs PNG poster, visible caption and text alternative.
 - Run `npm run notes:write -w crl-language-support`; review README; run `npm run notes:check -w crl-language-support` and strict `npm run notes:release -w crl-language-support`. Source directory must contain exactly catalog, generated README and referenced PNG/WebM. Shared parser checks signatures and cumulative5MiB media/1MiB video budget. Build tooling belongs to the extension package.
 - Ordinary/development packaging validates content consistency without requiring the current manifest's entry. Future source drafts can remain in development catalog/README; installed selection clamps to running version. Rehearsal export requires an anchor entry but allows later drafts; public preflight requires latest entry exactly equal actual release version. Exercise fail paths for stale README, unexpected/missing media, wrong signature, version mismatch and budget overflow.
+- Use `npm run package:release -w crl-language-support -- --out <VSIX>` for the actual release package: it runs strict notes:release before vsce. Ordinary development packaging remains content-only.
 - Run `node packages/crl-vscode/scripts/release-notes.mjs --export <release-output> --mode dry-run` to rehearse; public export uses `--mode publish`. Export self-contained illustrated HTML and text Markdown using the verified deployed-baseline catch-up range. Bundled README retains all authored history. Markdown/GitHub body links the illustrated HTML asset; do not link private raw media. Check actual expanded HTML size, image decode and any video playback offline.
 - Inspect the actual VSIX ZIP for byte-identical catalog/README/media and absence of unintended notes files. SDK-only installs do not own an editor tab. Confirm deployed VSIX is the sole CRL automatic owner; no KELP key/reader dependency. Stable Production/trusted/ready opens once in profile with focus preserved; full dev identity is manual-only and never consumes stable history.
 - Qualify first auto-open and manual reopen using normal isolated installed Code windows, sequentially on the same profile after confirming the first storage write and closing the first window. Do not seed/edit marker; extensionTestsPath is not profile-persistence evidence. Verify opt-out/failure recovery, script-disabled version navigation, images and any video. Separately obtain the deployment-equivalent installed Codespaces/editor check from Spaces; a headless Linux suite is not editor/media evidence.

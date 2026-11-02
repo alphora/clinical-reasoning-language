@@ -55,16 +55,15 @@ export function createReleaseNotes(context: vscode.ExtensionContext, log: (messa
     },
   })
   const reconsider = (): void => coordinator.onProject(eligible())
-  context.subscriptions.push(
-    vscode.commands.registerCommand(RELEASE_NOTES_COMMAND, () => coordinator.show().catch(error => {
-      log('Release Notes could not open: ' + String(error))
-      void vscode.window.showErrorMessage('CRL Release Notes could not open. See the CRL output channel for details.')
-    })),
-    vscode.workspace.onDidGrantWorkspaceTrust(reconsider),
-    vscode.workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration('crl.releaseNotes.autoOpen')) reconsider() }),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => { readyIdentity = undefined }),
-    { dispose: () => { disposed = true; panel?.dispose() } },
-  )
+  // Register the command last: earlier registration failure cannot leave a duplicate command for the fallback.
+  context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(reconsider))
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration('crl.releaseNotes.autoOpen')) reconsider() }))
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => { readyIdentity = undefined }))
+  context.subscriptions.push({ dispose: () => { disposed = true; panel?.dispose() } })
+  context.subscriptions.push(vscode.commands.registerCommand(RELEASE_NOTES_COMMAND, () => coordinator.show().catch(error => {
+    log('Release Notes could not open: ' + String(error))
+    void vscode.window.showErrorMessage('CRL Release Notes could not open. See the CRL output channel for details.')
+  })))
   return {
     // Capture identity before asynchronous content discovery begins, not when its result arrives.
     beginDiscovery: () => {
@@ -75,5 +74,17 @@ export function createReleaseNotes(context: vscode.ExtensionContext, log: (messa
         reconsider()
       }
     },
+  }
+}
+
+/** Informational startup failure must preserve language activation and a useful reopen command. */
+export function registerReleaseNotes(context: vscode.ExtensionContext, log: (message: string) => void): ReturnType<typeof createReleaseNotes> | undefined {
+  try { return createReleaseNotes(context, log) }
+  catch (error) {
+    log('Release Notes registration failed: ' + String(error))
+    context.subscriptions.push(vscode.commands.registerCommand(RELEASE_NOTES_COMMAND, () => {
+      void vscode.window.showErrorMessage('CRL Release Notes could not start in this window. See the CRL output channel for details.')
+    }))
+    return undefined
   }
 }
