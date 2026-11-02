@@ -82,6 +82,7 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
   // Older flags may omit Description. A delivered report still retains the request; never amend the saved flag here.
   const reportedRequest = !v.description?.trim() && v.changes?.[0]?.requestedChange;
   const description = reportedRequest || v.description;
+  const reportDate = (value: string): string => value.replace('T', ' ').replace(/(?:\.\d{3})?Z$/, ' UTC');
   // Description is always shown (an em-dash when empty), including read-only authoring flags.
   // Mutable legacy flags use a description-only edit form. Ref, by
   // contrast, is NOT editable, so an empty Ref row is omitted. Internal classifications belong in Details.
@@ -89,7 +90,7 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     (v.question?.trim() ? row("Question", escapeHtml(v.question), true) : "") +
     (v.sourceQuote?.trim() ? row("Source quotation", escapeHtml(v.sourceQuote), true) : "") +
     row("Status", `<span class="fa-status fa-status-${v.status}">${statusLabel}</span>`) +
-    row("Description", description?.trim() ? `${reportedRequest ? '<span class="fa-em">From latest change report:</span><br>' : ''}${escapeHtml(description)}` : em, true) +
+    row("Description", description?.trim() ? `${reportedRequest ? '<span class="fa-note">From latest change report:</span><br>' : ''}${escapeHtml(description)}` : em, true) +
     v.fields.map((f) => row(f.key, escapeHtml(f.value))).join("") +
     (v.issueRef?.trim() ? row("Ref", escapeHtml(v.issueRef)) : "") +
     row("Created", escapeHtml(v.createdAt)) +
@@ -109,12 +110,12 @@ export function renderFlagActionDrawer(v: FlagActionView): string {
     (v.sourceReference?.trim() ? row("Source reference", escapeHtml(v.sourceReference), true) : "") +
     row("Target", `${escapeHtml(v.targetLabel)}<span class="fa-addr">${target}</span>`) +
     row("Id", escapeHtml(v.id)) +
-    (v.changes ?? []).map(change => `<section class="fa-change"><h3>${escapeHtml(change.recordedAt)}</h3>` +
+    (v.changes ?? []).map(change => `<section class="fa-change"><h3>Change report — ${escapeHtml(reportDate(change.recordedAt))}</h3>` +
       row("Report file", escapeHtml(`${change.runId}.json`)) +
       row("Prior source revision", escapeHtml(change.beforeCommit)) + `</section>`).join("") +
     `</details>`;
   const changes = (v.changes ?? []).map(change =>
-    `<section class="fa-change"><h3>Changes — ${escapeHtml(change.recordedAt.replace('T',' ').replace(/\.\d{3}Z$/, ' UTC'))}</h3>` +
+    `<section class="fa-change"><h3>Changes — ${escapeHtml(reportDate(change.recordedAt))}</h3>` +
     row('Before',escapeHtml(change.priorState),true) +
     row(change.implemented ? 'After' : 'Not implemented',escapeHtml(change.change),true) +
     row('Affected nodes',escapeHtml(change.targets.join('\n')),true) +

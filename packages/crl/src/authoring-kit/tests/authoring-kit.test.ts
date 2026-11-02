@@ -680,7 +680,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
     expect(kit.schemaVersion).toBe("2.44");
-    expect(kit.contentHash).toBe("602ed0d30d328bcd8630ac29328b58423440f30523e1a4fede6cf550d1137212");
+    expect(kit.contentHash).toBe("e75cae86a9517c56e4d0b277595aa66cd072ec9b257cfc4fdec27234f6892f1d");
   });
 
   // @kit criterion:description-navigation
@@ -942,6 +942,7 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
     expect(text).toContain('requestedChange summarizes the selected request');
     expect(text).not.toContain('technical Before / Requested change / Change made');
     expect(text).not.toContain('source detail, reasoning, consequences and review question in');
+    expect(text).not.toContain('the flag record is LEAN');
     expect(rule!.clauses![0].text).toContain('a separate succinct `question`');
     expect(text).toContain('Completion messages do not replace the change report');
     const validate = new AjvJsonSchemaValidator().getValidator(flagChangeSummaryJsonSchema as never);

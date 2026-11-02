@@ -1358,8 +1358,8 @@ const RULES: KitRule[] = [
       {
         text:
           "When you cannot cleanly resolve a source/encoding problem during extraction, author a flag (via `create_flag`) " +
-          "at the narrowest faithful scope rather than silently choosing; the flag record is LEAN (gist + fields + `status " +
-          "open`), with a short title in `gist`, a separate succinct `question`, actual `sourceReference`/`sourceQuote`, and supporting reasoning and consequences in `description`; an optional tracker issue can be linked with `ref`. (`assumption`/" +
+          "at the narrowest faithful scope rather than silently choosing. Create a store record with status `open`, " +
+          "a short title in `gist`, a separate succinct `question`, actual `sourceReference`/`sourceQuote`, and supporting reasoning and consequences in `description`; an optional tracker issue can be linked with `ref`. (`assumption`/" +
           "`chosen`/`alternatives` are the semantic fields to include when they apply — not required.)",
         force: "default",
       },

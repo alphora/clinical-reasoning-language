@@ -86,6 +86,7 @@ test('the cockpit uses the live panel state for blue/pressed styling and dispatc
  assert.match(button('policy.cel'),/aria-pressed="false"/);assert.doesNotMatch(button('policy.cel'),/fc-active/);
  f.api.toggle('policy.cel');assert.match(button('policy.cel'),/fc-active/);assert.match(button('policy.cel'),/aria-pressed="true"/);
  assert.doesNotMatch(button('other.cel'),/fc-active/);assert.match(button('other.cel'),/aria-pressed="false"/);
+ assert.doesNotMatch(button(undefined),/fc-active/);assert.match(button(undefined),/aria-pressed="false"/);
  f.api.toggle('policy.cel');assert.doesNotMatch(button('policy.cel'),/fc-active/);
 });
 
