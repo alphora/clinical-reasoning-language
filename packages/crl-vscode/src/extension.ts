@@ -34,6 +34,7 @@ import { registerCelDiagnostics } from "./celDiagnostics";
 import { registerApplyQuestionnaireHarness } from "./applyQuestionnaireHarness";
 import { registerCorrespondenceCockpit } from "./correspondenceCockpit";
 import { registerCockpitPaneSerializers } from "./cockpitPaneSerializers";
+import { createReleaseNotes } from "./releaseNotesView";
 import { registerProvenancePanel } from "./provenancePanel";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
@@ -285,7 +286,8 @@ export function activate(context: vscode.ExtensionContext): void {
   registerPresentationEditor(context);
   registerKeUpdates(context);
   registerKeApp(context);
-  registerProvenancePanel(context);
+  const releaseNotes = createReleaseNotes(context, message => getOutputChannel().appendLine(message));
+  registerProvenancePanel(context, releaseNotes.beginDiscovery);
   registerCorrespondenceCockpit(context);
   // DEV-HOST ONLY. The CSP harness is an instrument, not a feature: it answered the LForms policy question and
   // is kept for re-walking the ladder on an LForms upgrade (media/lforms/README.md). It contributes no command

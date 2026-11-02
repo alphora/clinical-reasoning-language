@@ -251,7 +251,7 @@ describe.skipIf(!engineJar)("publication selector against pinned CRL engine $app
     const sha = (bytes: string | Buffer): string =>
       createHash("sha256").update(bytes).digest("hex");
     expect(sha(readFileSync(engineJar))).toBe(
-      "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
+      "2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa",
     );
     expect(sha(readFileSync(path.join(loaderPath, "ApplyDriver.class")))).toBe(
       "d01ff0ad88ddadc8deaf6c0f9efbad53c9bee3fce8bce9643c19b5e3097b50fd",

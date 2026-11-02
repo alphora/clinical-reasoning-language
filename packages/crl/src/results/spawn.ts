@@ -165,12 +165,12 @@ export async function resolveJavaAsync(
 // REFACTOR:grounded (#320, plan597): the delivered engine has a distinct identity and cache.
 /** Maintainer build with recorded dependency overrides and protocol 1 presentation-group generation. */
 export const ENGINE_JAR_SOURCE = {
-  buildId: "cqf-definition-dcac972f-normalized-cache-security-20261029",
+  buildId: "cqf-definition-dcac972f-normalized-cache-quantity-units-20261101",
   upstreamBase: "feature-definition-based-population",
   sourceCommit: "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-security-20261029/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
-  sha256: "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
-  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
+  url: "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-quantity-units-20261101/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-quantity-units-20261101.jar",
+  sha256: "2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa",
+  cacheRelativePath: ".cache/crl/engines/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-quantity-units-20261101.jar",
 } as const;
 
 /** One identified cache location; never replace or discover an upstream Maven artifact. */

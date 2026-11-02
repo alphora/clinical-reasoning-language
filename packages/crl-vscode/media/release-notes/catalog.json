@@ -1,0 +1,81 @@
+{
+  "baselineVersion": "6.4.41",
+  "deployedBaselineVersion": "6.4.41",
+  "releases": [
+    {
+      "version": "6.4.42",
+      "title": "Grouped choices in questionnaires",
+      "features": [
+        {
+          "title": "Present related choices together",
+          "description": "Group ordinary Boolean questions under one shared prompt, choose columns and checkbox or radio controls, and retain separate Yes, No and unanswered answers. Clearing one answer preserves the others. The same emitted CQL/FHIR gives older supported engines a meaningful prompt for each independent question. See the synthetic presentation-choice demo for an optional explanatory description."
+        },
+        {
+          "title": "Use package identity from the manifest",
+          "description": "Declare packageId at the package.json root. An explicit tool override takes precedence; the older crl.packageId field remains a fallback when the root field is absent."
+        }
+      ]
+    },
+    {
+      "version": "6.4.43",
+      "title": "Faster repeated native evaluations",
+      "features": [
+        {
+          "title": "Reuse the native runtime",
+          "description": "Repeated $apply calls in one CRL tool process reuse an owned JVM while clinical repositories and per-call state remain fresh. Streaming CLI sessions also support reuse. Cancellation, timeout or worker failure triggers cleanup before later work; failed evaluations are not replayed automatically."
+        }
+      ]
+    },
+    {
+      "version": "6.4.44",
+      "title": "Concurrent evaluation and compilation reuse",
+      "features": [
+        {
+          "title": "Run independent jobs concurrently",
+          "description": "The native runtime supports a configurable pool of reusable JVMs. Complete sessions keep one owner and execute their steps in sequence. Nautilus can select six workers; the generic default remains one. Compilation reuse checks definition content and invalidates on changed artifacts, while clinical evaluation state remains fresh."
+        }
+      ]
+    },
+    {
+      "version": "6.4.45",
+      "title": "Engine dependency security update",
+      "features": [
+        {
+          "title": "Updated engine dependencies",
+          "description": "The normalized-cache engine updates its packaged Guava runtime to33.7.2-jre. Application behavior, the normalized-cache implementation and driver/worker bytecode remain unchanged. The release includes a dated full-JAR dependency scan and immutable engine identity."
+        }
+      ]
+    },
+    {
+      "version": "6.4.46",
+      "title": "See what's new in CRL",
+      "features": [
+        {
+          "title": "Quantity questions carry their unit",
+          "description": "Declare a unit once on the CRL value type, for example: value type is Quantity 'kg/m2'. CQL evaluation and the emitted FHIR input profile use that declared unit; the matching $apply engine carries it into the Questionnaire. Enter a number in the Interactive Questionnaire and the client submits a Quantity in that unit. Change and clear remain available. Existing questions without a declared unit keep their prior behavior.",
+          "image": "quantity-entry.png",
+          "alt": "Synthetic BMI question in the real Interactive FHIR Questionnaire, with40 entered and kg/m2 provided by the form.",
+          "caption": "Synthetic runtime example. Raw unitless measurements from clients that ignore the unit contract are still rejected; the clinical threshold is authored separately."
+        },
+        {
+          "title": "Read the question and source separately",
+          "description": "KE flags can now carry a succinct question, source reference and source quotation in separate fields. The flag view displays those fields above the description so reviewers can distinguish the question from its supporting text. Legacy descriptions remain readable. The KE pipeline must populate the new fields to benefit.",
+          "image": "flag-context.png",
+          "alt": "Actual CRL flag drawer renderer showing a synthetic question, source reference and source quotation in separate labeled rows.",
+          "caption": "Synthetic display example using the shipped flag renderer; customer policy content is not shown."
+        },
+        {
+          "title": "See what a rerun reports changing",
+          "description": "A rerun can supply structured Before, Requested change, Change made and Affected nodes information, with evidence links. CRL verifies the referenced artifact evidence when opening it. These summaries report technical changes and do not automatically approve a flag or establish clinical correctness; the pipeline supplies the report.",
+          "image": "flag-summary.png",
+          "alt": "Actual CRL flag drawer renderer showing a synthetic run-reported change with before state, requested change and change made.",
+          "caption": "Synthetic display example. Existing flag review status remains under human control."
+        },
+        {
+          "title": "Reopen illustrated Release Notes",
+          "description": "CRL now bundles its own Release Notes with the extension. After a stable update they open once in this profile when a trusted CRL workspace is ready, preserving your keyboard focus. Reopen them with CRL: Release Notes, or disable automatic opening in the CRL settings. Skipped-release history, illustrations and the downloadable HTML remain available without fetching media from another service."
+        }
+      ]
+    }
+  ]
+}

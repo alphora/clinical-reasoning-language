@@ -108,12 +108,20 @@ class ProvenanceTreeProvider implements vscode.TreeDataProvider<Node> {
   }
 }
 
-export function registerProvenancePanel(context: vscode.ExtensionContext): void {
-  // Gate the view's visibility on the workspace actually containing CRL content (the extension also activates on
-  // onStartupFinished, so an unconditional setContext would show the view in every workspace).
-  void vscode.workspace
-    .findFiles("**/*.{crl,cel}", "**/node_modules/**", 1)
-    .then((hits) => vscode.commands.executeCommand("setContext", "crl.active", hits.length > 0), () => {});
+export function registerProvenancePanel(context: vscode.ExtensionContext, beginDiscovery?: () => (ready: boolean) => void): void {
+  // One shared content-readiness signal for the views and informational Release Notes.
+  let discovery = 0;
+  function discoverContent(): void {
+    const current = ++discovery;
+    const settled = beginDiscovery?.();
+    void Promise.resolve(vscode.workspace.findFiles("**/*.{crl,cel}", "**/node_modules/**", 1)).then(async (hits) => {
+      if (current !== discovery) return;
+      await vscode.commands.executeCommand("setContext", "crl.active", hits.length > 0);
+      if (current === discovery) settled?.(hits.length > 0);
+    }).catch(() => { if (current === discovery) settled?.(false); });
+  }
+  discoverContent();
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(discoverContent));
   const provider = new ProvenanceTreeProvider();
   const view = vscode.window.createTreeView<Node>("crlProvenanceFindings", { treeDataProvider: provider });
 
@@ -186,6 +194,7 @@ export function registerProvenancePanel(context: vscode.ExtensionContext): void 
     currentCel = ed.document.uri.fsPath;
     // Ensure the view is revealed even if the workspace had no .crl/.cel at activation (the gate's findFiles is one-shot).
     void vscode.commands.executeCommand("setContext", "crl.active", true);
+    beginDiscovery?.()(true);
     setupWatcher();
     rebuild();
   });

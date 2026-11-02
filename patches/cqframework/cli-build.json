@@ -1,5 +1,5 @@
 {
-  "bytes": 216669859,
+  "bytes": 216662890,
   "upstreamFixes": {
     "askedUnknown": "0ade9a9de6621eabb5adb6ff99cbf01ab67d725d",
     "sharedInputDeduplication": "dcac972fc38bc9a29aae2c662dfb5c4917d27234"
@@ -9,22 +9,23 @@
     "security-20261002/dependencies.patch",
     "presentation-choice-groups/groups.patch",
     "normalized-library-cache/kotlin-runtime.patch",
-    "security-20261029/dependencies.patch"
+    "security-20261029/dependencies.patch",
+    "quantity-type-units/units.patch"
   ],
   "buildLauncherJdkMajor": 17,
   "upstreamRelease": false,
   "targetJavaMajor": 17,
-  "sha256": "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
+  "sha256": "2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa",
   "sourceCommit": "dcac972fc38bc9a29aae2c662dfb5c4917d27234",
-  "asset": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
-  "buildId": "cqf-definition-dcac972f-normalized-cache-security-20261029",
+  "asset": "cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-quantity-units-20261101.jar",
+  "buildId": "cqf-definition-dcac972f-normalized-cache-quantity-units-20261101",
   "upstreamBase": "feature-definition-based-population",
   "sourceUrl": "https://github.com/cqframework/clinical-reasoning/tree/dcac972fc38bc9a29aae2c662dfb5c4917d27234",
   "embeddedBuildVersion": "4.13.0-crl-security-20261002-dcac972fc-SNAPSHOT",
   "license": "Apache-2.0",
   "buildCommand": "./gradlew :cqf-fhir-cr-cli:bootJar --no-daemon --max-workers=1 --init-script <module-repository-init.gradle>",
-  "scope": "Dependency-only security rebuild of the normalized-cache engine. Guava runtime33.7.2-jre; all application classes and the source-built CQL normalized-cache module are unchanged.",
-  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-security-20261029/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-security-20261029.jar",
+  "scope": "Typed Quantity input-profile allowedUnits to standard Questionnaire quantity unitOption. Source-class patch on the unchanged normalized-cache security engine; all runtime dependencies unchanged.",
+  "url": "https://github.com/alphora/clinical-reasoning-language/releases/download/engine-dcac972f-normalized-cache-quantity-units-20261101/cqf-fhir-cr-cli-definition-dcac972f-normalized-cache-quantity-units-20261101.jar",
   "dependencyPins": {
     "hl7Core": "6.9.12",
     "jacksonBom": "2.22.3",
@@ -176,5 +177,12 @@
     "baselineModuleSha256": "34fe17f7c63e916270e927c94f138266ac073fb40db62a3d82fea4825a1db06f",
     "coordinateNote": "The private source-built module retains cql-to-elm-jvm5.3.0 and its translator version; it is not the published upstream binary. Compare baselineModuleSha256 with sourceBuiltModuleSha256."
   },
-  "scopeBoundary": "Only runtime dependency bytes and generated build metadata differ from normalized-cache-20261029. Compile-time Guava API is retained to avoid unrelated Kotlin nullability source changes. Runtime qualification and dated full-JAR vulnerability scan are separate recorded gates."
+  "scopeBoundary": "Only ItemGenerator and its internal QuantityUnitException differ from the 20261029 security baseline. Existing normalized cache implementation and all132 runtime dependency hashes are preserved. The full-JAR security scan and actual installed/native qualification are separate gates.",
+  "quantityTypeUnits": {
+    "recipe": "quantity-type-units/rebuild.py",
+    "receipt": "quantity-type-units/candidate.json",
+    "baselineSha256": "99079b9cd0951e7a4001bbd8b17d84e91a1b108ef648a9461c160ef9aba101d2",
+    "compileJdkMajor": 23,
+    "targetJavaMajor": 17
+  }
 }

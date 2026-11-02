@@ -185,6 +185,10 @@
       {
         "command": "crl.agent.chat",
         "title": "CRL: Open CRL Assist"
+      },
+      {
+        "command": "crl.showReleaseNotes",
+        "title": "CRL: Release Notes"
       }
     ],
     "viewsContainers": {
@@ -466,6 +470,11 @@
           "default": "claude-sonnet-5",
           "scope": "window",
           "description": "The Anthropic model id the agent requests. Used only when crl.agent.provider is 'anthropic'."
+        },
+        "crl.releaseNotes.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open CRL Release Notes once after a stable update in this profile, when a trusted CRL workspace is ready."
         }
       }
     }
@@ -509,9 +518,13 @@
     "test:language-config": "vitest run --root ../.. --project crl-vscode --no-file-parallelism language-config.test",
     "test": "npm run compile && vitest run --root ../.. --project crl-vscode --no-file-parallelism",
     "oracle:update": "node test/oracle/update.mjs",
-    "vscode:prepublish": "npm run build:crl && npm run compile",
+    "vscode:prepublish": "npm run notes:check && npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies",
-    "test:watch": "vitest --root ../.. --project crl-vscode"
+    "test:watch": "vitest --root ../.. --project crl-vscode",
+    "notes:write": "node scripts/release-notes.mjs --write",
+    "notes:check": "node scripts/release-notes.mjs",
+    "notes:release": "node scripts/release-notes.mjs --release",
+    "notes:export": "node scripts/release-notes.mjs --export"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -417,7 +417,7 @@ try {
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
     assert.equal(kit.schemaVersion, "2.43");
-    assert.equal(kit.contentHash, "0eb8c7e65c10a9c43e380971e782f04e71c4defa91e8a8025f515f85275db6a8");
+    assert.equal(kit.contentHash, "3335e25050a9b4c5c9621780cac1838cc52c30ba2aa80e1b58d536f15ae6c8f9");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);
