@@ -2521,7 +2521,7 @@ Final reviewed source target 8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4 includes t
 
 ## CRL6.4.48 reviewer-facing flags and self-sufficient reporting — schema2.44
 
-Audit baseline `8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4`; release before-state `b99a8b9512709907edc565f62da1d0879b33367a`. Reviewed content target is finalized by the separate metadata stamp after content commit. Full changed-path inventory is maintenance-6.4.48-paths.txt, including the complete32-path baseline-to6.4.47 interval, current source/tests/media/config and this ledger. No prior baseline was silently replaced. Rule deletion provenance, complete assertion diff and matching plan/code review inputs are retained in discussions1233/1234. Scope is customer-neutral software and synthetic teaching, no policy authoring or customer lifecycle change.
+Audit baseline `8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4`; release before-state `b99a8b9512709907edc565f62da1d0879b33367a`. Reviewed content target `881a24fd49baa35ee44809d1f0baaa68a688a470`, schema2.44, canonical hash `602ed0d30d328bcd8630ac29328b58423440f30523e1a4fede6cf550d1137212`, bound by this separate metadata-only stamp. Full changed-path inventory is maintenance-6.4.48-paths.txt, including the complete32-path baseline-to6.4.47 interval, current source/tests/media/config and this ledger. No prior baseline was silently replaced. Rule deletion provenance, complete assertion diff and matching plan/code review inputs are retained in discussions1233/1234. Scope is customer-neutral software and synthetic teaching, no policy authoring or customer lifecycle change.
 
 | Changed paths / owning observations | Disposition, claim and limits |
 |---|---|
