@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "bcfbdc5b82ea0f82dd1cbf4df224165d2bde117a",
-  "auditedSchemaVersion": "2.44",
-  "auditedContentHash": "e75cae86a9517c56e4d0b277595aa66cd072ec9b257cfc4fdec27234f6892f1d",
-  "scope": "Schema 2.44 review-flags field roles, visible Before/After and complete agent reporting examples/discovery; baseline8e9b442578bdfa7076b2dc7c7005dc0f64fa55c4. UI controls preserve manual review/status and JSON contracts. No clinical, emitter or runtime semantic change. See coverage.md for actual evidence and separate installed/release gates.",
+  "auditedRevision": "17c4cd2d2c10f4311223fed71b7888c0057abb05",
+  "auditedSchemaVersion": "2.45",
+  "auditedContentHash": "c55212466cd02ab92714df40bbde8f6b8bfdd7ca1ce6d31690dad8d2b8f0c375",
+  "scope": "Schema 2.45 Optional uncertainty guard display: explicit Boolean Concept/Criterion metadata, conservative MV disclosure, truthful execution/review/source identities, unchanged emitted computational artifacts, and self-sufficient kit guidance. Baseline bcfbdc5b82ea0f82dd1cbf4df224165d2bde117a. Source/browser/private-extension evidence and prior UI delta dispositioned in coverage.md. No release, deployment or new native clinical qualification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
