@@ -1,8 +1,14 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.46.
+Updates since CRL 6.4.41 through 6.4.47.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.47 — Release notes for the combined KALM view
+
+### One combined place to see what changed
+
+CRL supplies versioned release notes and local illustrations for the combined KALM AI: What's New view\. This view is available in images that include the compatible Spaces launcher, which manages opening and skipped\-release history\. CRL no longer opens a separate notes tab\. Downloadable HTML and Markdown remain available from the release\.
 
 ## 6.4.46 — See what's new in CRL
 
@@ -10,7 +16,7 @@ Managed environments provide KALM AI: What's New for the combined Release Notes.
 
 Declare a unit once on the CRL value type, for example: value type is Quantity 'kg/m2'\. CQL evaluation and the emitted FHIR input profile use that declared unit; the matching $apply engine carries it into the Questionnaire\. Enter a number in the Interactive Questionnaire and the client submits a Quantity in that unit\. Change and clear remain available\. Existing questions without a declared unit keep their prior behavior\.
 
-![Synthetic BMI question in the real Interactive FHIR Questionnaire, with40 entered and kg/m2 provided by the form\.](quantity-entry.png)
+![Synthetic BMI question in the real Interactive FHIR Questionnaire, with 40 entered and kg/m2 provided by the form\.](quantity-entry.png)
 
 Synthetic runtime example\. Raw unitless measurements from clients that ignore the unit contract are still rejected; the clinical threshold is authored separately\.
 
@@ -30,19 +36,19 @@ A rerun can supply structured Before, Requested change, Change made and Affected
 
 Synthetic display example\. Existing flag review status remains under human control\.
 
-### Reopen illustrated Release Notes
+### Bundled illustrated Release Notes
 
-CRL now bundles its own Release Notes with the extension\. After a stable update they open once in this profile when a trusted CRL workspace is ready, preserving your keyboard focus\. Reopen them with CRL: Release Notes, or disable automatic opening in the CRL settings\. Skipped\-release history, illustrations and the downloadable HTML remain available without fetching media from another service\.
+CRL 6\.4\.46 introduced bundled illustrated Release Notes, skipped\-release history and offline media\. Downloadable HTML and Markdown provide the same authored content\.
 
 ### Use the matching Quantity\-capable engine
 
-CRL6\.4\.46 selects engine build cqf\-definition\-dcac972f\-normalized\-cache\-quantity\-units\-20261101, SHA256 2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa\. Declared\-unit questions require this generator support\. Deployment images must include the matching JAR; explicit runtime overrides must be updated for the new feature\. The normal runtime verifies its configured or cached engine and does not download it\.
+CRL 6\.4\.46 selects engine build cqf\-definition\-dcac972f\-normalized\-cache\-quantity\-units\-20261101, SHA256 2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa\. Declared\-unit questions require this generator support\. Deployment images must include the matching JAR; explicit runtime overrides must be updated for the new feature\. The normal runtime verifies its configured or cached engine and does not download it\.
 
 ## 6.4.45 — Engine dependency security update
 
 ### Updated engine dependencies
 
-The normalized\-cache engine updates its packaged Guava runtime to33\.7\.2\-jre\. Application behavior, the normalized\-cache implementation and driver/worker bytecode remain unchanged\. The release includes a dated full\-JAR dependency scan and immutable engine identity\.
+The normalized\-cache engine updates its packaged Guava runtime to 33\.7\.2\-jre\. Application behavior, the normalized\-cache implementation and driver/worker bytecode remain unchanged\. The release includes a dated full\-JAR dependency scan and immutable engine identity\.
 
 ## 6.4.44 — Concurrent evaluation and compilation reuse
 

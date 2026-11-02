@@ -28,7 +28,7 @@ At most 100 releases, each with 1–20 features. Release and feature titles are 
 
 Features may contain an image, video or both. Images require alt. Every video requires a PNG poster, alt and visible caption. With video only, alt describes the poster; with both, it describes the image and the caption describes the video. Captions without media and posters without video are invalid. Videos are controlled, muted and never autoplaying/looping.
 
-Media names match `^[a-z0-9][a-z0-9._-]{0,63}\.(png|webm)$` and must not contain `..`. No directories, URLs or traversal. Referenced inputs must be regular files, not links. PNG signature and first IHDR dimensions are checked: positive width/height, each at most 4096; each PNG at most 2 MiB. WebM signature is EBML. Total distinct referenced media is at most 5 MiB and distinct video at most 1 MiB, each file counted once. Producer signature validation does not certify video codec: before adding a video, retain VP8/VP9 codec evidence and actual offline/host playback evidence. No video is currently shipped.
+Media names match `^[a-z0-9][a-z0-9._-]{0,63}\.(png|webm)$` and must not contain `..`. No directories, URLs or traversal. Referenced inputs must be regular files, not links. PNG signature and first IHDR dimensions are checked: positive width/height, each at most 4096; each PNG at most 2 MiB. WebM signature is EBML. Total distinct referenced media is at most 5 MiB and distinct video at most 1 MiB, each file counted once. Producer signature validation does not certify video codec: before adding a video, retain VP8/VP9 codec evidence, verify the file has no audio track, and retain actual offline/host playback evidence. No video is currently shipped.
 
 ## Ownership and qualification
 
