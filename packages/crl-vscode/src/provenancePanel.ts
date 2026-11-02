@@ -108,19 +108,17 @@ class ProvenanceTreeProvider implements vscode.TreeDataProvider<Node> {
   }
 }
 
-export function registerProvenancePanel(context: vscode.ExtensionContext, beginDiscovery?: () => (ready: boolean) => void): void {
-  // One shared content-readiness signal for the views and informational Release Notes.
+export function registerProvenancePanel(context: vscode.ExtensionContext): void {
+  // Content discovery controls the existing provenance views only.
   let discovery = 0;
   let contextActive = false;
   function discoverContent(): void {
     const current = ++discovery;
-    const settled = beginDiscovery?.();
     void Promise.resolve(vscode.workspace.findFiles("**/*.{crl,cel}", "**/node_modules/**", 1)).then(async (hits) => {
       if (current !== discovery) return;
       contextActive ||= hits.length > 0;
       await vscode.commands.executeCommand("setContext", "crl.active", contextActive);
-      if (current === discovery) settled?.(hits.length > 0);
-    }).catch(() => { if (current === discovery) settled?.(false); });
+    }).catch(() => { /* Discovery or context failure must not break activation. */ });
   }
   discoverContent();
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(discoverContent));
@@ -198,7 +196,6 @@ export function registerProvenancePanel(context: vscode.ExtensionContext, beginD
     ++discovery;
     contextActive = true;
     void vscode.commands.executeCommand("setContext", "crl.active", true);
-    beginDiscovery?.()(true);
     setupWatcher();
     rebuild();
   });

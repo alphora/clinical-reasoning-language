@@ -10,7 +10,7 @@ import { renderBundledReadme, validateReleaseNotes, exportReleaseNotes, releaseB
 async function fixture() {
   const dir = mkdtempSync(join(tmpdir(), 'crl-notes-fixture-'))
   const input = { baselineVersion: '1.0.0', deployedBaselineVersion: '1.0.1', releases: [1,2,3].map(n => ({ version: '1.0.' + n, title: 'Release ' + n, features: [{ title: 'Sample', description: 'Use this feature.', image: 'sample.png', alt: 'Synthetic sample' }] })) }
-  writeFileSync(join(dir, 'catalog.json'), JSON.stringify(input)); writeFileSync(join(dir, 'sample.png'), Buffer.from([137,80,78,71,13,10,26,10]))
+  writeFileSync(join(dir, 'catalog.json'), JSON.stringify(input)); writeFileSync(join(dir, 'sample.png'), readFileSync(new URL('./fixtures/release-notes-1px.png', import.meta.url)))
   writeFileSync(join(dir, 'README.md'), await renderBundledReadme(dir))
   return dir
 }
@@ -51,28 +51,31 @@ describe('CRL release export gates', () => {
   })
 })
 
-it('contributes the exact reopen command and profile preference with an explicit media inclusion', () => {
+it('ships provider content without contributing a separate reader command or setting', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
-  expect(manifest.contributes.commands).toContainEqual({ command: 'crl.showReleaseNotes', title: 'CRL: Release Notes' })
-  expect(manifest.contributes.configuration.properties['crl.releaseNotes.autoOpen']).toMatchObject({ default: true, scope: 'application' })
+  expect(manifest.contributes.commands.some((entry: { command: string }) => entry.command === 'crl.showReleaseNotes')).toBe(false)
+  expect(manifest.contributes.configuration.properties['crl.releaseNotes.autoOpen']).toBeUndefined()
   const ignore = readFileSync(new URL('../../.vscodeignore', import.meta.url), 'utf8')
-  expect(ignore.trimEnd().endsWith('!media/release-notes/**')).toBe(true)
+  expect(ignore).toContain('media/release-notes/**'); expect(ignore.trimEnd().endsWith('!release-notes/**')).toBe(true)
 })
 
 it('executes the real body CLI with clean HEAD binding, rejecting a wrong SHA and dirty source', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'crl-notes-cli-')), repo = join(dir, 'repo'), pkg = join(repo, 'packages/crl-vscode')
   let media: string | undefined
-  const link = join(pkg, 'node_modules/esbuild'), script = join(pkg, 'scripts/release-notes.mjs'), hooks = join(dir, 'empty-hooks')
+  const ajvLink = join(pkg, 'node_modules/ajv'), link = join(pkg, 'node_modules/esbuild'), script = join(pkg, 'scripts/release-notes.mjs'), hooks = join(dir, 'empty-hooks')
   const require = createRequire(import.meta.url)
   try {
     media = await fixture()
   mkdirSync(join(pkg, 'scripts'), { recursive: true }); mkdirSync(join(pkg, 'src'), { recursive: true }); mkdirSync(join(pkg, 'node_modules')); mkdirSync(hooks)
     copyFileSync(new URL('../../scripts/release-notes.mjs', import.meta.url), script)
+    cpSync(new URL('../../scripts/release-notes-contract', import.meta.url), join(pkg, 'scripts/release-notes-contract'), { recursive: true })
     copyFileSync(new URL('../../src/releaseNotes.ts', import.meta.url), join(pkg, 'src/releaseNotes.ts'))
     cpSync(media, join(pkg, 'media/release-notes'), { recursive: true })
     writeFileSync(join(pkg, 'package.json'), JSON.stringify({ version: '1.0.3', type: 'module' }))
     writeFileSync(join(repo, '.gitignore'), '**/node_modules/\n')
     symlinkSync(dirname(require.resolve('esbuild/package.json')), link, 'junction')
+    const ownedRequire = createRequire(new URL('../../package.json', import.meta.url))
+    symlinkSync(dirname(ownedRequire.resolve('ajv/package.json')), ajvLink, 'junction')
     const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim()
     git('init', '--quiet')
     git('add', '.gitignore', 'packages/crl-vscode/package.json', 'packages/crl-vscode/scripts', 'packages/crl-vscode/src', 'packages/crl-vscode/media')
@@ -103,6 +106,7 @@ it('executes the real body CLI with clean HEAD binding, rejecting a wrong SHA an
   } finally {
     // Remove the explicitly created junction before recursive cleanup; never traverse its dependency target.
     try { unlinkSync(link) } catch {}
+    try { unlinkSync(ajvLink) } catch {}
     expect(resolve(dir).startsWith(resolve(tmpdir()) + sep)).toBe(true)
     rmSync(dir, { recursive: true, force: true })
     if (media) { expect(resolve(media).startsWith(resolve(tmpdir()) + sep)).toBe(true); rmSync(media, { recursive: true, force: true }) }

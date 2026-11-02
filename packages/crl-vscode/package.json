@@ -185,10 +185,6 @@
       {
         "command": "crl.agent.chat",
         "title": "CRL: Open CRL Assist"
-      },
-      {
-        "command": "crl.showReleaseNotes",
-        "title": "CRL: Release Notes"
       }
     ],
     "viewsContainers": {
@@ -470,12 +466,6 @@
           "default": "claude-sonnet-5",
           "scope": "window",
           "description": "The Anthropic model id the agent requests. Used only when crl.agent.provider is 'anthropic'."
-        },
-        "crl.releaseNotes.autoOpen": {
-          "type": "boolean",
-          "default": true,
-          "description": "Open CRL Release Notes once after a stable update in this profile, when a trusted CRL workspace is ready.",
-          "scope": "application"
         }
       }
     }
@@ -526,7 +516,7 @@
     "notes:check": "node scripts/release-notes.mjs",
     "notes:release": "node scripts/release-notes.mjs --release",
     "notes:export": "node scripts/release-notes.mjs --export",
-    "package:release": "npm run notes:release && vsce package --no-dependencies"
+    "package:release": "npm run notes:release && vsce package --no-dependencies && node scripts/verify-release-notes.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -534,8 +524,10 @@
     "@types/node": "^18.19.130",
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.0",
+    "ajv": "8.20.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.3.3",
+    "yauzl": "^3.4.0",
     "zod": "^4.4.3"
   }
 }

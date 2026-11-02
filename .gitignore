@@ -79,6 +79,9 @@ packages/*/test/oracle/.gen/
 # Release checksums — generated per release, attached as an asset, never committed.
 SHA256SUMS
 
+# Generated content provider, staged into the VSIX by the extension build.
+/packages/crl-vscode/release-notes/
+
 # vibe-tools:begin
 /.codex/config.toml
 /.codex/agents/vibe-reviewer-*.toml

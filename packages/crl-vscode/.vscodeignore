@@ -13,5 +13,6 @@ dist/highlight.js
 test/**
 scripts/**
 
-# Release Notes media is an explicit shipped payload. Keep this inclusion after broader exclusions.
-!media/release-notes/**
+# Source drafts and README are authoring inputs; only the staged provider is shipped.
+media/release-notes/**
+!release-notes/**

@@ -2,6 +2,7 @@ const esbuild = require("esbuild");
 const path = require("path");
 const fs = require("fs");
 const { builtinModules } = require("module");
+const { pathToFileURL } = require("node:url");
 
 // CRL core is resolved via node (the npm workspace link), not a hardcoded path,
 // so the extension build is independent of the on-disk layout. We consume the
@@ -55,6 +56,9 @@ const isBuiltin = (p) => builtinModules.includes(p.replace(/^node:/, ""));
 
 async function build() {
   assertCrlBuilt();
+  const { stageReleaseNotesProvider } = await import(pathToFileURL(path.join(__dirname, "scripts/release-notes.mjs")).href);
+  const notes = await stageReleaseNotesProvider();
+  console.log(notes.staged ? "Release Notes: staged content provider for " + notes.version : "Release Notes: no eligible provider history for " + notes.version);
 
   // Extension-host bundle. `vscode` is provided by the runtime, never bundled.
   await esbuild.build({
