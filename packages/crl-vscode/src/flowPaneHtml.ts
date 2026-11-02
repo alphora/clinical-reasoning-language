@@ -1245,7 +1245,7 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 }
 
 export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
-  `.flow-answer-group>text{font-size:12px;font-weight:600}.flow-answer-left>text{fill:#00e676}.flow-answer-right>text{fill:#f14c4c}` +
+  `.flow-answer-group>text{font-size:12px;font-weight:600}.flow-answer-left>text{fill:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}.flow-answer-right>text{fill:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `html:has(.flow-svg){overflow-anchor:none}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
   `body[data-mode="medical-validation"] #root:not(.flow-has-pin) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-show-all-pins:not(.flow-has-pin) .flow-activity>.flow-pin{display:inline}` +

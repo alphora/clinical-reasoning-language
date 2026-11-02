@@ -502,7 +502,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
 }
 
 export const ROUTE_CARD_STYLE = `
-.route-answer-group{font-weight:600;margin:8px 0 3px}.route-answer-left{color:#00e676}.route-answer-right{color:#f14c4c}.route-answer-use{font-weight:600;margin:10px 0 4px}
+.route-answer-group{font-weight:600;margin:8px 0 3px}.route-answer-left{color:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}.route-answer-right{color:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}.route-answer-use{font-weight:600;margin:10px 0 4px}
 
 ${VERDICT_ICON_STYLE}
 .route-editor input,.route-editor select{display:block;box-sizing:border-box;width:100%;color:var(--vscode-input-foreground,#ddd);background:var(--vscode-input-background,#333);border:1px solid var(--vscode-input-border,#555);padding:4px}.route-answer-description{white-space:pre-wrap;font-size:11px;opacity:.9;margin:3px 0}.route-answer-readonly,.route-answer-impact{font-size:11px;color:var(--vscode-descriptionForeground,#aaa)}.route-editor{border-top:1px solid var(--vscode-panel-border,#555);margin-top:6px;padding-top:4px}.route-editor-title{margin:4px 0}.route-answer-impact summary{cursor:pointer}.route-answer-case-impact{white-space:pre-wrap;color:var(--vscode-errorForeground,#f99)}
