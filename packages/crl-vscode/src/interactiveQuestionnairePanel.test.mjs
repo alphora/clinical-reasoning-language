@@ -62,7 +62,6 @@ test('a missing adapter becomes an in-panel error instead of throwing from open'
 test('toggle follows actual tab lifetime, refreshes chrome and cancels the closed session',async()=>{
  const f=fixture();assert.equal(f.api.isOpen,false);
  f.api.toggle('policy.cel');assert.equal(f.api.isOpen,true);assert.deepEqual(f.visibility,[true]);
- assert.equal(f.api.isOpenFor('policy.cel'),true);assert.equal(f.api.isOpenFor('other.cel'),false);assert.equal(f.api.isOpenFor(undefined),false);
  await f.receive({type:'ready'});const session=f.sessions.at(-1);
  f.api.open('policy.cel');assert.equal(f.panels.length,1);assert.equal(f.api.isOpen,true);
  f.api.toggle('policy.cel');assert.equal(f.api.isOpen,false);assert.ok(session.cancelled);assert.deepEqual(f.visibility,[true,false]);
@@ -85,9 +84,8 @@ test('the cockpit uses the live panel state for blue/pressed styling and dispatc
  const button=cel=>render(cel).match(/<button[^>]*data-interactive-questionnaire[^>]*>/)[0];
  assert.match(button('policy.cel'),/aria-pressed="false"/);assert.doesNotMatch(button('policy.cel'),/fc-active/);
  f.api.toggle('policy.cel');assert.match(button('policy.cel'),/fc-active/);assert.match(button('policy.cel'),/aria-pressed="true"/);
- assert.doesNotMatch(button('other.cel'),/fc-active/);assert.match(button('other.cel'),/aria-pressed="false"/);
- assert.doesNotMatch(button(undefined),/fc-active/);assert.match(button(undefined),/aria-pressed="false"/);
- f.api.toggle('policy.cel');assert.doesNotMatch(button('policy.cel'),/fc-active/);
+ // The button follows the one open tab. It doesn't invent a separate per-policy open state.
+ f.api.toggle('other.cel');assert.doesNotMatch(button('policy.cel'),/fc-active/);assert.equal(f.api.isOpen,false);
 });
 
 test('the actual chrome callback waits for retargeting to finish and is inert after disposal',()=>{

@@ -15,8 +15,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
   return {
     close,
     get isOpen() { return !!current; },
-    isOpenFor(cel: string | undefined) { return !!current && !!cel && owner===cel; },
-    toggle(cel: string) { if(this.isOpenFor(cel))close();else this.open(cel); },
+    toggle(cel: string) { if(current)close();else this.open(cel); },
     definitionsChanged(cel: string) { if(owner===cel)markStale?.(); },
     policyChanged(cel: string | undefined) { if (current && owner !== cel) close(); },
     open(cel: string) {
