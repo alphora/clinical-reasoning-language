@@ -1276,7 +1276,7 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   `.flow-answer-group>text{font-size:12px;font-weight:600}.flow-answer-left>text{fill:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}.flow-answer-right>text{fill:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `html:has(.flow-svg){overflow-anchor:none}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
-  `body[data-mode="medical-validation"] #root:not(.flow-has-pin) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-show-all-pins:not(.flow-has-pin) .flow-activity>.flow-pin{display:inline}` +
+  `body[data-mode="medical-validation"] #root:not(.flow-has-pin) .flow-activity>.flow-pin{display:inline}` +
   `.flow-pin>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-pin>path{fill:none;stroke:var(--vscode-foreground,#cccccc);stroke-width:1.8}.flow-pinned>.flow-pin>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}.flow-pin:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}` +
   // Operator-directed start/finish cue; independent of node focus, verdict color and pin selection.
   `body[data-mode="medical-validation"] #root:not(.flow-has-pin):not(.flow-policy-routes-approved):not(.flow-route-review-loading) .flow-default-pin>.flow-pin,body[data-mode="medical-validation"] #root.flow-has-pin.flow-policy-routes-approved .flow-pinned>.flow-pin{filter:drop-shadow(0 0 3px #ffd54f) drop-shadow(0 0 6px #ffd54f)}` +

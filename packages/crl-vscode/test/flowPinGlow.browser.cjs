@@ -4,7 +4,7 @@
 const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert/strict'),{spawn}=require('child_process'),esbuild=require('esbuild');
 const work=path.resolve(__dirname,'../../..'),out=path.resolve(process.env.CRL_PIN_BROWSER_OUT||path.join(work,'tmp/pin-yellow-glow/browser'));
 fs.mkdirSync(out,{recursive:true});
-const alias={vscode:path.join(work,'packages/crl-vscode/test/oracle/vscode-stub.ts'),'@smile-digital-health/crl':path.join(work,'packages/crl/dist/index.js'),'@smile-digital-health/crl/provenance':path.join(work,'packages/crl/dist/provenance/index.js'),'@smile-digital-health/crl/language-services':path.join(work,'packages/crl/dist/language-services/index.js')};
+const alias={vscode:path.join(work,'packages/crl-vscode/test/oracle/vscode-stub.ts'),'@smile-digital-health/crl/session':path.join(work,'packages/crl/dist/results/session.js'),'@smile-digital-health/crl':path.join(work,'packages/crl/dist/index.js'),'@smile-digital-health/crl/provenance':path.join(work,'packages/crl/dist/provenance/index.js'),'@smile-digital-health/crl/language-services':path.join(work,'packages/crl/dist/language-services/index.js')};
 esbuild.buildSync({stdin:{contents:`export {renderFlowPane,FLOW_STYLE} from './packages/crl-vscode/src/flowPaneHtml';export {COCKPIT_WEBVIEW_SCRIPT} from './packages/crl-vscode/src/correspondenceCockpit';export {ROUTE_CARD_STYLE} from './packages/crl-vscode/src/routeCardsWebview';`,resolveDir:work,loader:'ts'},bundle:true,platform:'node',format:'cjs',outfile:path.join(out,'fixture.cjs'),alias});
 const {renderFlowPane,FLOW_STYLE,ROUTE_CARD_STYLE,COCKPIT_WEBVIEW_SCRIPT:source}=require(path.join(out,'fixture.cjs'));
 const node=key=>({nodeKey:key,nodeId:key,decision:'Demo',lib:'Demo',kind:'action',label:key,refKeys:[],location:{},children:[],actionKind:'recommend-activity'});
@@ -39,13 +39,13 @@ const script=esbuild.buildSync({stdin:{contents:`
  const traversal=(state,token='workflow',next=true)=>({token,pinKey:'b',cards:[],label:'Review',verdict:{state,label:state,count:1},navigation:{previous:true,next,current:1,total:2}});
  window.showTraversal=(state,next=true)=>{pin('b');mark({gen:1,policyRoutesApproved:false});routeUi.show(traversal(state,'workflow',next))};
  window.runChecks=()=>{
-  equal(shown(),['a'],'first pin offered');check(!glowing('a'),'wait for current verdict state');mark({gen:0,policyRoutesApproved:true});check(!glowing('a'),'stale acknowledgement keeps loading');mark({gen:1,policyRoutesApproved:false});check(glowing('a'),'first pin fuzzy yellow');
-  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Shift',shiftKey:true}));equal(shown(),['a','b','c'],'Shift shows all');check(glowing('a')&&!glowing('b')&&!glowing('c'),'only suggested pin glows');
-  document.dispatchEvent(new KeyboardEvent('keyup',{key:'Shift'}));equal(shown(),['a'],'release restores first');
-  row('a').classList.add('leaf-allpass');pinVisibility.update();equal(shown(),['b'],'first without Pass offered');check(glowing('b')&&!glowing('a'),'cue follows default pin');
-  row('b').classList.add('leaf-allpass');pinVisibility.update();equal(shown(),['c'],'next offered');row('c').classList.add('leaf-allpass');pinVisibility.update();equal(shown(),['a'],'all Pass offers first');
-  row('a').classList.remove('leaf-allpass');pinVisibility.update();equal(shown(),['a'],'leaf without authored route still offered');
-  root.dispatchEvent(new PointerEvent('pointermove',{shiftKey:true}));equal(shown(),['a','b','c'],'enter with Shift held');window.dispatchEvent(new Event('blur'));equal(shown(),['a'],'blur clears Shift');
+  equal(shown(),['a','b','c'],'all pins visible before verdict state');check(!glowing('a'),'wait for current verdict state');mark({gen:0,policyRoutesApproved:true});check(!glowing('a'),'stale acknowledgement keeps loading');mark({gen:1,policyRoutesApproved:false});check(glowing('a'),'first pin fuzzy yellow');
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Shift',shiftKey:true}));equal(shown(),['a','b','c'],'Shift leaves all pins visible');check(glowing('a')&&!glowing('b')&&!glowing('c'),'only suggested pin glows');
+  document.dispatchEvent(new KeyboardEvent('keyup',{key:'Shift'}));equal(shown(),['a','b','c'],'release keeps all pins visible');
+  row('a').classList.add('leaf-allpass');pinVisibility.update();equal(shown(),['a','b','c'],'completing a leaf keeps all pins visible');check(glowing('b')&&!glowing('a'),'cue follows default pin');
+  row('b').classList.add('leaf-allpass');pinVisibility.update();equal(shown(),['a','b','c'],'next suggestion keeps all pins visible');check(glowing('c')&&!glowing('a')&&!glowing('b'),'only next incomplete pin glows');row('c').classList.add('leaf-allpass');pinVisibility.update();equal(shown(),['a','b','c'],'all Pass keeps all pins visible');check(glowing('a')&&!glowing('b')&&!glowing('c'),'all Pass retains first-pin fallback cue');
+  row('a').classList.remove('leaf-allpass');pinVisibility.update();equal(shown(),['a','b','c'],'leaf without authored route remains visible');
+  root.dispatchEvent(new PointerEvent('pointermove',{shiftKey:true}));equal(shown(),['a','b','c'],'enter with Shift held');window.dispatchEvent(new Event('blur'));equal(shown(),['a','b','c'],'blur leaves all pins visible');
   pin('b');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Shift',shiftKey:true}));equal(shown(),['b'],'pinned only even with Shift');check(!glowing('b'),'enter unfinished pinned removes yellow');
   check(control('b').getAttribute('aria-pressed')==='true','pressed state retained');check(getComputedStyle(control('b').querySelector('rect')).strokeWidth==='2px','existing pinned border retained');
   mark({gen:1,policyRoutesApproved:true});check(glowing('b'),'whole policy approved glows on current pin');
@@ -73,7 +73,7 @@ const script=esbuild.buildSync({stdin:{contents:`
   routeUi.questionnaireState(true);check(cue(verdictSelector),'detached questionnaire keeps verdict guide');routeUi.verdict({token:'new-route',verdict:{state:'pass',label:'Pass',count:1}});check(cue(nextSelector),'detached questionnaire uses same next guide');routeUi.questionnaireState(false);check(cue(nextSelector),'reattached cards retain guide');
   for(const theme of ['vscode-dark','vscode-light','vscode-high-contrast-light']){document.body.className=theme;routeUi.show(traversal('pending'));check(cue(verdictSelector),'verdict cue visible '+theme);routeUi.show(traversal('pass'));check(cue(nextSelector),'next cue visible '+theme);}
   routeUi.reset();check(!root.querySelector('.route-workflow-cue'),'reset removes obsolete guidance');pin('');mark({gen:1,policyRoutesApproved:false});check(glowing('a'),'return to normal tree retains first-pin cue');
-  pinVisibility.dispose();check(!root.classList.contains('flow-show-all-pins'),'dispose clears held Shift');
+  pinVisibility.dispose();equal(shown(),['a','b','c'],'dispose does not hide unpinned results');
   return {checks:count,scope:'Production renderer/controller and extracted webview handlers; not installed extension'};
  };
  window.ready=true;

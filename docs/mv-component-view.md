@@ -119,12 +119,12 @@ explanatory questions and actual answers. Display grouping does not change evalu
 case verdicts or the all-current-frozen-cases approval gate. This is not a claim
 of coverage of every feasible policy execution.
 
-The unpinned MV tree shows one pin: the first leaf without a Pass checkmark, or the first leaf when all leaves have Pass. Holding Shift exposes every leaf pin; releasing Shift or leaving the window restores the single pin. This follows visible review status, including leaves without an authored CEL route; activating such a pin retains the existing no-route message. Clicking a result’s pin immediately opens the pinned Question–Result view using its first available route, even when another route was selected previously. Right-clicking a node in the main unpinned tree offers its route chooser and opens Question–Result after a route is chosen; cancellation leaves the view unchanged. Right-clicking a pin does nothing. Pinned-node and nested-criterion review menus retain their interactions. Fresh pinning turns Questions on. An async choice is ignored after another selection/pin intent, tree replacement, or policy change. Unpinning restores the single default pin.
+The unpinned MV tree shows every leaf pin without a modifier key. The first leaf without a Pass checkmark, or the first leaf when all leaves have Pass, supplies the existing suggested-pin glow. Leaves without an authored CEL route remain visible; activating such a pin retains the existing no-route message. Clicking a result’s pin immediately opens the pinned Question–Result view using its first available route, even when another route was selected previously. Right-clicking a node in the main unpinned tree offers its route chooser and opens Question–Result after a route is chosen; cancellation leaves the view unchanged. Right-clicking a pin does nothing. Pinned-node and nested-criterion review menus retain their interactions. Fresh pinning turns Questions on. An async choice is ignored after another selection/pin intent, tree replacement, or policy change. Unpinning restores every leaf pin.
 
 Operator-directed next-best-action cue: while policy route approval is unfinished,
 the offered default pin has a fuzzy yellow glow inviting entry into pinned view.
 Opening pinned view removes that start cue; the normal pin color invites traversal
-enumeration. Other Shift-revealed pins do not glow. When every route in the policy
+enumeration. Other visible pins do not glow. When every route in the policy
 is approved, the current pinned pin glows yellow inviting exit. Returning to the
 approved tree removes the pin glow. Save and Unlock cues belong to KELP.
 Approval is derived from a nonempty set of current frozen case verdicts, all Pass;
