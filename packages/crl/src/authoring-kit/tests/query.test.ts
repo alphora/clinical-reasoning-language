@@ -297,11 +297,11 @@ it('uncertainty guard discovery carries the optional marker, polarity and origin
  expect(JSON.stringify(search)).toContain('rule:uncertainty-guard-display');
  const entry:any=query({view:'entry',id:'rule:uncertainty-guard-display'});
  const rule=entry.entries.find((e:any)=>e.id==='rule:uncertainty-guard-display');
- expect(rule.content.rule).toContain('@tree-uncertainty-guard:');
- expect(rule.content.rule).toContain('pass false');
- expect(rule.content.rule).toContain('pass true');
+ expect(rule.content.rule).toContain('uncertainty guard passes when');
+ expect(rule.content.rule).toContain('passes when false');
+ expect(rule.content.rule).toContain('passes when true');
  expect(rule.content.rule.toLowerCase()).toContain('optional');
  expect(entry.entries.some((e:any)=>e.id==='artifact:uncertainty-reference.crl')).toBe(true);
  const artifact=entry.entries.find((e:any)=>e.id==='artifact:uncertainty-reference.crl');
- expect(JSON.stringify(artifact.content)).toContain('@tree-uncertainty-guard:');
+ expect(JSON.stringify(artifact.content)).toContain('uncertainty guard passes when');
 });

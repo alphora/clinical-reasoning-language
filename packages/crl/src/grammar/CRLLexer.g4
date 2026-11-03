@@ -10,6 +10,8 @@ PRESENTATION_DECISION : 'in decision';
 PRESENTATION_CRITERION : 'in criterion';
 QUESTION_TEXT_IS : 'question text is';
 QUESTION_DESCRIPTION_IS : 'question description is';
+// REFACTOR:grounded: a tree-only presentation property, separate from question wording.
+UNCERTAINTY_GUARD_PASSES_WHEN : 'uncertainty guard passes when';
 // REFACTOR:grounded: criterion-owned explanatory metadata, separate from questions.
 DESCRIPTION_IS : 'description is';
 RECOMMEND_ACTIVITY  : 'recommend activity';

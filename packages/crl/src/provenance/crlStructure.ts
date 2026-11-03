@@ -13,7 +13,7 @@
  */
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
 import type { ActionStatement, BlockQualifier, BranchCondition, OtherwiseBlock, ReferenceName, WhenBlock } from "../ast/types";
-import { supportsUncertaintyGuardMetadata, uncertaintyGuardMetadata } from "../meta/uncertaintyGuard";
+import { createPresentationCatalog } from "../emit/presentation";
 import { getRefLibrary, getRefName } from "../ast/types";
 import { describeBranchCondition } from "../ast/branchCondition";
 import { buildCriterionIndex, guardConceptClosure, type CriterionIndex } from "../ast/criterionIndex";
@@ -46,7 +46,7 @@ export interface CrlStructureNode {
   children: CrlStructureNode[];
   /** Mode of this node's child block, not the mode of its enclosing block. */
   childrenQualifier?: BlockQualifier;
-  /** REFACTOR:grounded: explicit owner display metadata; passWhen includes this occurrence's NOT polarity. */
+  /** REFACTOR:grounded: explicit owner presentation; passWhen includes this occurrence's NOT polarity. */
   uncertaintyGuard?: { passWhen: boolean; target: { lib: string; name: string; kind: "concept" | "criterion" } };
 }
 
@@ -188,7 +188,8 @@ export function buildCrlStructure(
     const paths = owners.get(entry.name) ?? new Set<string>();
     paths.add(entry.filePath); owners.set(entry.name, paths);
   }
-  const displayGuard = (condition: BranchCondition, owner: string): CrlStructureNode["uncertaintyGuard"] => {
+  const catalogs = new Map([...libs].map(([lib, info]) => [lib, createPresentationCatalog(info.entry.ast, info.entry.filePath)]));
+  const displayGuard = (condition: BranchCondition, owner: string, decision: string): CrlStructureNode["uncertaintyGuard"] => {
     let negated = false;
     while (condition.type === "BranchConditionNot") { negated = !negated; condition = condition.operand; }
     if (condition.type !== "BranchConditionRef" && condition.type !== "BranchConditionCriterionRef") return;
@@ -198,11 +199,12 @@ export function buildCrlStructure(
       (statement.type === "Concept" || statement.type === "Criterion") && statement.name === name) ?? [];
     if (candidates.length !== 1) return;
     const target = candidates[0];
-    if (!supportsUncertaintyGuardMetadata(target)) return;
     if ((condition.type === "BranchConditionCriterionRef") !== (target.type === "Criterion")) return;
-    const metadata = uncertaintyGuardMetadata(target.meta);
-    if (metadata.kind !== "guard") return;
-    return { passWhen: metadata.passWhen !== negated, target: { lib, name, kind: target.type === "Criterion" ? "criterion" : "concept" } };
+    const catalog = catalogs.get(lib);
+    // Imported ownership carries its default; caller names cannot select owner-local scopes.
+    const passWhen = catalog?.resolveUncertaintyGuard(name, lib === owner ? catalog.uncertaintyContext(name, decision) : undefined);
+    if (passWhen === undefined) return;
+    return { passWhen: passWhen !== negated, target: { lib, name, kind: target.type === "Criterion" ? "criterion" : "concept" } };
   };
 
   const out: CrlDecisionStructure[] = [];
@@ -224,7 +226,7 @@ export function buildCrlStructure(
       for (const sn of decisionSpine(s)) {
         const location = lsLoc(info.entry.filePath, sn.node.location);
         if (!location) continue; // mirror the indexer's per-sub-node skip
-        const uncertaintyGuard = sn.kind === "when" ? displayGuard((sn.node as WhenBlock).condition, lib) : undefined;
+        const uncertaintyGuard = sn.kind === "when" ? displayGuard((sn.node as WhenBlock).condition, lib, name) : undefined;
         flat.push({
           nodeKey: nodeKey(decisionSubNodeRef(lib, name, sn.nodeId)),
           nodeId: sn.nodeId,

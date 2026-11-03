@@ -184,3 +184,11 @@ Two checks of the same question keep their own names and subsets. Existing ALL O
 Pin a route and show Questions in the tree, or open its CRL questionnaire. Expand Answer choices and use the pencil to edit or the trash icon to delete; the plus beside the expanded Answer choices adds an answer. Question and answer editors use matching fields and Save change / Cancel controls. Opening either editor closes the other. Save updates the associated local CRL terminology and regenerates its FHIR ValueSet and local CodeSystem along with the affected executable artifacts. Local Save works without KELP; when available, KELP lock, Save and unlock are best effort and do not block file writes; no KE-agent run is needed.
 
 Shared terminology affects every displayed consumer. Adding an answer asks whether it qualifies for each question. Coding identities stay fixed when editing wording. Deletion lists newly invalid saved examples before applying and retains their data for repair. Nonlocal CRL terminology and external CodeSystem answers show a read-only explanation. Open review cards refresh; an existing interactive FHIR session requires Restart against the new definitions.
+
+
+## Uncertainty checks in Medical Review
+
+<!-- REFACTOR:grounded: UI operations belong in viewer documentation; CRL authoring syntax lives in the kit. -->
+A compatible policy can mark an existing uncertainty guard in its CRL presentation. Supported guards normally show the ordinary terminal with a small **U** control. Click U, or focus it and press Enter/Space, to show the original guard and both alternatives. U changes the layout without centering or panning. Actual uncertain, unavailable or error evidence and flags that would be hidden keep the original check visible. Unmarked policies and unsupported shapes keep the full tree.
+
+While pinned, revealing U shows the alternate branch without marking it as executed or changing the case. Deliberate navigation to a hidden source/flag target reveals it. Snapshots capture the current view: U indicators are static, and a collapsed snapshot discloses the omitted checks. Expand checks in the live tree before exporting to include their branches.

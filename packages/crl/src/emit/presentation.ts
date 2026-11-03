@@ -23,6 +23,8 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
   const fail = (kind: PresentationDiagnostic["kind"], message: string, location: Location) => {
     if (!diagnostics.some((d) => d.kind === kind && d.message === message)) diagnostics.push({ kind, severity: "error", message, location, libraryName: ast.library.name, filePath });
   };
+  // REFACTOR:grounded: tree display and question wording are independent presentation properties.
+  const hasQuestionFields = (p: Presentation) => p.questionText !== undefined || p.questionDescription !== undefined || p.choiceGroup !== undefined;
   const local = (ref: ReferenceName) => !getRefLibrary(ref) || getRefLibrary(ref) === ast.library.name;
   for (const presentation of declarations) {
     if (!local(presentation.target) || presentation.contexts.some((context) => !local(context.ref))) {
@@ -30,11 +32,20 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
       continue;
     }
     const name = getRefName(presentation.target);
-    if (!concepts.has(name)) fail("presentation-reference", `Presentation target "${name}" must resolve to a concept.`, presentation.location);
-    const target = concepts.get(name);
-    if (target?.type === "Concept" && !target.code) fail("presentation-target-not-question-enabled", `Presentation target "${name}" must declare code is to provide a local Case Feature answer.`, presentation.location);
-    if (!presentation.questionText?.trim()) {
-      fail("presentation-empty", `Presentation for "${name}" requires nonempty question text.`, presentation.location);
+    const target = concepts.get(name), question = hasQuestionFields(presentation);
+    const role = presentation.uncertaintyGuardPassWhen !== undefined;
+    if (role) {
+      const candidates = ast.statements.filter(statement => (statement.type === "Concept" || statement.type === "Criterion") && statement.name === name);
+      const guard = candidates.length === 1 ? candidates[0] : undefined;
+      if (typeof presentation.uncertaintyGuardPassWhen !== "boolean" || !guard || (guard.type !== "Criterion" &&
+          !(guard.type === "Concept" && guard.valueTypes.length === 1 && guard.valueTypes[0] === "boolean"))) {
+        fail("presentation-reference", `Uncertainty guard presentation target "${name}" must resolve uniquely to a Boolean Concept or Criterion.`, presentation.location);
+      }
+    }
+    if (question || !role) {
+      if (!target) fail("presentation-reference", `Question presentation target "${name}" must resolve to a concept.`, presentation.location);
+      if (target && !target.code) fail("presentation-target-not-question-enabled", `Question presentation target "${name}" must declare code is to provide a local Case Feature answer.`, presentation.location);
+      if (!presentation.questionText?.trim()) fail("presentation-empty", `Question presentation for "${name}" requires nonempty question text.`, presentation.location);
     }
     const seen = new Set<string>();
     for (const context of presentation.contexts) {
@@ -83,7 +94,7 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
   }
   for (const group of ast.presentationGroups ?? []) if (!groups.get(group.name)?.members.length) fail("presentation-group-invalid", `Presentation group "${group.name}" has no valid members.`, group.location);
   for (const concept of ast.statements) {
-    if (concept.type === "Concept" && concept.code && !byTarget.has(concept.name)) diagnostics.push({
+    if (concept.type === "Concept" && concept.code && !(byTarget.get(concept.name) ?? []).some(hasQuestionFields)) diagnostics.push({
       kind: "presentation-question-text-missing", severity: "warning",
       libraryName: ast.library.name, filePath, location: concept.location,
       message: `Question-enabled concept "${ast.library.name}"."${concept.name}" has no presentation. Add question text and optional question description.`,
@@ -144,6 +155,16 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
     visit(condition, new Set());
     return contexts.length ? contexts : [new Set()];
   };
+  // REFACTOR:grounded: whole-guard scope includes only the referenced Criterion itself, never its dependencies.
+  const uncertaintyContext = (name: string, decision: string): PresentationContext => ({ decision,
+    criteria: criteria.has(name) ? new Set([name]) : new Set<string>() });
+  const resolveUncertaintyGuard = (name: string, context?: PresentationContext): boolean | undefined => {
+    const resolved = resolveOccurrence(name, context);
+    if (diagnostics.some(diagnostic => diagnostic.severity === "error") || resolved.diagnostics.length) return;
+    const defaults = (byTarget.get(name) ?? []).find(presentation => !presentation.contexts.length);
+    const value = resolved.declaration?.uncertaintyGuardPassWhen ?? defaults?.uncertaintyGuardPassWhen;
+    return typeof value === "boolean" ? value : undefined;
+  };
   // Validate declared scope intersections on authored input dependencies. Runtime form co-occurrence
   // is checked separately against final emitted actions and actual profile identities.
   const rawInputs = (ref: ReferenceName): { canonical: string }[] => {
@@ -162,17 +183,25 @@ export function createPresentationCatalog(ast: CRL, filePath?: string) {
   for (const decision of decisions.values()) {
     const walk = (members: readonly BlockMember[]): void => {
       for (const member of members) {
-        if (member.type === "WhenBlock") for (const name of byTarget.keys()) {
-          for (const ancestry of contextsForInput(member.condition, name, rawInputs)) for (const d of resolveOccurrence(name, { decision: decision.name, criteria: ancestry }).diagnostics) fail(d.kind, d.message, d.location);
+        if (member.type === "WhenBlock") {
+          for (const [name, list] of byTarget) if (list.some(hasQuestionFields)) for (const ancestry of contextsForInput(member.condition, name, rawInputs))
+            for (const d of resolveOccurrence(name, { decision: decision.name, criteria: ancestry }).diagnostics) fail(d.kind, d.message, d.location);
+          let condition = member.condition;
+          while (condition.type === "BranchConditionNot") condition = condition.operand;
+          if ((condition.type === "BranchConditionRef" || condition.type === "BranchConditionCriterionRef") && local(condition.ref)) {
+            const name = getRefName(condition.ref);
+            if ((byTarget.get(name) ?? []).some(presentation => presentation.uncertaintyGuardPassWhen !== undefined))
+              for (const d of resolveOccurrence(name, uncertaintyContext(name, decision.name)).diagnostics) fail(d.kind, d.message, d.location);
+          }
         }
         if ((member.type === "WhenBlock" || member.type === "OtherwiseBlock") && member.body.type === "BlockBody") walk(member.body.statements);
       }
     };
     walk(decision.body.statements);
   }
-  return { diagnostics, resolve, resolveOccurrence, criteriaFor, contextsForInput,
+  return { diagnostics, resolve, resolveOccurrence, criteriaFor, contextsForInput, uncertaintyContext, resolveUncertaintyGuard,
     groupFor: (name: string) => groups.get(membership.get(name) ?? ""),
-    hasDeclaration: (name: string) => byTarget.has(name), libraryName: ast.library.name };
+    hasDeclaration: (name: string) => (byTarget.get(name) ?? []).some(hasQuestionFields), libraryName: ast.library.name };
 }
 
 export type PresentationCatalog = ReturnType<typeof createPresentationCatalog>;

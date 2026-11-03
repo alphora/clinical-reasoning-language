@@ -19,7 +19,7 @@ describe("criterion description syntax", () => {
     expect(() => criterion(`- description is ${literal}.`)).toThrow(/nonempty/);
   });
   it("rejects duplicate or misplaced descriptions", () => {
-    expect(() => criterion('- description is "One".\n- description is "Two".')).toThrow(/only once/);
+    expect(() => criterion('- description is "One".\n- description is "Two".')).toThrow(/syntax errors/);
     expect(() => parseInput(source("") + '\n- description is "Late".')).toThrow(/syntax errors/);
   });
   it("retains description is as ordinary narrative vocabulary", () => {

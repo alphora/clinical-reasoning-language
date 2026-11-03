@@ -331,7 +331,11 @@ export function planPresentationEdit(
       const start = utf16(first.startIndex),
         lineStart = source.lastIndexOf("\n", start - 1) + 1;
       const indent = source.slice(lineStart, start).match(/^[ \t]*$/)?.[0] ?? "";
-      edit(start, start, `- question description is ${literal(desired[field])}.${eol}${indent}`);
+      // REFACTOR:grounded: a tree-only declaration can acquire its first question text without losing its display role.
+      const requiredText = field === "questionDescription" && expected[index].questionText === undefined
+        ? `- question text is ${literal(desired.questionText)}.${eol}${indent}` : "";
+      if (requiredText) expected[index].questionText = desired.questionText;
+      edit(start, start, requiredText + `- ${field === "questionText" ? "question text" : "question description"} is ${literal(desired[field])}.${eol}${indent}`);
       expected[index][field] = desired[field];
     }
   }

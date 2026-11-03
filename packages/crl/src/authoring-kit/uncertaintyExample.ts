@@ -71,12 +71,14 @@ presentation for "B":
 // If a derived result competes with other candidates, its anchor affects selection;
 // it is not automatically the latest contributing answer's date.
 concept "Current G A B Answers Include Uncertainty":
-- meta is \`@tree-uncertainty-guard: Terminal uncertainty check; pass false\`.
 - shape is Record.
 - type is Observation.
 - value type is boolean.
 - definition is any available value of "G" and "A" and "B" in "Uncertain Answers" using validity of "G".
 - shape reduction is most recent.
+
+presentation for "Current G A B Answers Include Uncertainty":
+- uncertainty guard passes when false.
 
 activity "certify.Met": - request CPGTaskRequest. - with \`Met\`.
 activity "not-certify.Unmet": - request CPGTaskRequest. - with \`Unmet\`.

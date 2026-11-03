@@ -1,8 +1,8 @@
 {
   "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the Validator; human companion is metadata-model.md in this folder.",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "status": "core-stable",
-  "statusNote": "REFACTOR:grounded: Typed metadata validates tag vocabulary, required/enum fields and cardinality. Tree uncertainty guards carry explicit display-only pass polarity; they do not emit clinical CQL/FHIR. Review flags remain in medical-validation/flags, separate from this registry.",
+  "statusNote": "REFACTOR:grounded: typed metadata validates tag vocabulary, fields and cardinality. Tree display is authored in presentation declarations. Review flags remain in medical-validation/flags.",
   "carrier": {
     "element": "meta",
     "rendering": "- meta is `@<tag>: <body>`.",
@@ -11,10 +11,9 @@
     "scope": [
       "concept",
       "decision",
-      "library",
-      "criterion"
+      "library"
     ],
-    "scopeNote": "The meta carrier parses on concept, leading decision, trailing library and pre-condition criterion annotations. Metadata is independent of clinical predicates; per-tag attachment targets define its intended scope.",
+    "scopeNote": "The `meta` carrier parses on `concept` (metaLine* in conceptBody), `decision` (leading metaLine* in decisionBody), and `library` (trailing metaLine* on libraryStatement) — KE #203 Todo 2 (grammar) + Todo 3/#154 (validator).",
     "backCompat": "A meta line with no leading @tag is a legitimate untyped note and passes validation."
   },
   "families": {
@@ -379,35 +378,6 @@
         "condition": "emit as a CQL block comment — a visible tracked gap, like @business-logic-deferred. Todo 4."
       },
       "notes": "A durable POINTER to a filed gap/issue — NOT a flag (no `flag`, no `warnWhileOpen`, no `status`; does not block mvComplete): a filed gap is managed work that ships fine (like `// TODO(#123)`). Requires `; ref <issue>`. Covers the KE's @stage-boundary case when the gap is FILED; the un-filed 'stage/language can't express this' cases REUSE @crl-future-expression (language limit) / @business-logic-deferred / @clinical-logic-deferred (deferred logic)."
-    },
-    {
-      "id": "tree-uncertainty-guard",
-      "aliases": [],
-      "family": "B-narrative",
-      "valueShape": "text",
-      "cardinality": "0..1",
-      "attachmentTargets": [
-        "concept",
-        "criterion"
-      ],
-      "extraFields": {
-        "pass": {
-          "type": "enum",
-          "values": [
-            "true",
-            "false"
-          ],
-          "required": true
-        }
-      },
-      "origin": "either",
-      "retention": "inline",
-      "lifecycle": "append",
-      "emit": {
-        "cql": false,
-        "fhir": false
-      },
-      "notes": "Explicit Boolean guard display role. Pass is the target Boolean value for the ordinary view path; occurrence negation reverses it. Optional metadata never changes evaluation, questions or results. Only admitted simple terminal topology collapses; unsupported topology remains complete."
     }
   ],
   "validatorRules": [
@@ -420,5 +390,5 @@
     "family-C tags and candidate (status=candidate) external refs MUST carry `run` -> error if omitted (otherwise the re-run replace match key is undefined)",
     "@gap-filed without a `ref` -> error (a filed gap needs its issue id)"
   ],
-  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, gap-filed, tree-uncertainty-guard) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). (Review FLAGS left the .crl registry in #212 step 4b — the flag re-add guard now lives with the medical-validation/flags/ store, not here.)"
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, gap-filed) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). (Review FLAGS left the .crl registry in #212 step 4b — the flag re-add guard now lives with the medical-validation/flags/ store, not here.)"
 }

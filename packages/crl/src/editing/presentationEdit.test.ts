@@ -250,3 +250,21 @@ test("reversal ignores JSON object-key order but preserves edit-array order and 
     }),
   ).toThrow(/not the inverse/);
 });
+
+// REFACTOR:grounded: editing question wording preserves the independent tree presentation property.
+test.each([true,false])('wording edits retain the guard role with existing question fields=%s',wording=>{
+ const source=base+(wording?presentation:'')+(wording?'':'\npresentation for "Complaint":\n')+'- uncertainty guard passes when false.\n';
+ const plan=roundTrip(source,{...req,questionText:'Updated complaint?',questionDescription:'Updated guidance.'});
+ const root=buildCRL(plan.candidateSource);expect(root.success).toBe(true);expect(root.result!.presentations).toHaveLength(1);expect(root.result!.presentations![0].uncertaintyGuardPassWhen).toBe(false);
+});
+
+// REFACTOR:grounded: description-only edits materialize wording in the actual selected role-only owner.
+test.each([false,true])('description-only role edit preserves scope and exact undo, scoped=%s',contextual=>{
+ const source=contextual ? base+'presentation for "Complaint": - question text is "Which complaint?".\nactivity "Met": - request CPGTaskRequest. decision "D": - when "Complaint" then recommend activity "Met".\npresentation for "Complaint": - in decision "D". - uncertainty guard passes when false.'
+  : base+'presentation for "Complaint": - uncertainty guard passes when false.';
+ const request={...req,questionDescription:'New guidance',...(contextual?{context:{decision:'D',criteria:[]}}:{})};
+ const plan=roundTrip(source,request),root=buildCRL(plan.candidateSource).result!;
+ const owner=root.presentations!.find(p=>p.uncertaintyGuardPassWhen!==undefined)!;
+ expect(owner.questionText).toBe(contextual?'Which complaint?':'Complaint');expect(owner.questionDescription).toBe('New guidance');expect(owner.uncertaintyGuardPassWhen).toBe(false);
+ if(contextual){expect(root.presentations![0].questionDescription).toBeUndefined();expect(owner.contexts).toHaveLength(1);}
+});

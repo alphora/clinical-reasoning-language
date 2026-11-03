@@ -129,9 +129,9 @@ Use logical library name plus concept name plus `Answer Options` for a concept-s
 
 ## Presentation
 
-A presentation is optional for a question-enabled concept. Missing presentation warns. With no presentation, no question-text extension is invented; the tested CQFramework4.7 generator uses the concept/profile metadata as its fallback label and still creates an answerable item. A concept with `code is` declares its local Case Feature answer identity; presentations cannot target uncoded computational concepts. Resource/type validity and supported answer emission are checked separately. Eligibility is not limited to boolean: coded options and quantities can also be answers.
+A question presentation is optional for a question-enabled concept. Missing presentation warns. With no presentation, no question-text extension is invented; the tested CQFramework4.7 generator uses the concept/profile metadata as its fallback label and still creates an answerable item. A concept with `code is` declares its local Case Feature answer identity; question wording cannot target uncoded computational concepts. Tree-only uncertainty guard presentation is described below. Resource/type validity and supported answer emission are checked separately. Eligibility is not limited to boolean: coded options and quantities can also be answers.
 
-Each declaration requires nonempty `question text is`; `question description is` is optional. Both accept double-quoted text or backtick-delimited free text. Use backticks for text containing double quotes or multiple lines; these fields are text, never declaration references. Duplicate fields are errors. There is no separate short or label field: the concept name remains the short metadata.
+Each declaration containing question fields requires nonempty `question text is`; `question description is` is optional. Both accept double-quoted text or backtick-delimited free text. Use backticks for text containing double quotes or multiple lines; these fields are text, never declaration references. Duplicate fields are errors. There is no separate short or label field: the concept name remains the short metadata.
 
 Question text emits `http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text` with `valueString`. Description emits `http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description` with `valueMarkdown` only when authored. These belong to PlanDefinition action inputs. CQFramework4.7 consumes the text extension but leaves description consumption unimplemented in ProcessAction. The KE apply path adds authored descriptions as display/help children to its static Questionnaires, matched by input profile and question text. This local enrichment leaves engine behavior and answer extraction unchanged; it refuses ambiguous descriptions rather than guessing an authored context. Ordinary native generation and existing interactive sessions do not gain this enrichment automatically.
 
@@ -168,3 +168,16 @@ The optional terminology member syntax is `- code is ` followed by a backtick co
 Coding identity stays fixed during wording edits. Creation requires a code unique across this terminology, an existing owned system, display, and per-question qualification. Shared coding declared in another terminology is identified and refused for wording edits until its owners are reconciled. Deleting the final finite member is refused; adding its replacement first keeps the domain valid. Source retrievals, explicit domains and activity uses of the same terminology are listed because membership edits affect them too. Out-of-workspace consumers require separate review.
 
 KE application clears deleted selections in saved MV and regression CEL routes while preserving case identity and authored expected outcomes. It compiles the complete candidate and generates native static questionnaires/responses before publication; failed or degraded generation blocks publication. Affected cases are listed for human outcome review. MV flags remain unchanged until MV manually marks Fixed then Approved. Revert in the Q/A controls withdraws the request; it never undoes authored content, even if KE has already applied a still-Pending flag. Existing interactive sessions retain their old definitions until Restart.
+
+
+## Uncertainty guard tree presentation
+
+<!-- REFACTOR:grounded: display role belongs to Presentation and is independent of question answerability. -->
+```crl
+presentation for "Current Answers Include Uncertainty":
+- uncertainty guard passes when false.
+```
+
+Use `false` when the existing predicate detects uncertainty, or `true` when it establishes no uncertainty. The property targets an existing Boolean Concept or Criterion and may stand alone on an uncoded computation. It never adds a question or changes the authored predicate, emitted CQL/FHIR or evaluation. Question fields keep their existing coded-Concept and question-text requirements. A Boolean coded Concept may combine question wording and this property in the same declaration.
+
+Base and scoped declarations follow the ordinary single-applicable-scope rule. For this whole-guard display property, `in criterion` matches only the referenced Criterion itself, not its descendants; a direct Concept guard has no Criterion ancestry. Imported owner defaults are inherited, and caller overrides remain unsupported. Duplicate properties/defaults, nonBoolean or ambiguous targets and overlapping applicable scopes are errors. Compatible viewers use the property only on supported whole-guard topologies; the full tree remains available. See the extension README for operating the view and exports.

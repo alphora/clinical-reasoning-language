@@ -400,8 +400,8 @@ export type {
 // schemaVersion → "2.41": structured review questions/source citations and artifact-local rerun reports.
 // REFACTOR:grounded (#328): schemaVersion → "2.43": source-qualified Quantity form units, distinct from released runtime availability.
 // REFACTOR:grounded: explicit display metadata is discoverable independently of clinical uncertainty policy.
-// CONTENT schemaVersion → "2.45": optional uncertainty-guard display role, polarity and view limitations.
-const SCHEMA_VERSION = "2.45";
+// CONTENT schemaVersion → "2.46": uncertainty guard display is an optional Presentation property.
+const SCHEMA_VERSION = "2.46";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -571,16 +571,15 @@ const RULES: KitRule[] = [
   },
   {
     "id": "uncertainty-guard-display",
-    "applicability": "An already-authored uncertainty guard whose Medical Validation tree should be compact",
+    "applicability": "Presenting an already-authored uncertainty guard in Medical Validation",
     "category": "process",
-    "rule": "Optionally mark the owning Boolean Concept or Criterion with - meta is `@tree-uncertainty-guard: Terminal uncertainty check; pass false`. The pass field names the target Boolean value for its ordinary path: use `pass false` for a predicate detecting uncertainty, `pass true` for a predicate establishing no uncertainty. The marker is display metadata, not a clinical check, answer type or evaluation rule. Preserve the actual authored predicate and its source basis.",
+    "rule": "Optionally declare presentation for \"Guard Name\": followed by - uncertainty guard passes when false. Use passes when false for a Boolean predicate detecting uncertainty, passes when true for one establishing no uncertainty. The target is an existing Boolean Concept or Criterion, including an uncoded computation. Preserve its authored condition and clinical basis. This property changes tree display only; it creates no answer slot and changes no CQL/FHIR or evaluation semantics.",
     "clauses": [
-      { "text": "The tag is optional, unique per target, and requires exactly one pass field with value true or false on a Boolean Concept or Criterion. On a Criterion, meta and optional description precede its required when clause. No question text or local answer code is required for the annotation. Occurrence NOT reverses the ordinary branch at that use. Invalid or duplicate metadata is rejected.", "force": "validator-enforced" },
-      { "text": "Mark only a real authored uncertainty guard when compact MV display is desired. Names, answer labels, terminology membership and any available value syntax do not identify the role. Do not introduce uncertainty answers or clinical checks into a policy that does not call for them merely to obtain this display behavior. The complete synthetic uncertainty-reference pair demonstrates pass false; its unchanged clinical assertions remain separately qualified.", "force": "default" },
-      { "text": "A compatible viewer refuses ambiguous source ownership and collapses only a whole marked direct guard (optionally negated) with one unguarded terminal on each branch. A small U reveals the original guard and both alternatives. Other topologies and unmarked policies keep their complete tree. Actual nonpassing, paused, invalidated or error evidence, or review flags that folding would conceal, keep the full guard visible. Color and branch arrows still describe the authored path, independent of terminal names. This annotation does not modify emitted CQL/FHIR or native runtime behavior.", "force": "default" },
-      { "text": "Snapshot exports remain static captures. A collapsed snapshot discloses that uncertainty checks are hidden; show them in the live tree before export to include the full branches. Source capability does not upgrade already installed viewers; inspect the rendered view after deploying compatible tooling. This example is not a customer uncertainty requirement or clinical approval.", "force": "default" }
+      { "text": "The property requires exactly true or false and occurs at most once per declaration. A tree-only declaration requires neither question text nor code is. Adding question fields still requires nonempty question text and a coded Concept; a Criterion cannot become a question. Duplicate/ambiguous targets, defaults, invalid types and overlapping scopes are errors.", "force": "validator-enforced" },
+      { "text": "The normal in decision and in criterion contexts select one scoped presentation over a base. For a whole Criterion guard, criterion scope contains that Criterion itself, never its descendants. A direct Concept guard has no enclosing Criterion scope. Imported owners supply their default; caller-local overrides and accidental same-name foreign scopes are unsupported. Whole direct guards and optional NOT carry the display role; an operand within a compound does not mark the whole compound.", "force": "default" },
+      { "text": "Mark only a real uncertainty guard already required by the policy; do not invent clinical checks or uncertainty answers for appearance. The shared uncertainty-reference pair demonstrates the property without changing its18 CRE expectations. Emitted-resource parity and rendered viewer behavior are separate evidence; source syntax alone does not upgrade installed tooling.", "force": "default" }
     ],
-    "ref": "artifact:uncertainty-reference.crl; artifact:uncertainty-reference.cel; src/meta/uncertaintyGuard.test.ts; src/provenance/tests/crlStructure.test.ts; src/fhir-emitter/tests/uncertaintyGuardDisplay.test.ts"
+    "ref": "artifact:uncertainty-reference.crl; artifact:uncertainty-reference.cel; src/emit/tests/uncertaintyPresentation.test.ts; src/provenance/tests/crlStructure.test.ts; src/fhir-emitter/tests/uncertaintyGuardDisplay.test.ts"
   },
   {
     "id": "selected-answer-aggregate",
@@ -679,7 +678,7 @@ const RULES: KitRule[] = [
     "id": "concept-presentation",
     "applicability": "All CRL authoring",
     "category": "concept-model",
-    "rule": "Keep concept identity separate from human wording. Author presentation for \"Concept\": with required question text is and optional question description is double-quoted or backtick-delimited text fields. Question text must be nonempty. A base presentation supplies defaults. Optional repeatable in decision \"Name\" and in criterion \"Name\" entries are alternative contexts; a matching scoped presentation inherits omitted fields.",
+    "rule": "Keep concept identity separate from human wording. Author question presentation for \"Concept\": with required question text is and optional question description is double-quoted or backtick-delimited text fields. Question text must be nonempty. A base presentation supplies defaults. Optional repeatable in decision \"Name\" and in criterion \"Name\" entries are alternative contexts; a matching scoped presentation inherits omitted fields.",
     "why": "Concept names identify knowledge. Questionnaire text asks a question in context; changing wording must not change computation, codes, or canonicals.",
     "ref": "docs/named-answer-valuesets-and-presentation.md; src/emit/presentation.ts; src/fhir-emitter/decision.ts",
     "clauses": [
@@ -704,7 +703,7 @@ const RULES: KitRule[] = [
         "force": "default"
       },
       {
-        "text": "Presentation is optional for any concept declaring code is, across answer types; missing presentation warns even if the concept is not reached. Presentation on an uncoded concept errors. Without presentation, the emitted input has no question-text extension and the tested engine uses the concept name; description is absent, not a repeated name. Authored text maps to cpg-input-text. Authored description is preserved in cpg-input-description but the delivered CQFramework does not yet display it. Verify emitted description separately from native question text and pause/leaf behavior. Co-occurring occurrences of the same input profile must resolve compatible wording, including authored text versus concept-name fallback. A scoped presentation without a base can therefore conflict with an unpresented occurrence (presentation-overlap); identical effective text is compatible.",
+        "text": "Question presentation is optional for any concept declaring code is, across answer types; missing question presentation warns even if the concept is not reached. Question wording on an uncoded concept errors. A separate tree-only uncertainty guard property may target a Boolean Concept or Criterion without adding a question. Without presentation, the emitted input has no question-text extension and the tested engine uses the concept name; description is absent, not a repeated name. Authored text maps to cpg-input-text. Authored description is preserved in cpg-input-description but the delivered CQFramework does not yet display it. Verify emitted description separately from native question text and pause/leaf behavior. Co-occurring occurrences of the same input profile must resolve compatible wording, including authored text versus concept-name fallback. A scoped presentation without a base can therefore conflict with an unpresented occurrence (presentation-overlap); identical effective text is compatible.",
         "force": "default"
       },
       {

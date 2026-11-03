@@ -38,6 +38,8 @@ export interface Presentation extends ASTNode {
   questionText?: string;
   questionDescription?: string;
   choiceGroup?: string;
+  /** REFACTOR:grounded: optional ordinary branch value for uncertainty-guard tree display only. */
+  uncertaintyGuardPassWhen?: boolean;
 }
 
 /** A presentation annotation; its members retain independent clinical values. */
@@ -177,8 +179,6 @@ export interface Decision extends ASTNode {
 export interface Criterion extends ASTNode {
   type: "Criterion";
   name: string;
-  /** REFACTOR:grounded: owner-authored metadata is independent of the Boolean condition. */
-  meta?: MetaEntry[];
   /** REFACTOR:grounded: explanatory wording owned by this group, not an answer or predicate. */
   description?: string;
   condition: BranchCondition;

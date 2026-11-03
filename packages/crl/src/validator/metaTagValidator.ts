@@ -8,8 +8,7 @@
 // SCOPE (this pass): the flag-feature-critical + core registry rules above. The family-C extraction-exhaust rules
 // (`run`-required, re-run staleness) and the re-add-detection guard are the documented #154 remainder — they concern
 // extraction provenance, not the flag/mvComplete path.
-import type { CRL, Concept, Criterion, Decision, Location, MetaEntry } from "../ast/types";
-import { supportsUncertaintyGuardMetadata, uncertaintyGuardMetadata } from "../meta/uncertaintyGuard";
+import type { CRL, Concept, Decision, Location, MetaEntry } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 
 import { parseMetaTag } from "../meta/parseMetaTag";
@@ -35,7 +34,7 @@ export class MetaTagValidator {
         const filePath = entry?.filePath;
         if (entry?.ast?.library && filePath && !seenFiles.has(filePath)) {
           seenFiles.add(filePath);
-          this.checkTarget(out, entry.ast.library.meta, { libraryName: entry.ast.library.name, filePath }, entry.ast.library);
+          this.checkTarget(out, entry.ast.library.meta, { libraryName: entry.ast.library.name, filePath });
         }
       }
       // statement meta — per-statement attribution.
@@ -48,26 +47,24 @@ export class MetaTagValidator {
     }
     // single-file
     const attr: Attribution = { libraryName: ast.library?.name };
-    if (ast.library) this.checkTarget(out, ast.library.meta, attr, ast.library);
+    if (ast.library) this.checkTarget(out, ast.library.meta, attr);
     for (const s of ast.statements) this.checkStatement(out, s, attr);
     return out;
   }
 
   private checkStatement(out: MetaDiagnostic[], s: unknown, attr: Attribution): void {
     const node = s as { type?: string; meta?: MetaEntry[] };
-    if (node?.type === "Concept" || node?.type === "Criterion" || node?.type === "Decision")
-      this.checkTarget(out, (s as Concept | Criterion | Decision).meta, attr, node as { type: string });
+    if (node?.type === "Concept" || node?.type === "Decision")
+      this.checkTarget(out, (s as Concept | Decision).meta, attr);
   }
 
   /** Validate all meta lines on one target (concept / decision / library). Cardinality counts by CANONICAL tag. */
-  private checkTarget(out: MetaDiagnostic[], meta: MetaEntry[] | undefined, attr: Attribution, target: { type: string }): void {
+  private checkTarget(out: MetaDiagnostic[], meta: MetaEntry[] | undefined, attr: Attribution): void {
     if (!meta || meta.length === 0) return;
-    // REFACTOR:grounded: malformed or misplaced display metadata cannot license hiding a guard.
-    const display = uncertaintyGuardMetadata(meta);
-    if (display.kind !== "absent" && (!supportsUncertaintyGuardMetadata(target) || display.kind === "invalid")) {
+    // REFACTOR:grounded: an obsolete display spelling must not silently become an ignored note.
+    for (const entry of meta) if (/^\s*@tree-uncertainty-guard(?=\s|:|$)/i.test(entry.text)) {
       out.push(this.diag("meta-invalid-target", "error",
-        "@tree-uncertainty-guard requires one Boolean concept or criterion annotation with exactly one '; pass true' or '; pass false' field.",
-        meta.find(entry => /@tree-uncertainty-guard/i.test(entry.text))!.location, attr));
+        "Declare tree display with presentation for the owning target: - uncertainty guard passes when true (or false).", entry.location, attr));
     }
     const canonicalCounts = new Map<string, number>();
     for (const entry of meta) {

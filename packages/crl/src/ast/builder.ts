@@ -373,6 +373,12 @@ export class CRLAstBuilder
         node.contexts.push({ kind: line.PRESENTATION_DECISION() ? "decision" : "criterion",
           ref: line.decisionReference() ? refFromRefContext(line.decisionReference()!) : refFromQualifiable(line.qualifiableReference()!),
           location: getLocation(line) });
+      } else if (line.UNCERTAINTY_GUARD_PASSES_WHEN()) {
+        // REFACTOR:grounded: explicit Boolean presentation value; no default or clinical inference.
+        const value = line.NARRATIVE_WORD()!.text;
+        if (node.uncertaintyGuardPassWhen !== undefined || !["true", "false"].includes(value))
+          this.reportError("AstError", line, { message: "Presentation uncertainty guard passes when requires true or false, declared only once." });
+        else node.uncertaintyGuardPassWhen = value === "true";
       } else {
         const key = line.CHOICE_GROUP_IS() ? "choiceGroup" : line.QUESTION_TEXT_IS() ? "questionText" : "questionDescription";
         const value = (line.QUOTED_STRING()?.text ?? line.backtickString()!.text).slice(1, -1);
@@ -381,8 +387,9 @@ export class CRLAstBuilder
         else node[key] = value;
       }
     }
-    if (!node.questionText?.trim()) this.reportError("AstError", ctx,
-      { message: "Presentation requires nonempty question text." });
+    if ((!node.questionText?.trim() && node.uncertaintyGuardPassWhen === undefined) ||
+        (!node.questionText?.trim() && (node.questionDescription !== undefined || node.choiceGroup !== undefined))) this.reportError("AstError", ctx,
+      { message: "Question presentation requires nonempty question text; a tree-only presentation requires uncertainty guard passes when." });
     return node;
   }
 
@@ -419,16 +426,11 @@ export class CRLAstBuilder
     const name = ctx.criterionIdentifier().text.slice(1, -1);
     const condition = this.branchConditionFrom(ctx.branchCondition());
     // REFACTOR:grounded: use the question-presentation literal contract; preserve authored text.
-    const descriptions = ctx.criterionDescription();
-    const desc = descriptions[0];
-    if (descriptions.length > 1) this.reportError("AstError", descriptions[1],
-      { message: "Criterion description may be declared only once." });
+    const desc = ctx.criterionDescription();
     const description = (desc?.QUOTED_STRING()?.text ?? desc?.backtickString()?.text)?.slice(1, -1);
     if (description !== undefined && !description.trim()) this.reportError("AstError", desc!,
       { message: "Criterion description must be nonempty." });
-    const meta = this.metaFrom(ctx.metaLine());
-    return { type: "Criterion", name, condition, ...(description !== undefined ? { description } : {}),
-      ...(meta.length ? { meta } : {}), location: getLocation(ctx) };
+    return { type: "Criterion", name, condition, ...(description !== undefined ? { description } : {}), location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {

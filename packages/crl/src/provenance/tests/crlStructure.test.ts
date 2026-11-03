@@ -485,9 +485,9 @@ function collect(nodes: CrlStructureNode[], acc: Map<string, CrlStructureNode>):
 
 
 // REFACTOR:grounded: display roles belong to the complete owner-qualified guard, never a nested operand.
-describe("explicit uncertainty guard display metadata", () => {
-  const marker = '- meta is `@tree-uncertainty-guard: Terminal check; pass false`.';
-  const concept = `concept "Check": - shape is Record. - type is Observation. - value type is boolean. ${marker} - shape reduction is most recent.`;
+describe("explicit uncertainty guard presentation", () => {
+  const marker = 'presentation for "Check": - uncertainty guard passes when false.';
+  const concept = `concept "Check": - shape is Record. - type is Observation. - value type is boolean. - shape reduction is most recent. ${marker}`;
   const activity = 'activity "X": - request CPGTaskRequest. - with `X`.';
   const nodes = (declarations: string, condition: string) => buildCrlStructure(graphFrom(`library "T". ${declarations} ${activity} decision "D": - when ${condition} then recommend activity "X".`, CEL))[0].children;
   // @kit uncertainty-guard-display:occurrence-polarity
@@ -499,11 +499,11 @@ describe("explicit uncertainty guard display metadata", () => {
     expect(nodes(concept+'concept "Other": - value type is boolean.','("Check" and "Other")')[0]).not.toHaveProperty('uncertaintyGuard');
   });
   it("reads criterion-owned annotation without promoting a marked concept through an unmarked criterion", () => {
-    const declarations=concept+`criterion "Group": ${marker} - when ("Check").`;
+    const declarations=concept+`criterion "Group": - when ("Check"). presentation for "Group": - uncertainty guard passes when false.`;
     const graph=graphFrom(`library "T". ${declarations} ${activity} decision "D": - when "Group" then recommend activity "X".`,CEL);
     graph.coversTarget!.ast = classifyCriterionRefs(graph.coversTarget!.ast);
     expect(buildCrlStructure(graph)[0].children[0].uncertaintyGuard).toEqual({passWhen:false,target:{lib:'T',name:'Group',kind:'criterion'}});
-    graph.coversTarget!.ast.statements.filter(s=>s.type==='Criterion').forEach(s=>{if(s.type==='Criterion')delete s.meta;});
+    graph.coversTarget!.ast.presentations = graph.coversTarget!.ast.presentations!.filter(p=>p.target!=='Group');
     expect(buildCrlStructure(graph)[0].children[0]).not.toHaveProperty('uncertaintyGuard');
   });
   // @kit uncertainty-guard-display:source-owner
@@ -515,8 +515,21 @@ describe("explicit uncertainty guard display metadata", () => {
     expect(buildCrlStructure(graph)[0].children[0]).not.toHaveProperty('uncertaintyGuard');
   });
   it("does not admit invalid, duplicate or nonBoolean metadata", () => {
-    for(const declarations of [concept.replace('pass false','pass maybe'),concept.replace(marker,marker+marker),concept.replace('value type is boolean','value type is string')]){
+    for(const declarations of [concept.replace(marker,'presentation for "Check": - in decision "Missing". - uncertainty guard passes when false.'),concept.replace(marker,marker+marker),concept.replace('value type is boolean','value type is string')]){
       expect(nodes(declarations,'"Check"')[0]).not.toHaveProperty('uncertaintyGuard');
     }
   });
+  it("does not select owner-local scopes using a foreign caller's same-named decision",()=>{
+    const shared=entry(`library "Shared". ${concept} ${activity} decision "D": - when "Check" then recommend activity "X". presentation for "Check": - in decision "D". - uncertainty guard passes when true.`, 'shared.crl','local');
+    const graph=graphFrom(`library "T". ${activity} decision "D": - when "Shared"."Check" then recommend activity "X".`,CEL,[shared]);
+    const structures=buildCrlStructure(graph);
+    expect(structures.find(s=>s.lib==='T')!.children[0].uncertaintyGuard?.passWhen).toBe(false);
+    expect(structures.find(s=>s.lib==='Shared')!.children[0].uncertaintyGuard?.passWhen).toBe(true);
+  });
+  it("keeps whole-Criterion scope independent from descendants in actual provenance",()=>{
+    const decl=concept+'criterion "Inner": - when ("Check"). criterion "Outer": - when ("Inner").';
+    const make=(scope:string)=>{const graph=graphFrom(`library "T". ${decl} ${activity} presentation for "Outer": - in criterion "${scope}". - uncertainty guard passes when false. decision "D": - when "Outer" then recommend activity "X".`,CEL);graph.coversTarget!.ast=classifyCriterionRefs(graph.coversTarget!.ast);return buildCrlStructure(graph)[0].children[0];};
+    expect(make('Inner').uncertaintyGuard).toBeUndefined();expect(make('Outer').uncertaintyGuard?.passWhen).toBe(false);
+  });
+
 });

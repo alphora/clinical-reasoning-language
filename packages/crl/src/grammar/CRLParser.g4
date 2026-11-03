@@ -76,7 +76,8 @@ presentationLine
            | PRESENTATION_CRITERION qualifiableReference
            | QUESTION_TEXT_IS (QUOTED_STRING | backtickString)
            | QUESTION_DESCRIPTION_IS (QUOTED_STRING | backtickString)
-           | CHOICE_GROUP_IS QUOTED_STRING) DOT
+           | CHOICE_GROUP_IS QUOTED_STRING
+           | UNCERTAINTY_GUARD_PASSES_WHEN NARRATIVE_WORD) DOT
     ;
 
 presentationGroupStatement
@@ -117,8 +118,8 @@ decisionStatement
 // unparenthesized `... "Lib"."X".` tail would be ambiguous. The KE authoring house
 // style parenthesizes regardless.
 criterionStatement
-    // REFACTOR:grounded: annotation order does not change the required Boolean body.
-    : CRITERION criterionIdentifier COLON (criterionDescription | metaLine)* DASH WHEN LPAREN branchCondition RPAREN DOT
+    // REFACTOR:grounded: Criterion description precedes its Boolean body; tree display belongs in presentation.
+    : CRITERION criterionIdentifier COLON criterionDescription? DASH WHEN LPAREN branchCondition RPAREN DOT
     ;
 
 // REFACTOR:grounded: one optional description; never part of the Boolean body.
@@ -717,7 +718,7 @@ narrativeElement
     // ⚠ QUALIFYING and DISPLAY_IS are admitted here because the membership predicate is NARRATIVE:
     //   `- definition is "Patient Complaint" in qualifying.`
     // Without this the keyword would eat its own use site and the predicate could not parse.
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_GROUP | CHOICE_GROUP_IS | COLUMNS_IS | CONTROL_IS | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | EXISTS | OTHERWISE | UNLESS | ONLY_WHEN | CRITERION | COUNT | AT | LEAST | THIS | THEN | COMMA | NARRATIVE_WORD | TIME_UNIT | QUALIFYING | PRESENTATION_GROUP | CHOICE_GROUP_IS | COLUMNS_IS | CONTROL_IS | PRESENTATION_FOR | PRESENTATION_DECISION | PRESENTATION_CRITERION | QUESTION_TEXT_IS | QUESTION_DESCRIPTION_IS | UNCERTAINTY_GUARD_PASSES_WHEN | DESCRIPTION_IS | NOT_QUALIFYING_IS | DISPLAY_IS | ANSWER_OPTIONS)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 
