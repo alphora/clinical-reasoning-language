@@ -168,6 +168,16 @@
       ],
       "text": "Each planned procedure needs its own documented necessity.",
       "rationale": "Separate documentation for the assessed procedure; combinations are evaluated through the individual-necessity question."
+    },
+    {
+      "id": "demo-upper-uncertainty",
+      "origin": "authored",
+      "text": "Synthetic UI teaching overlay requested by the operator: uncertain-yes and uncertain-no choices on complaint/skin, with an explicit ANY OF guard only after upper-branch evidence. Upper uncertainty leads to Unmet; ptosis deliberately remains unguarded for comparison. This is not an LCD requirement or a clinically deployable extension of its coverage rules. Original ordinary answers and clinical expectations are retained.",
+      "authoredKind": "clinical-assumption",
+      "supports": {
+        "cluster": "authored:tree-uncertainty-demo",
+        "items": []
+      }
     }
   ],
   "ignoredRanges": [
@@ -297,6 +307,13 @@
           "file": "src/cel/regression/medical-validation.cel",
           "kind": "case",
           "caseId": "common-negative-sibling-unanswered",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "demo-upper-uncertain-no-complaint",
           "relation": "tests-branch",
           "status": "linked"
         }
@@ -546,6 +563,13 @@
           "caseId": "ptosis-irrelevant-skin-positive",
           "relation": "tests-branch",
           "status": "linked"
+        },
+        {
+          "file": "src/cel/mv/medical-validation.cel",
+          "kind": "case",
+          "caseId": "demo-ptosis-unguarded-met",
+          "relation": "tests-branch",
+          "status": "linked"
         }
       ]
     },
@@ -639,6 +663,13 @@
           "caseId": "upper-ptosis-evidence-no-substitute",
           "relation": "tests-branch",
           "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "demo-upper-uncertain-no-skin",
+          "relation": "tests-branch",
+          "status": "linked"
         }
       ]
     },
@@ -690,7 +721,7 @@
           "lib": "Blepharoplasty And Blepharoptosis Repair",
           "kind": "decision",
           "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
-          "nodeId": "when[1]/when[0]/when[0]/action[0]",
+          "nodeId": "when[1]/when[0]/when[0]/otherwise/action[0]",
           "nodeKind": "decision-node",
           "ownership": "policy-owned",
           "relation": "recommends-disposition",
@@ -968,6 +999,185 @@
         }
       ],
       "cel": []
+    },
+    {
+      "id": "authored:tree-uncertainty-demo",
+      "label": "Authored tree-display comparison; not a source requirement",
+      "items": [
+        "demo-upper-uncertainty"
+      ],
+      "crl": [
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "terminology",
+          "name": "Demonstration Uncertain Answers",
+          "nodeKind": "terminology",
+          "ownership": "policy-owned",
+          "relation": "defines-concept",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "decision",
+          "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+          "nodeId": "when[1]",
+          "nodeKind": "decision-node",
+          "ownership": "policy-owned",
+          "relation": "implements-criterion",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "decision",
+          "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+          "nodeId": "when[1]/when[0]",
+          "nodeKind": "decision-node",
+          "ownership": "policy-owned",
+          "relation": "implements-criterion",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "decision",
+          "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+          "nodeId": "when[1]/when[0]/when[0]",
+          "nodeKind": "decision-node",
+          "ownership": "policy-owned",
+          "relation": "implements-criterion",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "decision",
+          "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+          "nodeId": "when[1]/when[0]/when[0]/when[0]",
+          "nodeKind": "decision-node",
+          "ownership": "policy-owned",
+          "relation": "implements-criterion",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "decision",
+          "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+          "nodeId": "when[1]/when[0]/when[0]/when[0]/action[0]",
+          "nodeKind": "decision-node",
+          "ownership": "policy-owned",
+          "relation": "recommends-disposition",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "concept",
+          "name": "Complaint Answer Is Uncertain",
+          "nodeKind": "leaf",
+          "ownership": "policy-owned",
+          "relation": "defines-concept",
+          "status": "linked"
+        },
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "concept",
+          "name": "Skin Answer Is Uncertain",
+          "nodeKind": "leaf",
+          "ownership": "policy-owned",
+          "relation": "defines-concept",
+          "status": "linked"
+        }
+      ],
+      "cel": [
+        {
+          "file": "src/cel/mv/medical-validation.cel",
+          "kind": "case",
+          "caseId": "demo-upper-uncertainty-unmet",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "demo-upper-skin-uncertainty-unmet",
+          "relation": "tests-branch",
+          "status": "linked"
+        }
+      ]
+    },
+    {
+      "id": "authored:tree-clear-demo",
+      "label": "Authored upper branch with no uncertain answer",
+      "items": [
+        "demo-upper-uncertainty"
+      ],
+      "crl": [
+        {
+          "lib": "Blepharoplasty And Blepharoptosis Repair",
+          "kind": "decision",
+          "name": "Blepharoplasty And Blepharoptosis Repair Coverage Determination",
+          "nodeId": "when[1]/when[0]/when[0]/otherwise",
+          "nodeKind": "decision-node",
+          "ownership": "policy-owned",
+          "relation": "implements-criterion",
+          "status": "linked"
+        }
+      ],
+      "cel": [
+        {
+          "file": "src/cel/mv/medical-validation.cel",
+          "kind": "case",
+          "caseId": "upper-other-activity-met",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/mv/medical-validation.cel",
+          "kind": "case",
+          "caseId": "upper-pseudo-mrd-met",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/mv/medical-validation.cel",
+          "kind": "case",
+          "caseId": "upper-side-gaze-met",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "functional-incidental-appearance-met",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "mixed-session-upper-met",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "upper-irrelevant-ptosis-negative",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "upper-irrelevant-ptosis-positive",
+          "relation": "tests-branch",
+          "status": "linked"
+        },
+        {
+          "file": "src/cel/regression/medical-validation.cel",
+          "kind": "case",
+          "caseId": "upper-latest-finding-met",
+          "relation": "tests-branch",
+          "status": "linked"
+        }
+      ]
     }
   ]
 }

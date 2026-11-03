@@ -247,6 +247,18 @@ define "__CRL_PublicationEnvelope_v1_Upper Blepharoplasty Photographs Documented
 define "Upper Blepharoplasty Photographs Documented":
   "__CRL_PublicationSelection_v1_Record"("__CRL_PublicationEnvelope_v1_Upper Blepharoplasty Photographs Documented")
 
+define "__CRL_PublicationEnvelope_v1_Complaint Answer Is Uncertain":
+  L34194BlephExampleInferences."__CRL_PublicationEnvelope_v1_Complaint Answer Is Uncertain"
+
+define "Complaint Answer Is Uncertain":
+  "__CRL_PublicationSelection_v1_Record"("__CRL_PublicationEnvelope_v1_Complaint Answer Is Uncertain")
+
+define "__CRL_PublicationEnvelope_v1_Skin Answer Is Uncertain":
+  L34194BlephExampleInferences."__CRL_PublicationEnvelope_v1_Skin Answer Is Uncertain"
+
+define "Skin Answer Is Uncertain":
+  "__CRL_PublicationSelection_v1_Record"("__CRL_PublicationEnvelope_v1_Skin Answer Is Uncertain")
+
 define "__CRL_PublicationEnvelope_v1_Ptosis Margin Requirement Met":
   L34194BlephExampleInferences."__CRL_PublicationEnvelope_v1_Ptosis Margin Requirement Met"
 
@@ -258,6 +270,9 @@ define "__CRL_PublicationEnvelope_v1_Ptosis Photographs Documented":
 
 define "Ptosis Photographs Documented":
   "__CRL_PublicationSelection_v1_Record"("__CRL_PublicationEnvelope_v1_Ptosis Photographs Documented")
+
+define "Upper Branch Has Uncertainty":
+  FHIRHelpers.ToBoolean(("Complaint Answer Is Uncertain").value as FHIR.boolean) or FHIRHelpers.ToBoolean(("Skin Answer Is Uncertain").value as FHIR.boolean)
 
 /*
  * Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint.
@@ -271,32 +286,38 @@ define "Upper Blepharoplasty Evidence":
 define "Blepharoptosis Repair Evidence":
   FHIRHelpers.ToBoolean(("Ptosis Margin Requirement Met").value as FHIR.boolean) and FHIRHelpers.ToBoolean(("Ptosis Photographs Documented").value as FHIR.boolean)
 
-define "CRL branch Ref L129C7":
+define "CRL branch Ref L166C7":
   FHIRHelpers.ToBoolean(("Cosmetic Surgical Purpose").value as FHIR.boolean)
 
-define "Not CRL branch Ref L129C7":
+define "Not CRL branch Ref L166C7":
   not (FHIRHelpers.ToBoolean(("Cosmetic Surgical Purpose").value as FHIR.boolean))
 
-define "CRL branch CriterionRef L130C7":
+define "CRL branch CriterionRef L167C7":
   "Functional Necessity Documented"
 
-define "Not CRL branch CriterionRef L130C7":
+define "Not CRL branch CriterionRef L167C7":
   not ("Functional Necessity Documented")
 
-define "CRL branch Ref L132C11":
+define "CRL branch Ref L169C11":
   FHIRHelpers.ToBoolean(("Upper Blepharoplasty Under Review").value as FHIR.boolean)
 
-define "Not CRL branch Ref L132C11":
+define "Not CRL branch Ref L169C11":
   not (FHIRHelpers.ToBoolean(("Upper Blepharoplasty Under Review").value as FHIR.boolean))
 
-define "CRL branch CriterionRef L134C15":
+define "CRL branch CriterionRef L171C15":
   "Upper Blepharoplasty Evidence"
 
-define "Not CRL branch CriterionRef L134C15":
+define "Not CRL branch CriterionRef L171C15":
   not ("Upper Blepharoplasty Evidence")
 
-define "CRL branch CriterionRef L139C15":
+define "CRL branch CriterionRef L173C19":
+  "Upper Branch Has Uncertainty"
+
+define "Not CRL branch CriterionRef L173C19":
+  not ("Upper Branch Has Uncertainty")
+
+define "CRL branch CriterionRef L180C15":
   "Blepharoptosis Repair Evidence"
 
-define "Not CRL branch CriterionRef L139C15":
+define "Not CRL branch CriterionRef L180C15":
   not ("Blepharoptosis Repair Evidence")

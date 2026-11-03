@@ -752,6 +752,106 @@
           "sha256": "3f08dae24f6495ac6754b42bb7a737cfe2efbd85f97bf279684cbbd797d64d8a"
         }
       ]
+    },
+    {
+      "caseName": "DEMO — upper branch rejects an uncertain qualifying complaint",
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demo-upper-uncertainty-unmet",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa",
+      "artifacts": [
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa",
+          "resourceType": "Patient",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa.json",
+          "sha256": "a9e9e39de028a296a9ae4e7e60dfd21e820255b3f2feb6457f697e80ffc69937"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-24502cf248ed",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/observation/blepharoplasty-and-blepharoptosis-repair-ca-24502cf248ed.json",
+          "sha256": "55059f82e2d22c6fbd63d3799fe50708109c05a9375feb67a3c4fe2e65701b06"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-f1621571090c",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/observation/blepharoplasty-and-blepharoptosis-repair-ca-f1621571090c.json",
+          "sha256": "43c634405ee720200cf2fcb96ffad83f062e0a9c0f44b211a21ecb5ee5b69666"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-c3aac85b506f",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/observation/blepharoplasty-and-blepharoptosis-repair-ca-c3aac85b506f.json",
+          "sha256": "4752c6508a8b52856dbcff9377632e034c29620f6c39c4dc2a22d4ec16536195"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-90639712214c",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/observation/blepharoplasty-and-blepharoptosis-repair-ca-90639712214c.json",
+          "sha256": "242407c98501c9edd58826d61e98aab103b00781897aa3f1da6b138ef87356f0"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-700437a26cbf",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/observation/blepharoplasty-and-blepharoptosis-repair-ca-700437a26cbf.json",
+          "sha256": "782a22e69cad1866acece4f4b00c7c6efd22f03cb61560d45706b56dad8d0b2d"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-1cd113c3aead",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa/observation/blepharoplasty-and-blepharoptosis-repair-ca-1cd113c3aead.json",
+          "sha256": "a868fc7ade04d296fa488f5fb5385627cab2d1fa1323252264cb50236c3c886c"
+        }
+      ]
+    },
+    {
+      "caseName": "DEMO — ptosis branch has no uncertainty guard",
+      "sourceFile": "src/cel/mv/medical-validation.cel",
+      "caseId": "demo-ptosis-unguarded-met",
+      "compartmentDir": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156",
+      "artifacts": [
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156",
+          "resourceType": "Patient",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156.json",
+          "sha256": "5dbad070c251bf7dd3fcb0d9938f5f0c9902c1355e5f8ddf1592a7639f12d95b"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b6835e26d70c",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/observation/blepharoplasty-and-blepharoptosis-repair-ca-b6835e26d70c.json",
+          "sha256": "58385a5f5ce274b1becaa6b69dea713d2baef2f103bacdabb55379ba1beed50c"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-8074208ef69b",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/observation/blepharoplasty-and-blepharoptosis-repair-ca-8074208ef69b.json",
+          "sha256": "97f2683def2cb989ab3e2d6a3c18575d2c94c4bc47531952ae8f540b6cb14f13"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-87f39542f8c5",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/observation/blepharoplasty-and-blepharoptosis-repair-ca-87f39542f8c5.json",
+          "sha256": "10ae45c4a88b88fbab17cc5183844976197f911d6d129f2406786b278873aac7"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-d6e0e3e13cee",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/observation/blepharoplasty-and-blepharoptosis-repair-ca-d6e0e3e13cee.json",
+          "sha256": "fa155bd622a92553e1ef76f30d436db10aff1048fd0ff6bb93ef681c23811c61"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-77f565990944",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/observation/blepharoplasty-and-blepharoptosis-repair-ca-77f565990944.json",
+          "sha256": "2c8017c857e9861f716a82d0387892f2ec16a25fbd21705d9625b7cc512ebb84"
+        },
+        {
+          "id": "blepharoplasty-and-blepharoptosis-repair-ca-b7c3c4e6852e",
+          "resourceType": "Observation",
+          "path": "patient/blepharoplasty-and-blepharoptosis-repair-ca-b6a2e0cd2156/observation/blepharoplasty-and-blepharoptosis-repair-ca-b7c3c4e6852e.json",
+          "sha256": "7fe1dc15e82f6431549256fdd49c0833c922f7e7867eaf444e2fe5847091d881"
+        }
+      ]
     }
   ]
 }

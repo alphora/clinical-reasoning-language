@@ -183,6 +183,20 @@
             "code": "none",
             "display": "No documented functional deficit affecting daily activities"
           }
+        },
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "uncertain-yes",
+            "display": "Uncertain — assume Yes (demo)"
+          }
+        },
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "uncertain-no",
+            "display": "Uncertain — assume No (demo)"
+          }
         }
       ]
     },
@@ -413,6 +427,20 @@
             "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
             "code": "neither",
             "display": "Neither qualifying skin finding is present"
+          }
+        },
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "uncertain-yes",
+            "display": "Uncertain — assume Yes (demo)"
+          }
+        },
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "uncertain-no",
+            "display": "Uncertain — assume No (demo)"
           }
         }
       ]

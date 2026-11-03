@@ -89,7 +89,7 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "CRL branch Ref L129C7"
+                "expression": "CRL branch Ref L166C7"
               }
             }
           ],
@@ -131,14 +131,14 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Not CRL branch Ref L129C7"
+                "expression": "Not CRL branch Ref L166C7"
               }
             },
             {
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "CRL branch CriterionRef L130C7",
+                "expression": "CRL branch CriterionRef L167C7",
                 "description": "Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint."
               }
             }
@@ -196,7 +196,7 @@
                   "kind": "applicability",
                   "expression": {
                     "language": "text/cql-identifier",
-                    "expression": "CRL branch Ref L132C11"
+                    "expression": "CRL branch Ref L169C11"
                   }
                 }
               ],
@@ -237,7 +237,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "CRL branch CriterionRef L134C15"
+                        "expression": "CRL branch CriterionRef L171C15"
                       }
                     }
                   ],
@@ -275,7 +275,96 @@
                       ]
                     }
                   ],
-                  "definitionCanonical": "http://example.org/crl/PlanDefinition/l34194-bleph-example-certify-met-recommendation"
+                  "action": [
+                    {
+                      "title": "Upper Branch Has Uncertainty",
+                      "description": "Upper Branch Has Uncertainty",
+                      "code": [
+                        {
+                          "coding": [
+                            {
+                              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                              "code": "guideline-based-care"
+                            }
+                          ]
+                        }
+                      ],
+                      "condition": [
+                        {
+                          "kind": "applicability",
+                          "expression": {
+                            "language": "text/cql-identifier",
+                            "expression": "CRL branch CriterionRef L173C19"
+                          }
+                        }
+                      ],
+                      "input": [
+                        {
+                          "extension": [
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                              "valueString": "Which daily activity is affected by the eyelid-related visual deficit?"
+                            },
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                              "valueMarkdown": "Select the documented functional deficit caused by the eyelid abnormality. Reading and driving are examples; other daily activities can also qualify. The physical signs must be consistent with the complaint in the eye under review."
+                            }
+                          ],
+                          "type": "Observation",
+                          "profile": [
+                            "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint"
+                          ]
+                        },
+                        {
+                          "extension": [
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                              "valueString": "Which skin finding is documented for upper blepharoplasty?"
+                            },
+                            {
+                              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                              "valueMarkdown": "Assess the affected eye. Pseudo-MRD measures from the corneal light reflex to the overhanging skin margin, not the actual eyelid margin. Side-gaze obstruction must be caused by predominantly medial or lateral redundant tissue."
+                            }
+                          ],
+                          "type": "Observation",
+                          "profile": [
+                            "http://example.org/crl/StructureDefinition/l34194-bleph-example-upper-eyelid-skin-finding"
+                          ]
+                        }
+                      ],
+                      "definitionCanonical": "http://example.org/crl/PlanDefinition/l34194-bleph-example-not-certify-unmet-recommendation"
+                    },
+                    {
+                      "title": "otherwise",
+                      "description": "otherwise",
+                      "code": [
+                        {
+                          "coding": [
+                            {
+                              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                              "code": "guideline-based-care"
+                            }
+                          ]
+                        }
+                      ],
+                      "definitionCanonical": "http://example.org/crl/PlanDefinition/l34194-bleph-example-certify-met-recommendation",
+                      "condition": [
+                        {
+                          "kind": "applicability",
+                          "expression": {
+                            "language": "text/cql-identifier",
+                            "expression": "Not CRL branch CriterionRef L173C19"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "extension": [
+                    {
+                      "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+                      "valueString": "any"
+                    }
+                  ]
                 },
                 {
                   "title": "otherwise",
@@ -296,7 +385,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "Not CRL branch CriterionRef L134C15"
+                        "expression": "Not CRL branch CriterionRef L171C15"
                       }
                     }
                   ]
@@ -341,7 +430,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "CRL branch CriterionRef L139C15"
+                        "expression": "CRL branch CriterionRef L180C15"
                       }
                     }
                   ],
@@ -400,7 +489,7 @@
                       "kind": "applicability",
                       "expression": {
                         "language": "text/cql-identifier",
-                        "expression": "Not CRL branch CriterionRef L139C15"
+                        "expression": "Not CRL branch CriterionRef L180C15"
                       }
                     }
                   ]
@@ -417,7 +506,7 @@
                   "kind": "applicability",
                   "expression": {
                     "language": "text/cql-identifier",
-                    "expression": "Not CRL branch Ref L132C11"
+                    "expression": "Not CRL branch Ref L169C11"
                   }
                 }
               ]
@@ -449,14 +538,14 @@
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Not CRL branch Ref L129C7"
+                "expression": "Not CRL branch Ref L166C7"
               }
             },
             {
               "kind": "applicability",
               "expression": {
                 "language": "text/cql-identifier",
-                "expression": "Not CRL branch CriterionRef L130C7"
+                "expression": "Not CRL branch CriterionRef L167C7"
               }
             }
           ]

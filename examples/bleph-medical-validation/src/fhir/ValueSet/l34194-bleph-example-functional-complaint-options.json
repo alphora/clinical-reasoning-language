@@ -51,6 +51,14 @@
           {
             "code": "none",
             "display": "No documented functional deficit affecting daily activities"
+          },
+          {
+            "code": "uncertain-yes",
+            "display": "Uncertain — assume Yes (demo)"
+          },
+          {
+            "code": "uncertain-no",
+            "display": "Uncertain — assume No (demo)"
           }
         ]
       }
@@ -78,6 +86,16 @@
         "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
         "code": "none",
         "display": "No documented functional deficit affecting daily activities"
+      },
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "uncertain-yes",
+        "display": "Uncertain — assume Yes (demo)"
+      },
+      {
+        "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+        "code": "uncertain-no",
+        "display": "Uncertain — assume No (demo)"
       }
     ]
   }

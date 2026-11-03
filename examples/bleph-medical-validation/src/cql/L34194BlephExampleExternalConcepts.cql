@@ -9,5 +9,6 @@ valueset "Procedure Options": 'http://example.org/crl/ValueSet/l34194-bleph-exam
 valueset "Upper Blepharoplasty Option": 'http://example.org/crl/ValueSet/l34194-bleph-example-upper-blepharoplasty-option'
 valueset "Functional Complaint Options": 'http://example.org/crl/ValueSet/l34194-bleph-example-functional-complaint-options'
 valueset "Upper Eyelid Skin Finding Options": 'http://example.org/crl/ValueSet/l34194-bleph-example-upper-eyelid-skin-finding-options'
+valueset "Demonstration Uncertain Answers": 'http://example.org/crl/ValueSet/l34194-bleph-example-demonstration-uncertain-answers'
 
 context Patient

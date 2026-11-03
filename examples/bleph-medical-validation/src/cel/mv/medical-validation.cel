@@ -271,3 +271,30 @@ case "Ptosis repair — required photographs not documented":
 - fact is "ptosisPhotos false 2026-01-01".
 - result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
 
+// Synthetic tree-display demonstrations, not additional L34194 criteria.
+fact "complaint uncertain-yes demo":
+- date is "2026-01-01".
+- value is "uncertain-yes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+case "DEMO — upper branch rejects an uncertain qualifying complaint":
+- id is "demo-upper-uncertainty-unmet".
+- subject is "Sample Patient".
+- fact is "procedure upper-blepharoplasty 2026-01-01".
+- fact is "cosmetic false 2026-01-01".
+- fact is "complaint uncertain-yes demo".
+- fact is "necessity true 2026-01-01".
+- fact is "skin pseudo-mrd-at-most-2-mm 2026-01-01".
+- fact is "upperPhotos true 2026-01-01".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "DEMO — ptosis branch has no uncertainty guard":
+- id is "demo-ptosis-unguarded-met".
+- subject is "Sample Patient".
+- fact is "procedure blepharoptosis-repair 2026-01-01".
+- fact is "cosmetic false 2026-01-01".
+- fact is "complaint uncertain-yes demo".
+- fact is "necessity true 2026-01-01".
+- fact is "mrd true 2026-01-01".
+- fact is "ptosisPhotos true 2026-01-01".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "certify.Met".

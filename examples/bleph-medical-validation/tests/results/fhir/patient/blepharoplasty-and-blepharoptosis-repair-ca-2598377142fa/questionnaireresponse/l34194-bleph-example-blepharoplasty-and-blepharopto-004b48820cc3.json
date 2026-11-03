@@ -1,0 +1,128 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "l34194-bleph-example-blepharoplasty-and-blepharopto-004b48820cc3",
+  "questionnaire": "http://example.org/crl/Questionnaire/l34194-bleph-example-blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa",
+  "status": "in-progress",
+  "subject": {
+    "reference": "Patient/blepharoplasty-and-blepharoptosis-repair-ca-2598377142fa"
+  },
+  "item": [
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+          "valueReference": {
+            "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+          }
+        }
+      ],
+      "linkId": "1",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-cosmetic-surgical-purpose#Observation.value[x]",
+      "text": "Is this procedure solely cosmetic, with no functional benefit?",
+      "answer": [
+        {
+          "valueBoolean": false
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+          "valueReference": {
+            "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+          }
+        }
+      ],
+      "linkId": "2",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-documented-patient-complaint#Observation.value[x]",
+      "text": "Which daily activity is affected by the eyelid-related visual deficit?",
+      "answer": [
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "uncertain-yes"
+          }
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+          "valueReference": {
+            "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+          }
+        }
+      ],
+      "linkId": "3",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-individual-procedure-necessity-documented#Observation.value[x]",
+      "text": "Is this procedure independently necessary and documented?",
+      "answer": [
+        {
+          "valueBoolean": true
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+          "valueReference": {
+            "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+          }
+        }
+      ],
+      "linkId": "4",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-procedure-under-review#Observation.value[x]",
+      "text": "Which procedure is being assessed?",
+      "answer": [
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "upper-blepharoplasty"
+          }
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+          "valueReference": {
+            "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+          }
+        }
+      ],
+      "linkId": "5",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-upper-eyelid-skin-finding#Observation.value[x]",
+      "text": "Which skin finding is documented for upper blepharoplasty?",
+      "answer": [
+        {
+          "valueCoding": {
+            "system": "http://example.org/crl/CodeSystem/l34194-answer-codes",
+            "code": "pseudo-mrd-at-most-2-mm"
+          }
+        }
+      ]
+    },
+    {
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+          "valueReference": {
+            "reference": "http://cqframework.org/fhir/Device/clinical-quality-language"
+          }
+        }
+      ],
+      "linkId": "6",
+      "definition": "http://example.org/crl/StructureDefinition/l34194-bleph-example-upper-blepharoplasty-photographs-documented#Observation.value[x]",
+      "text": "Do the photographs document the qualifying skin finding?",
+      "answer": [
+        {
+          "valueBoolean": true
+        }
+      ]
+    }
+  ]
+}

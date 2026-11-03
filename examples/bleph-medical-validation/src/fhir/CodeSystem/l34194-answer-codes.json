@@ -66,6 +66,14 @@
       "display": "Visual interference affecting reading"
     },
     {
+      "code": "uncertain-no",
+      "display": "Uncertain — assume No (demo)"
+    },
+    {
+      "code": "uncertain-yes",
+      "display": "Uncertain — assume Yes (demo)"
+    },
+    {
       "code": "upper-blepharoplasty",
       "display": "Upper blepharoplasty"
     }

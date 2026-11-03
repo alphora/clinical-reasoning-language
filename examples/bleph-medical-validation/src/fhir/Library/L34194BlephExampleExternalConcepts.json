@@ -59,6 +59,10 @@
     {
       "type": "depends-on",
       "resource": "http://example.org/crl/ValueSet/l34194-bleph-example-upper-eyelid-skin-finding-options"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://example.org/crl/ValueSet/l34194-bleph-example-demonstration-uncertain-answers"
     }
   ],
   "content": [

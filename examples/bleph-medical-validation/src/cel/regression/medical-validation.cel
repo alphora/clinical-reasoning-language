@@ -414,3 +414,62 @@ case "Unanswered cosmetic purpose pauses before negative clinical evidence":
 - fact is "skin neither 2026-01-01".
 - fact is "upperPhotos true 2026-01-01".
 - result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.
+
+// Synthetic tree-display demonstrations, not additional L34194 criteria.
+fact "skin uncertain-yes demo":
+- date is "2026-01-01".
+- value is "uncertain-yes".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Upper Eyelid Skin Finding".
+
+fact "complaint uncertain-no demo":
+- date is "2026-01-01".
+- value is "uncertain-no".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Documented Patient Complaint".
+
+fact "skin uncertain-no demo":
+- date is "2026-01-01".
+- value is "uncertain-no".
+- defined by "Blepharoplasty And Blepharoptosis Repair"."Upper Eyelid Skin Finding".
+
+case "DEMO — upper guard also checks the skin answer":
+- id is "demo-upper-skin-uncertainty-unmet".
+- subject is "Sample Patient".
+- fact is "procedure upper-blepharoplasty 2026-01-01".
+- fact is "cosmetic false 2026-01-01".
+- fact is "complaint reading 2026-01-01".
+- fact is "necessity true 2026-01-01".
+- fact is "skin uncertain-yes demo".
+- fact is "upperPhotos true 2026-01-01".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "DEMO — uncertain No complaint fails before the guard":
+- id is "demo-upper-uncertain-no-complaint".
+- subject is "Sample Patient".
+- fact is "procedure upper-blepharoplasty 2026-01-01".
+- fact is "cosmetic false 2026-01-01".
+- fact is "complaint uncertain-no demo".
+- fact is "necessity true 2026-01-01".
+- fact is "skin pseudo-mrd-at-most-2-mm 2026-01-01".
+- fact is "upperPhotos true 2026-01-01".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "DEMO — uncertain No skin fails before the guard":
+- id is "demo-upper-uncertain-no-skin".
+- subject is "Sample Patient".
+- fact is "procedure upper-blepharoplasty 2026-01-01".
+- fact is "cosmetic false 2026-01-01".
+- fact is "complaint reading 2026-01-01".
+- fact is "necessity true 2026-01-01".
+- fact is "skin uncertain-no demo".
+- fact is "upperPhotos true 2026-01-01".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is "not-certify.Unmet".
+
+case "DEMO — missing complaint still pauses before uncertainty":
+- id is "demo-upper-missing-complaint-pause".
+- subject is "Sample Patient".
+- fact is "procedure upper-blepharoplasty 2026-01-01".
+- fact is "cosmetic false 2026-01-01".
+- fact is "necessity true 2026-01-01".
+- fact is "skin uncertain-yes demo".
+- fact is "upperPhotos true 2026-01-01".
+- result is "Blepharoplasty And Blepharoptosis Repair Coverage Determination" is pause.

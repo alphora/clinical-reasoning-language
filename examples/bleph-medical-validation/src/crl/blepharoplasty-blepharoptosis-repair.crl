@@ -1,4 +1,6 @@
 # L34194 — Functional upper blepharoplasty and blepharoptosis repair
+// UI teaching overlay: synthetic uncertainty answers and an upper-branch-only guard.
+// These additions demonstrate tree behavior; they are not requirements from L34194.
 library "Blepharoplasty And Blepharoptosis Repair".
 
 // Noridian LCD L34194, version 27, revision R7, effective 2025-10-16.
@@ -22,12 +24,23 @@ terminology "Functional Complaint Options":
 - code is `driving` display is `Visual interference affecting driving`.
 - code is `other-daily-activity` display is `Another daily activity affected by the eyelid-related visual deficit`.
 - code is `none` display is `No documented functional deficit affecting daily activities`.
+- code is `uncertain-yes` display is `Uncertain — assume Yes (demo)`.
+- code is `uncertain-no` display is `Uncertain — assume No (demo)`.
 
 terminology "Upper Eyelid Skin Finding Options":
 - system is `http://example.org/crl/CodeSystem/l34194-answer-codes`.
 - code is `pseudo-mrd-at-most-2-mm` display is `Overhanging skin causes pseudo-MRD of 2.0 mm or less`.
 - code is `medial-lateral-obstruction` display is `Medial or lateral redundant tissue obscures the corresponding line of sight`.
 - code is `neither` display is `Neither qualifying skin finding is present`.
+- code is `uncertain-yes` display is `Uncertain — assume Yes (demo)`.
+- code is `uncertain-no` display is `Uncertain — assume No (demo)`.
+
+// Same authored codings occur in both answer domains so the explicit ANY OF
+// can inspect each selected answer. This terminology is a demo subset, not an LCD citation.
+terminology "Demonstration Uncertain Answers":
+- system is `http://example.org/crl/CodeSystem/l34194-answer-codes`.
+- code is `uncertain-yes` display is `Uncertain — assume Yes (demo)`.
+- code is `uncertain-no` display is `Uncertain — assume No (demo)`.
 
 concept "Procedure Under Review":
 - shape is Record.
@@ -54,6 +67,7 @@ concept "Documented Patient Complaint":
 - value domain is answer options.
 - value from is "Functional Complaint Options":
   - not qualifying is `none`.
+  - not qualifying is `uncertain-no`.
 
 concept "Individual Procedure Necessity Documented":
 - shape is Record.
@@ -71,6 +85,7 @@ concept "Upper Eyelid Skin Finding":
 - value domain is answer options.
 - value from is "Upper Eyelid Skin Finding Options":
   - not qualifying is `neither`.
+  - not qualifying is `uncertain-no`.
 
 concept "Ptosis Margin Requirement Met":
 - shape is Record.
@@ -114,6 +129,28 @@ concept "Qualifying Skin Finding Documented":
 - shape reduction is most recent.
 - definition is "Upper Eyelid Skin Finding" in qualifying.
 
+// Teaching-only checks. Both answers are required by the preceding upper-branch
+// criteria. Membership does not create extra answer slots or convert missing to false.
+concept "Complaint Answer Is Uncertain":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Documented Patient Complaint" in "Demonstration Uncertain Answers".
+- shape reduction is most recent.
+
+concept "Skin Answer Is Uncertain":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is "Upper Eyelid Skin Finding" in "Demonstration Uncertain Answers".
+- shape reduction is most recent.
+
+criterion "Upper Branch Has Uncertainty":
+- when ( "Complaint Answer Is Uncertain" or "Skin Answer Is Uncertain" ).
+
+presentation for "Upper Branch Has Uncertainty":
+- uncertainty guard passes when false.
+
 criterion "Functional Necessity Documented":
 - description is "Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint.".
 - when ( "Qualifying Patient Complaint Reported" and "Individual Procedure Necessity Documented" ).
@@ -131,7 +168,11 @@ first:
     first:
     - when "Upper Blepharoplasty Under Review" then:
         first:
-        - when "Upper Blepharoplasty Evidence" then recommend activity "Medical Policy Determination"."certify.Met".
+        - when "Upper Blepharoplasty Evidence" then:
+            first:
+            - when "Upper Branch Has Uncertainty" then recommend activity "Medical Policy Determination"."not-certify.Unmet".
+            - otherwise then recommend activity "Medical Policy Determination"."certify.Met".
+            end.
         - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
         end.
     - otherwise then:
