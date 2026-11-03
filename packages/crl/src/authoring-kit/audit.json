@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "17c4cd2d2c10f4311223fed71b7888c0057abb05",
-  "auditedSchemaVersion": "2.45",
-  "auditedContentHash": "c55212466cd02ab92714df40bbde8f6b8bfdd7ca1ce6d31690dad8d2b8f0c375",
-  "scope": "Schema 2.45 Optional uncertainty guard display: explicit Boolean Concept/Criterion metadata, conservative MV disclosure, truthful execution/review/source identities, unchanged emitted computational artifacts, and self-sufficient kit guidance. Baseline bcfbdc5b82ea0f82dd1cbf4df224165d2bde117a. Source/browser/private-extension evidence and prior UI delta dispositioned in coverage.md. No release, deployment or new native clinical qualification.",
+  "auditedRevision": "26a3413bf51b8679990c103fda6ce23f49f2b9b6",
+  "auditedSchemaVersion": "2.46",
+  "auditedContentHash": "ee5ba4d8bcd791aae1d3533593eeed225f4a7530be2c5102a52361c12f6fbd93",
+  "scope": "Schema 2.46 uncertainty guard display uses Presentation, with exact whole-guard scope and separate question answerability. Baseline17c4cd2d2c10f4311223fed71b7888c0057abb05. Three complete emitted-resource/CQL parity controls, original CRE expectations, source/editor/viewer and kit delivery evidence are recorded in coverage.md. No release, customer change or new native clinical qualification.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
