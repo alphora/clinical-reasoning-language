@@ -127,7 +127,7 @@ criterion "Blepharoptosis Repair Evidence":
 decision "Blepharoplasty And Blepharoptosis Repair Coverage Determination":
 first:
 - when "Cosmetic Surgical Purpose" then recommend activity "Medical Policy Determination"."not-certify.Unmet".
-- when "Functional Necessity Documented" then:
+- when "Functional Necessity Documented edited" then:
     first:
     - when "Upper Blepharoplasty Under Review" then:
         first:
@@ -136,7 +136,7 @@ first:
         end.
     - otherwise then:
         first:
-        - when "Blepharoptosis Repair Evidence" then recommend activity "Medical Policy Determination"."certify.Met".
+        - when "Blepharoptosis Repair Evidence edited" then recommend activity "Medical Policy Determination"."certify.Met".
         - otherwise then recommend activity "Medical Policy Determination"."not-certify.Unmet".
         end.
     end.
@@ -173,3 +173,12 @@ presentation for "Upper Blepharoplasty Photographs Documented":
 presentation for "Ptosis Photographs Documented":
 - question text is "Do the photographs document the qualifying lid position?".
 - question description is "Frontal photographs of both eyelids must support the actual-margin MRD for the eye under review, with sufficient quality and detail, patient name and date, and no distorting tilt. A lid obstructing the pupil is a clear-cut finding. Photographic measurement assumes an approximately 11 mm corneal diameter. If the corneal diameter deviates by more than 0.5 mm, document that deviation or include a millimeter ruler approximately in the corneal plane. An ordinary corneal diameter needs neither deviation documentation nor a ruler.".
+
+
+criterion "Functional Necessity Documented edited":
+- description is "Functional necessity requires both a qualifying patient-reported functional complaint and documentation that the procedure under review is individually necessary for that complaint.".
+- when (("Individual Procedure Necessity Documented" and "Qualifying Patient Complaint Reported")).
+
+
+criterion "Blepharoptosis Repair Evidence edited":
+- when (("Ptosis Photographs Documented" and "Ptosis Margin Requirement Met")).
