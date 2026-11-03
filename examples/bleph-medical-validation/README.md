@@ -10,7 +10,12 @@ For a session containing multiple procedures, review each procedure separately a
 
 ## Open and review
 
-Open `medical-validation.code-workspace`, then run **CRL: Show Medical Validation** and select Bleph. Opening this folder directly also works, using your configured panes. The workspace file opens the source, CRL Questionnaire, FHIR Questionnaire, and tree panes. The repository's **Run Bleph Medical Validation (isolated)** debugger configuration opens this workspace.
+For the upcoming development features, use the regular repository checkout on
+`develop`, select **Run Bleph Medical Validation** in Run and Debug, and press
+**F5**. It builds core and the extension from that checkout and opens this example.
+Stop an existing debug session before launching again to load the rebuilt code.
+
+Open `medical-validation.code-workspace`, then run **CRL: Show Medical Validation** and select Bleph. Opening this folder directly also works, using your configured panes. The workspace file opens the source, CRL Questionnaire, FHIR Questionnaire, and tree panes. The repository's **Run Bleph Medical Validation** debugger configuration opens this workspace.
 
 Select a case and pin its result to inspect the questions on that route. Use **Next** to traverse results and the questionnaire icon to open the Result Questionnaire. Expand descriptions and answer choices to inspect the source-specific wording. Review the corresponding source text, clinical answers, and result before setting a verdict.
 

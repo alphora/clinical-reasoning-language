@@ -40,7 +40,12 @@
       "type": "shell",
       "command": "npm run compile -w crl-language-support",
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "TEMP": "${workspaceFolder}/tmp/temp",
+          "TMP": "${workspaceFolder}/tmp/temp",
+          "npm_config_cache": "${workspaceFolder}/tmp/npm-cache"
+        }
       },
       "group": "build",
       "problemMatcher": [],

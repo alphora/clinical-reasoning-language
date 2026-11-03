@@ -23,7 +23,7 @@
       "preLaunchTask": "prepare-multiselect-demo"
     },
     {
-      "name": "Run Bleph Medical Validation (isolated)",
+      "name": "Run Bleph Medical Validation",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -33,6 +33,10 @@
         "--extensionDevelopmentPath=${workspaceFolder}/packages/crl-vscode",
         "${workspaceFolder}/examples/bleph-medical-validation/medical-validation.code-workspace"
       ],
+      "env": {
+        "TEMP": "${workspaceFolder}/tmp/temp",
+        "TMP": "${workspaceFolder}/tmp/temp"
+      },
       "outFiles": [
         "${workspaceFolder}/packages/crl-vscode/dist/**/*.js"
       ],

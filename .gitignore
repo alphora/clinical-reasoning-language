@@ -1,5 +1,6 @@
 # Dependency directories
 node_modules/
+/Microsoft/Windows/PowerShell/ModuleAnalysisCache
 # ...except test fixture node_modules — these are committed fake packages
 # exercised by resolver tests; they are not real npm dependencies.
 !packages/crl/src/imports/tests/fixtures/**/node_modules/

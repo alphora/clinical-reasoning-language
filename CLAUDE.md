@@ -325,6 +325,14 @@ prints the command. Ask the operator in chat — **do not run the grant yourself
 
 # Project rules (CRL) — outside the provisioned blocks above
 
+## Development and operator-test workflow
+
+Read and follow [docs/development-workflow.md](docs/development-workflow.md)
+before choosing a branch, creating a checkout, integrating completed work, or
+preparing an operator debug session. Completed features ready for operator
+testing merge into `develop`; normal F5 uses this checkout. Deferred work stays
+on feature branches. `main` promotion and publication require release authority.
+
 ## Local build and test storage
 
 Operator instruction: generated scratch, temporary files, build/test outputs and

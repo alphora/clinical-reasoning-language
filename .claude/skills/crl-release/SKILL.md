@@ -29,6 +29,11 @@ built `.vsix` as a zip.** Never conclude anything from `vsce ls`.
 
 ## 0. Before anything: is this release even wanted?
 
+Read [the development workflow](../../../docs/development-workflow.md). Operator
+debug testing runs completed work integrated into `develop` in the regular
+checkout. Deferred features remain on their own branches. Do not create another
+source checkout or treat readiness for `develop` testing as release permission.
+
 Ask the operator, in chat, unless they have already said to ship. Do NOT self-authorize a release
 because the work looks done. Standing operator instruction: *"we can't be releasing garbage"* /
 *"STOP SHIPPING SHIT"*.
@@ -251,8 +256,12 @@ own is a product nothing checks.
 3. Before tagging, **check the in-scope issues are actually closed**: `Closes #N` auto-closes only on
    the DEFAULT branch, so nothing landing on `develop` closes anything. `gh issue view <N> --json state`
    for each is a 30-second check; a release once shipped with 12 of 13 issues still open.
-4. `git checkout main && git merge --ff-only develop && git push` — main is strictly behind, so this is
-   clean.
+4. Verify `develop` contains the exact qualified source and excludes deferred work.
+   Check current local/remote `main` and `develop` identities and require
+   `git merge-base --is-ancestor main develop` before promotion. If main has fixes
+   absent from develop, integrate them into develop and qualify the changed
+   candidate first. Under release authorization, promote with
+   `git checkout main && git merge --ff-only --no-overwrite-ignore develop && git push`.
 5. **Lightweight** tag `vX.Y.Z` on main (prior tags are lightweight, not annotated); push it.
 6. `gh release create vX.Y.Z --title … --notes-file tmp/… --target main <assets>` — published, not
    draft. Publishing is what FIRES `release.yml`. Assets:
