@@ -180,7 +180,7 @@ import { reconcileScopeOperation } from './mvEditRecovery';
 import { inspectMvEdits } from './mvEditTransaction';
 import { MvDefinitionFreshness, type DefinitionFreshness } from './mvDefinitionFreshness';
 import { conditionTruthKeys, projectFlowStructure } from "./flowProjection";
-import { forcedUncertaintyVisibility, uncertaintyGuardCandidates, sanitizeUncertaintySnapshot, addUncertaintyDisclosureKeys, flaggedUncertaintyGuards } from "./uncertaintyGuardDisplay";
+import { forcedUncertaintyVisibility, uncertaintyGuardCandidates, uncertaintyGuardExpanded, sanitizeUncertaintySnapshot, addUncertaintyDisclosureKeys, flaggedUncertaintyGuards } from "./uncertaintyGuardDisplay";
 import { executionRoutes, routeScenario, buildRouteQuestionnaire, type ExecutionRoute } from "./executionRoutes";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
 import {
@@ -513,6 +513,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // REFACTOR:grounded: model-scoped view state; source predicates, pins and flags stay authoritative.
   let expandedUncertaintyGuards = new Set<string>();
   let forcedUncertaintyGuards = new Map<string, 'case' | 'flag' | 'evidence'>();
+  let collapsedUncertaintyGuards = new Set<string>();
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -966,10 +967,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // REFACTOR:grounded: explicit source/CRL navigation discloses; ACK/selection replay only paints.
     if (pane === 'tree' && target.expandUncertainty && mode === 'medical-validation') {
       const targetKeys = target.kind === 'unit' ? crlAnchorsForUnits([target.id], m) : target.kind === 'crlNode' ? [target.id] : [];
+      const display = { expanded: expandedUncertaintyGuards, collapsed: collapsedUncertaintyGuards, forced: forcedUncertaintyGuards };
       const owning = [...uncertaintyGuardCandidates(projectFlowStructure(crlStructure)).values()]
-        .filter(candidate => targetKeys.some(key => candidate.omittedKeys.includes(key)) && !expandedUncertaintyGuards.has(candidate.guardKey) && !forcedUncertaintyGuards.has(candidate.guardKey));
+        .filter(candidate => {
+          const retained = forcedUncertaintyGuards.get(candidate.guardKey) === 'case' ? candidate.nonpassTerminalKey : candidate.passTerminalKey;
+          return !uncertaintyGuardExpanded(candidate.guardKey, display)
+            && targetKeys.some(key => key !== retained && candidate.subtreeKeys.includes(key));
+        });
       if (owning.length) {
-        owning.forEach(candidate => expandedUncertaintyGuards.add(candidate.guardKey));
+        owning.forEach(candidate => { collapsedUncertaintyGuards.delete(candidate.guardKey); expandedUncertaintyGuards.add(candidate.guardKey); });
         renderPane('tree'); coord.queueReveal('tree', target, indexVersion); return;
       }
     }
@@ -2297,7 +2303,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const complete = renderFlowPane(crlStructure, treeRenderOptions(tree.gen));
       const fullView: PaneView = { ...tree, ...complete };
       const flaggedGids = new Set(flagPlacementFor(fullView, relatedFlags).gids);
-      for (const key of flaggedUncertaintyGuards(candidates, flaggedGids, complete.flagOwnerKeys ?? {})) forced.set(key, 'flag');
+      const retained = new Map([...candidates].map(([key,candidate]) => [key, forced.get(key) === 'case' ? candidate.nonpassTerminalKey : candidate.passTerminalKey]));
+      for (const key of flaggedUncertaintyGuards(candidates, flaggedGids, complete.flagOwnerKeys ?? {}, retained)) forced.set(key, 'flag');
     }
     return forced;
   }
@@ -2390,7 +2397,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // path with no new hit kinds, and it highlights in lockstep with the CRL pane (postReveal's crl|tree arms).
       forcedUncertaintyGuards = computeForcedUncertainty(v);
       const r = renderFlowPane(crlStructure, { ...treeRenderOptions(gen),
-        ...(mode === 'medical-validation' ? { uncertaintyDisplay: { expanded: expandedUncertaintyGuards, forced: forcedUncertaintyGuards } } : {}) });
+        ...(mode === 'medical-validation' ? { uncertaintyDisplay: { expanded: expandedUncertaintyGuards, collapsed: collapsedUncertaintyGuards, forced: forcedUncertaintyGuards } } : {}) });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       v.focusNodes = r.focusNodes;
@@ -3070,8 +3077,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void nodeMenu(msg.key); // #217 + #203 Todo 4b Slice B: right-click a flow node (MV) — combined menu (verdict / add-flag); a non-flaggable node routes straight to the verdict pick
     } else if (msg.type === 'toggleUncertaintyGuard' && typeof msg.key === 'string' && pane === 'tree' && mode === 'medical-validation' && msg.gen === v.gen) {
       const candidates = uncertaintyGuardCandidates(projectFlowStructure(crlStructure));
-      if (!candidates.has(msg.key) || computeForcedUncertainty(v).has(msg.key)) return;
-      if (expandedUncertaintyGuards.has(msg.key)) expandedUncertaintyGuards.delete(msg.key); else expandedUncertaintyGuards.add(msg.key);
+      const forced = computeForcedUncertainty(v);
+      if (!candidates.has(msg.key) || forced.get(msg.key) === 'flag' || forced.get(msg.key) === 'evidence') return;
+      if (uncertaintyGuardExpanded(msg.key, { expanded: expandedUncertaintyGuards, collapsed: collapsedUncertaintyGuards, forced })) {
+        expandedUncertaintyGuards.delete(msg.key); collapsedUncertaintyGuards.add(msg.key);
+      } else {
+        collapsedUncertaintyGuards.delete(msg.key); expandedUncertaintyGuards.add(msg.key);
+      }
       renderPane('tree', undefined, undefined, undefined, msg.key);
       const previousOrigin = scrollSuppressPane; scrollSuppressPane = 'tree';
       try { if (state.selection) dispatch({ type: 'select', selection: state.selection }, true); }
@@ -3426,7 +3438,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       resetToEmpty(`Failed to build CRL/CEL model: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
-    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
+    expandedUncertaintyGuards = new Set(); collapsedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     indexVersion += 1;
     lastClicked = undefined;
     // #173 T3: the runtime-ref → CRL-row-nodeKey join (pure, off crlStructure). A prior peek's gap list is stale now.
@@ -3526,7 +3538,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     defExpr = new Map();
     guardOutlines = new Map();
     criterionIdentities = new Map();
-    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
+    expandedUncertaintyGuards = new Set(); collapsedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     expandedGuardWhens = new Set();
     crlMaps = undefined;
     scenarios = undefined;
@@ -3565,7 +3577,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     caseKeyNumbers = {};
     conceptKeyNumbers = {};
     lastClicked = undefined;
-    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
+    expandedUncertaintyGuards = new Set(); collapsedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: { version: indexVersion, anchorFilePath: "", steps: [], sourceCycleIds: [], crlNav: [], celNav: [] } });
@@ -3743,7 +3755,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     currentCel = celPath;
     interactiveQuestionnaire.policyChanged(currentCel);
     flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
-    expandedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
+    expandedUncertaintyGuards = new Set(); collapsedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
     expandedGuardWhens = new Set(); // #224 ii.3 Slice 2: a retarget starts the new policy's criteria all-collapsed (nodeKeys aren't policy-qualified beyond lib/decision, so carry-over could pre-expand a same-named branch)
     cockpitAgentBridge.notifyChanged(); // refresh the agent chip for the new mode/policy (getAppState reads live state)
     const uri = vscode.Uri.file(celPath);

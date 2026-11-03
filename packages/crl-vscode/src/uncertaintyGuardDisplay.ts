@@ -5,11 +5,12 @@ export interface UncertaintyGuardCandidate {
   guardKey: string;
   passWhen: boolean;
   passTerminalKey: string;
+  nonpassTerminalKey: string;
   subtreeKeys: string[];
-  omittedKeys: string[];
 }
 export interface UncertaintyDisplayState {
   expanded?: ReadonlySet<string>;
+  collapsed?: ReadonlySet<string>;
   forced?: ReadonlyMap<string, "case" | "flag" | "evidence">;
 }
 export interface UncertaintyGuardControl {
@@ -45,10 +46,18 @@ export function uncertaintyGuardCandidates(structure: readonly CrlDecisionStruct
     add(node);
     if (subtree.some(key => counts.get(key) !== 1)) continue;
     const passTerminalKey = (node.uncertaintyGuard.passWhen ? yesLeaf : noLeaf).nodeKey;
-    result.set(node.nodeKey, { guardKey: node.nodeKey, passWhen: node.uncertaintyGuard.passWhen, passTerminalKey,
-      subtreeKeys: subtree, omittedKeys: subtree.filter(key => key !== passTerminalKey) });
+    const nonpassTerminalKey = (node.uncertaintyGuard.passWhen ? noLeaf : yesLeaf).nodeKey;
+    result.set(node.nodeKey, { guardKey: node.nodeKey, passWhen: node.uncertaintyGuard.passWhen, passTerminalKey, nonpassTerminalKey,
+      subtreeKeys: subtree });
   }
   return result;
+}
+
+/** Manual disclosure preferences apply to a known case; incomplete evidence and hidden flags require the full check. */
+export function uncertaintyGuardExpanded(guardKey: string, state: UncertaintyDisplayState): boolean {
+  const reason = state.forced?.get(guardKey);
+  return reason === 'flag' || reason === 'evidence' || !!state.expanded?.has(guardKey)
+    || (reason === 'case' && !state.collapsed?.has(guardKey));
 }
 
 /** REFACTOR:grounded: paint authority remains unfolded; only this cloned layout is shortened. */
@@ -58,13 +67,14 @@ export function foldUncertaintyGuards(structure: readonly CrlDecisionStructure[]
   const visit = (node: ProjectedFlowNode): ProjectedFlowNode => {
     const candidate = candidates.get(node.nodeKey), forced = state.forced?.get(node.nodeKey);
     if (candidate) {
-      const expanded = !!forced || !!state.expanded?.has(node.nodeKey);
+      const expanded = uncertaintyGuardExpanded(node.nodeKey, state);
       if (expanded) {
         controls.set(node.nodeKey, { guardKey: node.nodeKey, expanded: true, forced });
         disclosures[node.nodeKey] = candidate.subtreeKeys;
       } else {
+        const retainedTerminalKey = forced === 'case' ? candidate.nonpassTerminalKey : candidate.passTerminalKey;
         const find = (children: ProjectedFlowNode[]): ProjectedFlowNode | undefined => {
-          for (const child of children) { if (child.nodeKey === candidate.passTerminalKey) return child; const nested = find(child.children); if (nested) return nested; }
+          for (const child of children) { if (child.nodeKey === retainedTerminalKey) return child; const nested = find(child.children); if (nested) return nested; }
         };
         const leaf = find(node.children)!;
         controls.set(leaf.nodeKey, { guardKey: node.nodeKey, expanded: false });
@@ -87,6 +97,7 @@ export function forcedUncertaintyVisibility(candidates: ReadonlyMap<string, Unce
 }): Map<string, "case" | "evidence"> {
   const forced = new Map<string, "case" | "evidence">();
   if (!context) return forced;
+  const observed = new Map<string, boolean>();
   let unknownError = context.status === "error";
   const visit = (nodes: readonly ViewNode[]): void => {
     for (const node of nodes) {
@@ -97,7 +108,12 @@ export function forcedUncertaintyVisibility(candidates: ReadonlyMap<string, Unce
           if (!key) unknownError = true;
           if (candidate) {
             if (bad || node.unknown || typeof node.condition?.satisfied !== "boolean") forced.set(key!, "evidence");
-            else if (node.condition.satisfied !== candidate.passWhen) forced.set(key!, "case");
+            else {
+              const value = node.condition.satisfied;
+              if (observed.has(key!) && observed.get(key!) !== value) forced.set(key!, 'evidence');
+              observed.set(key!, value);
+              if (value !== candidate.passWhen && forced.get(key!) !== 'evidence') forced.set(key!, 'case');
+            }
           }
         }
       }
@@ -127,7 +143,10 @@ export function addUncertaintyDisclosureKeys(visible: Set<string>, pinned: reado
 }
 
 /** REFACTOR:grounded: placement GIDs include non-addressable Criterion rows and flag proxies. */
-export function flaggedUncertaintyGuards(candidates: ReadonlyMap<string, UncertaintyGuardCandidate>, gids: ReadonlySet<string>, owners: Readonly<Record<string, string>>): Set<string> {
+export function flaggedUncertaintyGuards(candidates: ReadonlyMap<string, UncertaintyGuardCandidate>, gids: ReadonlySet<string>, owners: Readonly<Record<string, string>>, retainedTerminals?: ReadonlyMap<string, string>): Set<string> {
   const flagged = new Set([...gids].map(gid => owners[gid]).filter((key): key is string => !!key));
-  return new Set([...candidates].filter(([,candidate]) => candidate.omittedKeys.some(key => flagged.has(key))).map(([key]) => key));
+  return new Set([...candidates].filter(([guardKey,candidate]) => {
+    const retained = retainedTerminals?.get(guardKey) ?? candidate.passTerminalKey;
+    return candidate.subtreeKeys.some(key => key !== retained && flagged.has(key));
+  }).map(([key]) => key));
 }

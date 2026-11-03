@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import { projectFlowStructure } from './flowProjection.ts';
-import { foldUncertaintyGuards, uncertaintyGuardCandidates, forcedUncertaintyVisibility, addUncertaintyDisclosureKeys } from './uncertaintyGuardDisplay.ts';
+import { foldUncertaintyGuards, uncertaintyGuardCandidates, forcedUncertaintyVisibility, addUncertaintyDisclosureKeys, flaggedUncertaintyGuards } from './uncertaintyGuardDisplay.ts';
 import { renderFlowPane } from './flowPaneHtml.ts';
 import { renderFlowSnapshotDocument } from './flowSnapshotHtml.ts';
 
@@ -35,6 +35,37 @@ test('user expansion and forced full evidence restore original branches without 
     assert.deepEqual(result.structure,full);assert.deepEqual(result.disclosures.u,keys(full));
     assert(result.controls.get('u').expanded);
   }
+});
+
+test('manual nonpass collapse retains its actual terminal and enabled U for either pass polarity', () => {
+  for (const passWhen of [false, true]) {
+    const full = projectFlowStructure(tree(guard('u', passWhen)));
+    full[0].children[0].incomingOutcome = 'Yes';
+    const before = JSON.stringify(full);
+    const candidate = uncertaintyGuardCandidates(full).get('u');
+    const state = { forced: new Map([['u', 'case']]), collapsed: new Set(['u']) };
+    const compact = foldUncertaintyGuards(full, state);
+    assert.equal(compact.structure[0].children[0].nodeKey, candidate.nonpassTerminalKey);
+    assert.equal(compact.structure[0].children[0].incomingOutcome, 'Yes');
+    assert.equal(JSON.stringify(full), before);
+    const rendered = renderFlowPane(tree(guard('u', passWhen)), { uncertaintyDisplay: state });
+    assert(rendered.anchors[candidate.nonpassTerminalKey]);
+    assert(!rendered.anchors[candidate.passTerminalKey]);
+    assert.match(rendered.html, /aria-expanded="false" aria-disabled="false"/);
+    const reopened = foldUncertaintyGuards(full, { ...state, expanded: new Set(['u']), collapsed: new Set() });
+    assert.deepEqual(reopened.structure, full);
+    for (const reason of ['flag', 'evidence']) {
+      assert.deepEqual(foldUncertaintyGuards(full, { ...state, forced: new Map([['u', reason]]) }).structure, full);
+    }
+  }
+});
+
+test('nonpass collapse cannot omit a flag on the opposite ordinary terminal', () => {
+  const candidates = uncertaintyGuardCandidates(projected());
+  const retained = new Map([['u', candidates.get('u').nonpassTerminalKey]]);
+  const owners = { ordinary: 'u-no', nonpass: 'u-yes' };
+  assert(flaggedUncertaintyGuards(candidates, new Set(['ordinary']), owners, retained).has('u'));
+  assert(!flaggedUncertaintyGuards(candidates, new Set(['nonpass']), owners, retained).has('u'));
 });
 test('unsupported, unmarked and ambiguous topologies remain complete',()=>{
   const cases=[];
@@ -73,7 +104,14 @@ test('unknown, invalidated, publication errors and evaluated-unavailable evidenc
 test('route scoping excludes other executions; conflicting reached values remain visible',()=>{
   const candidates=uncertaintyGuardCandidates(projected()),tree=[evidence(),evidence({nodeId:'other',condition:{satisfied:true}})];
   assert.equal(forcedUncertaintyVisibility(candidates,{tree,status:'pass',resolve:()=> 'u',routeNodeIds:new Set(['u'])}).size,0);
-  assert.equal(forcedUncertaintyVisibility(candidates,{tree,status:'pass',resolve:()=> 'u'}).get('u'),'case');
+  assert.equal(forcedUncertaintyVisibility(candidates,{tree,status:'pass',resolve:()=> 'u'}).get('u'),'evidence');
+  assert.equal(forcedUncertaintyVisibility(candidates,{tree:[...tree].reverse(),status:'pass',resolve:()=> 'u'}).get('u'),'evidence');
+  for (const extra of [{ unknown: true }, { invalidated: true }, { publicationErrors: [{}] }]) {
+    const unavailable = evidence(extra), nonpass = evidence({ condition: { satisfied: true } });
+    for (const order of [[unavailable, nonpass], [nonpass, unavailable]]) {
+      assert.equal(forcedUncertaintyVisibility(candidates, { tree: order, status: 'pass', resolve: () => 'u' }).get('u'), 'evidence');
+    }
+  }
 });
 test('pin disclosure visibility does not modify the executed pin and ignores off-route guards',()=>{
   const pinned=['a','u','u-no'],before=[...pinned],visible=new Set(pinned);

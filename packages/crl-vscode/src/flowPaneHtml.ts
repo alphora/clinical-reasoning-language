@@ -852,14 +852,14 @@ export function renderFlowPane(
     const x = left(n);
     const y = top(n);
     const uncertaintyControl = uncertainty?.controls.get(n.nodeKey);
+    const uncertaintyLocked = uncertaintyControl?.forced === 'flag' || uncertaintyControl?.forced === 'evidence';
     const uncertaintyTitle = uncertaintyControl?.forced === 'flag' ? 'Shown because this check has review flags'
       : uncertaintyControl?.forced === 'evidence' ? 'Shown because this check cannot safely be hidden'
-      : uncertaintyControl?.forced ? 'Shown for the inspected case'
       : uncertaintyControl?.expanded ? 'Hide uncertainty check' : 'Show uncertainty check';
     const uncertaintyMarkup = uncertaintyControl ?
       `<g class="flow-uncertainty-toggle" data-flow-uncertainty-toggle="${escapeHtml(uncertaintyControl.guardKey)}"` +
-      `${uncertaintyControl.expanded ? '' : ' data-flow-uncertainty-collapsed="1"'} role="button" tabindex="${uncertaintyControl.forced ? -1 : 0}"` +
-      ` aria-expanded="${uncertaintyControl.expanded}" aria-disabled="${!!uncertaintyControl.forced}" aria-label="${uncertaintyTitle}">` +
+      `${uncertaintyControl.expanded ? '' : ' data-flow-uncertainty-collapsed="1"'} role="button" tabindex="${uncertaintyLocked ? -1 : 0}"` +
+      ` aria-expanded="${uncertaintyControl.expanded}" aria-disabled="${uncertaintyLocked}" aria-label="${uncertaintyTitle}">` +
       `<title>${uncertaintyTitle}</title><rect x="${x + NODE_W + 6}" y="${y + 25}" width="20" height="18" rx="4"/>` +
       `<text x="${x + NODE_W + 16}" y="${y + 38}" text-anchor="middle">U</text></g>` : '';
     // ROW CATEGORY gates the anchor/reveal surface: a structure node and an OUTLINE LEAF are addressable (anchor + reveal);

@@ -31,7 +31,7 @@ export function fixture(directory: string) {
   const resolver = (sv: typeof model.scenarios.scenarios[number]) => (id: string) => resolveThisNode(id,
     { lib: sv.decision?.libraryName ?? '', decision: sv.decision?.name ?? '' }, sv.tree, runtime, undefined).nodeKey;
   const routes = (name: string) => executionRoutes(scenarios.get(name)!, model.crlStructure);
-  return { guardKeys: [...candidates.keys()], cases: [...scenarios.keys()], render(state: { gen: number; expanded?: string[]; selected?: string; pin?: string; flag?: string; modelVersion: number; focus?: string }) {
+  return { guardKeys: [...candidates.keys()], cases: [...scenarios.keys()], render(state: { gen: number; expanded?: string[]; collapsed?: string[]; selected?: string; pin?: string; flag?: string; modelVersion: number; focus?: string }) {
     const name = state.pin || state.selected, sv = name ? scenarios.get(name) : undefined;
     const route = state.pin ? routes(state.pin).find(r => r.terminalKind === 'produced') : undefined;
     const forced = new Map<string, 'case' | 'evidence' | 'flag'>(forcedUncertaintyVisibility(candidates, sv ? {
@@ -40,7 +40,7 @@ export function fixture(directory: string) {
     if (state.flag && candidates.has(state.flag)) forced.set(state.flag, 'flag');
     const rendered = renderFlowPane(model.crlStructure, { traversalNavigation: true, revealPrefix: `g${state.gen}_`, concepts: model.conceptLayer,
       guardOutlines: model.guardOutlines, defExpr: (lib, name) => model.defExpr.get(nodeKey(conceptDeclRef(lib, name))),
-      uncertaintyDisplay: { expanded: new Set(state.expanded ?? []), forced } });
+      uncertaintyDisplay: { expanded: new Set(state.expanded ?? []), collapsed: new Set(state.collapsed ?? []), forced } });
     const conditions = sv ? conditionTruthKeys(sv.tree, id => !route || route.nodeIds.includes(id) ? resolver(sv)(id) : undefined)
       .map(mark => ({ ids: rendered.anchors[mark.key]?.segmentIds ?? [], result: mark.result })) : [];
     const pinned = route ? { type: 'routeCards', gen: state.gen, token: 'pin:' + state.pin, pinKey: route.nodeKeys.at(-1),
