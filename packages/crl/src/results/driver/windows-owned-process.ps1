@@ -82,14 +82,14 @@ public static class CrlOwnedProcess {
             ThreadPool.QueueUserWorkItem(delegate { try { Console.OpenStandardInput().ReadByte(); } catch {} cancelled.Set(); });
             var command=new StringBuilder(Quote(executable)); foreach (var arg in args) command.Append(' ').Append(Quote(arg));
             if (WaitForSingleObject(owner,0)==0 || cancelled.WaitOne(0)) reason="cancelled";
-            else if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()>=deadline) reason="timeout";
+            else if (deadline>0 && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()>=deadline) reason="timeout";
             else {
                 Check(CreateProcess(executable,command,IntPtr.Zero,IntPtr.Zero,true,0x80000,IntPtr.Zero,null,ref startup,out child));
                 launched=true;
                 while (true) {
                     if (WaitForSingleObject(child.process,20)==0) { Check(GetExitCodeProcess(child.process,out exitCode)); reason="exit"; break; }
                     if (WaitForSingleObject(owner,0)==0 || cancelled.WaitOne(0)) { reason="cancelled"; break; }
-                    if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()>=deadline) { reason="timeout"; break; }
+                    if (deadline>0 && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()>=deadline) { reason="timeout"; break; }
                 }
             }
         } catch (Exception e) { Console.Error.WriteLine("CRL process launch/ownership: "+e.Message); }

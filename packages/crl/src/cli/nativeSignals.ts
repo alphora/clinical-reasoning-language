@@ -6,7 +6,7 @@ export function installNativeSignals(): { interrupted: boolean } {
   const stop = (code: number) => {
     if (state.interrupted) return;
     state.interrupted = true;
-    void shutdownProducer().finally(() => process.exit(code));
+    void shutdownProducer().catch(error=>console.error('Native cleanup failed: '+String(error))).finally(() => process.exit(code));
   };
   process.on("SIGINT", () => stop(130));
   process.on("SIGTERM", () => stop(143));

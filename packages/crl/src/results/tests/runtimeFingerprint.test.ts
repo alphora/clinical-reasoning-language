@@ -20,3 +20,8 @@ it.each([{...reply(),stdout:"broken"},{...reply(),failure:"timeout"},{...reply()
  const r=await runtimeFingerprint("java","engine.jar",DEFAULT_BOUNDS);
  expect(r.sha256).toBeUndefined();expect(r.cleanupConfirmed).toBe(result.cleanupConfirmed);
 });
+
+it('fingerprints the reserved worker without launching another JVM',async()=>{
+ native.mockClear();const runtime={mode:'worker' as const,runtimeInfo:reply().stdout,run:vi.fn()};
+ const result=await runtimeFingerprint('java','engine.jar',DEFAULT_BOUNDS,undefined,process.env,runtime);expect(result.sha256).toBeTruthy();expect(native).not.toHaveBeenCalled();
+});

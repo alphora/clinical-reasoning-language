@@ -251,9 +251,9 @@ const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.Vi
 // Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
 // actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
 const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", fhirQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
-// Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
+// Bound full source rendering; annotation-dense policies can exceed 2000 marks even with short source text.
 const MAX_SOURCE_CHARS = 200_000;
-const MAX_SOURCE_MARKS = 2000;
+const MAX_SOURCE_MARKS = 5000;
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
@@ -2239,7 +2239,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const textLen = model.anchor.text.length;
       const markCount = units.length + overlays.length;
       if (textLen > MAX_SOURCE_CHARS || markCount > MAX_SOURCE_MARKS) {
-        // Over the measured floor — STOP (per disc 118): post a navigation-only fallback rather than freeze the webview.
+        // Over the rendering budget: post a navigation-only fallback rather than freeze the webview.
         console.warn(
           `[crl.cockpit] Source inline render skipped: ${textLen} chars, ${markCount} marks (> ${MAX_SOURCE_CHARS}/${MAX_SOURCE_MARKS}). Navigate + Open Raw still work.`,
         );

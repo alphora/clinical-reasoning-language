@@ -2264,8 +2264,8 @@ export async function main(): Promise<void> {
   let exiting = false;
   const exit = async () => {
     if (exiting) return; exiting = true;
-    await shutdownProducer();
-    process.exit(0);
+    try { await shutdownProducer(); process.exit(0); }
+    catch(error) { console.error('Native cleanup failed: '+String(error)); process.exit(1); }
   };
   process.stdin.on("end", exit);
   process.on("SIGTERM", exit);

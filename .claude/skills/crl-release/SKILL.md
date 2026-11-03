@@ -107,11 +107,11 @@ unexecuted — exactly how 4.114.0’s missing driver stayed invisible through a
       require `audit.contentMatchesAudit === true` and equality with this export's canonical content,
       schema, content hash and audited revision. Do not certify a release using an unstamped kit.
 
-Build both published artifacts and **look inside them as archives**:
+Build both published artifacts and **look inside them as archives**. The versioned VSIX produced here is the one installed in Gate C and published in §7; copy verified bytes if needed, never rebuild a second untested upload:
 
 ```bash
-cd packages/crl-vscode && npx vsce package --no-dependencies -o /tmp/verify.vsix
-# pass the WINDOWS path -- git-bash /tmp is not the path python sees
+npm run package:release -w crl-language-support
+# Inspect the actual versioned VSIX produced above; pass its absolute filesystem path.
 python3 -c "import zipfile,sys;n=zipfile.ZipFile(sys.argv[1]).namelist();print(len(n));print(chr(10).join(n))" <abs-path-to.vsix>
 npm pack -w @smile-digital-health/crl --dry-run --json   # inspect .files[]
 ```
@@ -230,7 +230,7 @@ partial release that looks complete.
 
 | product | how it reaches a user | who publishes it |
 |---|---|---|
-| **vsix** (extension + bundled MCP server + catalog + `$apply` driver) | GitHub release ASSET — users download and install | **you, by hand** (`npm run package:extension`) |
+| **vsix** (extension + bundled MCP server + catalog + `$apply` driver) | GitHub release ASSET — users download and install | **you, by hand** (`npm run package:release -w crl-language-support`) |
 | **npm tarball** `@smile-digital-health/crl` (core + CLI + driver) | `npm install` | `release.yml` on `release: published` |
 | **catalog + CRLCommon.cql + pattern catalog md** | GitHub release assets | **you, by hand** |
 
@@ -242,9 +242,12 @@ own is a product nothing checks.
 
 1. Commit the bump from §1: `chore(release): X.Y.Z — <what changed>`. The gates have already run
    against these exact bytes.
-2. Release notes → **`tmp/RELEASE_NOTES_vX.Y.Z.md`**, never the repo root. The operator posts them to
-   the GitHub release page and treats that as canonical; they deleted the ones that accumulated in the
-   root and asked for them in `tmp/` instead.
+2. Generate the illustrated downloads from CRL's catalog using §Release Notes below, then run
+   `node packages/crl-vscode/scripts/release-notes.mjs --body <source-SHA> tmp/RELEASE_NOTES_vX.Y.Z.md`.
+   The CLI requires clean committed source and binds the supplied SHA to current HEAD. Regenerate if
+   HEAD moves. Keep that body in `tmp/`, never the repository root; pass that exact file to step6's
+   `--notes-file`. Other release outputs stay on the operator's designated storage drive.
+   Publish that generated copy as canonical; do not maintain a second handwritten feature list.
 3. Before tagging, **check the in-scope issues are actually closed**: `Closes #N` auto-closes only on
    the DEFAULT branch, so nothing landing on `develop` closes anything. `gh issue view <N> --json state`
    for each is a 30-second check; a release once shipped with 12 of 13 issues still open.
@@ -258,6 +261,7 @@ own is a product nothing checks.
    - `packages/crl-vscode/dist/catalog.json`
    - `packages/crl/src/cql-emitter/catalog/CRLCommon.cql`
    - `packages/crl/src/cql-emitter/catalog/inference-pattern-catalog.md`
+   - `crl-release-notes-<ver>.html` and `crl-release-notes-<ver>.md` — generated from the same catalog as the installed reader.
    - **`SHA256SUMS`** — `sha256sum <each asset> > SHA256SUMS`. Without it a consumer can only hash
      their own download, which proves their fetch and not the published bytes.
 7. **Watch `release.yml` to green.** A red CI after publish is a FAILED release, not a footnote: the
@@ -278,6 +282,20 @@ own is a product nothing checks.
   `gh release delete vX.Y.Z --yes --cleanup-tag` → re-tag at the fixed `main` HEAD → `gh release create`
   again. The built vsix/tgz are reusable if only CI files changed. If you committed the fix directly on
   `main`, FF `develop ← main` afterwards.
+
+## Release Notes — CRL content provider for Spaces
+
+The operator-approved ownership is CRL/KELP content providers and a Spaces-owned combined experience. Standalone CRL does not launch notes. The delivery contract is [docs/release-notes-provider-contract.md](../../../docs/release-notes-provider-contract.md); Spaces is authoritative for its consumer side. This section changes notes-specific gates only; all native/runtime/kit/full-suite/publication gates above remain in force.
+
+- Author concise versioned entries and actual synthetic screenshots/useful silent videos in `packages/crl-vscode/media/release-notes/`. Write for nurses and informaticists: explain visible review/questionnaire improvements in plain language. Omit internal engine, compiler, security-dependency, packaging, cache, hash and installation details from user feature entries; keep those in maintainer deployment evidence. Do not create entries announcing the Release Notes themselves. Retain relevant user-facing history and referenced media; explicit operator curation may remove irrelevant entries without inventing a newer deployment receipt or retained floor. Published past assets stay immutable. Mandatory PNG alt; every WebM has PNG poster, alt and visible caption/text equivalent. Retain VP8/VP9 codec evidence, verify there is no audio track, and retain actual playback before shipping video. No customer data or audio dependency.
+- For portable HTML/MD and the GitHub body, obtain Spaces' actual deployed CRL version/receipt for the targets and record it as `deployedBaselineVersion`. A public tag is not deployment evidence. Reconcile oldest supported target with the retained floor; never invent/clamp receipts or silently discard supported user-facing changes. Operator-directed removal of technical or self-referential entries does not raise the retained floor. Spaces ignores these producer fields for its combined viewer and owns its own deployment baseline/history.
+- Run `npm run notes:write -w crl-language-support`, review README, then `npm run notes:check -w crl-language-support`. Source is exactly catalog, README and referenced media. Check reported byte sizes before release: manifest4KiB/catalog256KiB/PNG2MiB+4096×4096pixels/media5MiB/video1MiB (distinct files counted once). Owner schema limits:100releases/20features; titles120/description2000/alt-caption300Unicode code points, displayName40, version64. Single-line fields reject controls; descriptions permit LF only. Source drafts remain allowed in development; provider staging filters entries through actual package version base and includes only their media. No eligible development history means no descriptor, not a failed compile. Public `notes:release` still requires the latest entry to equal the release version.
+- The normal compile stages the generated root `release-notes/` folder. Provider manifest has exactly schemaVersion:1, displayName:"CRL", version equal to actual package.json. Catalog path is fixed; no componentId/catalog descriptor fields. Old globalState keys remain inert. There is no CRL notes launch, command, setting, readiness callback or history writer; do not add branch/file watchers to show notes. Spaces owns **KALM AI: What's New** (`kalm.showReleaseNotes`).
+- Use `npm run package:release -w crl-language-support` for the actual versioned VSIX. After strict source preflight and vsce packaging it runs `scripts/verify-release-notes.mjs` on that produced archive. Confirm real ZIP entries `extension/release-notes/provider.json`, catalog and exact referenced media, canonical filtered JSON and exact source media bytes, exact manifest/package version, and absence of source `extension/media/release-notes/`, README/scripts, duplicate/extra/stale entries and retired reader wiring. Do not trust a source check or file list as archive evidence. Run the existing negative controls for stale README, missing/unexpected media, bad signatures, version mismatch and byte-budget overflow; observe missing/changed/extra archive controls fail. The generated folder's Git ignore must not silently exclude it from the actual VSIX.
+- Install and qualify those SAME verified bytes. Inspect installed package/runtime for absence of retired CRL command/setting/history logic; in a fresh normal isolated Code profile confirm no separate CRL notes tab or marker write. Never seed/delete/migrate history. Keep existing provenance/MV views working independently. The remaining installed-MCP/native gates still apply to their actual shipped entry points.
+- Generate illustrated HTML/MD with `node packages/crl-vscode/scripts/release-notes.mjs --export <output> --mode publish`; rehearsal uses `--mode dry-run`. Both use the receipt-backed portable catch-up range; source README is generated from the same curated user-facing history. Current boilerplate names the combined KALM AI command, not the removed CRL command. Record the actual base64-expanded HTML size; verify offline image decode, fragment navigation and video playback if video is shipped.
+- Keep the existing explicit release assets, both portable notes downloads and SHA256SUMS. No separate provider ZIP is published; the verified VSIX contains the provider. Keep intermediates outside the upload allowlist and publish the same tested bytes. Generate the body with the production `--body <source-SHA> tmp/RELEASE_NOTES_vX.Y.Z.md` CLI: clean source, exact HEAD and publisher-owned first marker ahead of hostile authored text remain mandatory.
+- Send Spaces exact extension ID smiledigitalhealth.crl-language-support, retained floor and factual portable-export deployment receipt (their config owns consumer baseline), immutable source/tag, VSIX and engine URLs/checksums, contained server/driver identities, provider contract/version, notes URLs and user summary; record acknowledgment. Validate against the vendored immutable Spaces schema pair and manual contract bounds. Fetch Spaces launcher/validate.cjs from alphora/mv-spaces-medical-policy commit11b2eb08f3a91ad1098d4c46d4ed9ef37224be24 and verify SHA256 f852bad6b89716191f3674e21cc673cc8874f92466becf80c6e46de8d953f86c; run node validate.cjs <actual-unpacked-VSIX-extension-root> --public and retain its exit0 output/package identity. A local schema check alone is not this owner-validator receipt. Producer publication enables Spaces' released-asset vendoring. Spaces owns the subsequent combined launcher acceptance in the real Codespaces editor: URI-based discovery/read of installed CRL/KELP data, images/video, automatic/manual opening, opt-out, per-component skipped history and fragments. That receipt is required for deployment qualification; do not label producer tests as a combined-UI pass. No image/customer deployment or notice is inferred from software publication.
 
 ## 8. Aborting — how to unwind, at each point
 
@@ -314,3 +332,5 @@ scratch; delete them so a later release cannot attach a stale one.
 > and it will be green the entire time.
 
 When tempted to skip a gate because the change is small: 4.114.0's defect was a **missing file copy**.
+
+`package:release` is the strict public-artifact path. Ordinary development VSIX packaging uses `vsce package --no-dependencies` after the normal compile, without the public current-entry gate. Portable export rehearsal uses `--mode dry-run`; it does not redefine public packaging or relax its checks.

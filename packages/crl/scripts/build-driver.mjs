@@ -63,20 +63,12 @@ try {
   const cp = [path.join(work, "BOOT-INF", "classes"), path.join(work, "BOOT-INF", "lib", "*")].join(path.delimiter);
 
   console.log("compiling ApplyDriver at --release 17…");
-  execFileSync(bin("javac"), ["--release", "17", "-cp", cp, "-d", DRIVER_DIR, path.join(DRIVER_DIR, "ApplyDriver.java")], { stdio: "inherit" });
+  execFileSync(bin("javac"), ["--release", "17", "-cp", cp, "-d", DRIVER_DIR, ...["ApplyDriver.java","ApplyWorker.java"].map(f=>path.join(DRIVER_DIR,f))], { stdio: "inherit" });
 
-  // ⚠ EXACTLY ONE CLASS, OR THE SHIPPING STEPS SILENTLY DROP THE REST. Add a lambda or an inner
-  // class to the driver and javac emits `ApplyDriver$1.class` beside it — but copy-catalog.mjs,
-  // esbuild.js and STABLE_SERVER_ASSETS each copy ONE hard-coded filename, so the extra class would
-  // be left behind and surface as NoClassDefFoundError at runtime with every gate green.
-  const produced = readdirSync(DRIVER_DIR).filter((f) => f.endsWith(".class"));
-  if (produced.length !== 1) {
-    console.error(
-      `javac produced ${produced.length} classes (${produced.join(", ")}); the shipping steps carry exactly one.
-` +
-        "Keep ApplyDriver free of lambdas and inner classes, or teach copy-catalog.mjs, esbuild.js and " +
-        "STABLE_SERVER_ASSETS to carry the whole set."
-    );
+  // REFACTOR:grounded: every compiled class must be carried by all installed payloads.
+  const produced = readdirSync(DRIVER_DIR).filter((f) => f.endsWith(".class")).sort();
+  if (JSON.stringify(produced)!==JSON.stringify(["ApplyDriver.class","ApplyWorker.class"])) {
+    console.error(`Unexpected Java class set: ${produced.join(', ')}. Update every packaging step before shipping.`);
     process.exit(1);
   }
 
@@ -97,6 +89,8 @@ try {
     javaSha256: createHash("sha256").update(readFileSync(path.join(DRIVER_DIR, "ApplyDriver.java"))).digest("hex"),
     classSha256: createHash("sha256").update(classBytes).digest("hex"),
     classFileMajor: major,
+    workerJavaSha256: createHash('sha256').update(readFileSync(path.join(DRIVER_DIR,'ApplyWorker.java'))).digest('hex'),
+    workerClassSha256: createHash('sha256').update(readFileSync(path.join(DRIVER_DIR,'ApplyWorker.class'))).digest('hex'),
     engineJar: path.basename(jar),
     engineJarSha256: createHash("sha256").update(readFileSync(path.resolve(jar))).digest("hex"),
   };
