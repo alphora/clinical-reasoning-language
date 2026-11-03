@@ -426,7 +426,7 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
 });
 
 check("#218 legend: buildTreeChromeHtml appends flowLegendChrome(mode) AFTER the banner (MV-gating lives in the exported helper)", () => {
-  assert.ok(/return definitionStatus \+ progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires[\s\S]*?\+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
+  assert.ok(/return definitionStatus \+ progress \+ toggle \+ diverterToggle \+ exportBtn \+ sourceDocumentsBtn \+ reviewVerdictsBtn \+ questionnaires[\s\S]*?\+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner (export + review-verdicts buttons sit before the banner)");
   assert.ok(/import \{[^}]*flowLegendChrome[^}]*\} from "\.\/flowPaneHtml"/.test(COCKPIT_SRC), "flowLegendChrome imported from flowPaneHtml (co-located with FLOW_STYLE + the shared TOK_* consts)");
 });
 
@@ -1290,7 +1290,7 @@ check("tree-snapshot: the trigger is an IN-PANE chrome button on the tree pane (
   // host: the tree-chrome builder renders the export button
   assert.match(COCKPIT_SRC, /class="fc-toggle-btn fc-export" data-export-snapshot/, "the export button is in the tree chrome");
   assert.match(COCKPIT_SRC, /const exportBtn =/);
-  assert.match(COCKPIT_SRC, /return definitionStatus \+ progress \+ toggle \+ diverterToggle \+ exportBtn \+ reviewVerdictsBtn \+ questionnaires[\s\S]*?\+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
+  assert.match(COCKPIT_SRC, /return definitionStatus \+ progress \+ toggle \+ diverterToggle \+ exportBtn \+ sourceDocumentsBtn \+ reviewVerdictsBtn \+ questionnaires[\s\S]*?\+ banner \+ flowLegendChrome/, "the button is part of the tree chrome");
   // webview: the fcChrome click delegate posts exportSnapshot
   assert.match(SCRIPT, /closest\('\[data-export-snapshot\]'\);.*v\.postMessage\(\{type:'exportSnapshot'\}\);return;/s);
   // host: the exportSnapshot message (tree-only) runs the command with a catch backstop

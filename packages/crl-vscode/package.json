@@ -156,6 +156,10 @@
         "icon": "$(save-as)"
       },
       {
+        "command": "crl.medicalValidation.openSourceDocuments",
+        "title": "CRL: Open Medical Validation Source Documents"
+      },
+      {
         "command": "crl.cockpit.reviewVerdicts",
         "title": "CRL: Review Verdicts (bulk)",
         "icon": "$(checklist)"

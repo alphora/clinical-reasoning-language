@@ -1,5 +1,6 @@
 import { buildAnswerContributions, contributionsForOccurrences } from "./answerContributions";
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
+import { showSourceDocuments, type SourceDocument } from './sourceDocuments';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
 import { applyKeFlagAction, keFlagRevision, keFlagContentRevision, isKeAnswerSavedError } from './flagWorkflowStore';
@@ -503,6 +504,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // #(tree-snapshot) Todo 2 — the one-shot host↔webview capture coordinator (the host doesn't hold the tree DOM; it asks the
   // webview for `#root`). Single-flight, settle-once; the pure state machine lives in snapshotCapture.ts.
   const snapshotCapture = new SnapshotCapture();
+  let sourceDocumentsBusy = false;
   let snapshotExporting = false; // command-level single-flight: guards the WHOLE export (capture → dialog → write), so a second toolbar click while the save dialog is open can't stack two dialogs
   // #224 ii.3 Slice 2: nodeKeys of single-criterion `when`s the user has EXPANDED (default: all collapsed). Ephemeral —
   // not persisted (reload → all-collapsed-with-verdict is the desired steady state). NodeKeys are case-independent, so
@@ -1163,9 +1165,50 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
     // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
     const questionnaires=mode==='medical-validation'?`<div class="fc-toggle">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn${interactiveQuestionnaire.isOpen?" fc-active":""}" data-interactive-questionnaire aria-pressed="${interactiveQuestionnaire.isOpen}">Interactive FHIR Questionnaire</button></div>`:'';
+    const sourceDocumentsBtn = mode === "medical-validation" ? `<div class="fc-toggle"><button class="fc-toggle-btn" data-open-source-documents title="Open a Source or Refined source document">Source documents…</button></div>` : "";
     const definitionMessage=definitionStatusMessage();
     const definitionStatus=mode==='medical-validation' && definitionMessage?`<div role="status" class="fc-gaps">${escapeHtml(definitionMessage)}</div>`:'';
-    return definitionStatus + progress + toggle + diverterToggle + exportBtn + reviewVerdictsBtn + questionnaires + (mode==='medical-validation'?'<div class="fc-toggle"><button class="fc-toggle-btn" data-mv-edit-action="history">Review edit history</button><button class="fc-toggle-btn" data-mv-edit-action="recovery">Edit recovery</button></div>':'') + banner + flowLegendChrome(mode);
+    return definitionStatus + progress + toggle + diverterToggle + exportBtn + sourceDocumentsBtn + reviewVerdictsBtn + questionnaires + (mode==='medical-validation'?'<div class="fc-toggle"><button class="fc-toggle-btn" data-mv-edit-action="history">Review edit history</button><button class="fc-toggle-btn" data-mv-edit-action="recovery">Edit recovery</button></div>':'') + banner + flowLegendChrome(mode);
+  }
+
+  /** Open the selected policy's source documents using its folder layout and default editors. */
+  async function openPolicySourceDocuments(): Promise<void> {
+    if (mode !== 'medical-validation' || !currentCel) {
+      void vscode.window.showInformationMessage('Open a policy in Medical Validation to see its source documents.');
+      return;
+    }
+    if (sourceDocumentsBusy) {
+      void vscode.window.setStatusBarMessage('Choose a document in the open Source documents list.', 3000);
+      return;
+    }
+    const src = findPolicySrc(currentCel);
+    if (!src) {
+      void vscode.window.showWarningMessage('Could not locate the source folders for this policy.');
+      return;
+    }
+    sourceDocumentsBusy = true;
+    try {
+      await showSourceDocuments(src, {
+        choose: async (documents, options) => {
+          const items: (vscode.QuickPickItem & { document?: SourceDocument })[] = [];
+          let group: SourceDocument['group'] | undefined;
+          for (const document of documents) {
+            if (document.group !== group) {
+              group = document.group;
+              items.push({ label: group, kind: vscode.QuickPickItemKind.Separator });
+            }
+            items.push({ label: document.relativePath, description: document.group, document });
+          }
+          const chosen = await vscode.window.showQuickPick(items, {
+            title: options.title,
+            placeHolder: options.incomplete ? 'Some documents could not be listed — choose one to open' : 'Choose a document to open',
+          });
+          return chosen?.document;
+        },
+        open: file => vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file), { viewColumn: vscode.ViewColumn.Beside, preview: false }),
+        message: (text, level) => { void (level === 'warning' ? vscode.window.showWarningMessage(text) : vscode.window.showInformationMessage(text)); },
+      });
+    } finally { sourceDocumentsBusy = false; }
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the
@@ -3046,6 +3089,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // #(tree-snapshot) Todo 2 — the tree webview's reply to `requestSnapshot` (only the TREE pane is a valid source). The
       // coordinator ignores a stale/late token; the payload is COERCED to string here + fully screened in captureTreeDom.
       snapshotCapture.resolve(msg.token, typeof msg.html === "string" ? msg.html : undefined);
+    } else if (msg.type === "openSourceDocuments" && pane === "tree") {
+      void openPolicySourceDocuments();
     } else if (msg.type === "exportSnapshot" && pane === "tree") {
       // #(tree-snapshot): the in-pane "⤓ Export snapshot" chrome button (tree pane only) → the host command.
       void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`));
@@ -5384,6 +5429,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     void exportTreeSnapshot().catch((e) => vscode.window.showErrorMessage(`Tree snapshot: ${e instanceof Error ? e.message : String(e)}`)),
   );
   // #(bulk-verdict) Todo 2b: the palette + tree-chrome entry to the bulk verdict grid (guards MV/sidecar/empty inside).
+  const sourceDocumentsCmd = vscode.commands.registerCommand("crl.medicalValidation.openSourceDocuments", () => void openPolicySourceDocuments());
   const reviewVerdictsCmd = vscode.commands.registerCommand("crl.cockpit.reviewVerdicts", () => void openReviewGrid());
 
   const openRawCmd = vscode.commands.registerCommand("crl.cockpit.openRaw", () => {
@@ -5778,6 +5824,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     openRawCmd,
     exportTreeSnapshotCmd,
     reviewVerdictsCmd,
+    sourceDocumentsCmd,
     onSave,
     onConfig,
     {
@@ -6522,7 +6569,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `window.addEventListener('pointerup',()=>{if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
   `root.addEventListener('click',(e)=>{if(fpMoved){fpMoved=false;e.stopPropagation();e.preventDefault();}},true);` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
-  `fcc.addEventListener('click',(e)=>{const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
+  `fcc.addEventListener('click',(e)=>{const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
   // disc 164: the produced-path diverter overlay on/off toggle (MV chrome).
   `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +
