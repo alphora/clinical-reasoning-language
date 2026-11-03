@@ -68,16 +68,16 @@ export function foldUncertaintyGuards(structure: readonly CrlDecisionStructure[]
     const candidate = candidates.get(node.nodeKey), forced = state.forced?.get(node.nodeKey);
     if (candidate) {
       const expanded = uncertaintyGuardExpanded(node.nodeKey, state);
+      const retainedTerminalKey = forced === 'case' ? candidate.nonpassTerminalKey : candidate.passTerminalKey;
+      // Keep disclosure on the same terminal through expansion and route layout changes.
+      controls.set(retainedTerminalKey, { guardKey: node.nodeKey, expanded, forced });
       if (expanded) {
-        controls.set(node.nodeKey, { guardKey: node.nodeKey, expanded: true, forced });
         disclosures[node.nodeKey] = candidate.subtreeKeys;
       } else {
-        const retainedTerminalKey = forced === 'case' ? candidate.nonpassTerminalKey : candidate.passTerminalKey;
         const find = (children: ProjectedFlowNode[]): ProjectedFlowNode | undefined => {
           for (const child of children) { if (child.nodeKey === retainedTerminalKey) return child; const nested = find(child.children); if (nested) return nested; }
         };
         const leaf = find(node.children)!;
-        controls.set(leaf.nodeKey, { guardKey: node.nodeKey, expanded: false });
         // The incoming edge belongs to the parent, not the omitted guard's pass polarity.
         return { ...leaf, incomingOutcome: node.incomingOutcome, children: [] };
       }

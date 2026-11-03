@@ -202,6 +202,8 @@ const LABEL_MAX = 22; // chars PER LINE before wrapping/truncation (the proven ~
 // #203 GAP 3: a LEAF's centered label must clear BOTH end badges — the all-pass ✓ (right-center) and the new ⚑ (left-
 // center) — so a leaf wraps/truncates a few chars sooner than a left-aligned node, reserving a badge gutter each side.
 const LEAF_LABEL_MAX = 17;
+// The inset U hitbox needs a wider gutter than the small right-side badges.
+const UNCERTAINTY_LEAF_LABEL_MAX = 12;
 
 type FlowKind = "decision" | "when" | "otherwise" | "action" | "leaf";
 
@@ -860,8 +862,8 @@ export function renderFlowPane(
       `<g class="flow-uncertainty-toggle" data-flow-uncertainty-toggle="${escapeHtml(uncertaintyControl.guardKey)}"` +
       `${uncertaintyControl.expanded ? '' : ' data-flow-uncertainty-collapsed="1"'} role="button" tabindex="${uncertaintyLocked ? -1 : 0}"` +
       ` aria-expanded="${uncertaintyControl.expanded}" aria-disabled="${uncertaintyLocked}" aria-label="${uncertaintyTitle}">` +
-      `<title>${uncertaintyTitle}</title><rect x="${x + NODE_W + 6}" y="${y + 25}" width="20" height="18" rx="4"/>` +
-      `<text x="${x + NODE_W + 16}" y="${y + 38}" text-anchor="middle">U</text></g>` : '';
+      `<title>${uncertaintyTitle}</title><rect x="${x + 12}" y="${y + NODE_H / 2 - 9}" width="20" height="18" rx="4"/>` +
+      `<text x="${x + 22}" y="${y + NODE_H / 2 + 4}" text-anchor="middle">U</text></g>` : '';
     // ROW CATEGORY gates the anchor/reveal surface: a structure node and an OUTLINE LEAF are addressable (anchor + reveal);
     // an operator / top-OR / external / more row is RENDER-ONLY (no anchor, no reveal — a click resolves to nothing).
     const addressable = !n.outline || n.outlineRow === "leaf";
@@ -1038,6 +1040,7 @@ export function renderFlowPane(
     // rounded pills, rx = half-height); every INTERIOR node (when / use-decision / otherwise) stays a rounded rectangle
     // (rx 6). The on-path ring matches — a stadium node rings as a pill (rx = half the ring-rect height, off 2.5 → NODE_H+5).
     const isLeafEnd = n.kind === "action" && !n.useDecision; // a recommend-activity outcome tip (disposition leaf)
+    const leafLabelMax = uncertaintyControl ? UNCERTAINTY_LEAF_LABEL_MAX : LEAF_LABEL_MAX;
     const stadium = n.kind === "decision" || isLeafEnd;
     const rx = stadium ? NODE_H / 2 : 6;
     // #210 ALL-PASS ✓ BADGE — a HIDDEN theme-aware (green circle + white check) grandchild on every disposition leaf,
@@ -1085,7 +1088,7 @@ export function renderFlowPane(
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="${rx}"/>` +
       // #210: a disposition LEAF (outcome tip) centers its label; interior nodes stay left-aligned (shifted for a chevron).
-      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, LEAF_LABEL_MAX, NODE_W / 2, true) : labelMarkup(critC ? "Criterion" : n.label, x, y, NODE_H, labelMax, labelDx)) +
+      (isLeafEnd ? labelMarkup(n.label, x, y, NODE_H, leafLabelMax, NODE_W / 2, true) : labelMarkup(critC ? "Criterion" : n.label, x, y, NODE_H, labelMax, labelDx)) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       (n.kind === "when" ? `<text class="flow-truth-unknown" x="${x - 14}" y="${y + 16}"><title>Not answered — evaluation paused here</title>?</text>` +
         (!n.children.some(c => c.incomingOutcome === "No") ? `<path class="flow-false-stop" d="M${x + NODE_W} ${y + NODE_H / 2} h24 m0 -4 v8"><title>Condition false — this branch stops here</title></path>` : "") : "") +

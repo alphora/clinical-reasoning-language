@@ -30,10 +30,13 @@ test('explicit polarity and labels stay independent, including negated occurrenc
 });
 test('user expansion and forced full evidence restore original branches without changing identities',()=>{
   const full=projected();
-  for(const state of [{expanded:new Set(['u'])},{forced:new Map([['u','case']])},{forced:new Map([['u','flag']])}]){
+  for(const state of [{expanded:new Set(['u'])},{forced:new Map([['u','case']])},{forced:new Map([['u','flag']])},{forced:new Map([['u','evidence']])}]){
     const result=foldUncertaintyGuards(full,state);
     assert.deepEqual(result.structure,full);assert.deepEqual(result.disclosures.u,keys(full));
-    assert(result.controls.get('u').expanded);
+    const terminal = state.forced?.get('u') === 'case' ? 'u-yes' : 'u-no';
+    assert(result.controls.get(terminal).expanded);
+    assert.equal(result.controls.get(terminal).guardKey, 'u');
+    assert(!result.controls.has('u'));
   }
 });
 
@@ -54,6 +57,7 @@ test('manual nonpass collapse retains its actual terminal and enabled U for eith
     assert.match(rendered.html, /aria-expanded="false" aria-disabled="false"/);
     const reopened = foldUncertaintyGuards(full, { ...state, expanded: new Set(['u']), collapsed: new Set() });
     assert.deepEqual(reopened.structure, full);
+    assert.equal(reopened.controls.get(candidate.nonpassTerminalKey).expanded, true);
     for (const reason of ['flag', 'evidence']) {
       assert.deepEqual(foldUncertaintyGuards(full, { ...state, forced: new Map([['u', reason]]) }).structure, full);
     }
@@ -80,7 +84,7 @@ test('unsupported, unmarked and ambiguous topologies remain complete',()=>{
 test('two independent guards can disclose independently',()=>{
   const full=[...projected(),...projectFlowStructure([({...decision([guard('v'),node('fallback-v','otherwise',[leaf('v-no')])]),nodeKey:'E',decision:'E'})])];
   const result=foldUncertaintyGuards(full,{expanded:new Set(['u'])});
-  assert(result.controls.get('u').expanded);assert.equal(result.controls.get('v-no').expanded,false);
+  assert(result.controls.get('u-no').expanded);assert.equal(result.controls.get('v-no').expanded,false);
   assert.deepEqual(Object.keys(result.disclosures),['u']);
 });
 
@@ -126,4 +130,15 @@ test('renderer defaults remain full, explicit opt-in folds, and snapshot describ
   const exported=html=>renderFlowSnapshotDocument({flowHtml:html,styleCss:'',title:'Example'});
   assert.match(exported(compact.html),/Uncertainty checks are hidden in this snapshot/);
   assert(!exported(expanded.html).includes('Uncertainty checks are hidden in this snapshot'));
+});
+
+test('U-bearing terminals reserve label space and retain the full wording', () => {
+  const source = tree();
+  source[0].children[1].children[0].label = 'Extended coverage determination';
+  const compact = renderFlowPane(source, { uncertaintyDisplay: {} });
+  const label = compact.html.match(/<text[^>]*data-flow-label="Extended coverage determination"[^>]*>(.*?)<\/text>/);
+  assert(label, 'full wording remains available to label fitting and the tooltip');
+  const lines = [...label[1].matchAll(/<tspan[^>]*>(.*?)<\/tspan>/g)].map(match => match[1]);
+  assert.equal(lines.length, 2);
+  assert(lines.every(line => line.length <= 12));
 });
