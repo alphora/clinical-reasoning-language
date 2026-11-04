@@ -1276,6 +1276,7 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
 
 export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   `.flow-uncertainty-toggle{cursor:pointer}.flow-uncertainty-toggle>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.flow-uncertainty-toggle>text{fill:var(--vscode-foreground,#ccc);font-size:12px}.flow-uncertainty-toggle:focus{outline:2px solid var(--vscode-focusBorder,#007fd4)}.flow-uncertainty-toggle[aria-disabled=true]{cursor:default}` +
+  `.flow-uncertainty-toggle[aria-expanded=true]>rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2}` +
   `.flow-answer-group>text{font-size:12px;font-weight:600}.flow-answer-left>text{fill:#fff;filter:drop-shadow(0 0 2px #00e676) drop-shadow(0 0 3px #00e676)}.flow-answer-right>text{fill:#fff;filter:drop-shadow(0 0 1.5px #f14c4c) drop-shadow(0 0 2px #f14c4c)}` +
   `html:has(.flow-svg){overflow-anchor:none}` +
   `.flow-focus-hidden{display:none}.flow-pin{display:none;cursor:pointer}.flow-pinned>.flow-pin{display:inline}` +
