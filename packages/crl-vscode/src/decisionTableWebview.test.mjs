@@ -23,6 +23,7 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
  const browser=await browserFixture(`<!doctype html><html><head><style>body{background:#1e1e1e;color:#ddd}${FLOW_STYLE}${ROUTE_CARD_STYLE}${DECISION_TABLE_STYLE}</style></head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div><script>window.messages=[];window.acquireVsCodeApi=()=>({postMessage:m=>messages.push(m)});${script.replace(/<\/script/gi,'<\\/script')}</script></body></html>`);
  try{
   const run=code=>browser.evaluate('{'+code+'}');
+  await browser.until(()=>run(`!!document.getElementById('root')&&!!globalThis.tableUi`),'production table runtime installed');
   const message=data=>run(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(data)}}))`);
   const row=(id,message)=>({type:'decisionTableRow',epoch:4,rowId:id,message});
   const layout={type:'decisionTable',epoch:4,label:'D',total:'2',uncovered:'1',range:'1–2',rows:[{id:'a',label:'Met',caseLabel:'A',caseCount:2},{id:'b',label:'Met',caseLabel:'B',error:'Coverage error example',caseCount:1}]};
@@ -31,6 +32,9 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   await message(row('b',{type:'render',gen:2,indexVersion:1,mode:'medical-validation',html:b.html}));
   await message(row('a',{type:'render',gen:1,indexVersion:1,mode:'medical-validation',html:a.html}));
   const aId=a.anchors.w.segmentIds[0],bId=b.anchors.w.segmentIds[0];
+  await run(`messages.length=0;document.querySelector('.decision-table-row [data-flow-key="w"]').focus({preventScroll:true});document.querySelectorAll('.decision-table-row')[1].querySelector('[data-flow-key="w"]').focus({preventScroll:true});`);
+  assert.deepEqual(await run(`messages.filter(m=>m.type==='decisionTableRow'&&m.message.type==='branchFocus').map(m=>[m.rowId,m.message.gen])`),[['a',1],['b',2]],'real focusin producers identify their own installed row generation');
+
   await message(row('a',{type:'markLeaves',gen:1,yesIds:[aId],noIds:[]}));
   await message(row('b',{type:'markLeaves',gen:2,noIds:[bId],yesIds:[]}));
   await message(row('a',{type:'markLeaves',gen:0,noIds:[aId],yesIds:[]}));

@@ -1432,7 +1432,8 @@ check("flag-action drawer: refreshFlagActionDrawer re-finds by id, RE-STAMPS ver
   // reconciled on external store change (watcher) AND on a same-policy rebuild (both same-policy by construction)
   assert.match(COCKPIT_SRC, /driveFlagBadges\(\);\s*\n\s*refreshFlagActionDrawer\(\); \/\/ an open action drawer/);
   // rebuild re-stamps ver AFTER the render loop (disc 360) so `targetPresent` reads the fresh tree substrate
-  assert.match(COCKPIT_SRC, /for \(const pane of PANES\) renderPane\(pane\);[\s\S]*?refreshFlagActionDrawer\(\);/);
+  assert.match(COCKPIT_SRC, /renderRebuiltPanes\(\);[\s\S]*?refreshFlagActionDrawer\(\);/);
+  assert.match(COCKPIT_SRC, /function renderRebuiltPanes\(\): void \{\s*for\s*\(const pane of PANES\)\s*renderPane\(pane\);\s*refreshDecisionTableAfterRebuild\(\);/);
   assert.match(COCKPIT_SRC, /AFTER the render loop \(disc 360 \[important\]\): the drawer's `targetPresent` reads the/);
   // flagStoreWarning is DISTINCT from flagStateError (set only on a STORE read problem, not on `.crl`-parse / un-migrated)
   assert.match(COCKPIT_SRC, /flagStoreWarning = true; \/\/ …AND specifically a STORE read problem/);
