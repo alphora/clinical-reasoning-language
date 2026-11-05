@@ -1,3 +1,4 @@
+// REFACTOR:grounded: retain this probe's distinct assertions using the production question-mode API.
 // Exact tree + pinned-route controllers, with a small host bridge. No policy writes.
 // Start a disposable browser with CDP, then set CRL_TEST_CDP_URL before running.
 // Fixture bridge stubs concept resolution; flag placement and browser controllers are production code.
@@ -63,7 +64,7 @@ UI.paintFlagBadges(document,flagMessage());
 toggle().focus();toggle().dispatchEvent(new KeyboardEvent('keydown',{key:'f',ctrlKey:true,bubbles:true}));result.keyboardScopedFlag=badgeMessages.at(-1)?.gid===input().id&&badgeMessages.at(-1)?.type==='nodeFlagAction';
 input().querySelector('[data-node-flag-gid]').dispatchEvent(new MouseEvent('click',{bubbles:true}));const message=badgeMessages.at(-1);result.scopedFlagRoute=message.type==='nodeFlagAction'&&!!current.reveals[message.key]&&current.flagsByGid[message.gid].join(',')==='dependency';
 result.directSingle=root.querySelectorAll('[data-flow-key="direct"][data-flow-question]').length===1;
-root.querySelector('.route-questions-toggle').click();result.offVisible=visible(input())&&visible(toggle());result.offFlagVisible=visible(input().querySelector('.flow-flag-badge'));
+cards.questionnaireState(false,undefined,undefined,'off');result.offVisible=visible(input())&&visible(toggle());result.offFlagVisible=visible(input().querySelector('.flow-flag-badge'));
 toggle().dispatchEvent(new MouseEvent('click',{bubbles:true}));await pending;
 result.expanded=input().dataset.flowInput==='expanded'&&root.querySelectorAll('[data-flow-question]').length===2;
 result.focusRestored=document.activeElement===toggle();result.nestedCollapsed=root.querySelectorAll('[data-flow-input="collapsed"]').length===1;
@@ -72,11 +73,11 @@ result.choicesExpanded=root.querySelectorAll('[data-flow-choice]').length===2;
 toggle().focus();toggle().dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await pending;
 result.keyboardCollapse=input().dataset.flowInput==='collapsed'&&!root.querySelector('[data-flow-choice]');
 toggle().focus();toggle().dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true}));await pending;
-result.reopenedChoices=root.querySelectorAll('[data-flow-choice]').length===2;result.questionsStayedOff=root.querySelector('.route-questions-toggle').getAttribute('aria-pressed')==='false';
-root.querySelector('.route-questions-toggle').click();result.onVisible=visible(input())&&visible(toggle());
+result.reopenedChoices=root.querySelectorAll('[data-flow-choice]').length===2;result.questionsStayedOff=!root.querySelector('.route-card');
+cards.questionnaireState(false,undefined,undefined,'inline');result.onVisible=visible(input())&&visible(toggle());
 toggle().dispatchEvent(new MouseEvent('click',{bubbles:true}));await pending;result.onCollapsedVisible=visible(input())&&input().dataset.flowInput==='collapsed';result.onFlagVisible=visible(input().querySelector('.flow-flag-badge'));
 result.recollapsedQuestionBadge=visible(hiddenBadge());
-cards.questionnaireState(true);result.detachedHiddenBadge=visible(hiddenBadge());cards.questionnaireState(false);
+cards.questionnaireState(true);result.detachedHiddenBadge=visible(hiddenBadge());cards.questionnaireState(false,undefined,undefined,'inline');
 payload.cards[1].criteria=[];await swap(undefined,'plain');
 result.plainCollapsedQuestionBadge=visible(hiddenBadge());result.plainHasNoFrame=bounds()===null;
 toggle().dispatchEvent(new MouseEvent('click',{bubbles:true}));await pending;

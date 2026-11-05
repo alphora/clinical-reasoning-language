@@ -74,12 +74,12 @@ window.runChecks=async()=>{
  await toggle(active,true);check(visible(row(active)),'expanded guard visible while pinned');check(harness.last.alternate.some(key=>visible(row(key))),'alternate Unmet and wrapper survive pin visibility filter');
  await harness.load({questionCard:true},true);await checkPlacement(active,'pinned pass expanded');check(!!root.querySelector('.route-card'),'attached question card rendered');
  check(root.querySelector('.route-leaf-nav-count').textContent==='2 of 6','pinned traversal navigation matches reported view');
- root.querySelector('.route-questions-toggle').click();check(!root.querySelector('.route-card'),'Questions hides the attached card');await checkPlacement(active,'pinned questions hidden');
- root.querySelector('.route-questions-toggle').click();check(!!root.querySelector('.route-card'),'Questions restores the attached card');
+ window.dispatchEvent(new MessageEvent('message',{data:{type:'branchQuestionnaireState',gen:harness.state.gen,open:false,questionMode:'off'}}));check(!root.querySelector('.route-card'),'Questions hides the attached card');await checkPlacement(active,'pinned questions hidden');
+ window.dispatchEvent(new MessageEvent('message',{data:{type:'branchQuestionnaireState',gen:harness.state.gen,open:false,questionMode:'inline'}}));check(!!root.querySelector('.route-card'),'Questions restores the attached card');
  window.dispatchEvent(new MessageEvent('message',{data:{type:'branchQuestionnaireState',open:true,gen:harness.state.gen}}));
  check(root.querySelector('.route-layout-toggle').getAttribute('aria-pressed')==='true','detached questionnaire state applied');await checkPlacement(active,'pinned detached questionnaire');
- window.dispatchEvent(new MessageEvent('message',{data:{type:'branchQuestionnaireState',open:false,gen:harness.state.gen}}));
- check(root.querySelector('.route-layout-toggle').getAttribute('aria-pressed')==='false','attached questionnaire state restored');await checkPlacement(active,'pinned questionnaire restored');check(!!root.querySelector('.route-card'),'closing detached questionnaire restores the attached card');await harness.load({questionCard:false},true);
+ window.dispatchEvent(new MessageEvent('message',{data:{type:'branchQuestionnaireState',open:false,questionMode:'inline',gen:harness.state.gen}}));
+ check(root.querySelector('.route-layout-toggle').getAttribute('data-question-mode')==='inline','inline questionnaire state restored');await checkPlacement(active,'pinned questionnaire restored');check(!!root.querySelector('.route-card'),'closing detached questionnaire restores the attached card');await harness.load({questionCard:false},true);
  const alternate=harness.last.alternate.map(row).filter(Boolean);check(alternate.every(n=>!n.classList.contains('pinned-traversal-node')&&!n.classList.contains('flow-pinned')),'alternate is visible without becoming executed pin');
  const pinnedExport=snapshot();check(pinnedExport.includes('data-flow-key="'+active.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"'),'expanded pinned export retains guard');
  await toggle(active);check(visible(row(pinned))&&!row(active),'collapse retains original pin');

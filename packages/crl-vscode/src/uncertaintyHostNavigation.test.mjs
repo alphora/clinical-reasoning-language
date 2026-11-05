@@ -19,7 +19,7 @@ test('explicit source navigation unfolds once; replay after Hide stays hidden ac
  const context={coord,views:new Map([['tree',view]]),crlMaps:{},crlStructure:tree,indexVersion:1,mode:'medical-validation',expandedUncertaintyGuards:expanded,collapsedUncertaintyGuards:new Set(),forcedUncertaintyGuards:new Map(),uncertaintyGuardCandidates,uncertaintyGuardExpanded,projectFlowStructure,
    crlAnchorsForUnits:()=>['u'],conceptNodesForRow:()=>[],scrollSuppressPane:undefined,disclosureFocus:undefined,
    renderPane(){view.gen=coord.startRender('tree');view.acked=false;view.preserveTreeViewport=true;},
-   branchQuestionnaire:{isOpen:false},pinnedCards:undefined,renderTreeChrome(){},driveDoneOverlay(){},driveFlagBadges(){},driveNodeFocus(){},postTreeFocus(){},driveThisNode(){},
+   branchQuestionnaire:{isOpen:false},legacyQuestionMode:'off',branchQuestionnaireOwner:undefined,pinnedCards:undefined,renderTreeChrome(){},driveDoneOverlay(){},driveFlagBadges(){},driveNodeFocus(){},postTreeFocus(){},driveThisNode(){},
    selectingTreeFocus:false,clearTreeFocus(){},state:{selection:{primary:'source',unitId:'source-unit'}},focusedCaseId:()=>undefined,
    reduce:(state)=>({state,effects:[{pane:'tree',target:{kind:'unit',id:'source-unit'}}]}),onNav:{fire(){}},reflectSelectionToTree(){},driveFailedCriteriaPeek(){},driveDiverters(){},driveLeafMarks(){},shouldRerenderQuestionnaire:()=>false};
  view.anchors={u:{scrollTo:'guard-anchor',segmentIds:['guard-anchor']}};view.panel={webview:{postMessage:m=>messages.push(m)}};context.highlightRows=host('highlightRows',context);
@@ -31,6 +31,12 @@ test('explicit source navigation unfolds once; replay after Hide stays hidden ac
  ready('tree',{gen:view.gen,questionnaireOpen:false},view);assert(!expanded.has('u'),'paint replay cannot undo Hide');assert.equal(messages.findLast(m=>m.type==='highlight').scrollTo,undefined,'paint replay preserves manual pan after ACK');
  context.state.selection={primary:'crl',nodeKey:'u'};context.reduce=state=>({state,effects:[{pane:'tree',target:{kind:'crlNode',id:'u'}}]});view.acked=true;
  dispatch({type:'select',selection:context.state.selection});assert(expanded.has('u'),'explicit CRL navigation also reveals original target');
+ // REFACTOR:grounded: execute the actual outer ACK handler against row-owned physical state and legacy intent.
+ context.branchQuestionnaire.isOpen=true;context.branchQuestionnaireOwner={};messages.length=0;
+ ready('tree',{gen:view.gen,questionnaireOpen:false},view);assert(!messages.some(m=>m.type==='branchQuestionnaireState'),'row-owned panel does not cause an outer mode resync');
+ ready('tree',{gen:view.gen,questionnaireOpen:true},view);let state=messages.findLast(m=>m.type==='branchQuestionnaireState');assert.equal(state.questionMode,'off');assert.equal(state.open,false,'row panel cannot hide stale outer external mode');
+ context.legacyQuestionMode='panel';context.branchQuestionnaireOwner=undefined;context.branchQuestionnaire.isOpen=false;
+ ready('tree',{gen:view.gen,questionnaireOpen:false},view);state=messages.findLast(m=>m.type==='branchQuestionnaireState');assert.equal(state.questionMode,'panel');assert.equal(state.open,false,'pending intent is independent of physical readiness');
 });
 test('actual placement on a non-anchor nested Criterion forces the original uncertainty guard visible',()=>{
  const inner={kind:'criterion',name:'Inner',lib:'L',bodyHash:'inner',operand:{kind:'leaf',name:'Question',lib:'L',nodeKey:'q',isSource:false}};

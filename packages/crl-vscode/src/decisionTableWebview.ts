@@ -74,7 +74,7 @@ export function installDecisionTableWebview(
   let epoch: unknown, active = false, zoom = 1, layout: any, focusVersion = 0;
   // A reply to row navigation must not steal focus after a later interaction in any row.
   for (const type of ['pointerdown','keydown','focusin']) win.addEventListener(type, () => { focusVersion++; }, { capture:true, signal:events.signal });
-  const rows = new Map<string, { element: HTMLElement; label: HTMLElement; error: HTMLElement; cases: HTMLButtonElement; channel: EventTarget; runtime: BranchRuntime }>();
+  const rows = new Map<string, { element: HTMLElement; label: HTMLElement; caseLabel: HTMLElement; error: HTMLElement; cases: HTMLButtonElement; channel: EventTarget; runtime: BranchRuntime }>();
   const send = (action: string, rowId?: string) => bridge.postMessage({ type: 'decisionTableAction', epoch, action, ...(rowId ? { rowId } : {}) });
   const button = (label: string, action: string) => {
     const element = doc.createElement('button'); element.type = 'button'; element.textContent = label;
@@ -110,9 +110,11 @@ export function installDecisionTableWebview(
       if (!row) {
         const element = doc.createElement('section'); element.className = 'decision-table-row';
         const header = doc.createElement('div'); header.className = 'decision-table-row-label';
-        const label = doc.createElement('span'), cases = doc.createElement('button'); cases.type = 'button'; cases.textContent = 'Choose case';
+        const label = doc.createElement('span'), caseLabel=doc.createElement('span'), selection=doc.createElement('span'), cases = doc.createElement('button'); cases.type = 'button'; cases.textContent = 'Choose case';
+        // REFACTOR:grounded: retain the picker and evidence, hide only its row UI.
+        selection.dataset.tableCaseSelection='';selection.hidden=true;selection.append(caseLabel,cases);
         const rowEvents = new win.AbortController();
-        cases.dataset.tableControls = ''; cases.addEventListener('click', () => send('case', description.id), { signal: rowEvents.signal }); header.append(label, cases);
+        cases.dataset.tableControls = ''; cases.addEventListener('click', () => send('case', description.id), { signal: rowEvents.signal }); header.append(label, selection);
         const error = doc.createElement('p'); error.className = 'decision-table-error'; error.setAttribute('role', 'alert');
         const chrome = doc.createElement('div'), root = doc.createElement('div'); root.className = 'cockpit-root';
         element.append(header, error, chrome, root); rowsRoot.append(element);
@@ -121,9 +123,9 @@ export function installDecisionTableWebview(
         const installed = install({ root, chrome, drawer: doc.createElement('div'), channel, tableRow:true,
           bridge: { postMessage: (payload: unknown) => { if (mounted) bridge.postMessage({ type: 'decisionTableRow', epoch: localEpoch, rowId: description.id, message: payload && typeof payload === 'object' && ['navigatePinnedBranch','toggleUncertaintyGuard'].includes((payload as any).type) ? {...payload,tableFocusVersion:focusVersion} : payload }); } }, onZoom: setZoom });
         const runtime = { setZoom: installed.setZoom, dispose() { mounted = false; rowEvents.abort(); installed.dispose(); } };
-        runtime.setZoom(zoom); row = { element, label, error, cases, channel, runtime }; rows.set(description.id, row);
+        runtime.setZoom(zoom); row = { element, label, caseLabel, error, cases, channel, runtime }; rows.set(description.id, row);
       }
-      row.label.textContent = description.caseLabel ? `${description.label} — ${description.caseLabel}` : description.label;
+      row.label.textContent = description.label;row.caseLabel.textContent=description.caseLabel?` — ${description.caseLabel} `:'';
       (row.element.querySelector('.cockpit-root') as HTMLElement).dataset.flowScopeKey = description.scopeKey ?? '';
       row.error.textContent = description.error ?? ''; row.error.hidden = !description.error;
       row.cases.hidden = !(description.caseCount > 1);

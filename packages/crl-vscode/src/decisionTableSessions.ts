@@ -1,3 +1,6 @@
+/** REFACTOR:grounded: one host-owned question display preference per branch. */
+export type QuestionDisplayMode = 'off' | 'panel' | 'inline';
+
 /** Host-owned identity. Webview-supplied fields never update this record. */
 export interface BranchSessionIdentity {
   id: string;

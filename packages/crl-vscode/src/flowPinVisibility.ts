@@ -1,7 +1,7 @@
 // REFACTOR:grounded: instance ownership and focus-only pins follow the confirmed stacked-branch contract.
 /// <reference lib="dom" />
-/** Mark the first result without a Pass check for the existing glow cue. */
-export function installFlowPinVisibility(root: HTMLElement) {
+/** Focus alone exposes tree pins; a table exposes only its dynamic scope anchor. */
+export function installFlowPinVisibility(root: HTMLElement, tableRow = false) {
   const doc=root.ownerDocument,events=new doc.defaultView!.AbortController();
   const update = () => {
     const active=doc.activeElement,focused=active&&root.contains(active)?active.closest('[data-flow-key]'):undefined;
@@ -19,14 +19,11 @@ export function installFlowPinVisibility(root: HTMLElement) {
         path.setAttribute('d',`M${x+12} ${y-13} h10 l-2 6 l3 3 h-12 l3-3 z M${x+17} ${y-4} v5`);
         pin.append(title,hit,path);node.append(pin);
       }
-      node.classList.toggle('flow-pin-focus',node===focused);
-      node.classList.toggle('flow-scope-anchor',!!scope&&scope===node.dataset.flowKey);
+      node.classList.toggle('flow-pin-focus',!tableRow&&node===focused);
+      node.classList.toggle('flow-scope-anchor',tableRow&&!!scope&&scope===node.dataset.flowKey);
       const label=scope===node.dataset.flowKey?'Close Decision Table':'Open Decision Table from this node';
       pin.setAttribute('aria-label',label);const title=pin.querySelector('title');if(title)title.textContent=label;
     }
-    for (const node of Array.from(root.querySelectorAll('.flow-default-pin'))) node.classList.remove('flow-default-pin');
-    const leaves = Array.from(root.querySelectorAll('.flow-activity'));
-    (leaves.find(node => !node.classList.contains('leaf-allpass')) ?? leaves[0])?.classList.add('flow-default-pin');
   };
   root.addEventListener('focusin',update,{signal:events.signal});
   root.addEventListener('focusout',()=>queueMicrotask(()=>{if(!events.signal.aborted)update();}),{signal:events.signal});

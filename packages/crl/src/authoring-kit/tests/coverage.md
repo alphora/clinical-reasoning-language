@@ -1,5 +1,18 @@
 <!-- REFACTOR:grounded (#328): bounded maintenance interval; no installed-release claim. -->
 
+## Decision Table control probe ownership — evidence correction, 2026-11-05
+
+REFACTOR:grounded: bounded UI/test-evidence maintenance from `01214dad2e297eaa74f8528baccc5e8e30f83649`; the reviewed target and execution receipts are recorded in discussion1298 and the implementing commit. This is not a new full kit audit. The saved schema2.46 audit stamp and author-facing content are unchanged. No CRL/CQL/FHIR/native behavior, kit tag or claim is added or retired.
+
+Earlier maintenance sections below describe their historical executions. Current `flowPinGlow.browser.cjs`, `flowPinVisibility.browser.cjs` and `routeCards.browser.cjs` entry points delegate to maintained production browser/host/panel suites. They are no longer independent evidence of all assertions formerly in those scripts. Current ownership is:
+
+| Affected paths/evidence | Disposition and limits |
+| --- | --- |
+| `crl-vscode/src/decisionTableWebview.test.mjs`, `decisionTableHost.test.mjs`, `branchQuestionnairePanel.test.mjs`, `routeCardsWebview.test.mjs`; `test/runDecisionTableControlTests.cjs` | Not author-facing: focus-only yellow pins; hidden retained case selection; off/panel/inline display; row/paging ownership; real editor events, cancellation, disclosures, shared wording variants; current panel disposal and column reuse. Browser/host tests do not establish clinical correctness or released availability. |
+| `test/answerContributions.browser.cjs`, `flowInputs.browser.cjs`, `routeQuestionDedup.browser.cjs`, `uncertaintyGuard.browser.cjs` | Existing guidance sufficient: retain their distinct grouping/input/dedup/uncertainty assertions, replacing the removed Questions button with explicit production question-mode state. These synthetic bridges exercise renderer/controller behavior, not native clinical qualification. |
+| Historical uncertainty live/static evidence below | Current full uncertainty execution belongs to `test/uncertaintyGuard.browser.cjs` and its parsed source fixture, plus `src/uncertaintyHostNavigation.test.mjs` for real host dispatch. The pin-glow delegate is not a substitute for that independent uncertainty execution. Original source annotation and byte-parity claims retain their own core tests. |
+
+
 ## Quantity type units (#328) — schema2.43 maintenance
 
 REFACTOR:grounded: user places the unit on the Quantity value type, affecting CQL and concept profile. Prior completed audit a76ad3927f72f94552936599bda1bc8761c01b6a/schema2.42/hash8e4591f12700e0223610f133f11bb78172f74f896b78c4ffe7e93660b2c32fb0; intervening c89bd1fb04bce21259a4faffc347b3374ead1cef is metadata-only. That unreleased presentation-default interpretation is superseded. Exact deleted doctrine and before-state are retained in Git and discussion1220. Reviewed source target `c5966c5f80aad52ec582774766e7332a9bdaddf4` is named by this separate metadata stamp; do not relabel older evidence as this semantic change. Source schema2.43/hash0eb8c7e65c10a9c43e380971e782f04e71c4defa91e8a8025f515f85275db6a8; the stamp now binds the existing final reviewed source.

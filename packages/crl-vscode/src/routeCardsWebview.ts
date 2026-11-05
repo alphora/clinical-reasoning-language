@@ -33,7 +33,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const title=`Verdict: ${verdict.label} — set all ${verdict.count} cases reaching this result`;
     badge.setAttribute('aria-label',title);badge.querySelector('title')!.textContent=title;
   };
-  function requestQuestionnaire() {
+  function requestQuestionnaire(questionMode: string) {
     cancelQuestionnaireFocus();
     const captured=snapshot,expectedGen=generation(),doc=root.ownerDocument,win=doc.defaultView!;
     let timer: number;
@@ -46,7 +46,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       const current=questionnaireFocus===request;cancel();
       if(!current || snapshot!==captured || generation()!==expectedGen || !doc.hasFocus())return;
       const owner=root.querySelector<SVGGElement>('.flow-pinned'),active=doc.activeElement;
-      if(owner && (!active || active===doc.body || active===doc.documentElement || active===owner || active.classList.contains('route-layout-toggle'))){
+      if(owner && (!active || active===doc.body || active===doc.documentElement || active===owner || active.classList.contains('route-layout-toggle')&&root.classList.contains('flow-pointer-interaction'))){
         set(owner,'tabindex','-1');owner.focus({preventScroll:true});owner.scrollIntoView({block:'nearest',inline:'nearest'});
       }
     };
@@ -57,7 +57,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     questionnaireFocus=request;cancelQuestionnaireFocus=cancel;
     win.addEventListener('resize',resize);
     for(const type of ['pointerdown','keydown','wheel'])doc.addEventListener(type,cancel,true);
-    api.postMessage({type:'toggleBranchQuestionnaire',gen:generation(),token:captured.token,requestId:request.id});
+    api.postMessage({type:'toggleBranchQuestionnaire',gen:generation(),token:captured.token,requestId:request.id,questionMode});
   }
   // Measure in SVG user units so label fitting is independent of canvas zoom.
   function fitLabel(node: SVGGElement, box: { x: number; y: number; height: number }, width: number) {
@@ -237,7 +237,10 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       form.addEventListener("click", e => e.stopPropagation()); form.addEventListener("keydown", e => e.stopPropagation());
     return form;
   }
-  function render() {
+  function render(preserveQuestionControl = false) {
+    // REFACTOR:grounded: mode-only host redraws keep a keyboard user's live icon, never restore across frames.
+    const doc=root.ownerDocument,active=doc.activeElement;
+    const focusedQuestionControl=preserveQuestionControl&&doc.hasFocus()&&!!active&&root.contains(active)&&active.classList.contains('route-layout-toggle');
     clear();
     if (!snapshot) return;
     if (standalone) {
@@ -270,11 +273,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
     const svg = root.querySelector<SVGSVGElement>(".flow-svg");
     if (!svg) return;
     originalBox = svg.getAttribute("viewBox");
-    toolbar = document.createElement("div");toolbar.className="route-card-toolbar";
-    const visibility=document.createElement("button");visibility.className="route-questions-toggle";visibility.textContent="Questions";visibility.title=questionsVisible?"Hide questions":"Show questions";visibility.setAttribute("aria-pressed",String(questionsVisible));
-    visibility.onclick=()=>{questionsVisible=!questionsVisible;render();root.querySelector<HTMLButtonElement>('.route-questions-toggle')?.focus();};toolbar.append(visibility);
-    if(snapshot.note){const note=document.createElement("span");note.className="route-card-note";note.setAttribute("role","status");note.textContent=snapshot.note;toolbar.append(note);}
-    root.prepend(toolbar);
+    if(snapshot.note){toolbar = document.createElement("div");toolbar.className="route-card-toolbar";const note=document.createElement("span");note.className="route-card-note";note.setAttribute("role","status");note.textContent=snapshot.note;toolbar.append(note);root.prepend(toolbar);}
     layer = svgEl("g", { class: "route-cards" }) as SVGGElement; svg.append(layer);
     const nodes = Array.from(root.querySelectorAll<SVGGElement>("[data-flow-key]"));
     const byKey = new Map(nodes.map(n => [n.dataset.flowKey!, n]));
@@ -451,31 +450,36 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       }
       paintVerdict();
       const x=pinBox.x+pinBox.width+6,y=pinBox.y+10;
-      const label=external?"Close Result Questionnaire":"Open Result Questionnaire";
-      const toggle=svgEl("g",{class:"route-layout-toggle",role:"button",tabindex:0,"aria-label":label,"aria-pressed":String(external)});
+      // REFACTOR:grounded: explicit rendered-state intent avoids a focus-transfer/click double toggle.
+      const questionMode=external?'panel':questionsVisible?'inline':'off';
+      const nextMode=questionMode==='off'?'panel':questionMode==='panel'?'inline':'off';
+      const label=`Result questions: ${questionMode}. ${nextMode==='off'?'Hide questions':nextMode==='panel'?'Show in panel':'Show inline'}`;
+      const toggle=svgEl("g",{class:"route-layout-toggle",role:"button",tabindex:0,"aria-label":label,"aria-pressed":String(questionMode!=='off'),"data-question-mode":questionMode});
       const title=svgEl("title",{});title.textContent=label;toggle.append(title);
       toggle.append(svgEl("rect",{x,y,width:22,height:22,rx:4}));
-      const drawing=!external?"M5 6 H7 M10 6 H17 M5 11 H7 M10 11 H17 M5 16 H7 M10 16 H17":"M5 4 H17 V10 H5 Z M5 14 H17 M5 18 H14";
+      const drawing=questionMode==='off'?"M5 6 H7 M10 6 H17 M5 11 H7 M10 11 H17 M5 16 H7 M10 16 H17":questionMode==='panel'?"M5 4 H17 V10 H5 Z M5 14 H17 M5 18 H14":"M5 3 H17 V9 H5 Z M5 12 H17 V18 H5 Z";
       toggle.append(svgEl("path",{d:drawing,transform:`translate(${x} ${y})`}));
-      const change=()=>requestQuestionnaire();
+      const change=()=>requestQuestionnaire(nextMode);
       toggle.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();change();});
       toggle.addEventListener("keydown",e=>{const k=e as KeyboardEvent;if(k.shiftKey||k.ctrlKey||k.altKey||k.metaKey)return;if(k.key==="Enter"||k.key===" "){e.preventDefault();e.stopPropagation();change();}});
       layer!.append(toggle);right=Math.max(right,x+22+20);bottom=Math.max(bottom,y+22+20);
     }
     svg.setAttribute("viewBox",`0 0 ${right} ${bottom}`);svg.setAttribute("width",String(right));svg.setAttribute("height",String(bottom));
     onLayout();
+    if(focusedQuestionControl&&doc.hasFocus()&&(!doc.activeElement||doc.activeElement===doc.body||doc.activeElement===doc.documentElement))root.querySelector<SVGElement>('.route-layout-toggle')?.focus({preventScroll:true});
   }
   return {
-    show(value: any) { if(snapshot?.token !== value.token)selectedWording.clear(); if(value.showQuestions && snapshot?.token !== value.token) questionsVisible = true; if (snapshot?.token === value.token) for (const card of value.cards) {
+    show(value: any) { if(snapshot?.token !== value.token)selectedWording.clear(); if(['off','panel','inline'].includes(value.questionMode)){external=value.questionMode==='panel';questionsVisible=value.questionMode==='inline';}else if(value.showQuestions && snapshot?.token !== value.token) questionsVisible = true; if (snapshot?.token === value.token) for (const card of value.cards) {
       const previous = snapshot.cards.find((c: any) => c.id === card.id);
       if(previous)Object.assign(card,{descriptionOpen:previous.descriptionOpen,choicesOpen:previous.choicesOpen,saving:previous.saving,statusMessage:previous.statusMessage});
       if (previous && !value.authoritativeDrafts) Object.assign(card, { editing: previous.editing, editingOwner: previous.editingOwner, draftText: previous.draftText, draftDescription: previous.draftDescription, answerDraft:previous.answerDraft, proposal: previous.proposal, descriptionOpen: previous.descriptionOpen, choicesOpen: previous.choicesOpen });
-    } snapshot = value; render(); },
+    } const sameToken=snapshot?.token===value.token;snapshot = value; render(sameToken); },
     token() { return snapshot?.token; },
     isExternal() { return external; },
     reset() { cancelQuestionnaireFocus();selectedWording.clear();snapshot = undefined; external = false; clear(); },
-    questionnaireState(open: boolean, focusToken?: string, requestId?: string) {
-      if(external!==open){external=open;render();}
+    questionnaireState(open: boolean, focusToken?: string, requestId?: string, questionMode?: string) {
+      const next=['off','panel','inline'].includes(questionMode??'')?questionMode:open?'panel':external?'off':questionsVisible?'inline':'off';
+      const changed=external!==(next==='panel')||questionsVisible!==(next==='inline');external=next==='panel';questionsVisible=next==='inline';if(changed)render(true);
       // State synchronization alone never takes focus. A particular click owns
       // the one pan, cancelled by user interaction even before the host replies.
       if(focusToken===snapshot?.token && questionnaireFocus?.id===requestId && questionnaireFocus?.token===focusToken)questionnaireFocus?.schedule();
@@ -524,7 +528,7 @@ ${VERDICT_ICON_STYLE}
 .route-questionnaire { box-sizing:border-box; width:480px; border:3px solid var(--vscode-focusBorder,#3794ff); border-radius:6px; padding:8px; background:transparent; }
 .route-questionnaire .route-card + .route-card { margin-top:8px; }
 .route-card-note { flex-basis:100%; color:var(--vscode-editorWarning-foreground,#cca700); }
-.route-card-toolbar {display:flex;align-items:center;gap:8px;margin:6px 0;} .route-questions-toggle {cursor:pointer;background:var(--vscode-button-secondaryBackground,#333);color:var(--vscode-button-secondaryForeground,#eee);border:1px solid transparent;border-radius:3px;padding:3px 7px;} .route-questions-toggle[aria-pressed=true] {border-color:var(--vscode-focusBorder,#3794ff);}
+.route-card-toolbar {display:flex;align-items:center;gap:8px;margin:6px 0;}
 .route-card label { display:block; margin:6px 0; } .route-card textarea { display:block;box-sizing:border-box; width:100%; min-height:64px; resize:none; padding:4px;border:1px solid var(--vscode-input-border,#555); background:var(--vscode-input-background,#303030); color:var(--vscode-input-foreground,#ddd); }
 .route-leaf-nav-label,.route-leaf-nav-count{fill:var(--vscode-foreground,#ddd);font:12px var(--vscode-font-family,sans-serif);pointer-events:none}.route-branch-nav{cursor:pointer}.route-branch-nav[aria-disabled=true]{opacity:.3;cursor:default}.route-branch-nav rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c)}.route-branch-nav path{fill:none;stroke:var(--vscode-foreground,#ddd);stroke-width:2}.route-branch-nav:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff)}.route-layout-toggle {cursor:pointer;} .route-layout-toggle rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);} .route-layout-toggle path {fill:none;stroke:var(--vscode-foreground,#ddd);stroke-width:1.5;pointer-events:none;} .route-layout-toggle[aria-pressed=true] rect {stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2;}
 .route-question-badge { pointer-events:none; } .route-question-badge rect {fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-focusBorder,#3794ff);stroke-width:1;} .route-question-badge text {fill:var(--vscode-foreground,#ddd);font:11px sans-serif;}

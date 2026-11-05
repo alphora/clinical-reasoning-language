@@ -7,6 +7,7 @@ import { caseDisplayName } from './caseDisplayName.ts';
 import { branchMessageIsCurrent, branchCaptureManifest } from './decisionTableSessions.ts';
 const source=ts.createSourceFile('cockpit.ts',readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
 function host(names,environment,result,deps={}){
+ if(names.some(n=>['focusBranchSession','reconcileDecisionTable','refreshDecisionTableAfterRebuild','handleDecisionTableMessage'].includes(n)))names=[...new Set([...names,'branchSessionCurrent','postBranch','questionModeFor','hasBranchQuestionCase','postQuestionMode','publishQuestionModes','onBranchQuestionnaireClosed','closeQuestionPanel','syncQuestionPanel','setQuestionDisplayMode'])];
  const found=new Map();
  const visit=node=>{if(ts.isFunctionDeclaration(node)&&node.name&&names.includes(node.name.text))found.set(node.name.text,node.getText(source));ts.forEachChild(node,visit);};visit(source);
  for(const name of names)assert(found.has(name),'production closure '+name);
@@ -14,9 +15,9 @@ function host(names,environment,result,deps={}){
  return new Function('deps',code)({branchMessageIsCurrent,branchCaptureManifest,...deps});
 }
 const row=(id)=>({id,epoch:'table',sourceVersion:1,generation:3,mounted:true,ready:false,renderToken:id+'-pin',view:{gen:3,acked:false,panel:{webview:{postMessage(){}}}},row:{cases:[{caseId:id+'Case',route:{terminalId:id+'Route'}}]},pin:{token:id+'-pin',epoch:1,caseId:id+'Case',routeId:id+'Route',verdictCaseIds:[id+'Case'],payload:{cards:[{id:'q',text:'Question'}]},targets:new Map([['q',{}]])},drafts:new Map()});
-const lifetime=`let mode='medical-validation',indexVersion=1;const decisionTable={epoch:'table',sessions:new Map(deps.rows.map(row=>[row.id,row]))};
+const lifetime=`let legacyQuestionMode='off';let mode='medical-validation',indexVersion=1;const decisionTable={epoch:'table',sessions:new Map(deps.rows.map(row=>[row.id,row]))};
 const posts=[];const views=new Map([['tree',{panel:{webview:{postMessage:message=>posts.push(message)}}}]]);`;
-test('production draft messages preserve row and RQ owner across other-row activation and paging',()=>{
+test('production draft messages preserve row and RQ owner across other-row edits and paging',()=>{
  const a=row('a'),b=row('b');
  const h=host(['branchSessionCurrent','postBranch','acceptCardDraft'],lifetime+`
  let branchQuestionnaireOwner=deps.rows[0],pinnedCards;const questionnaire=[];const branchQuestionnaire={post:m=>questionnaire.push(m)};`,
@@ -97,7 +98,8 @@ test('production off-page flag navigation preserves current and dormant drafts p
 function fhirHost(rows){
  const loads=[],posts=[];
  const h=host(['branchSessionCurrent','fhirInspectionContext','syncFhirInspection','focusBranchSession','renderFhirQuestionnaire','handleDecisionTableMessage'],`
- let mode='medical-validation',currentCel='policy.cel',indexVersion=1,focusedBranchSession,lastFhirInspectionIdentity;
+ let legacyQuestionMode='off';let mode='medical-validation',currentCel='policy.cel',indexVersion=1,focusedBranchSession,lastFhirInspectionIdentity,branchQuestionnaireOwner,pinnedCards;
+ const branchQuestionnaire={isOpen:false,open(){},close(){onBranchQuestionnaireClosed();}};
  let decisionTable={epoch:'table',sessions:new Map(deps.rows.map(row=>[row.id,row]))};
  const branchMessageIsCurrent=deps.branchMessageIsCurrent;
  const state={selection:{primary:'cel',caseId:'legacy'}};
@@ -160,8 +162,8 @@ test('production table lifecycle preserves focus or replaces it after page/fold 
  const folded={scope:{nodeKey:'folded'},totalRows:1n,parent:wide.scope,children:[],rows:()=>[a],underlyingRow:id=>id==='a'?a:undefined};
  const h=host(['branchSessionCurrent','fhirInspectionContext','syncFhirInspection','focusBranchSession','renderFhirQuestionnaire',
  'reconcileDecisionTable','decisionTableAction','chooseBranchCase','suspendDecisionTable','closeDecisionTable','refreshDecisionTableAfterRebuild','renderRebuiltPanes'],`
- let mode='medical-validation',currentCel='policy.cel',indexVersion=1,decisionTable,focusedBranchSession,lastFhirInspectionIdentity,pinnedCards,branchQuestionnaireOwner,flagDrawerSession,nextBranchSession=0;
- const state={selection:{primary:'cel',caseId:'legacy'},index:{crlNav:[]}},scenario=id=>({case:{name:id},decision:{libraryName:'L'},compartmentDir:id+'-directory'});
+ let legacyQuestionMode='off';let mode='medical-validation',currentCel='policy.cel',indexVersion=1,decisionTable,focusedBranchSession,lastFhirInspectionIdentity,pinnedCards,branchQuestionnaireOwner,flagDrawerSession,nextBranchSession=0;
+ const state={selection:{primary:'cel',caseId:'bCase'},index:{crlNav:[]}},scenario=id=>({case:{name:id},decision:{libraryName:'L'},compartmentDir:id+'-directory'});
  const scenarioByCaseId=new Map(['aCase','aSecond','bCase','cCase','legacy'].map(id=>[id,scenario(id)]));
  const focusedCaseId=state=>state.selection?.caseId,focusedScenario=()=>scenarioByCaseId.get(focusedCaseId(state)),caseDisplayName=name=>name;
  const view={gen:0,panel:{webview:{postMessage:m=>{if(m.type==='fhirQuestionnaire')deps.posts.push(m)}}}};
@@ -171,19 +173,24 @@ test('production table lifecycle preserves focus or replaces it after page/fold 
  const renderPane=pane=>{const v=views.get(pane);if(v&&pane==='fhirQuestionnaire')renderFhirQuestionnaire(v,++v.gen);};
  const buildDecisionTable=(_source,_entries,scope)=>scope.nodeKey==='folded'?deps.folded:deps.wide,crlStructure={},tableEntries=()=>[],tableDisplayState=()=>({});
  const PANES=['tree','fhirQuestionnaire'],DECISION_TABLE_PAGE_SIZE=20,randomUUID=()=>String(indexVersion),clearTreeFocus=()=>{},snapshotCapture={settleEmpty(){}},expandedGuardWhens=new Set();
- const coord={disposePane:key=>deps.disposed.push(key)},branchQuestionnaire={close(){}},postDecisionTableLayout=()=>{},renderBranchSession=()=>{},driveLeafMarks=()=>{},flagNote=message=>{throw Error(message)};
+ let panelOpen=false,lastPanelPayload;const coord={disposePane:key=>deps.disposed.push(key)},branchQuestionnaire={get isOpen(){return panelOpen},open:payload=>{panelOpen=true;lastPanelPayload=payload;},close(){if(!panelOpen)return;panelOpen=false;onBranchQuestionnaireClosed();}},postDecisionTableLayout=()=>{},renderBranchSession=()=>{},driveLeafMarks=()=>{},flagNote=message=>{throw Error(message)};
  const vscode={window:{showQuickPick:async items=>items[deps.pick()]}};`,
  `return{reconcile:reconcileDecisionTable,focus:focusBranchSession,context:fhirInspectionContext,choose:chooseBranchCase,suspend:suspendDecisionTable,
  action:action=>decisionTableAction({epoch:decisionTable.epoch,action}),close:closeDecisionTable,rebuild:()=>{indexVersion++;renderRebuiltPanes();},
- row:id=>decisionTable.sessions.get(id),table:()=>decisionTable};`,{loads,posts,disposed,wide,folded,createHash,pick:()=>picked});
- h.reconcile(wide.scope);assert.equal(loads.at(-1).compartment,'aCase-directory');
+ row:id=>decisionTable.sessions.get(id),table:()=>decisionTable,display:setQuestionDisplayMode,owner:()=>branchQuestionnaireOwner,selectCase:id=>{state.selection.caseId=id},setLegacy:mode=>{legacyQuestionMode=mode},legacy:()=>legacyQuestionMode,panelOpen:()=>panelOpen,lastPanel:()=>lastPanelPayload,
+ pinRow:id=>{const row=decisionTable.sessions.get(id);row.pin={token:id+':'+row.caseId,epoch:indexVersion,caseId:row.caseId,routeId:row.routeId,payload:{token:id+':'+row.caseId,caseId:row.caseId,cards:[{id:'q',draftText:'Saved host draft'}]}};syncQuestionPanel(row);return row.pin}};`,{loads,posts,disposed,wide,folded,createHash,pick:()=>picked});
+ h.setLegacy('panel');h.reconcile(wide.scope);assert.equal(h.legacy(),'off','new table cancels even unopened legacy panel intent');assert.equal(loads.at(-1).compartment,'aCase-directory');assert.equal(h.row('a').questionMode,'panel','first top covered row defaults panel');assert.equal(h.row('b').questionMode,'off','other rows default off');
  h.focus(h.row('b'));const pendingB=loads.at(-1);h.reconcile(wide.scope);assert.equal(h.context().caseId,'bCase','visible focused row is retained');
  assert.equal(loads.at(-1),pendingB,'same focus reconcile does not reload');
- await h.action('nextPage');assert.equal(h.context().caseId,'cCase','page removal chooses a current visible row');
+ h.row('a').caseId='removedCase';h.selectCase('aSecond');h.reconcile(wide.scope);assert.equal(h.row('a').caseId,'aSecond','an existing row remaps its removed case using worklist preference');h.selectCase('bCase');
+ await h.action('nextPage');assert.equal(h.context().caseId,'cCase','page removal chooses a current visible row');assert.equal(h.row('c').questionMode,'panel','paging from panel owner hands panel to focused replacement');assert.equal(h.row('b').questionMode,'off');
  pendingB.resolve(fullNative('obsolete B',6));await settle();assert(!posts.some(p=>p.q?.id==='obsolete B'));
- await h.action('previousPage');assert.equal(h.context().caseId,'aCase');h.focus(h.row('b'));const foldedB=loads.at(-1);
- h.reconcile(folded.scope);assert.equal(h.context().caseId,'aCase','fold removal chooses remaining visible row');
+ await h.action('previousPage');assert.equal(h.context().caseId,'bCase','replacement prefers the selected case when no focused row remains visible');h.selectCase('legacy');h.focus(h.row('b'));const foldedB=loads.at(-1);
+ h.reconcile(folded.scope);assert.equal(h.context().caseId,'aSecond','fold removal retains the remapped case in the remaining row');assert.equal(h.row('a').questionMode,'panel','folding away a panel owner follows focus');
  foldedB.resolve(fullNative('folded B',6));await settle();assert(!posts.some(p=>p.q?.id==='folded B'));
+ h.reconcile(wide.scope);h.display(h.row('b'),'inline');h.focus(h.row('b'));assert.equal(h.owner(),h.row('a'),'inline destination does not silently transfer panel');
+ await h.action('nextPage');assert.equal(h.owner(),undefined,'panel owner left off-page is closed, not orphaned');assert.equal(h.row('a').questionMode,'off');assert.equal(h.row('c').questionMode,'off','page change from inline does not reapply initial panel default');
+ await h.action('previousPage');h.focus(h.row('a'));assert.equal(h.row('a').questionMode,'off','default is not reapplied when returning to an existing table');
  picked=1;await h.choose(h.row('a'));assert.equal(h.context().caseId,'aSecond');assert.equal(loads.at(-1).compartment,'aSecond-directory');
  const beforeSuspend=loads.at(-1);h.suspend();assert.equal(loads.at(-1).compartment,'legacy-directory');
  beforeSuspend.resolve(fullNative('before suspension',6));await settle();assert(!posts.some(p=>p.q?.id==='before suspension'));
@@ -194,6 +201,16 @@ test('production table lifecycle preserves focus or replaces it after page/fold 
  h.rebuild();assert.equal(posts.length,beforeRender,'production pre-reconcile pane render emits no empty/loading message');loads.at(-1).resolve(stable);await settle();assert.equal(posts.at(-1).key,stableKey,'production rebuild preserves the successful native form mount key');
  const beforeClose=loads.at(-1);h.close();assert.equal(loads.at(-1).compartment,'legacy-directory');
  beforeClose.resolve(fullNative('before close',6));await settle();assert(!posts.some(p=>p.q?.id==='before close'));assert.equal(h.table(),undefined);assert(disposed.length>0);
+ // Real reconcile/close callback: an owned case remap closes stale UI, retains the old draft key and pending owner.
+ h.selectCase('aCase');h.reconcile(wide.scope);h.setLegacy('inline');const originalCases=a.cases,oldPin=h.pinRow('a');assert(h.panelOpen());
+ h.row('a').caseId='removedCase';a.cases=originalCases.filter(entry=>entry.caseId==='aSecond');h.selectCase('aSecond');h.reconcile(wide.scope);
+ assert.equal(h.row('a').caseId,'aSecond');assert(!h.panelOpen(),'removed case is never left visible during replacement');assert.equal(h.owner(),h.row('a'));assert.equal(h.row('a').questionMode,'panel');
+ assert.equal(h.row('a').drafts.get(JSON.stringify(['aCase','aRoute'])),oldPin,'drafts use old pin identity rather than already changed session identity');h.pinRow('a');assert(h.panelOpen());assert.equal(h.lastPanel().caseId,'aSecond');
+ a.cases=[];h.reconcile(wide.scope);assert.equal(h.row('a').questionMode,'off','retained focused row losing its last case clears panel intent');assert.equal(h.owner(),undefined);assert(!h.panelOpen());assert.equal(h.legacy(),'inline');assert(h.row('a').drafts.has(JSON.stringify(['aSecond','aRoute'])),'newly uncovered row retains its archived drafts');
+ h.focus(h.row('b'));assert.equal(h.row('b').questionMode,'off','leaving an uncovered row cannot cause a phantom panel handoff');assert.equal(h.owner(),undefined);a.cases=originalCases.filter(entry=>entry.caseId==='aSecond');
+ h.row('a').caseId='removedAgain';h.selectCase('legacy');h.reconcile(wide.scope);assert.equal(h.row('a').caseId,'aSecond','missing worklist match falls back to first admitted case');
+ a.cases=originalCases;h.reconcile(wide.scope);h.focus(h.row('b'));h.display(h.row('b'),'panel');h.pinRow('b');assert(h.panelOpen());a.cases=[];
+ h.reconcile(folded.scope);assert.equal(h.owner(),undefined);assert(!h.panelOpen());assert.equal(h.row('a').questionMode,'off');assert.equal(h.legacy(),'inline','actual owner disposal then uncovered fold keeps dormant tree preference');a.cases=originalCases;h.close();
 });
 
 test('a changed native definition digest rejects the prior inspection even before source rebuild',async()=>{
@@ -215,4 +232,68 @@ test('pre-reconcile stale inspection is deferred and legacy route changes preser
 test('an unexpected loader rejection reports a diagnostic and path instead of leaving loading',async()=>{
  const a=row('a');a.caseId='aCase';const h=fhirHost([a]);h.focus(a);assert.equal(h.posts.at(-1).loading,true);
  h.loads[0].reject(Error('read failed'));await settle();assert.equal(h.posts.at(-1).loading,false);assert.equal(h.posts.at(-1).q,undefined);assert.equal(h.posts.at(-1).label,'aCase');assert.match(h.posts.at(-1).loadError,/read failed/);assert.equal(h.posts.at(-1).lookedFor,'aCase-directory');
+});
+
+// REFACTOR:grounded: execute the real host mode/owner/focus handlers with the panel's synchronous close callback.
+function questionHost(){
+ const a=row('a'),b=row('b'),empty=row('empty'),rows=[a,b,empty],opens=[],posts=[];
+ for(const r of rows){r.questionMode='off';r.caseId=r.id+'Case';r.routeId=r.id+'Route';r.pin.payload.token=r.pin.token;r.pin.payload.authoritativeDrafts=true;r.pin.payload.cards[0].draftText=r.id+' unsaved';}
+ empty.caseId=empty.routeId=undefined;empty.row.cases=[];empty.pin=undefined;
+ const h=host(['focusBranchSession','syncQuestionPanel','closeQuestionPanel','setQuestionDisplayMode','handleDecisionTableMessage'],`
+ let mode='medical-validation',indexVersion=1,legacyQuestionMode='off',focusedBranchSession,branchQuestionnaireOwner,pinnedCards;
+ const decisionTable={epoch:'table',sessions:new Map(deps.rows.map(r=>[r.id,r]))},scenarioByCaseId=new Map([['aCase',{}],['bCase',{}]]);
+ const branchMessageIsCurrent=deps.branchMessageIsCurrent,views=new Map([['tree',{gen:1,panel:{webview:{postMessage:m=>deps.posts.push(m)}}}]]);
+ const syncFhirInspection=()=>{},coord={ready(){}},paintBranchSession=()=>{};let opened=false;
+ const branchQuestionnaire={get isOpen(){return opened},open:payload=>{if(!payload?.token)throw Error('Empty panel payload');opened=true;deps.opens.push(payload);},close:()=>{if(!opened)return;opened=false;onBranchQuestionnaireClosed();}};`,
+ `return{set:setQuestionDisplayMode,focus:focusBranchSession,sync:syncQuestionPanel,close:closeQuestionPanel,manualClose:()=>branchQuestionnaire.close(),legacy:()=>legacyQuestionMode,setLegacy:mode=>{legacyQuestionMode=mode},
+ message:handleDecisionTableMessage,owner:()=>branchQuestionnaireOwner,open:()=>opened};`,{rows,opens,posts});
+ return{...h,a,b,empty,opens,posts};
+}
+test('three explicit question modes share host draft state and manual/inline closure cannot reset intended mode',()=>{
+ const h=questionHost();h.setLegacy('inline');h.set(h.a,'panel');assert.equal(h.a.questionMode,'panel');assert.equal(h.owner(),h.a);assert(h.open());
+ h.set(h.a,'inline');assert.equal(h.a.questionMode,'inline');assert.equal(h.owner(),undefined);assert(!h.open());
+ assert.equal(h.legacy(),'inline','closing a table-owned panel does not erase the tree display preference');
+ assert.equal(h.a.pin.payload.cards[0].draftText,'a unsaved');assert.equal(h.a.pin.payload.showQuestions,true);
+ h.set(h.a,'off');assert.equal(h.a.questionMode,'off');assert.equal(h.a.pin.payload.showQuestions,false);
+ h.set(h.a,'panel');h.manualClose();assert.equal(h.a.questionMode,'off');assert.equal(h.owner(),undefined);
+});
+test('panel follows panel-row to off-row focus and an explicit rendered-panel request cannot double-cycle to inline',()=>{
+ const h=questionHost();h.focus(h.a);h.set(h.a,'panel');h.focus(h.b);
+ assert.equal(h.a.questionMode,'off');assert.equal(h.b.questionMode,'panel');assert.equal(h.owner(),h.b);assert.equal(h.opens.at(-1).token,'b-pin');
+ h.message({type:'decisionTableRow',epoch:'table',rowId:'b',message:{type:'toggleBranchQuestionnaire',gen:3,token:'b-pin',questionMode:'panel'}});
+ assert.equal(h.b.questionMode,'panel','focus-before-click still applies the rendered off->panel intent');
+ h.message({type:'decisionTableRow',epoch:'table',rowId:'b',message:{type:'toggleBranchQuestionnaire',gen:3,token:'old',questionMode:'inline'}});assert.equal(h.b.questionMode,'panel');
+ h.message({type:'decisionTableRow',epoch:'table',rowId:'b',message:{type:'toggleBranchQuestionnaire',gen:3,token:'b-pin',questionMode:'invented'}});assert.equal(h.b.questionMode,'panel');
+ h.focus(h.a);assert.equal(h.owner(),h.a);assert.equal(h.a.pin.payload.cards[0].draftText,'a unsaved');
+});
+test('uncovered focus clears old panel; covered pending intent never borrows the origin payload or reopens on old ACK',()=>{
+ const h=questionHost();h.focus(h.a);h.set(h.a,'panel');h.focus(h.empty);
+ assert(!h.open());assert.equal(h.owner(),undefined);assert.equal(h.a.questionMode,'off');assert.equal(h.empty.questionMode,'off');
+ h.focus(h.a);h.set(h.a,'panel');const pin=h.b.pin;h.b.pin=undefined;h.focus(h.b);
+ assert.equal(h.b.questionMode,'panel');assert.equal(h.owner(),h.b);assert(!h.open());
+ h.message({type:'decisionTableRow',epoch:'table',rowId:'a',message:{type:'branchReady',gen:3,token:'a-pin'}});assert(!h.open());assert.equal(h.owner(),h.b);
+ h.b.pin=pin;h.sync(h.b);assert(h.open());assert.equal(h.opens.at(-1).token,'b-pin');
+});
+
+// REFACTOR:grounded: a pre-removal panel phase cannot turn a table-only handoff into a legacy close.
+test('an uncovered replacement after owner disposal preserves the tree inline preference',()=>{
+ const h=questionHost();h.setLegacy('inline');h.focus(h.a);h.set(h.a,'panel');h.manualClose();h.focus(h.empty,true);
+ assert.equal(h.owner(),undefined);assert.equal(h.empty.questionMode,'off');assert.equal(h.legacy(),'inline');
+});
+
+// REFACTOR:grounded: close is safe without an open panel, while explicit close still cancels pending legacy panel intent.
+test('idempotent panel close preserves dormant inline mode and clears pending legacy panel mode',()=>{
+ const h=questionHost();h.setLegacy('inline');h.close();assert.equal(h.legacy(),'inline');h.setLegacy('panel');h.close();assert.equal(h.legacy(),'off');
+});
+
+test('programmatic token-refresh close preserves intent, and panel-to-inline uses the authoritative host payload',()=>{
+ const h=questionHost();h.focus(h.a);h.set(h.a,'panel');h.close(true);
+ assert(!h.open());assert.equal(h.a.questionMode,'panel');assert.equal(h.owner(),h.a);h.sync(h.a);assert(h.open());
+ h.a.pin.payload.cards[0].answerDraft={kind:'boolean',value:true};h.set(h.a,'inline');
+ const payload=h.posts.filter(p=>p.type==='decisionTableRow'&&p.rowId==='a'&&p.message.type==='routeCards').at(-1).message;
+ assert.equal(payload.questionMode,'inline');assert.deepEqual(payload.cards[0].answerDraft,{kind:'boolean',value:true});assert.equal(payload.cards[0].draftText,'a unsaved');
+});
+test('an inline destination keeps its explicit mode instead of receiving an unrequested panel transfer',()=>{
+ const h=questionHost();h.set(h.b,'inline');h.focus(h.a);h.set(h.a,'panel');h.focus(h.b);
+ assert.equal(h.b.questionMode,'inline');assert.equal(h.a.questionMode,'panel');assert.equal(h.owner(),h.a);
 });

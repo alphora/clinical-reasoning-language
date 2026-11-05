@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { browserExecutable, browserFixture } from '../test/browserHarness.mjs';
 import { COCKPIT_WEBVIEW_SCRIPT } from './correspondenceCockpit.ts';
 import { renderFlowPane, FLOW_STYLE } from './flowPaneHtml.ts';
-import { ROUTE_CARD_STYLE } from './routeCardsWebview.ts';
+import { ROUTE_CARD_STYLE, installRouteCards } from './routeCardsWebview.ts';
 import { installDecisionTableWebview, captureDecisionTable, DECISION_TABLE_STYLE } from './decisionTableWebview.ts';
 import { screenCapturedDom } from './snapshotCapture.ts';
 import { sanitizeUncertaintySnapshot } from './uncertaintyGuardDisplay.ts';
@@ -119,3 +119,84 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   await run(`tableUi.dispose()`);assert.equal(await run(`document.getElementById('crlDecisionTable')`),null);
  }finally{await browser.close();}
 },30000);
+
+// REFACTOR:grounded: one yellow scope pin and one icon for the three question display modes.
+test.skipIf(!browserExecutable)('tree focus pins, hidden row chooser and explicit three-mode result icon use the production runtime',async()=>{
+ const browser=await browserFixture(`<!doctype html><html><head><style>${FLOW_STYLE}${ROUTE_CARD_STYLE}${DECISION_TABLE_STYLE}</style></head><body data-mode="medical-validation"><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div><script>window.messages=[];window.acquireVsCodeApi=()=>({postMessage:m=>messages.push(m)});${script.replace(/<\/script/gi,'<\\/script')}</script></body></html>`);
+ try{
+  const run=code=>browser.evaluate('{'+code+'}'),message=data=>run(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(data)}}))`);
+  await browser.until(()=>run(`!!globalThis.tableUi`),'installed runtime');
+  const visible=selector=>run(`[...document.querySelectorAll(${JSON.stringify(selector)})].filter(n=>getComputedStyle(n).display!=='none'&&n.getClientRects().length).length`);
+  await message({type:'render',gen:1,indexVersion:1,mode:'medical-validation',html:a.html});
+  assert.equal(await visible('#root [data-flow-pin]'),0,'no suggested/default pin');
+  await run(`document.querySelector('#root [data-flow-key="w"]').focus({preventScroll:true})`);assert.equal(await visible('#root [data-flow-pin]'),1);
+  assert.match(await run(`getComputedStyle(document.querySelector('#root .flow-pin-focus>.flow-pin')).filter`),/255, 213, 79/);
+  const layout={type:'decisionTable',epoch:7,label:'D',total:'2',range:'1–2',rows:[{id:'a',scopeKey:'w',label:'Met',caseLabel:'Case A',caseCount:2},{id:'b',label:'Met',caseLabel:'Case B',caseCount:1}]};
+  await message(layout);const row=(id,message)=>({type:'decisionTableRow',epoch:7,rowId:id,message});
+  await message(row('a',{type:'render',gen:1,indexVersion:1,mode:'medical-validation',html:a.html}));await message(row('b',{type:'render',gen:2,indexVersion:1,mode:'medical-validation',html:b.html}));
+  assert.equal(await run(`document.querySelectorAll('[data-table-case-selection][hidden]').length`),2);assert.equal(await visible('.decision-table-row-label button'),0);
+  assert.equal(await run(`document.querySelectorAll('.decision-table-row-label button').length`),2,'picker capability retained');
+  const pin={type:'routeCards',gen:1,token:'a-pin',pinKey:'end',routeKeys:['D','w','end'],cards:[{id:'q',ownerKey:'w',library:'L',concept:'Q',criterionPaths:[[{lib:'L',name:'C'}]],text:'Question?',answer:'yes',editable:true,editing:true,draftText:'Preserved draft',draftDescription:'Description',answerDraft:{kind:'boolean',value:true}}],questionMode:'off',authoritativeDrafts:true,label:'Case A'};
+  await message(row('a',pin));await message(row('b',{...pin,gen:2,token:'b-pin',label:'Case B'}));
+  assert.equal(await visible('.decision-table-row [data-flow-pin]'),1,'only dynamic scope anchor');
+  await run(`document.querySelectorAll('.decision-table-row')[1].querySelector('[data-flow-key]').focus({preventScroll:true})`);assert.equal(await visible('.decision-table-row [data-flow-pin]'),1,'focus cannot reveal other table pins');
+  assert.match(await run(`getComputedStyle(document.querySelector('.flow-scope-anchor>[data-flow-pin]')).filter`),/255, 213, 79/);
+  assert.equal(await run(`document.querySelectorAll('.route-questions-toggle').length`),0,'separate Questions button removed');
+  const state=mode=>message(row('a',{type:'branchQuestionnaireState',gen:1,questionMode:mode,open:mode==='panel'}));
+  const click=()=>run(`document.querySelector('.decision-table-row .route-layout-toggle').dispatchEvent(new MouseEvent('click',{bubbles:true}));messages.filter(m=>m.message?.type==='toggleBranchQuestionnaire').at(-1).message.questionMode`);
+  assert.equal(await click(),'panel');await state('panel');assert.equal(await run(`document.querySelector('.route-layout-toggle').dataset.questionMode`),'panel');assert.equal(await visible('.decision-table-row foreignObject .route-card'),0);
+  assert.equal(await click(),'inline');await state('inline');assert.equal(await run(`document.querySelector('.decision-table-row textarea')?.value`),'Preserved draft');
+  assert.equal(await click(),'off');await state('off');assert.equal(await visible('.decision-table-row foreignObject .route-card'),0);
+  await state('panel');await state('inline');assert.equal(await run(`document.querySelector('.decision-table-row textarea')?.value`),'Preserved draft','panel/inline preserves host-authored draft fields');
+ }finally{await browser.close();}
+});
+
+// REFACTOR:grounded: the three-mode icon retains explicit-focus cancellation across editor frames.
+test.skipIf(!browserExecutable)('Tab focus survives the full row handoff message sequence before Enter activates the new mode',async()=>{
+ const browser=await browserFixture(`<!doctype html><html><head><style>${FLOW_STYLE}${ROUTE_CARD_STYLE}${DECISION_TABLE_STYLE}</style></head><body data-mode="medical-validation"><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div><script>window.messages=[];window.acquireVsCodeApi=()=>({postMessage:m=>messages.push(m)});${script.replace(/<\/script/gi,'<\\/script')}</script></body></html>`);
+ try{
+  const run=code=>browser.evaluate('{'+code+'}'),message=data=>run(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(data)}}))`),row=(id,m)=>({type:'decisionTableRow',epoch:9,rowId:id,message:m});
+  await browser.until(()=>run(`!!globalThis.tableUi`),'installed runtime');
+  await message({type:'decisionTable',epoch:9,label:'D',total:'2',range:'1–2',rows:[{id:'a',scopeKey:'w',label:'Met'},{id:'b',label:'Met'}]});
+  const pin={type:'routeCards',gen:1,token:'a',pinKey:'end',routeKeys:['D','w','end'],questionMode:'panel',label:'A',cards:[]};
+  await message(row('a',{type:'render',gen:1,indexVersion:1,mode:'medical-validation',html:a.html}));await message(row('a',pin));
+  await message(row('b',{type:'render',gen:2,indexVersion:1,mode:'medical-validation',html:b.html}));const other={...pin,gen:2,token:'b',label:'B',questionMode:'off'};await message(row('b',other));
+  await run(`const icon=document.querySelectorAll('.route-layout-toggle')[1];for(const n of document.querySelectorAll('[tabindex],button'))if(n!==icon)n.setAttribute('tabindex','-1');const before=document.createElement('button');document.body.prepend(before);before.focus();messages.length=0;`);
+  const key=async(key,code)=>{for(const type of ['keyDown','keyUp'])await browser.rpc('Input.dispatchKeyEvent',{type,key,code:key,windowsVirtualKeyCode:code,nativeVirtualKeyCode:code});};
+  await key('Tab',9);assert.equal(await run(`document.activeElement===document.querySelectorAll('.route-layout-toggle')[1]`),true);
+  assert.equal(await run(`messages.some(m=>m.rowId==='b'&&m.message.type==='branchFocus')`),true,'actual keyboard focus reaches host bridge');
+  await message(row('a',{...pin,questionMode:'off'}));await message(row('a',{type:'branchQuestionnaireState',gen:1,questionMode:'off',open:false}));
+  await message(row('b',{...other,questionMode:'panel'}));for(let i=0;i<3;i++)await message(row('b',{type:'branchQuestionnaireState',gen:2,questionMode:'panel',open:true}));
+  assert.equal(await run(`document.activeElement===document.querySelectorAll('.route-layout-toggle')[1]`),true,'handoff and repeated telemetry retain the replacement icon');
+  await key('Enter',13);const request=await run(`messages.filter(m=>m.rowId==='b'&&m.message.type==='toggleBranchQuestionnaire').at(-1)?.message`);assert.equal(request.questionMode,'inline');
+  await message(row('b',{type:'branchQuestionnaireState',gen:2,questionMode:'inline',open:false,focusToken:'b',requestId:request.requestId}));
+  await new Promise(resolve=>setTimeout(resolve,240));assert.equal(await run(`document.activeElement===document.querySelectorAll('.route-layout-toggle')[1]`),true,'delayed explicit ACK preserves keyboard icon for the next Enter');
+  await key('Enter',13);assert.equal(await run(`messages.filter(m=>m.rowId==='b'&&m.message.type==='toggleBranchQuestionnaire').at(-1).message.questionMode`),'off');
+ }finally{await browser.close();}
+});
+
+// REFACTOR:grounded: the three-mode icon retains explicit-focus cancellation across editor frames.
+test.skipIf(!browserExecutable)('question-mode acknowledgements never steal later editor focus across frames',async()=>{
+ const browser=await browserFixture('<!doctype html><html><body><textarea id="outer"></textarea><iframe id="frame"></iframe></body></html>');
+ try{
+  await browser.until(()=>browser.evaluate(`!!document.getElementById('frame')`),'frame fixture');
+  const result=await browser.evaluate(`(async()=>{
+   const frame=document.getElementById('frame'),d=frame.contentDocument,w=frame.contentWindow;
+   d.head.innerHTML='<style>'+${JSON.stringify(FLOW_STYLE+ROUTE_CARD_STYLE)}+'</style>';d.body.dataset.mode='medical-validation';d.body.innerHTML='<div id="root">'+${JSON.stringify(a.html)}+'</div>';
+   const root=d.getElementById('root'),leaf=root.querySelector('[data-flow-key="end"]');leaf.classList.add('flow-pinned');leaf.setAttribute('tabindex','-1');
+   const install=w.eval('('+${JSON.stringify(installRouteCards.toString())}+')'),sent=[],ui=install(root,{postMessage:m=>sent.push(m)},()=>1);
+   ui.show({token:'pin',pinKey:'end',questionMode:'off',label:'A',cards:[{id:'q',ownerKey:'w',library:'L',concept:'Q',text:'Question?',value:'Yes'}]});
+   let pans=0;leaf.scrollIntoView=()=>pans++;const wait=()=>new Promise(r=>setTimeout(r,220));
+   const click=()=>{root.querySelector('.route-layout-toggle').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));return sent.at(-1).requestId};
+   leaf.focus();const first=click();ui.questionnaireState(true,'pin',first,'panel');await wait();const explicit=pans===1;
+   ui.questionnaireState(true,'pin',first,'panel');await wait();const repeated=pans===1;
+   const second=click(),outer=document.getElementById('outer');outer.focus();const frameLostFocus=!d.hasFocus();ui.questionnaireState(false,'pin',second,'inline');await wait();
+   const crossFrame=frameLostFocus&&document.activeElement===outer&&pans===1;
+   leaf.focus();const third=click();d.body.dispatchEvent(new w.Event('wheel',{bubbles:true}));ui.questionnaireState(false,'pin',third,'off');await wait();const cancelled=pans===1;
+   root.querySelector('.route-layout-toggle').focus();root.classList.add('flow-pointer-interaction');const fourth=click();ui.questionnaireState(true,'pin',fourth,'panel');await wait();const pointerIcon=pans===2&&d.activeElement===leaf;
+   root.classList.remove('flow-pointer-interaction');root.querySelector('.route-layout-toggle').focus();const fifth=click();ui.questionnaireState(true,'pin',fifth,'panel');await wait();const keyboardIcon=pans===2&&d.activeElement===root.querySelector('.route-layout-toggle');
+   ui.reset();frame.remove();return{explicit,repeated,crossFrame,cancelled,pointerIcon,keyboardIcon};
+  })()`);
+  assert.deepEqual(result,{explicit:true,repeated:true,crossFrame:true,cancelled:true,pointerIcon:true,keyboardIcon:true});
+ }finally{await browser.close();}
+});

@@ -11,8 +11,10 @@ export function nextQuestionnaireColumn(): vscode.ViewColumn {
 /** One pinned-branch pane. A replaced panel can neither send commands nor close its replacement. */
 export function createBranchQuestionnairePanel(onMessage: (message: any) => void, onClosed: () => void) {
   let current: vscode.WebviewPanel | undefined, payload: any, ready = false, serial = 0;
+  // REFACTOR:grounded: cycling panel/inline/off reuses its established column.
+  let preferredColumn: vscode.ViewColumn | undefined;
   const post = (message: any) => { if (ready && current) void current.webview.postMessage({...message,gen:serial}); };
-  const close = () => { const old=current;if(!old)return;current=undefined;payload=undefined;ready=false;old.dispose();onClosed(); };
+  const close = () => { const old=current;if(!old)return;preferredColumn=old.viewColumn??preferredColumn;current=undefined;payload=undefined;ready=false;old.dispose();onClosed(); };
   return {
     get isOpen() { return !!current; }, post, close,
     update(value: any) { payload=value;post({type:'routeCards',...value}); },
@@ -20,7 +22,7 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
       if(current){payload=value;post({type:'routeCards',...value});return;}
       payload=value;ready=false;const generation=++serial;
       const panel=vscode.window.createWebviewPanel(BRANCH_QUESTIONNAIRE_VIEW_TYPE,'Medical Validation — Result Questionnaire',
-        {viewColumn:nextQuestionnaireColumn(),preserveFocus:true},{enableScripts:true,retainContextWhenHidden:true,localResourceRoots:[]});
+        {viewColumn:preferredColumn??(preferredColumn=nextQuestionnaireColumn()),preserveFocus:true},{enableScripts:true,retainContextWhenHidden:true,localResourceRoots:[]});
       current=panel;
       const listener=panel.webview.onDidReceiveMessage(message=>{
         if(current!==panel || message?.gen!==generation)return;
@@ -29,7 +31,9 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
         // REFACTOR:grounded: Q/A request status and revert remain in the same MV UI.
         if(['routeCardSave','routeCardAnswerSave','routeCardDraft','qaRequestAction'].includes(message.type))onMessage(message);
       });
-      panel.onDidDispose(()=>{listener.dispose();if(current!==panel)return;current=undefined;payload=undefined;ready=false;onClosed();});
+      // REFACTOR:grounded: disposed VS Code panels reject property access; remember moves while alive.
+      const viewState=panel.onDidChangeViewState(()=>{if(current===panel)preferredColumn=panel.viewColumn??preferredColumn;});
+      panel.onDidDispose(()=>{listener.dispose();viewState.dispose();if(current!==panel)return;current=undefined;payload=undefined;ready=false;onClosed();});
       const nonce=randomUUID();
       panel.webview.html=`<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';"><style nonce="${nonce}">
         body{padding:12px;color:var(--vscode-editor-foreground);background:var(--vscode-editor-background);font:var(--vscode-font-size) var(--vscode-font-family)}

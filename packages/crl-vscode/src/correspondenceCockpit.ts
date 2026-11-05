@@ -161,7 +161,7 @@ import { collectDispositionLeafKeys, toggleCriterionExpansion, expandTraversalCr
 import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
 import { captureDecisionTable, installDecisionTableWebview, DECISION_TABLE_STYLE } from './decisionTableWebview';
 import { buildDecisionTable, DECISION_TABLE_PAGE_SIZE, type DecisionTableModel, type DecisionTableRow, type DecisionTableScope } from './decisionTableModel';
-import { branchCaptureManifest, branchMessageIsCurrent, type BranchSessionIdentity } from './decisionTableSessions';
+import { branchCaptureManifest, branchMessageIsCurrent, type BranchSessionIdentity, type QuestionDisplayMode } from './decisionTableSessions';
 import { SnapshotCapture, screenCapturedDom, snapshotFileName } from "./snapshotCapture";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
@@ -313,6 +313,7 @@ interface BranchSession extends BranchSessionIdentity {
   drafts: Map<string, BranchPin>;
   expanded: Set<string>;
   flagsByGid: Map<string, MvFlag[]>;
+  questionMode: QuestionDisplayMode;
 }
 
 /** CRL nav list — pre-order flatten of the structure (roots + when/otherwise/action); the crl-primary cycle/selectable
@@ -2503,9 +2504,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     lastFhirInspectionIdentity=identity;
     renderPane('fhirQuestionnaire');
   }
-  function focusBranchSession(session: BranchSession): void {
+  function focusBranchSession(session: BranchSession, fromPanel=focusedBranchSession?.questionMode==='panel'): void {
     if(!branchSessionCurrent(session)||!session.mounted)return;
-    focusedBranchSession=session;syncFhirInspection();
+    const previous=focusedBranchSession;focusedBranchSession=session;
+    // REFACTOR:grounded: only the operator-specified panel -> off focus transition transfers ownership.
+    if(previous&&previous!==session&&fromPanel&&(session.questionMode??'off')==='off'){
+      if(hasBranchQuestionCase(session))setQuestionDisplayMode(session,'panel');
+      else{previous.questionMode='off';if(branchQuestionnaireOwner)closeQuestionPanel();postQuestionMode(previous,true);}
+    }
+    syncFhirInspection();
   }
   /** Load the full saved native Q/QR; a clicked node never truncates the form to a path prefix. */
   function renderFhirQuestionnaire(view: PaneView, gen: number): void {
@@ -2778,6 +2785,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // Render dedupe only; the freshly resolved inspection context is the read-freshness authority.
   let lastFhirInspectionIdentity: string | undefined;
   let branchQuestionnaireOwner: BranchSession | undefined;
+  let legacyQuestionMode: QuestionDisplayMode = 'off';
   let flagDrawerSession: BranchSession | undefined;
   let nextBranchSession = 0;
   function branchSessionCurrent(session: BranchSession): boolean {
@@ -2798,11 +2806,58 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(message.type==='routeCardSave' || message.type==='routeCardAnswerSave')void saveCard(message,session);
     else if(message.type==='routeCardDraft')acceptCardDraft(message,true,session);
     else if(message.type==='qaRequestAction')qaRequestAction(message,session);
-  }, () => {
-    branchQuestionnaireOwner = undefined;
-    const tree=views.get('tree');if(tree)postBranch(undefined,{type:'branchQuestionnaireState',gen:tree.gen,open:false});
-    for (const session of decisionTable?.sessions.values() ?? []) postBranch(session,{type:'branchQuestionnaireState',gen:session.view.gen,open:false});
-  });
+  }, onBranchQuestionnaireClosed);
+  /** REFACTOR:grounded: UI mode is host-owned; open is panel telemetry, never a second preference. */
+  function questionModeFor(session?: BranchSession): QuestionDisplayMode {return session?.questionMode??(session?'off':legacyQuestionMode);}
+  function hasBranchQuestionCase(session: BranchSession): boolean {
+    return !!session.caseId&&scenarioByCaseId.has(session.caseId)&&session.row.cases.some(entry=>entry.caseId===session.caseId&&entry.route.terminalId===session.routeId);
+  }
+  function postQuestionMode(session?: BranchSession, payload=false, focusToken?: string, requestId?: string): void {
+    const view=session?.view??views.get('tree');if(!view)return;
+    const questionMode=questionModeFor(session),pin=session?session.pin:pinnedCards;
+    if(pin){pin.payload.questionMode=questionMode;pin.payload.showQuestions=questionMode==='inline';
+      if(payload)postBranch(session,{type:'routeCards',gen:view.gen,...pin.payload});}
+    postBranch(session,{type:'branchQuestionnaireState',gen:view.gen,questionMode,
+      open:branchQuestionnaire.isOpen&&branchQuestionnaireOwner===session,...(focusToken?{focusToken,requestId}:{})});
+  }
+  function publishQuestionModes(): void {
+    postQuestionMode();for(const session of decisionTable?.sessions.values()??[])postQuestionMode(session);
+  }
+  function onBranchQuestionnaireClosed(): void {
+    const owner=branchQuestionnaireOwner;branchQuestionnaireOwner=undefined;
+    if(owner?.questionMode==='panel'){owner.questionMode='off';postQuestionMode(owner,true);}
+    else if(!owner&&legacyQuestionMode==='panel')legacyQuestionMode='off';
+    publishQuestionModes();
+  }
+  /** Detach before synchronous onClosed; refresh restores intent, explicit off/inline does not. */
+  function closeQuestionPanel(preserveIntent=false): void {
+    const owner=branchQuestionnaireOwner,legacy=legacyQuestionMode;branchQuestionnaireOwner=undefined;
+    if(!preserveIntent){if(owner?.questionMode==='panel')owner.questionMode='off';if(!owner&&legacyQuestionMode==='panel')legacyQuestionMode='off';}
+    // REFACTOR:grounded: factory close notifies synchronously once; restore only after that callback, not a delayed disposal event.
+    branchQuestionnaire.close();
+    if(preserveIntent){branchQuestionnaireOwner=owner;legacyQuestionMode=legacy;}else if(owner)legacyQuestionMode=legacy;
+    publishQuestionModes();
+  }
+  function syncQuestionPanel(session?: BranchSession): void {
+    if(questionModeFor(session)!=='panel'||branchQuestionnaireOwner!==session)return;
+    const pin=session?session.pin:pinnedCards;
+    if(pin&&pin.epoch===indexVersion&&(!session||(branchSessionCurrent(session)&&pin.caseId===session.caseId&&pin.routeId===session.routeId))){
+      pin.payload.questionMode='panel';pin.payload.showQuestions=false;branchQuestionnaire.open(pin.payload);
+    }else closeQuestionPanel(true); // A missing current-case payload stays pending; never borrow prior case data.
+  }
+  function setQuestionDisplayMode(session: BranchSession|undefined, requested: QuestionDisplayMode): void {
+    if(session&&(!branchSessionCurrent(session)||!session.mounted))return;
+    const next=session&&!hasBranchQuestionCase(session)?'off':requested,previous=branchQuestionnaireOwner;
+    if(next==='panel'){
+      if(previous&&previous!==session){previous.questionMode='off';postQuestionMode(previous,true);}
+      branchQuestionnaireOwner=session;if(session)session.questionMode=next;else legacyQuestionMode=next;
+      syncQuestionPanel(session);
+    }else{
+      if(session)session.questionMode=next;else legacyQuestionMode=next;
+      if(branchQuestionnaireOwner===session){closeQuestionPanel();if(!session)legacyQuestionMode=next;}
+    }
+    postQuestionMode(session,true);publishQuestionModes();
+  }
   function acceptCardDraft(msg: any, fromBranch=false, session?: BranchSession): void {
     if (session && !branchSessionCurrent(session)) return;
     const pin=session ? session.pin : pinnedCards;
@@ -2900,9 +2955,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const outer=views.get('tree');if(!outer||mode!=='medical-validation')return;
     const model=buildDecisionTable(crlStructure,tableEntries(),scope,tableDisplayState());
     if(model.error){closeDecisionTable();flagNote(model.error);return;}
-    let table=decisionTable;
+    let table=decisionTable;const created=!table,fromPanel=focusedBranchSession?.questionMode==='panel';
     if(!table){
-      branchQuestionnaire.close();pinnedCards=undefined;clearTreeFocus();
+      // REFACTOR:grounded: a new table replaces the singleton legacy panel, including unopened pending intent.
+      closeQuestionPanel();pinnedCards=undefined;clearTreeFocus();
       table={epoch:randomUUID(),model,scope:model.scope,offset:0n,sessions:new Map(),visible:[]};decisionTable=table;
     }
     snapshotCapture.settleEmpty();
@@ -2925,18 +2981,22 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         const view:PaneView={panel:outer.panel,gen:0,indexVersion,acked:false,anchors:{},reveals:{},leafConcepts:{},conceptOccurrences:[],criterionOccurrences:[],flaggableGids:[],disposables:[]};
         session={id:row.id,row,epoch:table.epoch,sourceVersion:indexVersion,generation:0,renderToken:'',ready:false,mounted:true,
           coordinatorKey:`tree/branch/${number}`,prefix:`b${number}_`,view,index:table.offset+BigInt(index),caseId:preferred?.caseId,routeId:preferred?.route.terminalId,
-          drafts:new Map(),expanded:new Set(expandedGuardWhens),flagsByGid:new Map()};
+          drafts:new Map(),expanded:new Set(expandedGuardWhens),flagsByGid:new Map(),questionMode:'off'};
         table.sessions.set(row.id,session);
       }
       session.row=row;session.index=table.offset+BigInt(index);session.mounted=true;
       if(!row.cases.some(entry=>entry.caseId===session.caseId&&entry.route.terminalId===session.routeId)){
         if(session.pin)session.drafts.set(JSON.stringify([session.pin.caseId,session.pin.routeId]),session.pin);
-        const preferred=row.cases[0];session.caseId=preferred?.caseId;session.routeId=preferred?.route.terminalId;session.pin=undefined;
+        const preferred=row.cases.find(entry=>entry.caseId===focusedCaseId(state))??row.cases[0];session.caseId=preferred?.caseId;session.routeId=preferred?.route.terminalId;session.pin=undefined;
+        if(branchQuestionnaireOwner===session)closeQuestionPanel(hasBranchQuestionCase(session)); // Only eligible replacements retain panel intent.
       }
     }
-    if(!focusedBranchSession||!table.visible.includes(focusedBranchSession.id)||table.sessions.get(focusedBranchSession.id)!==focusedBranchSession)
-      focusedBranchSession=table.visible.map(id=>table.sessions.get(id)!).find(row=>row.caseId===focusedCaseId(state))??table.sessions.get(table.visible[0]);
-    syncFhirInspection();
+    const retained=focusedBranchSession&&table.visible.includes(focusedBranchSession.id)&&table.sessions.get(focusedBranchSession.id)===focusedBranchSession?focusedBranchSession:undefined;
+    const selected=table.visible.map(id=>table!.sessions.get(id)!).find(row=>row.caseId===focusedCaseId(state));
+    const focused=created?table.sessions.get(table.visible[0]):retained??selected??table.sessions.get(table.visible[0]);
+    if(focused)focusBranchSession(focused,fromPanel);else{focusedBranchSession=undefined;syncFhirInspection();}
+    if(branchQuestionnaireOwner&&!branchQuestionnaireOwner.mounted)closeQuestionPanel();
+    if(created&&focused&&hasBranchQuestionCase(focused))setQuestionDisplayMode(focused,'panel');
     postDecisionTableLayout();
     for(const id of table.visible)renderBranchSession(table.sessions.get(id)!);
   }
@@ -2960,7 +3020,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
   function refreshDecisionTableAfterRebuild(): void {
     const table=decisionTable;if(!table)return;
-    branchQuestionnaire.close();flagDrawerSession=undefined;table.epoch=randomUUID();
+    closeQuestionPanel(true);flagDrawerSession=undefined;table.epoch=randomUUID();
     for(const session of table.sessions.values()){session.epoch=table.epoch;session.sourceVersion=indexVersion;session.ready=false;}
     if(table.suspended){
       table.model=buildDecisionTable(crlStructure,tableEntries(),table.scope,tableDisplayState());
@@ -3045,7 +3105,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(msg.type==='branchReady'){
       if(msg.token!==session.renderToken)return true;
       session.ready=true;view.acked=true;coord.ready(session.coordinatorKey,view.gen,indexVersion);paintBranchSession(session);
-      postBranch(session,{type:'branchQuestionnaireState',gen:view.gen,open:branchQuestionnaire.isOpen&&branchQuestionnaireOwner===session});return true;
+      postQuestionMode(session);return true;
     }
     if(msg.type==='pinFirstRoute'&&typeof msg.key==='string'){openDecisionTableAt(msg.key,session);return true;}
     if(msg.type==='unpinRoute'){openDecisionTableAt(session.row.terminalKey,session);return true;}
@@ -3056,11 +3116,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(msg.type==='navigatePinnedBranch'){navigateTableBranch(session,msg.dir,msg.token,msg.tableFocusVersion);return true;}
     if(msg.type==='toggleBranchQuestionnaire'){
       const pin=session.pin;if(!pin||msg.token!==pin.token)return true;
-      if(branchQuestionnaire.isOpen&&branchQuestionnaireOwner===session)branchQuestionnaire.close();
-      else{branchQuestionnaireOwner=session;branchQuestionnaire.open(pin.payload);}
-      for(const row of table.sessions.values())postBranch(row,{type:'branchQuestionnaireState',gen:row.view.gen,
-        open:branchQuestionnaire.isOpen&&branchQuestionnaireOwner===row,
-        ...(row===session?{focusToken:pin.token,requestId:typeof msg.requestId==='string'?msg.requestId:undefined}:{})});
+      if(!['off','panel','inline'].includes(msg.questionMode))return true;
+      setQuestionDisplayMode(session,msg.questionMode);
+      postQuestionMode(session,false,pin.token,typeof msg.requestId==='string'?msg.requestId:undefined);
       return true;
     }
     if(msg.type==='routeCardSource'){
@@ -3143,6 +3201,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     pinCards(next.caseId,next.routeId,'branch-navigation',false,next.traversalKey);
   }
   function pinCards(caseId: string, routeId: string, focusRequest?: string, showQuestions = false, traversalKey?: string, priorPin?: BranchPin, session?: BranchSession): void {
+    if(!session&&showQuestions&&legacyQuestionMode==='off')legacyQuestionMode='inline';
     if (session && !branchSessionCurrent(session)) return;
     priorPin ??= session ? session.pin : pinnedCards;
     const view = session?.view ?? views.get("tree"), sv = scenarioByCaseId.get(caseId);
@@ -3221,13 +3280,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const token = randomUUID();
     const verdictCaseIds=session ? [...new Set(session.row.cases.map(entry=>entry.caseId))] : caseIdsThroughReviewNode(route.nodeKeys[route.nodeKeys.length-1]);
     const paint=treeFocusPaint([traversal],route.nodeKeys.at(-1)!,view.focusNodes ?? {});
-    const payload = { token, pathNodeKeys:paint.nodeKeys, pathGroupKeys:paint.groupKeys, pathGroupOutcomes:paint.groupOutcomes, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:typeof neighbors.index==='bigint'?String(neighbors.index+1n):neighbors.index+1,total:typeof neighbors.total==='bigint'?String(neighbors.total):neighbors.total,...(typeof neighbors.index==='bigint'?{countLabel:`${neighbors.index+1n} of ${neighbors.total}`}:{})}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
+    const payload = { token, questionMode:questionModeFor(session), pathNodeKeys:paint.nodeKeys, pathGroupKeys:paint.groupKeys, pathGroupOutcomes:paint.groupOutcomes, verdict:pinnedVerdict(verdictCaseIds), showQuestions:questionModeFor(session)==='inline', authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:typeof neighbors.index==='bigint'?String(neighbors.index+1n):neighbors.index+1,total:typeof neighbors.total==='bigint'?String(neighbors.total):neighbors.total,...(typeof neighbors.index==='bigint'?{countLabel:`${neighbors.index+1n} of ${neighbors.total}`}:{})}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
       pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
     const nextPin = { token, epoch: indexVersion, caseId, routeId, traversalKey:selectedTraversalKey, traversal, verdictCaseIds, payload, targets: built.targets, answerTargets };
     if (session) { session.pin=nextPin; session.renderToken=token; session.ready=false; }
     else pinnedCards=nextPin;
     postBranch(session,{ type: "routeCards", gen: view.gen, ...payload, focusRequest });
-    if(branchQuestionnaire.isOpen && branchQuestionnaireOwner===session)branchQuestionnaire.update(payload);
+    syncQuestionPanel(session);
     if (session) paintBranchSession(session); else driveLeafMarks();
   }
   function hasPendingWording(): boolean { const src = currentCel && findPolicySrc(currentCel); if (!src) return false; const p = pendingPresentationProposals(src); return !!(p.pending || p.unreadable); }
@@ -3344,7 +3403,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown; assignments?: unknown; dirty?: unknown; epoch?: unknown; caseId?: string; routeId?: string; category?: unknown; routeToken?: unknown; questionnaireOpen?: unknown; requestId?: unknown },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown; assignments?: unknown; dirty?: unknown; epoch?: unknown; caseId?: string; routeId?: string; category?: unknown; routeToken?: unknown; questionnaireOpen?: unknown; requestId?: unknown; questionMode?: unknown },
   ): void {
     if(pane==='tree'&&handleDecisionTableMessage(msg))return;
     const v = views.get(pane);
@@ -3361,8 +3420,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (msg.type === 'navigatePinnedBranch' && typeof msg.dir==='string') {navigatePinnedBranch(msg.dir,msg.token);return;}
       if (msg.type === 'toggleBranchQuestionnaire') {
         if(!pinnedCards || pinnedCards.epoch!==indexVersion || msg.token!==pinnedCards.token || mode!=="medical-validation")return;
-        if(branchQuestionnaire.isOpen)branchQuestionnaire.close();else branchQuestionnaire.open(pinnedCards.payload);
-        void v.panel.webview.postMessage({type:'branchQuestionnaireState',gen:v.gen,open:branchQuestionnaire.isOpen,focusToken:msg.token,requestId:typeof msg.requestId==='string'?msg.requestId:undefined});return;
+        if(msg.questionMode!=='off'&&msg.questionMode!=='panel'&&msg.questionMode!=='inline')return;
+        setQuestionDisplayMode(undefined,msg.questionMode);
+        postQuestionMode(undefined,false,pinnedCards.token,typeof msg.requestId==='string'?msg.requestId:undefined);return;
       }
       if(msg.type==='toggleQuestionnairePane' && (msg.value==='questionnaire'||msg.value==='fhirQuestionnaire')){toggleQuestionnairePane(msg.value);return;}
       if(msg.type==='openInteractiveQuestionnaire' && mode==='medical-validation' && currentCel){interactiveQuestionnaire.toggle(currentCel);return;}
@@ -3393,7 +3453,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // through the `if (opened && state.selection) dispatch(...)` path in reconcilePaneOrder.
       if (pane === "tree") {
         renderTreeChrome();
-        if(msg.questionnaireOpen!==branchQuestionnaire.isOpen)void v.panel.webview.postMessage({type:'branchQuestionnaireState',gen:v.gen,open:branchQuestionnaire.isOpen});
+        if(msg.questionnaireOpen!==(legacyQuestionMode==='panel'))void v.panel.webview.postMessage({type:'branchQuestionnaireState',gen:v.gen,open:branchQuestionnaire.isOpen&&!branchQuestionnaireOwner,questionMode:legacyQuestionMode});
         if (pinnedCards?.epoch === indexVersion && msg.routeToken!==pinnedCards.token) void v.panel.webview.postMessage({ type: "routeCards", gen: v.gen, ...pinnedCards.payload });
         // #156 slice 5 / #210: a freshly-(re)rendered tree loses its verdict classes (innerHTML replaced) — re-post the MV
         // review overlay on ack so the at-rest verdict painting survives a render. (The failed-criterion overlay
@@ -3779,7 +3839,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         catch (error) { console.warn("[crl.mv] Source correspondence unavailable", error); }
       }
       pinnedCards = undefined;
-      clearTreeFocus();if(!preservePin)branchQuestionnaire.close();
+      clearTreeFocus();if(!preservePin)closeQuestionPanel(!!decisionTable);
       loadEditRecovery(selected.suite.projectRoot);
       const previousDefinitions=currentDefinitions;
       currentDefinitions=selected.suite.policyPath?definitionFreshness.check(selected.suite.policyPath,join(editStorage(selected.suite.projectRoot),"freshness")):{state:"unknown",message:"Policy entry is unavailable."};
@@ -6683,7 +6743,7 @@ const COCKPIT_WEBVIEW_BODY =
   `const logicUi=(${installFlowLogicHighlight.toString()})(root);` +
   `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();logicUi.update();};` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
-  `const keyboardUi=(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
+  `const keyboardUi=(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root,options.tableRow===true);` +
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
@@ -6789,7 +6849,7 @@ const COCKPIT_WEBVIEW_BODY =
   `else if(m.type==='modeledBranch'){if(m.gen!==gen)return;routeCardUi.reset();treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=[];pinnedGroupKeys=[];pinnedGroupOutcomes=[];pinnedRouteLabel=m.label;currentRouteLabel=m.label;applyFlowPin();applyZoom();if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
   `else if(m.type==='unpinnedTreeFocus'){treeFocusUi.show(m);}` +
   `else if(m.type==='clearTreeFocus'){if(m.gen===gen)treeFocusUi.reset();}` +
-  `else if(m.type==='branchQuestionnaireState'){if(m.gen===gen)routeCardUi.questionnaireState(m.open,m.focusToken,m.requestId);}` +
+  `else if(m.type==='branchQuestionnaireState'){if(m.gen===gen)routeCardUi.questionnaireState(m.open,m.focusToken,m.requestId,m.questionMode);}` +
   `else if(m.type==='routeCardDraft'){if(m.gen===gen)routeCardUi.draft(m);}` +
   `else if(m.type==='routeVerdict'){if(m.gen===gen)routeCardUi.verdict(m);}` +
   `else if(m.type==='routeVerdictFocus'){if(m.gen===gen)routeCardUi.verdictFocus(m);}` +
