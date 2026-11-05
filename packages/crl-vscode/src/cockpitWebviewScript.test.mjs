@@ -17,7 +17,7 @@ import { reduce, initialState } from './correspondenceEngine.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 // The cockpit SHELL source text — for the HOST-side lifecycle wiring that lives outside the bundled webview SCRIPT string
 // (the ack-drive of the marker is host code, not in COCKPIT_WEBVIEW_SCRIPT). A coarse but load-bearing source-grep lock.
-const COCKPIT_SRC = readFileSync(resolve(here, "correspondenceCockpit.ts"), "utf8");
+const COCKPIT_SRC = readFileSync(resolve(here, "correspondenceCockpit.ts"), "utf8").replace(/\r\n/g, "\n");
 const ENGINE_SRC = readFileSync(resolve(here, "correspondenceEngine.ts"), "utf8");
 // Todo 2 (disc 357): the flag→node placement (concept/decision/rollup matching) was extracted to a PURE module — executably
 // tested in flagPlacement.test.mjs. Source-locks that referenced the old inline pass now point here.
@@ -51,11 +51,12 @@ function handlerBody(type) {
 }
 
 check('pin focus follows the matching response and unpin retains the leaf; stale frames cannot steal focus',()=>{
-  const section=SCRIPT.slice(SCRIPT.indexOf("let pendingPinFocus="),SCRIPT.indexOf("window.addEventListener('message'"));
+  const section=SCRIPT.slice(SCRIPT.indexOf("let pendingPinFocus="),SCRIPT.indexOf("listen(channel,'message'"));
   const frames=[],messages=[],events=[],cancellations=[];
   const leaf={dataset:{flowKey:'leaf'},setAttribute(){},focus(){events.push('focus');},scrollIntoView(){events.push('scroll');}};
   const root={querySelectorAll:()=>[leaf]};
   const ui=new Function('root','requestAnimationFrame','v','window',`
+    const listen=(target,type,callback,flags)=>target.addEventListener(type,callback,flags);
     let gen=1,pinnedFlowKey='',pinnedRouteKeys=[],pinnedRouteLabel='',currentRouteKeys=['leaf'],currentRouteCase='case',currentRouteId='route';
     const routeCardUi={reset(){},show(){}},treeFocusUi={reset(){}},applyFlowPin=()=>{},applyZoom=()=>{};
     ${section}
@@ -106,7 +107,7 @@ check('internal disclosure and label refresh replays preserve tree focus; user n
 
 // Extract the root 'click' listener body (brace-matched) — the delegated handler where the note controls live.
 function handlerClick() {
-  const marker = "root.addEventListener('click',(e)=>{";
+  const marker = "listen(root,'click',(e)=>{";
   const start = SCRIPT.indexOf(marker);
   assert.ok(start > -1, "root click listener exists");
   let depth = 1, i = start + marker.length;
@@ -692,7 +693,7 @@ check("#216/#217 caseIdsForNodeThroughLit (PURE): keeps cases whose per-case key
 
 // ── #217 right-click a flow node → per-case verdict quick-pick (webview gate + host wiring; collapse to one execution reach) ──
 check("#217 webview: a contextmenu listener gates MV (live data-mode) + .flow-svg (tree only) + .flow-row[data-reveal], posts nodeVerdictMenu", () => {
-  assert.ok(/addEventListener\('contextmenu',\(e\)=>\{/.test(SCRIPT), "contextmenu listener present");
+  assert.ok(/listen\(root,'contextmenu',\(e\)=>\{/.test(SCRIPT), "contextmenu listener present");
   assert.ok(/contextmenu'[\s\S]*document\.body\.dataset\.mode!=='medical-validation'\)return/.test(SCRIPT), "MV-only via the LIVE data-mode signal (else native menu preserved)");
   assert.ok(/contextmenu'[\s\S]*closest\('\.flow-svg'\)\)\)return/.test(SCRIPT), "flow/tree pane ONLY (else the shared script would suppress the native menu in other panes)");
   assert.ok(/contextmenu'[\s\S]*closest\('\.flow-row\[data-reveal\],\.flow-crit-row\[data-reveal\]'\)/.test(SCRIPT), "a rendered structure node OR a non-root criterion box (#233 Todo 2b); guard tabs are .flow-guard-tab, excluded");
@@ -1145,23 +1146,23 @@ check("tree zoom: applyZoom scales the SVG BOX (viewBox base × treeZoom, not a 
   assert.match(SCRIPT, /let treeZoom=1;/);
   assert.match(SCRIPT, /const applyZoom=\(\)=>\{const s=root\.querySelector\('\.flow-svg'\)/); // reads the flow SVG
   assert.match(SCRIPT, /s\.style\.width=\(bw\*treeZoom\)\+'px';s\.style\.height=\(bh\*treeZoom\)\+'px'/); // scale the box → the pane scrolls to pan
-  assert.match(SCRIPT, /const setZoom=\(z\)=>\{treeZoom=Math\.min\(3,Math\.max\(\.25,z\)\)/); // clamped 0.25–3×
+  assert.match(SCRIPT, /const setZoom=\(z,shared=false\)=>\{treeZoom=Math\.min\(3,Math\.max\(\.25,z\)\)/); // clamped 0.25–3×
   assert.match(SCRIPT, /root\.innerHTML=m\.html;if\(!m\.preserveViewport\)fcc\.innerHTML='';[\s\S]*?applyZoom\(\);/); // persists across a re-render
 });
 check("grab-drag pan: pointerdown on .flow-svg starts a pan; window pointermove past a threshold adjusts scroll + swallows the node click", () => {
   // press starts only on the flow pane, left button, and captures the scroll origin
-  assert.match(SCRIPT, /addEventListener\('pointerdown',\(e\)=>\{if\(e\.button!==0\|\|!\(e\.target\.closest&&e\.target\.closest\('\.flow-svg'\)\)\|\|e\.target\.closest\('foreignObject'\)\)return;fpPan=true;fpMoved=false;/);
+  assert.match(SCRIPT, /listen\(root,'pointerdown',\(e\)=>\{if\(e\.button!==0\|\|!\(e\.target\.closest&&e\.target\.closest\('\.flow-svg'\)\)\|\|e\.target\.closest\('foreignObject'\)\)return;fpPan=true;fpMoved=false;/);
   // move rides window (tracks outside the pane), has a 4px threshold (so a stationary press still selects), and pans scroll
-  assert.match(SCRIPT, /window\.addEventListener\('pointermove',\(e\)=>\{if\(!fpPan\)return;.*Math\.abs\(dx\)\+Math\.abs\(dy\)<4\)return;fpMoved=true;.*s\.scrollLeft=fpL-dx;s\.scrollTop=fpT-dy;e\.preventDefault\(\)/);
+  assert.match(SCRIPT, /listen\(window,'pointermove',\(e\)=>\{if\(!fpPan\)return;.*Math\.abs\(dx\)\+Math\.abs\(dy\)<4\)return;fpMoved=true;.*s\.scrollLeft=fpL-dx;s\.scrollTop=fpT-dy;e\.preventDefault\(\)/);
   // a moved (panned) press swallows the ensuing click in CAPTURE so the node isn't selected after a pan
-  assert.match(SCRIPT, /addEventListener\('click',\(e\)=>\{if\(fpMoved\)\{fpMoved=false;e\.stopPropagation\(\);e\.preventDefault\(\);\}\},true\)/);
+  assert.match(SCRIPT, /listen\(root,'click',\(e\)=>\{if\(fpMoved\)\{fpMoved=false;e\.stopPropagation\(\);e\.preventDefault\(\);\}\},true\)/);
 });
 check("tree zoom: Ctrl+wheel (flow pane only, passive:false) + the − / reset / + control (NO Ctrl+/-/0 — VS Code owns those)", () => {
-  assert.match(SCRIPT, /addEventListener\('wheel',\(e\)=>\{if\(!e\.ctrlKey\)return;if\(!root\.querySelector\('\.flow-svg'\)\)return;e\.preventDefault\(\)/); // Ctrl+wheel, tree only
+  assert.match(SCRIPT, /listen\(root,'wheel',\(e\)=>\{if\(!e\.ctrlKey\)return;if\(!root\.querySelector\('\.flow-svg'\)\)return;e\.preventDefault\(\)/); // Ctrl+wheel, tree only
   assert.match(SCRIPT, /\{passive:false\}/); // preventDefault must work on wheel
   assert.match(SCRIPT, /closest\('\[data-zoom\]'\)[\s\S]*?setZoom\(a==='in'\?treeZoom\*1\.2:a==='out'\?treeZoom\/1\.2:1\)/); // control buttons
   // Inspect only keyboard listener bodies; a later wheel/click handler may legitimately zoom.
-  for (const match of SCRIPT.matchAll(/addEventListener\('keydown',(?:\(e\)|e)=>\{/g)) {
+  for (const match of SCRIPT.matchAll(/listen\((?:root|document),'keydown',(?:\(e\)|e)=>\{/g)) {
     let depth = 1, end = match.index + match[0].length;
     const start = end;
     for (; end < SCRIPT.length && depth; end++) {
@@ -1766,7 +1767,7 @@ check("delete: closeIssueAsNotPlanned — warning fail-closed, resurrection + sh
 });
 
 check('KE Answer and Ignore buttons dispatch distinct opaque intents', () => {
- const marker = "fld.addEventListener('click',(e)=>{";
+ const marker = "listen(fld,'click',(e)=>{";
  const start = SCRIPT.indexOf(marker) + marker.length;
  const end = SCRIPT.indexOf("const ec=", start);
  assert.ok(start >= marker.length && end > start);
@@ -1780,7 +1781,7 @@ check('KE Answer and Ignore buttons dispatch distinct opaque intents', () => {
 });
 
 check('summary evidence click dispatches only an opaque key through the actual drawer listener',()=>{
- const marker="fld.addEventListener('click',(e)=>{";
+ const marker="listen(fld,'click',(e)=>{";
  const start=SCRIPT.indexOf(marker)+marker.length,end=SCRIPT.indexOf('const ec=',start);
  const click=new Function('e','v',SCRIPT.slice(start,end));const messages=[];
  click({target:{closest:selector=>selector==='[data-flag-summary-evidence]'?{getAttribute:()=> 'opaque-key'}:null},preventDefault(){},stopPropagation(){}},{postMessage:m=>messages.push(m)});

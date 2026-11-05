@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 /** Manual and route reading aids share one glow; neither changes evaluation. */
 export function installFlowLogicHighlight(root: HTMLElement) {
+  const events = new root.ownerDocument.defaultView!.AbortController();
   const active = new Set<string>(), parents = new Map<string,string>();
   type Outcome = {key:string;result:'true'|'false'};
   let treeRoute = new Map<string,Outcome['result']>(), pinnedRoute = new Map<string,Outcome['result']>();
@@ -46,11 +47,12 @@ export function installFlowLogicHighlight(root: HTMLElement) {
       }
     } else active.add(key);
     update();
-  });
+  }, { signal: events.signal });
   return {update,
     treeRoute(keys:string[],outcomes:Outcome[]=[]){treeRoute=route(keys,outcomes);update();},
     pinnedRoute(keys:string[],outcomes:Outcome[]=[]){pinnedRoute=route(keys,outcomes);update();},
-    reset(){clearPaint();active.clear();treeRoute.clear();pinnedRoute.clear();parents.clear();}
+    reset(){clearPaint();active.clear();treeRoute.clear();pinnedRoute.clear();parents.clear();},
+    dispose(){events.abort();clearPaint();active.clear();treeRoute.clear();pinnedRoute.clear();parents.clear();}
   };
 }
 export const FLOW_LOGIC_STYLE = `

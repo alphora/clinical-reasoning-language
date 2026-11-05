@@ -10,9 +10,10 @@ export interface UnpinnedFocusMessage extends TreeFocusPaint {
 /** A tree-local reading focus. The pinned view retains its own controls and paint. */
 export function installUnpinnedTreeFocus(root: HTMLElement, bridge: { postMessage(message: unknown): void }, generation: () => number, pinned: () => boolean, groupGlow: (keys: string[], outcomes: TreeFocusPaint['groupOutcomes']) => void = ()=>{}) {
   const doc = root.ownerDocument, win = doc.defaultView!;
+  const events = new win.AbortController();
   let selected: UnpinnedFocusMessage | undefined;
   let pendingFocus: {gen:number;token:string;key:string;dir?:string} | undefined;
-  doc.addEventListener('focusin',()=>{pendingFocus=undefined;});
+  doc.addEventListener('focusin',()=>{pendingFocus=undefined;},{signal:events.signal});
   // REFACTOR:grounded: U discloses structure; it does not select its enclosing route.
   const controls = '[data-flow-uncertainty-toggle],[data-flow-pin],[data-toggle-crit],[data-criterion-info],[data-criterion-verdict],[data-mv-flag-badge],[data-flow-open-decision],[data-flow-logic],input,textarea,select,button,a,summary';
   const strip = () => {
@@ -85,15 +86,16 @@ export function installUnpinnedTreeFocus(root: HTMLElement, bridge: { postMessag
     event.preventDefault(); event.stopImmediatePropagation();
     node.focus({preventScroll:true});
     bridge.postMessage({type:'treeFocus',gen:generation(),key:node.dataset.flowKey});
-  });
+  },{signal:events.signal});
   root.addEventListener('keydown', event => {
     if (event.defaultPrevented || doc.body.dataset.mode !== 'medical-validation' || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !['Enter',' '].includes(event.key) || pinned()) return;
     const target=event.target as Element;
     if (target.closest(controls) || !target.closest('[data-flow-key],[data-tree-traversal-nav]')) return;
     event.preventDefault(); event.stopImmediatePropagation();
     target.dispatchEvent(new win.MouseEvent('click',{bubbles:true}));
-  },{capture:true});
+  },{capture:true,signal:events.signal});
   return {
+    dispose() { events.abort(); selected=undefined; pendingFocus=undefined; strip(); },
     beforeRender(token?: string) {
       pendingFocus=undefined;
       const active=doc.activeElement as SVGElement|null, node=active?.closest<SVGGElement>('[data-flow-key]');

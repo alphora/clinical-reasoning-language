@@ -159,6 +159,7 @@ import { reviewGridHtml, REVIEW_GRID_DRAWER_STYLE, REVIEW_GRID_DRAWER_SCRIPT } f
 import { renderCrlPane } from "./crlPaneHtml";
 import { collectDispositionLeafKeys, toggleCriterionExpansion, expandTraversalCriteria, expandQuestionInputs, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
 import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
+import { captureDecisionTable, installDecisionTableWebview, DECISION_TABLE_STYLE } from './decisionTableWebview';
 import { SnapshotCapture, screenCapturedDom, snapshotFileName } from "./snapshotCapture";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
@@ -6224,7 +6225,7 @@ body[data-mode="medical-validation"] .flow-svg{box-sizing:content-box;padding-ri
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}${DECISION_TABLE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
@@ -6247,6 +6248,7 @@ ${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${RO
     paneShellFragments(pane, { nonce, asset }).bodyScripts +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
+    (pane === 'tree' ? `const crlDecisionTable=(${installDecisionTableWebview.toString()})(document.getElementById('root'),crlCockpitBridge,globalThis.installCrlCockpitRuntime,(${captureDecisionTable.toString()}),[(${sanitizeUncertaintySnapshot.toString()}),(${sanitizeCriterionDescriptionSnapshot.toString()}),(${sanitizeUnpinnedTreeFocusSnapshot.toString()})]);` : '') +
     `</script></body></html>`
   );
 }
@@ -6257,8 +6259,8 @@ ${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${RO
  *  test: the selection handlers (highlight/clearHighlight) never call clrRO() (the review overlay survives selection), and
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
-export const COCKPIT_WEBVIEW_SCRIPT =
-  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');const fld=document.getElementById('flagDrawer');let gen=-1;` +
+const COCKPIT_WEBVIEW_BODY =
+  `const v=options.bridge;const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;let gen=-1;` +
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
   `const aff=()=>{const ts=fld.querySelector('[data-flag-tag]');if(!ts)return;const tg=ts.value;for(const g of fld.querySelectorAll('[data-flag-field-for]')){g.hidden=g.getAttribute('data-flag-field-for')!==tg;}};` +
@@ -6267,7 +6269,7 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // (idempotent) and updates the % readout; it's re-run after every render so the persisted zoom survives a rebuild.
   `let treeZoom=1;` +
   `const applyZoom=()=>{const s=root.querySelector('.flow-svg');if(!s)return;const vb=s.viewBox&&s.viewBox.baseVal;const bw=vb&&vb.width?vb.width:parseFloat(s.getAttribute('width'))||0;const bh=vb&&vb.height?vb.height:parseFloat(s.getAttribute('height'))||0;s.style.width=(bw*treeZoom)+'px';s.style.height=(bh*treeZoom)+'px';const p=root.querySelector('.flow-zoom-pct');if(p)p.textContent=Math.round(treeZoom*100)+'%';};` +
-  `const setZoom=(z)=>{treeZoom=Math.min(3,Math.max(.25,z));applyZoom();};` +
+  `const setZoom=(z,shared=false)=>{treeZoom=Math.min(3,Math.max(.25,z));applyZoom();if(!shared&&options.onZoom)options.onZoom(treeZoom);};` +
   `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt,.failed-criterion-pending')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');el.classList.remove('failed-criterion-pending');}};` +
   // #156 slice 5 / #210: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so the verdict fills SURVIVE selection (the survives-selection invariant).
@@ -6295,11 +6297,11 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const logicUi=(${installFlowLogicHighlight.toString()})(root);` +
   `const alignBorders=()=>{(${alignFlowConnectorBorders.toString()})(root);componentUi();logicUi.update();};` +
   `const routeCardUi=(${installRouteCards.toString()} )(root,v,()=>gen,()=>{applyZoom();alignBorders();});` +
-  `(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
+  `const keyboardUi=(${installFlowKeyboardActions.toString()})(root);const criterionDescriptionUi=(${installCriterionDescriptionNavigation.toString()})(root);const pinVisibility=(${installFlowPinVisibility.toString()})(root);` +
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
-  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)document.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=document.getElementById('flowPinNotice');if(!note){note=document.createElement('div');note.id='flowPinNotice';root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);uncertaintyVisibility(keep,pinnedRouteKeys,uncertaintyDisclosures);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
+  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)fld.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=root.querySelector('[data-flow-pin-notice]');if(!note){note=document.createElement('div');note.setAttribute('data-flow-pin-notice','');root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);uncertaintyVisibility(keep,pinnedRouteKeys,uncertaintyDisclosures);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
   `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
   `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
   `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
@@ -6542,8 +6544,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(ct){e.preventDefault();e.stopPropagation();v.postMessage({type:'toggleCriterion',gen,key:ct.getAttribute('data-toggle-crit'),token:disclosureUi.capture(ct)});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
-  `document.addEventListener('keydown',e=>{if(e.defaultPrevented||(e.key!=='Enter'&&e.key!==' '))return;const link=e.target.closest&&e.target.closest('[data-flow-open-decision]');if(!link)return;e.preventDefault();link.dispatchEvent(new MouseEvent('click',{bubbles:true}));});` +
-  `document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.shiftKey||(e.key!=='Enter'&&e.key!==' '))return;const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(!fp)return;e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);});` +
+  `document.addEventListener('keydown',e=>{if(!root.contains(e.target)||e.defaultPrevented||(e.key!=='Enter'&&e.key!==' '))return;const link=e.target.closest&&e.target.closest('[data-flow-open-decision]');if(!link)return;e.preventDefault();link.dispatchEvent(new MouseEvent('click',{bubbles:true}));});` +
+  `document.addEventListener('keydown',e=>{if(!root.contains(e.target)||e.defaultPrevented||e.shiftKey||(e.key!=='Enter'&&e.key!==' '))return;const fp=e.target.closest&&e.target.closest('[data-flow-pin]');if(!fp)return;e.preventDefault();e.stopPropagation();const k=fp.dataset.flowPin;toggleFlowPin(k);});` +
   // Main-tree node right-click chooses a route; pinned nodes retain their review menu. Pin right-click is inert.
   // Gate: MV mode (live `data-mode`) + inside `.flow-svg` (the FLOW/tree pane ONLY — the script is shared by every pane, so
   // without this we'd `preventDefault` the native menu in source/cel/worklist too) + a `.flow-row[data-reveal]` (a rendered
@@ -6638,3 +6640,22 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // resident state) that reuses the `fld`/`v` in this scope — see reviewGridHtml.ts. Appended LAST so the grid session's picks
   // live entirely in the drawer DOM (an innerHTML swap to another mode resets them; no cross-session closure deadlock).
   REVIEW_GRID_DRAWER_SCRIPT;
+
+// REFACTOR:grounded: each branch owns its DOM, message channel and controller lifetime.
+export const COCKPIT_WEBVIEW_INSTALLER =
+  `globalThis.installCrlCockpitRuntime=(options)=>{` +
+  `let disposed=false;const removers=[],timers=new Set(),frames=new Set();` +
+  `const listen=(target,type,callback,flags)=>{const guarded=e=>{if(!disposed)callback(e);};target.addEventListener(type,guarded,flags);removers.push(()=>target.removeEventListener(type,guarded,flags));};` +
+  `const setTimeout=(fn,delay)=>{const id=window.setTimeout(()=>{timers.delete(id);if(!disposed)fn();},delay);timers.add(id);return id;};` +
+  `const requestAnimationFrame=fn=>{const id=window.requestAnimationFrame(t=>{frames.delete(id);if(!disposed)fn(t);});frames.add(id);return id;};` +
+  COCKPIT_WEBVIEW_BODY
+    .split("window.addEventListener('message',").join("listen(channel,'message',")
+    .split('window.addEventListener(').join('listen(window,')
+    .split('document.addEventListener(').join('listen(document,')
+    .split('root.addEventListener(').join('listen(root,')
+    .split('fcc.addEventListener(').join('listen(fcc,')
+    .split('fld.addEventListener(').join('listen(fld,') +
+  `return {setZoom:z=>setZoom(z,true),dispose(){if(disposed)return;disposed=true;if(fpPan){fpPan=false;document.body.style.cursor='';}for(const remove of removers)remove();for(const id of timers)window.clearTimeout(id);for(const id of frames)window.cancelAnimationFrame(id);keyboardUi.dispose();disclosureUi.cancel();routeCardUi.reset();treeFocusUi.dispose();criterionDescriptionUi.dispose();logicUi.dispose();pinVisibility.dispose();}};};`;
+
+export const COCKPIT_WEBVIEW_SCRIPT = COCKPIT_WEBVIEW_INSTALLER +
+  `const crlCockpitBridge=acquireVsCodeApi();const crlCockpitRuntime=globalThis.installCrlCockpitRuntime({root:document.getElementById('root'),chrome:document.getElementById('fcChrome'),drawer:document.getElementById('flagDrawer'),bridge:crlCockpitBridge});`;

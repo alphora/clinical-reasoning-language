@@ -40,15 +40,18 @@ export function installFlowDisclosureFocus(root: HTMLElement) {
       pending = undefined;unwatch();
       const owner = Array.from(root.querySelectorAll<SVGGElement>('[data-flow-key]')).find(n => n.dataset.flowKey === saved.key);
       const control = owner?.querySelector<SVGElement>('[data-toggle-crit]');
-      if (!control || control.getClientRects().length === 0) return;
-      if(!control.hasAttribute('tabindex'))control.setAttribute('tabindex','-1');
       const active=doc.activeElement;
       const mayFocus=doc.hasFocus() && (!active || active===doc.body || active===doc.documentElement || active===control);
       if(mayFocus && saved.editor){
         const editor=saved.editor,card=Array.from(root.querySelectorAll<HTMLElement>('.route-card')).find(n=>n.dataset.cardId===editor.cardId && n.dataset.ownerKey===editor.ownerKey);
         const field=card?.querySelectorAll('textarea')[editor.index];
         if(field){field.focus({preventScroll:true});if(editor.start!==null && editor.end!==null)field.setSelectionRange(editor.start,editor.end);}
-      }else if(mayFocus && saved.focus)control.focus({ preventScroll: true });
+      }
+      // A current editor in this row survives DOM replacement; interruption cancels only disclosure focus/scroll.
+      if (!saved.focus) return;
+      if (!control || control.getClientRects().length === 0) return;
+      if(!control.hasAttribute('tabindex'))control.setAttribute('tabindex','-1');
+      if(mayFocus && !saved.editor)control.focus({ preventScroll: true });
       const box = control.getBoundingClientRect();
       const scroller = root.ownerDocument.scrollingElement ?? root.ownerDocument.documentElement;
       scroller.scrollLeft += box.left - saved.left;

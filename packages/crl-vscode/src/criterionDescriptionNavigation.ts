@@ -3,6 +3,7 @@
 /** Local navigation between a criterion's SVG indicator and its selectable long description. */
 export function installCriterionDescriptionNavigation(root: HTMLElement) {
   const doc = root.ownerDocument;
+  const events = new doc.defaultView!.AbortController();
   let selected: { identity: string; occurrence: string } | undefined;
   let disclosureOpen: boolean | undefined;
   let highlightTimer: number | undefined;
@@ -70,13 +71,13 @@ export function installCriterionDescriptionNavigation(root: HTMLElement) {
     const owner = info.closest<SVGElement>("[data-flow-criterion]");
     const identity = owner?.dataset.flowCriterion;
     if (identity) open(identity, info.dataset.criterionInfo!, info);
-  });
+  }, { signal: events.signal });
   root.addEventListener("toggle", (event) => {
     const details = event.target as HTMLDetailsElement;
     if (!details.matches(".flow-criterion-descriptions") || details.open) return;
     disclosureOpen = false;
     clearSelection();
-  }, true);
+  }, { capture: true, signal: events.signal });
   const refresh = () => {
     const details = root.querySelector<HTMLDetailsElement>(".flow-criterion-descriptions");
     if (!details?.open || !selected) { clearSelection(); return; }
@@ -85,6 +86,7 @@ export function installCriterionDescriptionNavigation(root: HTMLElement) {
     else { details.hidden = false; paintSelection(); }
   };
   return {
+    dispose() { events.abort(); clearSelection(); clearEntryHighlight(); },
     beforeRender() { disclosureOpen = root.querySelector<HTMLDetailsElement>(".flow-criterion-descriptions")?.open; },
     restore() {
       const details = root.querySelector<HTMLDetailsElement>(".flow-criterion-descriptions");
