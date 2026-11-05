@@ -41,6 +41,7 @@ export interface DecisionTableModel {
   error?: string;
   rows(offset?: bigint, limit?: number): DecisionTableRow[];
   underlyingRow(id: string): DecisionTableRow | undefined;
+  indexOfRow(id: string): bigint | undefined;
   scopeForCase(entry: DecisionTableCase, nodeKey: string): DecisionTableScope | undefined;
 }
 
@@ -181,7 +182,7 @@ export function buildDecisionTable(
   const projected = projectFlowStructure([...structure]);
   const full = graphOf(projected), path = scopePath(full, requestedScope);
   const empty: DecisionTableModel = { scope: requestedScope, label: '', totalRows: 0n, underlyingRows: 0n, uncoveredRows: 0n,
-    forcedGuards: [], children: [], rows: () => [], underlyingRow: () => undefined, scopeForCase: () => undefined };
+    forcedGuards: [], children: [], rows: () => [], underlyingRow: () => undefined, indexOfRow: () => undefined, scopeForCase: () => undefined };
   if (!path) return { ...empty, error: 'The focused source occurrence is unavailable. Choose a current node.' };
   const root = path[0], focus = path.at(-1)!;
   const scope: DecisionTableScope = { nodeKey: focus, rootKey: root, path };
@@ -259,6 +260,22 @@ export function buildDecisionTable(
       if (!Array.isArray(value) || value[0] !== root || typeof value[1] !== 'string') return;
       const endpoint = actualPath(full, root, value[1]);
       return endpoint && hasPrefix(endpoint.steps.map(s => s.key), path) ? makeRow(endpoint) : undefined;
+    },
+    indexOfRow(id) {
+      const row = model.underlyingRow(id);
+      if (!row || !display.has(row.terminalKey)) return;
+      const keys = row.pathKeys.filter(key => display.has(key)), start = keys.indexOf(focus);
+      if (start < 0 || keys.at(-1) !== row.terminalKey) return;
+      let ordinal = 0n;
+      for (let i = start + 1; i < keys.length; i++) {
+        const children = display.get(keys[i - 1])!.children, child = keys[i];
+        if (!children.includes(child)) return;
+        for (const sibling of children) {
+          if (sibling === child) break;
+          ordinal += visible.counts.get(sibling) ?? 0n;
+        }
+      }
+      return ordinal;
     },
     scopeForCase(entry, nodeKey) {
       const endpoint = actual.get(entry);

@@ -69,7 +69,11 @@ export function installDecisionTableWebview(
   const controls = doc.createElement('div'); controls.className = 'decision-table-controls'; controls.dataset.tableControls = '';
   const caption = doc.createElement('span'); controls.append(caption);
   const rowsRoot = doc.createElement('div'); rowsRoot.className = 'decision-table-rows'; table.append(controls, rowsRoot);
-  let epoch: unknown, active = false, zoom = 1, layout: any;
+  const resume = doc.createElement('button');resume.type='button';resume.textContent='Return to Decision Table';resume.hidden=true;table.after(resume);
+  resume.addEventListener('click',()=>send('resume'),{signal:events.signal});
+  let epoch: unknown, active = false, zoom = 1, layout: any, focusVersion = 0;
+  // A reply to row navigation must not steal focus after a later interaction in any row.
+  for (const type of ['pointerdown','keydown','focusin']) win.addEventListener(type, () => { focusVersion++; }, { capture:true, signal:events.signal });
   const rows = new Map<string, { element: HTMLElement; label: HTMLElement; error: HTMLElement; cases: HTMLButtonElement; channel: EventTarget; runtime: BranchRuntime }>();
   const send = (action: string, rowId?: string) => bridge.postMessage({ type: 'decisionTableAction', epoch, action, ...(rowId ? { rowId } : {}) });
   const button = (label: string, action: string) => {
@@ -94,7 +98,7 @@ export function installDecisionTableWebview(
   const reconcile = (message: any) => {
     if (!Array.isArray(message.rows)) return;
     if (epoch !== message.epoch) clear();
-    epoch = message.epoch; layout = message; active = true; table.hidden = false; outerRoot.hidden = true;
+    epoch = message.epoch; layout = message; active = true;resume.hidden=true; table.hidden = false; outerRoot.hidden = true;
     const keep = new Set(message.rows.map((row: any) => row.id));
     for (const [id, row] of rows) if (!keep.has(id)) { row.runtime.dispose(); row.element.remove(); rows.delete(id); }
     caption.textContent = `${message.label ?? 'Decision Table'} — ${message.range ?? ''} of ${message.total ?? ''} branches${message.uncovered && message.uncovered !== '0' ? `; ${message.uncovered} coverage errors` : ''}`;
@@ -114,12 +118,13 @@ export function installDecisionTableWebview(
         element.append(header, error, chrome, root); rowsRoot.append(element);
         const channel = new win.EventTarget(), localEpoch = epoch;
         let mounted = true;
-        const installed = install({ root, chrome, drawer: doc.createElement('div'), channel,
-          bridge: { postMessage: (payload: unknown) => { if (mounted) bridge.postMessage({ type: 'decisionTableRow', epoch: localEpoch, rowId: description.id, message: payload }); } }, onZoom: setZoom });
+        const installed = install({ root, chrome, drawer: doc.createElement('div'), channel, tableRow:true,
+          bridge: { postMessage: (payload: unknown) => { if (mounted) bridge.postMessage({ type: 'decisionTableRow', epoch: localEpoch, rowId: description.id, message: payload && typeof payload === 'object' && ['navigatePinnedBranch','toggleUncertaintyGuard'].includes((payload as any).type) ? {...payload,tableFocusVersion:focusVersion} : payload }); } }, onZoom: setZoom });
         const runtime = { setZoom: installed.setZoom, dispose() { mounted = false; rowEvents.abort(); installed.dispose(); } };
         runtime.setZoom(zoom); row = { element, label, error, cases, channel, runtime }; rows.set(description.id, row);
       }
       row.label.textContent = description.caseLabel ? `${description.label} — ${description.caseLabel}` : description.label;
+      (row.element.querySelector('.cockpit-root') as HTMLElement).dataset.flowScopeKey = description.scopeKey ?? '';
       row.error.textContent = description.error ?? ''; row.error.hidden = !description.error;
       row.cases.hidden = !(description.caseCount > 1);
       if (rowsRoot.children[index] !== row.element) rowsRoot.insertBefore(row.element, rowsRoot.children[index] ?? null);
@@ -129,16 +134,28 @@ export function installDecisionTableWebview(
     const message = event.data;
     if (message?.type === 'decisionTable') {
       event.stopImmediatePropagation();
-      if (message.active === false) { clear(); active = false; table.hidden = true; outerRoot.hidden = false; epoch = undefined; layout = undefined; }
+      if (message.active === false) { clear(); active = false; table.hidden = true; outerRoot.hidden = false; resume.hidden=message.preserve!==true;epoch=message.preserve===true?message.epoch:undefined;layout=undefined; }
       else reconcile(message);
+    } else if (message?.type === 'decisionTableFocus') {
+      event.stopImmediatePropagation();
+      if(active && message.epoch === epoch && message.focusVersion === focusVersion){
+        const controlIn = (row: typeof rows extends Map<string,infer R> ? R : never) => Array.from(row.element.querySelectorAll<SVGElement>('[data-flow-uncertainty-toggle]'))
+          .find(control => control.dataset.flowUncertaintyToggle === message.key && control.getClientRects().length > 0);
+        const origin = rows.get(message.rowId), control = (origin && controlIn(origin)) || Array.from(rows.values()).map(controlIn).find(Boolean);
+        control?.focus({preventScroll:true});
+      }
     } else if (message?.type === 'decisionTableRow') {
       event.stopImmediatePropagation();
-      if (active && message.epoch === epoch) rows.get(message.rowId)?.channel.dispatchEvent(new win.MessageEvent('message', { data: message.message }));
+      if (active && message.epoch === epoch) {
+        const payload = message.message;
+        const data = payload?.focusRequest === 'branch-navigation' && payload.tableFocusVersion !== focusVersion ? {...payload,focusRequest:undefined} : payload;
+        rows.get(message.rowId)?.channel.dispatchEvent(new win.MessageEvent('message', { data }));
+      }
     } else if (active && message?.type === 'requestSnapshot') {
       event.stopImmediatePropagation(); bridge.postMessage({ type: 'snapshotDom', token: message.token, html: capture(table, sanitizers) });
     }
   }, { capture: true, signal: events.signal });
-  return { get active() { return active; }, get layout() { return layout; }, dispose() { events.abort(); clear(); table.remove(); outerRoot.hidden = false; } };
+  return { get active() { return active; }, get layout() { return layout; }, dispose() { events.abort(); clear(); table.remove(); resume.remove(); outerRoot.hidden = false; } };
 }
 
 export const DECISION_TABLE_STYLE = `

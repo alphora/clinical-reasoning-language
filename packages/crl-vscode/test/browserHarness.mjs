@@ -1,6 +1,7 @@
+// REFACTOR:grounded: instance ownership and focus-only pins follow the confirmed stacked-branch contract.
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 
@@ -52,7 +53,12 @@ export async function browserFixture(html) {
         for (const socket of sockets) socket.close();
         if (child.exitCode === null) await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 2000))]);
         if (child.exitCode === null) child.kill();
-        rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+        if (!resolve(root).startsWith(resolve(tmpdir()) + sep) || !basename(root).startsWith('crl-browser-')) throw Error('Unexpected test profile path');
+        try { rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); }
+        catch (error) {
+          if (error.code !== 'EBUSY' && error.code !== 'EPERM') throw error;
+          console.warn('Windows still locks test profile after browser close, retained at ' + root);
+        }
       }
     } };
   } catch (error) { for (const socket of sockets) socket.close(); child.kill(); throw error; }

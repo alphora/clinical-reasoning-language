@@ -36,6 +36,14 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   await message(row('a',{type:'markLeaves',gen:0,noIds:[aId],yesIds:[]}));
   const marks=()=>run(`[document.getElementById(${JSON.stringify(aId)}).classList.contains('flow-leaf-yes'),document.getElementById(${JSON.stringify(bId)}).classList.contains('flow-leaf-no')]`);
   assert.deepEqual(await marks(),[true,true]);
+  await message(row('a',{type:'flagHl',gen:1,gids:[aId]}));
+  await message(row('b',{type:'flagHl',gen:2,gids:[]}));
+  assert.equal(await run(`document.getElementById(${JSON.stringify(aId)}).classList.contains('flag-current')`),true,'B clear cannot erase A highlight');
+  await message(row('b',{type:'flagHl',gen:2,gids:[bId]}));
+  assert.equal(await run(`document.querySelectorAll('.decision-table-row .flag-current').length`),2);
+  // Ready order is verified on a fresh render after the semantic-action check.
+  await run(`messages.length=0`);await message(row('b',{type:'render',gen:2,indexVersion:1,mode:'medical-validation',html:b.html}));await message(row('a',{type:'render',gen:1,indexVersion:1,mode:'medical-validation',html:a.html}));
+  await message(row('a',{type:'markLeaves',gen:1,yesIds:[aId],noIds:[]}));await message(row('b',{type:'markLeaves',gen:2,noIds:[bId],yesIds:[]}));
   assert.deepEqual(await run(`messages.filter(m=>m.type==='decisionTableRow'&&m.message.type==='ready').map(m=>[m.rowId,m.message.gen])`),[['b',2],['a',1]]);
   await run(`messages.length=0;document.querySelector('.decision-table-row button').click()`);
   assert.deepEqual(await run(`messages`),[{type:'decisionTableAction',epoch:4,action:'case',rowId:'a'}]);
@@ -43,6 +51,12 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   assert.deepEqual(await marks(),[true,true]);
   const pin={type:'routeCards',gen:1,token:'pinA',pinKey:'end',routeKeys:['D','w','end'],pathNodeKeys:['D','w','end'],cards:[{id:'q',ownerKey:'w',library:'L',concept:'Q',criterionPaths:[[{lib:'L',name:'C'}]],text:'Actual visible question?',description:'Description',answer:'yes',editable:true,editing:true,draftText:'A draft',draftDescription:'A description'}],showQuestions:true,label:'Case A',navigation:{current:1,total:2,previous:false,next:true}};
   await message(row('a',pin));
+  // Real production click/context-menu producers cross the strict generation boundary.
+  await run(`messages.length=0;const owner=document.querySelector('.decision-table-row [data-flow-key="end"]');owner.dispatchEvent(new MouseEvent('click',{bubbles:true}));owner.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));`);
+  const actions=await run(`messages.filter(m=>m.type==='decisionTableRow'&&['reveal','nodeVerdictMenu'].includes(m.message.type))`);
+  assert(actions.some(m=>m.message.type==='reveal'));assert(actions.some(m=>m.message.type==='nodeVerdictMenu'));
+  for(const action of actions)assert.equal(action.message.gen,1,'all real row producers carry their installed generation');
+
   assert(await run(`document.querySelector('.decision-table-row foreignObject .route-card')!==null`));
   assert.equal(await run(`document.querySelector('.decision-table-row textarea')?.value`),'A draft');
   await run(`globalThis.savedRow=document.querySelector('.decision-table-row');globalThis.savedField=savedRow.querySelector('textarea');savedField.focus()`);
@@ -83,6 +97,21 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   await run(`oldButton.click()`);await message(row('a',{type:'render',gen:3,indexVersion:1,html:a.html}));
   await message({...row('b',{type:'render',gen:3,indexVersion:1,html:'bad'}),epoch:3});
   assert.deepEqual(await run(`messages`),[]);assert(await run(`document.querySelector('.decision-table-row .flow-svg')!==null`));
+  await run(`globalThis.u=document.createElementNS('http://www.w3.org/2000/svg','g');u.dataset.flowUncertaintyToggle='guard';u.setAttribute('tabindex','0');u.innerHTML='<rect width="20" height="20"/><text>U</text>';document.querySelector('.decision-table-row svg').append(u);u.focus({preventScroll:true});u.dispatchEvent(new MouseEvent('click',{bubbles:true}));`);
+  const toggle=await run(`messages.findLast(m=>m.type==='decisionTableRow'&&m.message.type==='toggleUncertaintyGuard')`);
+  assert.equal(toggle.message.gen,2);
+  await run(`document.activeElement.blur()`);
+  await message({type:'decisionTableFocus',epoch:4,rowId:'removed-row',key:'guard',focusVersion:toggle.message.tableFocusVersion});
+  assert.equal(await run(`document.activeElement===u`),true,'folded origin restores corresponding surviving U without scrolling');
+  await run(`u.dispatchEvent(new MouseEvent('click',{bubbles:true}));`);
+  const laterToggle=await run(`messages.findLast(m=>m.type==='decisionTableRow'&&m.message.type==='toggleUncertaintyGuard')`);
+  await run(`document.querySelector('.decision-table-controls button').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));document.activeElement.blur()`);
+  await message({type:'decisionTableFocus',epoch:4,rowId:'b',key:'guard',focusVersion:laterToggle.message.tableFocusVersion});
+  assert.equal(await run(`document.activeElement===u`),false,'later interaction cancels delayed U focus');
+  await message({type:'decisionTable',active:false,preserve:true,epoch:4});
+  assert.equal(await run(`document.getElementById('root').hidden`),false);
+  await run(`messages.length=0;[...document.querySelectorAll('button')].find(n=>n.textContent==='Return to Decision Table').click()`);
+  assert.deepEqual(await run(`messages`),[{type:'decisionTableAction',epoch:4,action:'resume'}]);
   await run(`tableUi.dispose()`);assert.equal(await run(`document.getElementById('crlDecisionTable')`),null);
  }finally{await browser.close();}
 },30000);

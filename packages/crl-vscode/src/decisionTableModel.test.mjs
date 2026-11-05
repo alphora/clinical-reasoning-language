@@ -28,6 +28,7 @@ test('scope/depth navigation preserves exact terminal identity, and rejects stal
  const entries=complete(),model=buildDecisionTable(simple(),entries,{nodeKey:'w'});
  assert.equal(model.totalRows,2n);assert.equal(model.parent.nodeKey,'D');assert.deepEqual(model.children.map(c=>[c.scope.nodeKey,c.count]),[['yes',1n],['no-leaf',1n]]);
  const row=model.rows()[1],scope=model.scopeForCase(entries[1],'no-leaf'),terminal=buildDecisionTable(simple(),entries,scope);
+ assert.equal(model.indexOfRow(row.id),1n);assert.equal(model.indexOfRow('bad'),undefined);
  assert.equal(terminal.totalRows,1n);assert.equal(terminal.rows()[0].id,row.id);
  assert.equal(model.underlyingRow(row.id).id,row.id);assert.equal(model.underlyingRow('bad'),undefined);
  assert.match(buildDecisionTable(simple(),entries,{nodeKey:'w',rootKey:'D',path:['D','yes','w']}).error,/unavailable/);
@@ -57,6 +58,7 @@ test('uncertainty folds only covered paths, preserves IDs and forces hidden cove
  const folded=buildDecisionTable(structure,entries,{nodeKey:'D'}),expanded=buildDecisionTable(structure,entries,{nodeKey:'D'},{expanded:new Set(['u'])});
  assert.equal(folded.underlyingRows,2n);assert.equal(folded.totalRows,1n);assert.equal(expanded.totalRows,2n);
  assert.equal(folded.rows()[0].id,expanded.rows()[1].id);assert.equal(folded.underlyingRow(expanded.rows()[0].id).cases[0].caseId,'u');
+ assert.equal(folded.indexOfRow(expanded.rows()[0].id),undefined);assert.equal(folded.indexOfRow(expanded.rows()[1].id),0n);
  assert.deepEqual(folded.children.map(c=>[c.scope.nodeKey,c.count]),[['met',1n]]);
  assert.equal(buildDecisionTable(structure,entries,folded.children[0].scope).rows()[0].id,folded.rows()[0].id);
  const expandedGuard=buildDecisionTable(structure,entries,expanded.children[0].scope,{expanded:new Set(['u'])});
@@ -103,5 +105,6 @@ test('depth24 authored DAG counts over fifty million paths and retrieves bounded
   assert.equal(model.totalRows,3n*2n**24n-1n);assert.equal(model.uncoveredRows,model.totalRows);
   assert.equal(model.rows(0n,100).length,20);const last=model.rows(model.totalRows-1n);assert.equal(last.length,1);
   assert.notEqual(last[0].id,model.rows()[0].id);assert.equal(model.underlyingRow(last[0].id).id,last[0].id);
+  assert.equal(model.indexOfRow(last[0].id),model.totalRows-1n);
  }finally{rmSync(root,{recursive:true,force:true});}
 });

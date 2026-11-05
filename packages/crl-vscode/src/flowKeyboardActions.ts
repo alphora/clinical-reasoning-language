@@ -47,7 +47,7 @@ export function installFlowKeyboardActions(root: HTMLElement) {
       if (e.shiftKey) return;
       // Unpinned node activation belongs to the prefix/traversal navigation handler.
       if (!button && !root.querySelector('.flow-pinned') && doc.body.dataset.mode === 'medical-validation') return;
-      const owner = root.querySelector<SVGGElement>(".flow-pinned") ?? current;
+      const owner = (current && (nodeOf(current) ?? current)) ?? root.querySelector<SVGGElement>(".flow-pinned");
       const pin = owner?.querySelector<SVGGElement>("[data-flow-pin]");
       const action = button ?? (pin && visible(pin) ? pin : undefined);
       if (action) { e.preventDefault(); e.stopPropagation(); click(action); }

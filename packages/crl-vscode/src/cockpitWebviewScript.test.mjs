@@ -58,7 +58,7 @@ check('pin focus follows the matching response and unpin retains the leaf; stale
   const ui=new Function('root','requestAnimationFrame','v','window',`
     const listen=(target,type,callback,flags)=>target.addEventListener(type,callback,flags);
     let gen=1,pinnedFlowKey='',pinnedRouteKeys=[],pinnedRouteLabel='',currentRouteKeys=['leaf'],currentRouteCase='case',currentRouteId='route';
-    const routeCardUi={reset(){},show(){}},treeFocusUi={reset(){}},applyFlowPin=()=>{},applyZoom=()=>{};
+    const options={},routeCardUi={reset(){},show(){}},treeFocusUi={reset(){}},applyFlowPin=()=>{},applyZoom=()=>{};
     ${section}
     return {toggle:toggleFlowPin,receive:m=>{${handlerBody('routeCards')}},invalidate:()=>{pendingPinFocus='';pinFocusVersion++;gen++;}};
   `)(root,fn=>frames.push(fn),{postMessage:m=>messages.push(m)},{addEventListener:(type,callback,capture)=>cancellations.push({type,callback,capture})});
@@ -708,7 +708,7 @@ check("#217 host: nodeVerdictMenu is routed, normalizes the hit to a SEMANTIC ke
   assert.ok(m, "nodeVerdictMenu body");
   assert.ok(/tree\?\.reveals\[revealKey\]/.test(m[1]), "looks the opaque reveal key up in the tree reveals (never passes it raw to the resolver)");
   assert.ok(/isSubQuestionHit\(hit\)[\s\S]*hit\.subQuestionLeafKey[\s\S]*"nodeKey" in hit[\s\S]*hit\.nodeKey/.test(m[1]), "normalizes {subQuestionLeafKey}/{nodeKey} → the semantic key");
-  assert.ok(/caseIdsThroughReviewNode\(semanticKey\)/.test(m[1]), "resolves cases via the SHARED lit reach + the pure membership core over scenarioByCaseId");
+  assert.ok(/caseIdsThroughReviewNode\(semanticKey,tree\)/.test(m[1]), "resolves cases via the SHARED lit reach + the pure membership core over scenarioByCaseId");
   assert.ok(/setStatusBarMessage/.test(m[1]), "every no-op exit emits a transient status note (the native menu is already suppressed — no silent dead click)");
 });
 check("review reach shares complete route-owned bodies with the case menu, without clinical truth filtering", () => {
@@ -844,11 +844,11 @@ check("#233/#(bulk-verdict) host: applyCriterionVerdict DELEGATES the guard poli
   assert.match(COCKPIT_SRC, /persistMv\(reviewByCaseId, notesByCaseId, upd\.map\)/);
 });
 check("#233 Todo 2b host: the criterion-encoding menu captures the seen hash + in-situ elided + sidecar at OPEN and guards across the pick await (the guard POLICY is the shared computeCriterionVerdictUpdate)", () => {
-  assert.match(COCKPIT_SRC, /const ident = resolveCriterionFromReveal\(revealKey\)/);
+  assert.match(COCKPIT_SRC, /const ident = resolveCriterionFromReveal\(revealKey,session\?\.view\?\?views\.get\("tree"\)\)/);
   assert.match(COCKPIT_SRC, /const openHash = ident\.bodyHash;/);
   assert.match(COCKPIT_SRC, /const seenElided = ident\.elided \|\| liveFacts\.elided/);
   assert.match(COCKPIT_SRC, /const openSidecar = mvSidecarPath;/);
-  assert.match(COCKPIT_SRC, /if \(mvSidecarPath !== openSidecar\) return note\("policy changed/);
+  assert.match(COCKPIT_SRC, /if \(\(session&&\(!branchSessionCurrent\(session\)\|\|session\.view\.gen!==generation\)\) \|\| mvSidecarPath !== openSidecar\) return note\("policy changed/);
   assert.match(COCKPIT_SRC, /applyCriterionVerdict\(ident\.lib, ident\.name, pick\.value, openHash, seenElided\)/);
 });
 check("criterion verdict menu shares case labels while retaining criterion persistence", () => {
@@ -865,7 +865,7 @@ check("#233 Todo 2b host: nodeMenu offers 'Verdict' for a ROOT criterion (topCri
   assert.match(COCKPIT_SRC, /pick\.act === "criterion"\) return criterionEncodingMenu/);
 });
 check("#233 Todo 2b host: resolveCriterionFromReveal resolves a ROOT when (topCriterion(go.expr)) OR a non-root {criterionOccurrence}; LEFT-click on an occurrence is INERT", () => {
-  assert.match(COCKPIT_SRC, /function resolveCriterionFromReveal\(revealKey: string\)/);
+  assert.match(COCKPIT_SRC, /function resolveCriterionFromReveal\(revealKey: string, tree: PaneView \| undefined = views\.get\("tree"\)\)/);
   assert.match(COCKPIT_SRC, /if \(isCriterionOccurrenceHit\(hit\)\) return \{ \.\.\.hit\.criterionOccurrence \}/);
   assert.match(COCKPIT_SRC, /const tc = go \? topCriterion\(go\.expr\) : undefined/);
   // left-click reveal path diverts a criterion-occurrence BEFORE mapHitToPrimary (inert, like the toggle divert)
@@ -914,13 +914,13 @@ check("#203 Slice A host: the tree render captures conceptOccurrences + flaggabl
 check("#203 Slice B + GAP 3: nodeMenu offers verdict + one 'Add flag on <target>' per choice; no choices → verdict only", () => {
   const m = COCKPIT_SRC.match(/async function nodeMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "nodeMenu body");
-  assert.match(m[1], /const choices = flagTargetChoices\(hit\)/);
-  assert.match(m[1], /if \(choices\.length === 0 && !isCriterion\) return nodeVerdictMenu\(revealKey\)/); // not flaggable AND not a criterion → verdict only (#224 Slice 2b)
+  assert.match(m[1], /const choices = flagTargetChoices\(hit,tree\)/);
+  assert.match(m[1], /if \(choices\.length === 0 && !isCriterion\) \{ if\(hasCaseVerdict\)await nodeVerdictMenu\(revealKey,session\);return; \}/); // not flaggable AND not a criterion → verdict only (#224 Slice 2b)
   assert.match(m[1], /Set case verdict/);
   assert.match(m[1], /choices\.map\(\(c\) =>/); // one menu item per target choice
   assert.match(m[1], /Add flag on \$\{c\.label\}/); // labeled per choice
   assert.match(m[1], /const ver = indexVersion/); // ver/cel captured BEFORE the menu
-  assert.match(m[1], /openFlagDrawer\(\{ target: pick\.choice \}\)/); // #211: opens the drawer on the RESOLVED target
+  assert.match(m[1], /openFlagDrawer\(\{ target: pick\.choice \},session\)/); // #211: opens the drawer on the RESOLVED target
 });
 check("#203 GAP 3: flagTargetChoices — decision root → object-decision; a `when` → concept (object) + this condition (occurrence); a leaf → this recommendation", () => {
   const m = COCKPIT_SRC.match(/function flagTargetChoices\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
@@ -987,7 +987,7 @@ check("#203 Slice B: findDeclaration re-parses src/crl (live-buffer via crlText)
 check("#211: nodeMenu opens the drawer on the RESOLVED target (Option A) — openFlagDrawer, not a native gist chain", () => {
   const m = COCKPIT_SRC.match(/async function nodeMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "nodeMenu body");
-  assert.match(m[1], /openFlagDrawer\(\{ target: pick\.choice \}\)/); // the ONE seam; the webview never names a target
+  assert.match(m[1], /openFlagDrawer\(\{ target: pick\.choice \},session\)/); // the ONE seam; the webview never names a target
   assert.doesNotMatch(m[1], /addFlagAtNode/); // the old scratch-editor chain is gone
 });
 check("#211: openFlagDrawer is a STANDALONE seam — MV-only, captures ver/cel, posts the drawer", () => {
@@ -1242,15 +1242,15 @@ check("tree-snapshot host: captureTreeDom gates (no pane / no model / not acked 
   assert.ok(m, "captureTreeDom body");
   const b = m[0];
   assert.match(b, /if \(!tree\) return \{ ok: false, note: "open the tree pane first" \}/);
-  assert.match(b, /if \(!model\) return \{ ok: false, note: "open a policy first/, "no model → refuse (no junk placeholder export)");
-  assert.match(b, /if \(!tree\.acked\)/, "the acked gate (fully-overlaid capture — overlay drives FIFO-ahead)");
+  assert.match(b, /if \(!model && !decisionTable\) return \{ ok: false, note: "open a policy first/, "no model → refuse (no junk placeholder export)");
+  assert.match(b, /if \(!capturedTable && !tree\.acked\)/, "the acked gate (fully-overlaid capture — overlay drives FIFO-ahead)");
   assert.match(b, /if \(snapshotCapture\.pending\)/, "single-flight");
   assert.match(b, /const capturedGen = tree\.gen;[\s\S]*const capturedCel = currentCel;/, "freeze gen + cel before the round-trip");
   // TOKEN-scoped fast-fail + timer (so a slow/late delivery of THIS capture can't abort a LATER one) + a try/catch around post.
   assert.match(b, /setTimeout\(\(\) => snapshotCapture\.resolve\(token, undefined\), 3000\)/, "3s timeout, token-scoped");
   assert.match(b, /=== false\) snapshotCapture\.resolve\(token, undefined\)/, "postMessage false → token-scoped settle");
   assert.match(b, /\} catch \{\s*snapshotCapture\.resolve\(token, undefined\)/, "a synchronous post throw → token-scoped settle (timer installed first)");
-  assert.match(b, /views\.get\("tree"\) !== capturedTree \|\| capturedTree\.gen !== capturedGen \|\| currentCel !== capturedCel/, "re-validate the identity after the await (reject a mid-capture change)");
+  assert.match(b, /views\.get\("tree"\) !== capturedTree \|\| currentCel !== capturedCel[\s\S]*tableManifest\(\)!==frozenManifest[\s\S]*capturedTree\.gen !== capturedGen/, "re-validate the identity after the await (reject a mid-capture change)");
   assert.match(b, /screenCapturedDom\(raw\)/, "screen the payload (trust boundary)");
   assert.match(b, /!screened\.html\.includes\('class="flow-svg"'\)/, "refuse a placeholder / non-flow render");
   assert.ok(!/stripEphemeralOverlays/.test(b), "the ephemeral strip now runs webview-side (exact classList), not host-side");
@@ -1260,7 +1260,7 @@ check("tree-snapshot host: exportTreeSnapshot builds via Todo 1, save-dialog (ca
   const m = COCKPIT_SRC.match(/async function exportTreeSnapshot\(\)[\s\S]*?\n  \}/);
   assert.ok(m, "exportTreeSnapshot body");
   const b = m[0];
-  assert.match(b, /renderFlowSnapshotDocument\(\{ flowHtml: cap\.html, styleCss: FLOW_STYLE, title: `\$\{policyId \?\? "decision"\} — decision tree` \}\)/);
+  assert.match(b, /renderFlowSnapshotDocument\(\{ flowHtml: cap\.html, styleCss: FLOW_STYLE\+DECISION_TABLE_STYLE, title: `\$\{policyId \?\? "decision"\} — decision tree` \}\)/);
   assert.match(b, /policyIdFromSrc\(src\) : undefined\) \?\? policyLabel\(\)/, "policy-dir id, else the .cel basename");
   assert.match(b, /src \?\? \(currentCel \? dirname\(currentCel\) : undefined\)/, "default dir = policy src, else the .cel's dir (NOT the first workspace folder)");
   assert.match(b, /showSaveDialog/);
@@ -1465,7 +1465,7 @@ check("flag-action drawer: openFlagList doesn't open a GHOST — clean deletion 
   assert.ok(m, "openFlagList body");
   assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === pick\.flag\.id\);/);
   assert.match(m[1], /if \(!live && !flagStoreWarning\) return flagNote\("the flag changed on disk/);
-  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel, true\);/); // disc 359: reclick-same closes, different switches
+  assert.match(m[1], /toggleFlagActionView\(flag, ver, cel, true,origin\);/); // disc 359: reclick-same closes, different switches
 });
 
 check("flag-action drawer: the flag list opens the drawer (ends the loop) with a post-pick stale guard; no re-entrant action QuickPick", () => {
@@ -1473,7 +1473,7 @@ check("flag-action drawer: the flag list opens the drawer (ends the loop) with a
   assert.ok(m, "openFlagList body");
   assert.ok(!/for \(;;\)/.test(m[1]), "no re-entrant loop");
   assert.match(m[1], /if \(indexVersion !== ver \|\| currentCel !== cel \|\| mode !== "medical-validation"\) return flagNote\("policy changed/, "post-pick stale guard");
-  assert.match(m[1], /toggleFlagActionView\(live \?\? pick\.flag, ver, cel, true\);/); // disc 359: reclick-same closes, different switches
+  assert.match(m[1], /toggleFlagActionView\(flag, ver, cel, true,origin\);/); // disc 359: reclick-same closes, different switches
 });
 
 check("flag-action drawer: 'Reveal in source' is GONE (revealFlag + flagActionMenu removed)", () => {
@@ -1518,13 +1518,13 @@ check("node-filter: driveFlagBadges delegates to the PURE computeFlagPlacement +
 check("node-filter: openNodeFlags — single-skip on length===1, >1 filtered picker, unknown/empty gid → note, full disc-355 re-find", () => {
   const m = COCKPIT_SRC.match(/async function openNodeFlags\(gid: string, category\?: [^)]*\): Promise<void> \{([\s\S]*?)\n  \}/);
   assert.ok(m, "openNodeFlags body");
-  assert.match(m[1], /const flags = \(flagsByGid\.get\(gid\) \?\? \[\]\)\.filter/, "gid looked up in the host map (unknown → empty)");
+  assert.match(m[1], /const flags = \(\(session\?\.flagsByGid\?\?flagsByGid\)\.get\(gid\) \?\? \[\]\)\.filter/, "gid looked up in the host map (unknown → empty)");
   assert.match(m[1], /if \(flags\.length === 0\) return flagNote\("no flags on this node"\);/, "unknown/stale gid + genuinely-empty unified to one note");
   assert.match(m[1], /if \(flags\.length === 1\) return openOne\(flags\[0\]\);/, "single-skip predicate = length === 1");
   // openOne re-finds by id (ghost guard + store-warning keep — disc 355), used by BOTH the skip and the picker paths
   assert.match(m[1], /const live = flagsList\.find\(\(f\) => f\.id === snap\.id\);/);
   assert.match(m[1], /if \(!live && !flagStoreWarning\) return flagNote\("the flag changed on disk/);
-  assert.match(m[1], /toggleFlagActionView\(live \?\? snap, ver, cel\);/); // disc 359: reclick-same closes, different switches
+  assert.match(m[1], /toggleFlagActionView\(live \?\? snap, ver, cel, false,session\);/); // disc 359: reclick-same closes, different switches
   // >1 → a filtered QuickPick with a post-pick stale guard + a shared flagPickItem
   assert.match(m[1], /const items = flags\.map\(flagPickItem\);/);
   assert.match(m[1], /showQuickPick\(items, \{ placeHolder: "Flags on this node/);
@@ -1552,12 +1552,12 @@ check("gold-link: driveFlagNodeHighlight posts the OPEN DRAWER's target gids (cr
   // gidsForFlag reuses the shared flagPlacementFor for a SINGLE filed flag (open or resolved)
   assert.match(COCKPIT_SRC, /function gidsForFlag\(flag: MvFlag\): string\[\] \{[\s\S]*?flagPlacementFor\(tree, \[flag\]\)\.gids/);
   // disc 361: gidsForTargetChoice synthesizes the anchor the flag WILL carry (kind->scope, key->occurrenceKey) → the SAME placement.
-  assert.match(COCKPIT_SRC, /function gidsForTargetChoice\(target: FlagTargetChoice\): string\[\] \{[\s\S]*?scope: target\.kind,[\s\S]*?flagPlacementFor\(tree, \[synthetic\]\)\.gids/);
+  assert.match(COCKPIT_SRC, /function gidsForTargetChoice\(target: FlagTargetChoice, tree: PaneView \| undefined = views\.get\("tree"\)\): string\[\] \{[\s\S]*?scope: target\.kind,[\s\S]*?flagPlacementFor\(tree, \[synthetic\]\)\.gids/);
 });
 
 check("gold-link: only explicit policy-wide list selection reveals a flag target", () => {
   assert.match(SCRIPT, /else if\(m\.type==='flagHl'\)\{if\(m\.gen!==gen\)return;/);
-  assert.match(SCRIPT, /for\(const fe of document\.querySelectorAll\('\.flag-current'\)\)fe\.classList\.remove\('flag-current'\);/);
+  assert.match(SCRIPT, /for\(const fe of root\.querySelectorAll\('\.flag-current'\)\)fe\.classList\.remove\('flag-current'\);/);
   const body = SCRIPT.slice(SCRIPT.indexOf("else if(m.type==='flagHl')"), SCRIPT.indexOf("else if(m.type==='criterionVerdicts')"));
   assert.match(body, /el\.classList\.add\('flag-current'\)/);
   assert.match(body, /if\(m\.reveal===true&&flagTarget\)/);
@@ -1666,7 +1666,7 @@ check("edit/grid: guardDrawerDiscard prompts on a dirty EDIT or a dirty GRID; ga
   assert.match(m[1], /return true;/); // no unsaved work → proceed silently
   // wired into every implicit-switch entry (list / node / create) — one guard now covers both drawer modes
   assert.match(COCKPIT_SRC, /async function openFlagList\(\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;/);
-  assert.match(COCKPIT_SRC, /async function openNodeFlags\([^)]*\): Promise<void> \{\s*\n\s*if \(mode[^\n]*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;/);
+  assert.match(COCKPIT_SRC, /async function openNodeFlags\([^)]*\): Promise<void> \{[\s\S]*?if \(!current\(\) \|\| mode[^\n]*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;/);
   assert.match(COCKPIT_SRC, /if \(pick\.choice\) \{\s*\n\s*if \(!\(await guardDrawerDiscard\(\)\)\) return;[\s\S]*?openFlagDrawer/);
   assert.doesNotMatch(COCKPIT_SRC, /guardEditDiscard/, "the edit-only guard is fully superseded by guardDrawerDiscard");
 });

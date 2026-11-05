@@ -434,7 +434,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       verdict.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();verdictFocusToken=snapshot.token;if(pinned){set(pinned,'tabindex','-1');pinned.focus({preventScroll:true});}api.postMessage({type:'routeVerdictMenu',gen:generation(),token:snapshot.token});});
       layer!.append(verdict);
       const navigation=snapshot.navigation;
-      const count=navigation?.current>0 && navigation.current<=navigation.total ? `${navigation.current} of ${navigation.total}` : '';
+      const count=typeof navigation?.countLabel==='string' ? navigation.countLabel : navigation?.current>0 && navigation.current<=navigation.total ? `${navigation.current} of ${navigation.total}` : '';
       const navCenter=pinBox.x+pinBox.width/2+(count?count.length*6+8:0)/2;
       if(count){const progress=svgEl('text',{class:'route-leaf-nav-count',x:navCenter-64,y:pinBox.y-15,'text-anchor':'end','aria-label':`Traversal ${navigation.current} of ${navigation.total}`});progress.textContent=count;layer!.append(progress);}
       const navLabel=svgEl('text',{class:'route-leaf-nav-label',x:navCenter,y:pinBox.y-15,'text-anchor':'middle'});navLabel.textContent='Next';layer!.append(navLabel);

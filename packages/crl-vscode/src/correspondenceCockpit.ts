@@ -160,6 +160,8 @@ import { renderCrlPane } from "./crlPaneHtml";
 import { collectDispositionLeafKeys, toggleCriterionExpansion, expandTraversalCriteria, expandQuestionInputs, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
 import { renderFlowSnapshotDocument } from "./flowSnapshotHtml";
 import { captureDecisionTable, installDecisionTableWebview, DECISION_TABLE_STYLE } from './decisionTableWebview';
+import { buildDecisionTable, DECISION_TABLE_PAGE_SIZE, type DecisionTableModel, type DecisionTableRow, type DecisionTableScope } from './decisionTableModel';
+import { branchCaptureManifest, branchMessageIsCurrent, type BranchSessionIdentity } from './decisionTableSessions';
 import { SnapshotCapture, screenCapturedDom, snapshotFileName } from "./snapshotCapture";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
@@ -294,6 +296,22 @@ interface PaneView {
   /** the start/primary-node gid — carries the chrome-mirror count badge (see driveFlagBadges). */
   startNodeGid?: string;
   disposables: vscode.Disposable[];
+}
+
+type BranchPin = { token: string; epoch: number; caseId: string; routeId: string; traversalKey: string; traversal: TreeTraversal; verdictCaseIds: string[]; payload: any; targets: Map<string, WordingTarget>; answerTargets: Map<string, AnswerTarget> };
+// REFACTOR:grounded: row ownership passed host/browser checks and actual Code case, draft, questionnaire and source-rebuild qualification.
+interface BranchSession extends BranchSessionIdentity {
+  row: DecisionTableRow;
+  view: PaneView;
+  coordinatorKey: string;
+  prefix: string;
+  index: bigint;
+  caseId?: string;
+  routeId?: string;
+  pin?: BranchPin;
+  drafts: Map<string, BranchPin>;
+  expanded: Set<string>;
+  flagsByGid: Map<string, MvFlag[]>;
 }
 
 /** CRL nav list — pre-order flatten of the structure (roots + when/otherwise/action); the crl-primary cycle/selectable
@@ -1377,7 +1395,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // over the dead snapshot — note + return. A store WARNING (state unknown) → keep the snapshot (matches refreshFlagActionDrawer).
     const live = flagsList.find((f) => f.id === pick.flag.id);
     if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
-    toggleFlagActionView(live ?? pick.flag, ver, cel, true); // whole-policy list explicitly navigates; disc 359: reclicking the same flag closes; a different one switches
+    const flag=live??pick.flag;
+    let origin:BranchSession|undefined;
+    if(decisionTable){
+      origin=decisionTable.visible.map(id=>decisionTable!.sessions.get(id)!).find(session=>{
+        const gids=new Set(flagPlacementFor(session.view,[flag]).gids),path=new Set(session.row.pathKeys);
+        return Object.entries(session.view.anchors).some(([key,anchor])=>gids.has(anchor.scrollTo)&&
+          (path.has(key)||path.has(session.view.focusNodes?.[key]?.owner??'')));
+      });
+      // Explicit policy-list navigation may leave the current scope to show an off-row target.
+      if(!origin)suspendDecisionTable();
+    }
+    toggleFlagActionView(flag, ver, cel, true,origin); // whole-policy list explicitly navigates; disc 359: reclicking the same flag closes; a different one switches
   }
 
   /** Todo 2 (disc 356): the per-node ⚑ badge entry — open the ACTION DRAWER filtered to THIS node's flags. `gid` is a
@@ -1386,20 +1415,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (the operator's "skip the list, go to the action UI"); >1 → a filtered QuickPick (the `openFlagList` idiom, scoped) → pick →
    *  drawer. Every open re-finds by id (disc 355: never hand the drawer a stale map snapshot; clean deletion → note; store-warning
    *  → keep). The START-node count pill is a DIFFERENT channel (`mvFlags` → the full list) — untouched. */
-  async function openNodeFlags(gid: string, category?: 'validation'|'extraction'): Promise<void> {
-    if (mode !== "medical-validation") return;
+  async function openNodeFlags(gid: string, category?: 'validation'|'extraction', session?: BranchSession): Promise<void> {
+    const generation=session?.view.gen;
+    const current=()=>!session||(branchSessionCurrent(session)&&session.view.gen===generation);
+    if (!current() || mode !== "medical-validation") return;
     if (!(await guardDrawerDiscard())) return; // Todo 3/5: switching to this node's flag would abandon an in-progress edit OR the grid's picks — confirm first
     const ver = indexVersion;
     const cel = currentCel;
-    const flags = (flagsByGid.get(gid) ?? []).filter(f => !category || f.category === category); // Open and resolved records share the node's review entry.
+    const flags = ((session?.flagsByGid??flagsByGid).get(gid) ?? []).filter(f => !category || f.category === category); // Open and resolved records share the node's review entry.
     if (flags.length === 0) return flagNote("no flags on this node"); // unknown/stale gid OR a concurrent resolve/delete emptied it
     if (flagStateNote) flagNote(flagStateNote);
     // Re-find by id from the LIVE list so the drawer never opens over a stale map snapshot when a live record exists.
     const openOne = (snap: MvFlag): void => {
+      if(!current())return;
       const live = flagsList.find((f) => f.id === snap.id);
       if (!live && !flagStoreWarning) return flagNote("the flag changed on disk — reopen it");
       if (category && (live ?? snap).category !== category) return flagNote('the flag changed on disk — reopen it');
-      toggleFlagActionView(live ?? snap, ver, cel); // disc 359: reclicking the same flag closes; a different one switches
+      toggleFlagActionView(live ?? snap, ver, cel, false,session); // disc 359: reclicking the same flag closes; a different one switches
     };
     if (flags.length === 1) return openOne(flags[0]); // single-skip (disc 356: skip predicate = length === 1)
     // >1 → a filtered QuickPick, structurally identical to openFlagList (shared flagPickItem), scoped to this node, then the drawer.
@@ -1798,10 +1830,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     caseId: string,
     sv: ScenarioViewModel | undefined,
     dispositionLeafKeys: Set<string>,
+    tree: PaneView | undefined = views.get("tree"),
   ): string[] {
     const interior = routesForCase(caseId).flatMap(r => r.nodeKeys).filter((k) => !dispositionLeafKeys.has(k));
     const produced = sv ? producedDispositionLeafKeys(sv, dispositionLeafKeys) : [];
-    return caseReviewReach([...interior, ...produced], views.get("tree")?.focusNodes ?? {});
+    return caseReviewReach([...interior, ...produced], tree?.focusNodes ?? {});
   }
 
   function driveDoneOverlay(): void {
@@ -1870,6 +1903,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** Paint open/resolved flag status and authoring-step identity. Node membership includes both statuses;
    * policy gate/count/error and unplaced-blocker metrics remain based on open flags. */
   function driveFlagBadges(): void {
+    for(const session of decisionTable?.sessions.values()??[])paintBranchSession(session);
     const tree = views.get("tree");
     if (!tree) {
       flagsByGid = new Map(); // no tree → no badges → no node map (keeps the "rebuilt wholesale every drive" invariant true, disc 357)
@@ -1929,8 +1963,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (buildFlagDraft's mapping: `kind`→scope, `lib`→library, an occurrence `key`→occurrenceKey) and run the SAME placement, so
    *  the draft highlights exactly the node(s) the filed flag would. `computeFlagPlacement` reads only `anchor.{scope,name,library,
    *  occurrenceKey}` + `id`, so this throwaway record needs nothing else; nothing is stored. */
-  function gidsForTargetChoice(target: FlagTargetChoice): string[] {
-    const tree = views.get("tree");
+  function gidsForTargetChoice(target: FlagTargetChoice, tree: PaneView | undefined = views.get("tree")): string[] {
     if (!tree) return [];
     const synthetic: MvFlag = {
       schemaVersion: 1,
@@ -1968,6 +2001,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           ? gidsForFlag(flagActionView.flag)
           : []; // Todo 5 (D6): the bulk grid has no single target node → no gold link (falls through here, grid mode is mutually exclusive with the three above)
     void tree.panel.webview.postMessage({ type: "flagHl", gen: tree.gen, gids, ...(reveal ? { reveal: true } : {}) });
+    for(const session of decisionTable?.sessions.values()??[]){
+      const placed=flagDraft
+        ? gidsForTargetChoice(flagDraft.target,session.view)
+        : flagEditDraft?flagPlacementFor(session.view,[flagEditDraft.flag]).gids
+        : flagActionView?flagPlacementFor(session.view,[flagActionView.flag]).gids:[];
+      postBranch(session,{type:'flagHl',gen:session.view.gen,gids:placed,
+        ...(reveal&&flagDrawerSession===session?{reveal:true}:{})});
+    }
   }
 
   /** #224 ii.3 Slice 2b / #233 Todo 2b — the LIVE criterion identities: `{lib,name}` → `{bodyHash, elided}`. The gate set is
@@ -1995,8 +2036,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   /** Paint occurrence checks. Stored criterion review still owns the encoding-completion gate. */
-  function driveCriterionVerdicts(projection?: ReturnType<typeof projectCriterionReview>): void {
-    const tree = views.get("tree");
+  function driveCriterionVerdicts(projection?: ReturnType<typeof projectCriterionReview>, session?: BranchSession): void {
+    const tree = session?.view ?? views.get("tree");
     if (!tree) return;
     const allGids = tree.criterionOccurrences.map(o => o.gid);
     const derivedGids: string[] = [];
@@ -2009,7 +2050,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         if (state === "pass" && criterionVerdicts[criterionVerdictKey(occ.lib, occ.name)]?.state !== "pass") derivedGids.push(occ.gid);
       }
     }
-    void tree.panel.webview.postMessage({ type: "criterionVerdicts", gen: tree.gen, allGids, byState, derivedGids });
+    postBranch(session,{ type: "criterionVerdicts", gen: tree.gen, allGids, byState, derivedGids });
   }
 
   /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
@@ -2288,12 +2329,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   /** REFACTOR:grounded: actual inspected evidence and original flag placement prevent misleading omission. */
-  function computeForcedUncertainty(tree: PaneView): Map<string, 'case' | 'flag' | 'evidence'> {
+  function computeForcedUncertainty(tree: PaneView, session?: BranchSession): Map<string, 'case' | 'flag' | 'evidence'> {
     const candidates = uncertaintyGuardCandidates(projectFlowStructure(crlStructure));
     if (mode !== 'medical-validation' || !candidates.size) return new Map();
-    const pin = pinnedCards?.epoch === indexVersion ? pinnedCards : undefined;
-    const sv = pin ? scenarioByCaseId.get(pin.caseId) : focusedScenario();
-    const route = pin ? routesForCase(pin.caseId).find(route => route.terminalId === pin.routeId) : undefined;
+    const pin = session ? session.pin : pinnedCards?.epoch === indexVersion ? pinnedCards : undefined;
+    const caseId = session ? session.caseId : pin?.caseId;
+    const sv = caseId ? scenarioByCaseId.get(caseId) : session ? undefined : focusedScenario();
+    const route = caseId ? routesForCase(caseId).find(route => route.terminalId === (session?.routeId ?? pin?.routeId)) : undefined;
     const forced = new Map<string, 'case' | 'flag' | 'evidence'>(forcedUncertaintyVisibility(candidates, sv ? {
       tree: sv.tree, status: sv.status, resolve: whenKeyResolver(sv),
       ...(route ? { routeNodeIds: new Set(route.nodeIds) } : {}),
@@ -2301,7 +2343,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (flagStateError || (pin && (!sv || !route))) for (const key of candidates.keys()) forced.set(key, 'evidence');
     const relatedFlags = flagsList.filter(flag => flag.anchor.scope === 'concept' || (flag.anchor.scope === 'decision' && !!flag.anchor.occurrenceKey));
     if (relatedFlags.length) {
-      const complete = renderFlowPane(crlStructure, treeRenderOptions(tree.gen));
+      const complete = renderFlowPane(crlStructure, { ...treeRenderOptions(tree.gen), ...(session ? {expandedGuardWhens:session.expanded,revealPrefix:session.prefix} : {}) });
       const fullView: PaneView = { ...tree, ...complete };
       const flaggedGids = new Set(flagPlacementFor(fullView, relatedFlags).gids);
       const retained = new Map([...candidates].map(([key,candidate]) => [key, forced.get(key) === 'case' ? candidate.nonpassTerminalKey : candidate.passTerminalKey]));
@@ -2317,6 +2359,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (next.size === forcedUncertaintyGuards.size && [...next].every(([key, reason]) => forcedUncertaintyGuards.get(key) === reason)) return;
     // Store before rendering/selection replay so ACK-driven paint cannot recursively re-render.
     forcedUncertaintyGuards = next;
+    if (decisionTable&&!decisionTable.suspended) reconcileDecisionTable(decisionTable.scope,decisionTable.offset);
     renderPane('tree');
     const previousOrigin = scrollSuppressPane; scrollSuppressPane = 'tree';
     try { if (state.selection) dispatch({ type: 'select', selection: state.selection }, true); }
@@ -2714,55 +2757,347 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // REFACTOR:grounded: the host owns pin identity and proposal targets; webview never supplies paths.
   let wordingSources: ReturnType<typeof graphWordingSources> = new Map();
   let disclosureFocus: { gen: number; token: string } | undefined;
-  let pinnedCards: { token: string; epoch: number; caseId: string; routeId: string; traversalKey: string; traversal: TreeTraversal; verdictCaseIds: string[]; payload: any; targets: Map<string, WordingTarget>; answerTargets:Map<string,AnswerTarget> } | undefined;
+  let pinnedCards: BranchPin | undefined;
+  let decisionTable: { epoch: string; model: DecisionTableModel; scope: DecisionTableScope; offset: bigint; sessions: Map<string, BranchSession>; visible: string[]; suspended?: boolean } | undefined;
+  let branchQuestionnaireOwner: BranchSession | undefined;
+  let flagDrawerSession: BranchSession | undefined;
+  let nextBranchSession = 0;
+  function branchSessionCurrent(session: BranchSession): boolean {
+    return mode === 'medical-validation' && !!decisionTable && decisionTable.epoch === session.epoch
+      && session.sourceVersion === indexVersion && decisionTable.sessions.get(session.id) === session;
+  }
+  function postBranch(session: BranchSession | undefined, message: any): void {
+    const tree = views.get('tree'); if (!tree) return;
+    if (session) {
+      if (!branchSessionCurrent(session) || !session.mounted) return;
+      void tree.panel.webview.postMessage({ type: 'decisionTableRow', epoch: session.epoch, rowId: session.id, message });
+    } else void tree.panel.webview.postMessage(message);
+  }
   const branchQuestionnaire = createBranchQuestionnairePanel(message => {
-    if (!pinnedCards || pinnedCards.epoch!==indexVersion || mode!=="medical-validation" || message.token!==pinnedCards.token) return;
-    if(message.type==='routeCardSave' || message.type==='routeCardAnswerSave')void saveCard(message);
-    else if(message.type==='routeCardDraft')acceptCardDraft(message,true);
-    else if(message.type==='qaRequestAction')qaRequestAction(message);
-  }, () => { const tree=views.get('tree');if(tree)void tree.panel.webview.postMessage({type:'branchQuestionnaireState',gen:tree.gen,open:false}); });
-  function acceptCardDraft(msg: any, fromBranch=false): void {
-    const pin=pinnedCards;
+    const session = branchQuestionnaireOwner;
+    const pin = session ? (branchSessionCurrent(session) ? session.pin : undefined) : pinnedCards;
+    if (!pin || pin.epoch!==indexVersion || mode!=="medical-validation" || message.token!==pin.token) return;
+    if(message.type==='routeCardSave' || message.type==='routeCardAnswerSave')void saveCard(message,session);
+    else if(message.type==='routeCardDraft')acceptCardDraft(message,true,session);
+    else if(message.type==='qaRequestAction')qaRequestAction(message,session);
+  }, () => {
+    branchQuestionnaireOwner = undefined;
+    const tree=views.get('tree');if(tree)postBranch(undefined,{type:'branchQuestionnaireState',gen:tree.gen,open:false});
+    for (const session of decisionTable?.sessions.values() ?? []) postBranch(session,{type:'branchQuestionnaireState',gen:session.view.gen,open:false});
+  });
+  function acceptCardDraft(msg: any, fromBranch=false, session?: BranchSession): void {
+    if (session && !branchSessionCurrent(session)) return;
+    const pin=session ? session.pin : pinnedCards;
     if(!pin || pin.epoch!==indexVersion || msg.token!==pin.token || (!pin.targets.has(msg.key) && !pin.answerTargets?.has(msg.key)) || mode!=="medical-validation")return;
     const fields=msg.fields;
     if(!fields || typeof fields.editing!=='boolean' || !['editingOwner','draftText','draftDescription'].every(k=>fields[k]===null||typeof fields[k]==='string'))return;
     const card=pin.payload.cards.find((c:any)=>c.id===msg.key);if(!card)return;
     if(fields.answerDraft!==undefined && fields.answerDraft!==null && (typeof fields.answerDraft!=='object' || JSON.stringify(fields.answerDraft).length>32000))return;
     for(const key of ['editing','editingOwner','draftText','draftDescription','answerDraft']){if(fields[key]===undefined)continue;if(fields[key]===null)delete card[key];else card[key]=fields[key];}
-    const tree=views.get('tree');
-    if(fromBranch && tree)void tree.panel.webview.postMessage({...msg,gen:tree.gen});
-    else branchQuestionnaire.post(msg);
+    const tree=session?.view ?? views.get('tree');
+    if(fromBranch && tree)postBranch(session,{...msg,gen:tree.gen});
+    else if(branchQuestionnaireOwner===session)branchQuestionnaire.post(msg);
   }
   function branchOrder() {
     const nodes=views.get('tree')?.focusNodes ?? {};
     return treeTraversalEntries()?.filter(e=>nodes[e.route.nodeKeys.at(-1)??'']?.terminal)
       .map(e=>({caseId:e.caseId,routeId:e.route.terminalId,leafKey:e.route.nodeKeys.at(-1)!,traversalKey:treeTraversalSignature(e)}));
   }
+
+  function tableEntries() {
+    return [...scenarioByCaseId.keys()].flatMap(caseId => routesForCase(caseId).map(route => ({caseId,route})));
+  }
+  function tableDisplayState() {
+    return { expanded:expandedUncertaintyGuards, collapsed:collapsedUncertaintyGuards,
+      forced:new Map([...forcedUncertaintyGuards].filter(([,reason])=>reason!=='case')) };
+  }
+  function tableManifest(): string | undefined {
+    const table=decisionTable;
+    return table && !table.suspended ? branchCaptureManifest(table.epoch,indexVersion,JSON.stringify(table.scope),table.offset,
+      table.visible.map(id=>table.sessions.get(id)!).filter(Boolean)) : undefined;
+  }
+  function branchNavigation(session: BranchSession) {
+    const table=decisionTable!;
+    let model=table.model.totalRows===1n
+      ? buildDecisionTable(crlStructure,tableEntries(),{nodeKey:session.row.rootKey},tableDisplayState()) : table.model;
+    if(table.model.totalRows===1n&&model.indexOfRow(session.id)===undefined){
+      const state=tableDisplayState(),expanded=new Set(state.expanded);
+      for(const [guard,candidate]of uncertaintyGuardCandidates(projectFlowStructure(crlStructure)))if(candidate.subtreeKeys.includes(session.row.terminalKey))expanded.add(guard);
+      model=buildDecisionTable(crlStructure,tableEntries(),{nodeKey:session.row.rootKey},{...state,expanded});
+    }
+    const index=model.indexOfRow(session.id) ?? session.index;
+    return {index,total:model.totalRows,previous:index>0n,next:index+1n<model.totalRows,model};
+  }
+  function renderBranchSession(session: BranchSession, focusRequest?: string, disclosureToken?: string): void {
+    if (!branchSessionCurrent(session)) return;
+    const gen=coord.startRender(session.coordinatorKey);
+    session.generation=gen;session.view.gen=gen;session.view.indexVersion=indexVersion;session.view.acked=false;session.ready=false;
+    const forced=computeForcedUncertainty(session.view,session);
+    for (const guard of decisionTable!.model.forcedGuards) forced.set(guard,'evidence');
+    const expanded=new Set(expandedUncertaintyGuards);
+    for (const [key,candidate] of uncertaintyGuardCandidates(projectFlowStructure(crlStructure)))
+      if (candidate.subtreeKeys.includes(decisionTable!.scope.nodeKey) && ![candidate.passTerminalKey,candidate.nonpassTerminalKey].includes(decisionTable!.scope.nodeKey)) { expanded.add(key);forced.set(key,'evidence'); }
+    const rendered=renderFlowPane(crlStructure,{...treeRenderOptions(gen),expandedGuardWhens:session.expanded,
+      revealPrefix:`${session.prefix}g${gen}_`,uncertaintyDisplay:{expanded,collapsed:collapsedUncertaintyGuards,forced}});
+    Object.assign(session.view,rendered);
+    postBranch(session,{type:'render',gen,indexVersion,mode,html:rendered.html,preserveViewport:true,disclosureToken,
+      uncertaintyDisclosures:rendered.uncertaintyDisclosures??{}});
+    if(session.caseId && session.routeId) {
+      const prior=session.pin ?? session.drafts.get(JSON.stringify([session.caseId,session.routeId]));
+      pinCards(session.caseId,session.routeId,focusRequest,prior?.payload.showQuestions??false,undefined,prior,session);
+    } else {
+      session.pin=undefined;session.renderToken=randomUUID();
+      postBranch(session,{type:'modeledBranch',gen,token:session.renderToken,pinKey:session.row.terminalKey,
+        routeKeys:session.row.pathKeys,label:session.row.label});
+      paintBranchSession(session);
+    }
+  }
+  function paintBranchSession(session: BranchSession): void {
+    if(!branchSessionCurrent(session) || !session.mounted)return;
+    const view=session.view,pin=session.pin,marks=pin?.payload.marks;
+    postBranch(session,{type:'markLeaves',gen:view.gen,yesIds:segmentsFor(view,marks?.yesKeys??[]).segmentIds,
+      noIds:segmentsFor(view,marks?.noKeys??[]).segmentIds,
+      conditions:(marks?.conditions??[]).map((mark:{key:string;result:string})=>({ids:segmentsFor(view,[mark.key]).segmentIds,result:mark.result})),
+      routeCaseId:session.caseId,routeId:session.routeId,routeKeys:session.row.pathKeys,routeLabel:pin?.payload.label??session.row.label});
+    const ids=[...new Set(session.row.cases.map(entry=>entry.caseId))],leaves=collectDispositionLeafKeys(crlStructure);
+    const perCase=buildReviewPerCase(ids,id=>scenarioByCaseId.get(id)?.status,
+      ()=>caseReviewReach(session.row.pathKeys,view.focusNodes??{}));
+    const review=deriveReviewOverlay(reviewByCaseId,perCase,key=>leaves.has(key)),projection=criterionReviewProjection(view);
+    for(const [key,node] of Object.entries(view.focusNodes??{}))if(node.outline)review.pass.delete(key);
+    for(const key of projection.pass){review.pass.add(key);review.fail.delete(key);review.pending.delete(key);}
+    for(const key of projection.blocked)if(view.focusNodes?.[key]?.outline)review.pass.delete(key);
+    const allPass=ids.length>0&&ids.every(id=>reviewByCaseId[id]==='pass');
+    postBranch(session,{type:'markReviewOverlay',gen:view.gen,
+      pass:segmentsFor(view,[...review.pass]).segmentIds,fail:segmentsFor(view,[...review.fail]).segmentIds,
+      pending:segmentsFor(view,[...review.pending]).segmentIds,error:segmentsFor(view,session.row.error?[session.row.terminalKey]:[...review.error]).segmentIds,
+      allPassLeaves:allPass?segmentsFor(view,[session.row.terminalKey]).segmentIds:[],policyRoutesApproved:decisionTable!.model.uncoveredRows===0n && allRouteVerdictsApproved((scenarios?.scenarios??[]).map(sc=>{const id=caseIdByName[caseViewKey(sc.case)];return duplicateScenarioNames.has(caseViewKey(sc.case))||!id?'unreviewed':reviewByCaseId[id]??'unreviewed';}))});
+    const placement=flagPlacementFor(view,flagsList);session.flagsByGid=placement.byGid;
+    postBranch(session,{type:'flagBadges',gen:view.gen,flaggableGids:view.flaggableGids,gids:placement.gids,
+      summaries:summarizeFlagBadges(placement.byGid),startNodeGid:view.startNodeGid,
+      open:flagsList.filter(isOpen).length,resolved:flagsList.filter(flag=>!isOpen(flag)).length,flagError:flagStateError,unplaced:placement.unplaced});
+    driveCriterionVerdicts(projection,session);
+    if(pin){pin.payload.verdict=pinnedVerdict(pin.verdictCaseIds);postBranch(session,{type:'routeVerdict',gen:view.gen,token:pin.token,verdict:pin.payload.verdict});}
+  }
+  function reconcileDecisionTable(scope: DecisionTableScope, offset=0n): void {
+    const outer=views.get('tree');if(!outer||mode!=='medical-validation')return;
+    const model=buildDecisionTable(crlStructure,tableEntries(),scope,tableDisplayState());
+    if(model.error){closeDecisionTable();flagNote(model.error);return;}
+    let table=decisionTable;
+    if(!table){
+      branchQuestionnaire.close();pinnedCards=undefined;clearTreeFocus();
+      table={epoch:randomUUID(),model,scope:model.scope,offset:0n,sessions:new Map(),visible:[]};decisionTable=table;
+    }
+    snapshotCapture.settleEmpty();
+    table.suspended=false;table.model=model;table.scope=model.scope;
+    table.offset=offset<0n?0n:offset>=model.totalRows?((model.totalRows-1n)/BigInt(DECISION_TABLE_PAGE_SIZE))*BigInt(DECISION_TABLE_PAGE_SIZE):offset;
+    if(table.offset<0n)table.offset=0n;
+    for(const [id,session] of table.sessions){
+      session.mounted=false;
+      if(!model.underlyingRow(id)){
+        if(branchQuestionnaireOwner===session)branchQuestionnaire.close();
+        coord.disposePane(session.coordinatorKey);table.sessions.delete(id);
+      }
+    }
+    const rows=model.rows(table.offset);table.visible=rows.map(row=>row.id);
+    for(const [index,row] of rows.entries()){
+      let session=table.sessions.get(row.id);
+      if(!session){
+        const number=++nextBranchSession;
+        const preferred=row.cases.find(entry=>entry.caseId===focusedCaseId(state))??row.cases[0];
+        const view:PaneView={panel:outer.panel,gen:0,indexVersion,acked:false,anchors:{},reveals:{},leafConcepts:{},conceptOccurrences:[],criterionOccurrences:[],flaggableGids:[],disposables:[]};
+        session={id:row.id,row,epoch:table.epoch,sourceVersion:indexVersion,generation:0,renderToken:'',ready:false,mounted:true,
+          coordinatorKey:`tree/branch/${number}`,prefix:`b${number}_`,view,index:table.offset+BigInt(index),caseId:preferred?.caseId,routeId:preferred?.route.terminalId,
+          drafts:new Map(),expanded:new Set(expandedGuardWhens),flagsByGid:new Map()};
+        table.sessions.set(row.id,session);
+      }
+      session.row=row;session.index=table.offset+BigInt(index);session.mounted=true;
+      if(!row.cases.some(entry=>entry.caseId===session.caseId&&entry.route.terminalId===session.routeId)){
+        if(session.pin)session.drafts.set(JSON.stringify([session.pin.caseId,session.pin.routeId]),session.pin);
+        const preferred=row.cases[0];session.caseId=preferred?.caseId;session.routeId=preferred?.route.terminalId;session.pin=undefined;
+      }
+    }
+    postDecisionTableLayout();
+    for(const id of table.visible)renderBranchSession(table.sessions.get(id)!);
+  }
+  /** Explicit off-scope flag navigation preserves current and dormant per-case drafts and RQ ownership. */
+  function suspendDecisionTable(): void {
+    const table=decisionTable;if(!table)return;
+    snapshotCapture.settleEmpty();table.suspended=true;
+    for(const session of table.sessions.values())session.mounted=false;
+    void views.get('tree')?.panel.webview.postMessage({type:'decisionTable',active:false,preserve:true,epoch:table.epoch});
+  }
+  function closeDecisionTable(): void {
+    const table=decisionTable;if(!table)return;
+    decisionTable=undefined;branchQuestionnaire.close();branchQuestionnaireOwner=undefined;snapshotCapture.settleEmpty();
+    for(const session of table.sessions.values())coord.disposePane(session.coordinatorKey);
+    void views.get('tree')?.panel.webview.postMessage({type:'decisionTable',active:false});
+  }
+  function refreshDecisionTableAfterRebuild(): void {
+    const table=decisionTable;if(!table)return;
+    branchQuestionnaire.close();flagDrawerSession=undefined;table.epoch=randomUUID();
+    for(const session of table.sessions.values()){session.epoch=table.epoch;session.sourceVersion=indexVersion;session.ready=false;}
+    if(table.suspended){
+      table.model=buildDecisionTable(crlStructure,tableEntries(),table.scope,tableDisplayState());
+      void views.get('tree')?.panel.webview.postMessage({type:'decisionTable',active:false,preserve:true,epoch:table.epoch});
+    }else reconcileDecisionTable(table.scope,table.offset);
+  }
+  function openDecisionTableAt(key: string, session?: BranchSession): void {
+    const table=decisionTable,view=session?.view??views.get('tree');if(!view)return;
+    const keys=new Set(toCrlNav(crlStructure).map(node=>node.nodeKey));
+    const owner=keys.has(key)?key:view.focusNodes?.[key]?.owner;
+    if(!owner || !keys.has(owner))return;
+    if(table && !table.suspended && table.scope.nodeKey===owner && (!session || session.row.rootKey===(table.scope.rootKey??session.row.rootKey))){closeDecisionTable();renderPane('tree');driveLeafMarks();return;}
+    let scope:DecisionTableScope={nodeKey:owner};
+    if(session && table){
+      const entry=session.row.cases.find(entry=>entry.caseId===session.caseId&&entry.route.terminalId===session.routeId);
+      const actual=entry&&table.model.scopeForCase(entry,owner);
+      const index=session.row.pathKeys.indexOf(owner);
+      if(actual)scope=actual;
+      else if(index>=0)scope={nodeKey:owner,rootKey:session.row.rootKey,path:session.row.pathKeys.slice(0,index+1)};
+    }
+    reconcileDecisionTable(scope);
+  }
+  async function chooseBranchCase(session: BranchSession): Promise<void> {
+    if(!branchSessionCurrent(session))return;
+    const oldPin=session.pin,generation=session.view.gen;
+    const choices=session.row.cases.map(entry=>({entry,label:scenarioByCaseId.get(entry.caseId)?.case.name??entry.caseId,
+      description:entry.caseId===session.caseId&&entry.route.terminalId===session.routeId?'current':'',
+      detail:entry.route.nodeKeys.map(key=>state.index?.crlNav.find(node=>node.nodeKey===key)?.label).filter(Boolean).join(' → ')}));
+    const picked=await vscode.window.showQuickPick(choices,{placeHolder:'Choose the case shown in this branch'});
+    if(!picked||!branchSessionCurrent(session)||session.pin!==oldPin||session.view.gen!==generation)return;
+    if(!session.row.cases.some(entry=>entry.caseId===picked.entry.caseId&&entry.route.terminalId===picked.entry.route.terminalId))return;
+    if(oldPin)session.drafts.set(JSON.stringify([oldPin.caseId,oldPin.routeId]),oldPin);
+    session.caseId=picked.entry.caseId;session.routeId=picked.entry.route.terminalId;session.pin=undefined;
+    postDecisionTableLayout();renderBranchSession(session);
+  }
+  function postDecisionTableLayout(): void {
+    const table=decisionTable,outer=views.get('tree');if(!table||!outer)return;
+    const model=table.model;
+    void outer.panel.webview.postMessage({type:'decisionTable',epoch:table.epoch,label:model.label,total:String(model.totalRows),uncovered:String(model.uncoveredRows),
+      range:table.visible.length?`${table.offset+1n}–${table.offset+BigInt(table.visible.length)}`:'0',shallower:!!model.parent,deeper:!!model.children.length,
+      previousPage:table.offset>0n,nextPage:table.offset+BigInt(table.visible.length)<model.totalRows,
+      rows:table.visible.map((id,index)=>{const session=table.sessions.get(id)!,row=session.row,scenario=session.caseId?scenarioByCaseId.get(session.caseId):undefined;
+        return{id,scopeKey:index===0?table.scope.nodeKey:undefined,label:row.label,error:row.error,caseCount:row.cases.length,caseLabel:scenario?`${scenario.case.name}${scenario.status==='error'?' — Evaluation error':scenario.status==='fail'?' — Expected result mismatch':''}`:undefined};})});
+  }
+  async function decisionTableAction(message: any): Promise<void> {
+    const table=decisionTable;if(!table||message.epoch!==table.epoch)return;
+    if(message.action==='resume'){if(table.suspended)reconcileDecisionTable(table.scope,table.offset);return;}
+    if(message.action==='unpin'){closeDecisionTable();renderPane('tree');driveLeafMarks();return;}
+    if(message.action==='case'){
+      const session=table.sessions.get(message.rowId);if(session?.mounted)await chooseBranchCase(session);return;
+    }
+    if(message.action==='previousPage'||message.action==='nextPage'){
+      const offset=table.offset+(message.action==='previousPage'?-1n:1n)*BigInt(DECISION_TABLE_PAGE_SIZE);
+      if(offset>=0n&&offset<table.model.totalRows)reconcileDecisionTable(table.scope,offset);return;
+    }
+    if(message.action==='shallower'&&table.model.parent){reconcileDecisionTable(table.model.parent);return;}
+    if(message.action==='deeper'){
+      const scopes=table.model.children;
+      const selected=scopes.length===1?scopes[0]:(await vscode.window.showQuickPick(scopes.map(child=>({label:child.label,description:`${child.count} branches`,child})),{placeHolder:'Choose the deeper focus'}))?.child;
+      if(selected&&decisionTable===table)reconcileDecisionTable(selected.scope);
+    }
+  }
+  function navigateTableBranch(session: BranchSession, direction: string, token: unknown, focusVersion?: number): void {
+    if(!branchSessionCurrent(session)||session.pin?.token!==token)return;
+    const table=decisionTable!,navigation=branchNavigation(session),index=navigation.index+(direction==='previous'?-1n:direction==='next'?1n:0n);
+    if(index<0n||index>=navigation.total||index===navigation.index)return;
+    const row=navigation.model.rows(index,1)[0];if(!row)return;
+    if(table.model.totalRows===1n){reconcileDecisionTable({nodeKey:row.terminalKey,rootKey:row.rootKey,path:row.pathKeys});return;}
+    const offset=(index/BigInt(DECISION_TABLE_PAGE_SIZE))*BigInt(DECISION_TABLE_PAGE_SIZE);
+    if(offset!==table.offset)reconcileDecisionTable(table.scope,offset);
+    const target=decisionTable?.sessions.get(row.id);
+    if(target?.pin)postBranch(target,{type:'routeCards',gen:target.view.gen,...target.pin.payload,focusRequest:'branch-navigation',tableFocusVersion:focusVersion});
+  }
+  function handleDecisionTableMessage(message: any): boolean {
+    if(message?.type==='decisionTableAction'){void decisionTableAction(message);return true;}
+    if(message?.type!=='decisionTableRow')return false;
+    const table=decisionTable,session=table?.sessions.get(message.rowId),msg=message.message;
+    if(!table||!session||!msg||typeof msg!=='object'||!branchMessageIsCurrent(session,table.epoch,indexVersion,{epoch:message.epoch,rowId:message.rowId,gen:msg.gen}))return true;
+    const view=session.view;
+    if(msg.type==='ready')return true;
+    if(msg.type==='branchReady'){
+      if(msg.token!==session.renderToken)return true;
+      session.ready=true;view.acked=true;coord.ready(session.coordinatorKey,view.gen,indexVersion);paintBranchSession(session);
+      postBranch(session,{type:'branchQuestionnaireState',gen:view.gen,open:branchQuestionnaire.isOpen&&branchQuestionnaireOwner===session});return true;
+    }
+    if(msg.type==='pinFirstRoute'&&typeof msg.key==='string'){openDecisionTableAt(msg.key,session);return true;}
+    if(msg.type==='unpinRoute'){openDecisionTableAt(session.row.terminalKey,session);return true;}
+    if(msg.type==='routeCardDraft'){acceptCardDraft(msg,false,session);return true;}
+    if(msg.type==='routeCardSave'||msg.type==='routeCardAnswerSave'){void saveCard(msg,session);return true;}
+    if(msg.type==='qaRequestAction'){qaRequestAction(msg,session);return true;}
+    if(msg.type==='routeVerdictMenu'){void pinnedVerdictMenu(msg.token,session);return true;}
+    if(msg.type==='navigatePinnedBranch'){navigateTableBranch(session,msg.dir,msg.token,msg.tableFocusVersion);return true;}
+    if(msg.type==='toggleBranchQuestionnaire'){
+      const pin=session.pin;if(!pin||msg.token!==pin.token)return true;
+      if(branchQuestionnaire.isOpen&&branchQuestionnaireOwner===session)branchQuestionnaire.close();
+      else{branchQuestionnaireOwner=session;branchQuestionnaire.open(pin.payload);}
+      for(const row of table.sessions.values())postBranch(row,{type:'branchQuestionnaireState',gen:row.view.gen,
+        open:branchQuestionnaire.isOpen&&branchQuestionnaireOwner===row,
+        ...(row===session?{focusToken:pin.token,requestId:typeof msg.requestId==='string'?msg.requestId:undefined}:{})});
+      return true;
+    }
+    if(msg.type==='routeCardSource'){
+      const pin=session.pin,card=pin&&pin.token===msg.token&&pin.payload.cards.find((card:any)=>card.id===msg.key);
+      if(card&&crlMaps){const units=unitsForRow(card.ownerKey,crlMaps);if(units[0])postReveal('source',{kind:'unit',id:units[0]});}return true;
+    }
+    if(msg.type==='toggleCriterion'&&typeof msg.key==='string'){
+      const hit=view.reveals[msg.key],key=hit&&('nodeKey'in hit?hit.nodeKey:isCriterionToggleHit(hit)?hit.criterionToggle:undefined);
+      if(key){session.expanded=toggleCriterionExpansion(session.expanded,key,crlStructure,{...treeRenderOptions(view.gen),expandedGuardWhens:session.expanded});renderBranchSession(session,undefined,typeof msg.token==='string'?msg.token:undefined);}return true;
+    }
+    if(msg.type==='toggleUncertaintyGuard'&&typeof msg.key==='string'){
+      const candidates=uncertaintyGuardCandidates(projectFlowStructure(crlStructure)),forced=computeForcedUncertainty(view,session);
+      if(!candidates.has(msg.key)||table.model.forcedGuards.includes(msg.key)||['flag','evidence'].includes(forced.get(msg.key)??''))return true;
+      if(uncertaintyGuardExpanded(msg.key,{expanded:expandedUncertaintyGuards,collapsed:collapsedUncertaintyGuards,forced})){
+        expandedUncertaintyGuards.delete(msg.key);collapsedUncertaintyGuards.add(msg.key);
+      }else{collapsedUncertaintyGuards.delete(msg.key);expandedUncertaintyGuards.add(msg.key);}
+      reconcileDecisionTable(table.scope,table.offset);
+      void views.get('tree')?.panel.webview.postMessage({type:'decisionTableFocus',epoch:table.epoch,key:msg.key,rowId:session.id,focusVersion:msg.tableFocusVersion});return true;
+    }
+    if(msg.type==='criterionVerdictMenu'&&typeof msg.key==='string'){void criterionEncodingMenu(msg.key,session);return true;}
+    if(msg.type==='nodeVerdictMenu'&&typeof msg.key==='string'){void nodeMenu(msg.key,session);return true;}
+    if(msg.type==='mvFlags'){void openFlagList();return true;}
+    if(msg.type==='nodeFlags'&&typeof msg.gid==='string'){void openNodeFlags(msg.gid,undefined,session);return true;}
+    if(msg.type==='nodeFlagAction'&&typeof msg.key==='string'&&typeof msg.gid==='string'){
+      void nodeFlagAction(msg.key,msg.gid,view.gen,msg.category==='extraction'?'extraction':'validation',session);return true;
+    }
+    if(msg.type==='reveal'&&typeof msg.key==='string'){
+      const hit=view.reveals[msg.key];if(!hit)return true;
+      if(isConceptHit(hit))peekConceptNode(hit.conceptNodeKey);
+      else if(isFactHit(hit))peekConcept(hit);
+      else if(crlMaps){
+        const key='nodeKey'in hit?hit.nodeKey:isSubQuestionHit(hit)?hit.subQuestionLeafKey:undefined;
+        if(key){const source=unitsForRow(key,crlMaps);if(source[0])postReveal('source',{kind:'unit',id:source[0]});}
+      }
+      return true;
+    }
+    return true; // Unknown row messages never fall through to singleton handlers.
+  }
   function branchNeighbors(current: BranchIdentity) {
     const order=branchOrder();
     return order ? traversalRouteNeighbors(order,current,[...collectDispositionLeafKeys(crlStructure)]) : undefined;
   }
-  function caseIdsThroughReviewNode(semanticKey: string): string[] {
-    const tree=views.get('tree'), maps=crlMaps;if(!tree || !maps)return [];
+  function caseIdsThroughReviewNode(semanticKey: string, tree: PaneView | undefined = views.get("tree")): string[] {
+    const maps=crlMaps;if(!tree || !maps)return [];
     const leaves=collectDispositionLeafKeys(crlStructure);
-    return caseIdsForNodeThroughLit(semanticKey,[...scenarioByCaseId].map(([caseId,sv])=>({caseId,keys:litNodeKeysForCase(caseId,sv,leaves)})));
+    return caseIdsForNodeThroughLit(semanticKey,[...scenarioByCaseId].map(([caseId,sv])=>({caseId,keys:litNodeKeysForCase(caseId,sv,leaves,tree)})));
   }
   function pinnedVerdict(caseIds: string[]) {
     const summary=summarizeBranchVerdict(caseIds,reviewByCaseId);
     return {...summary,label:REVIEW_LABEL[summary.state]};
   }
   function drivePinnedVerdict(): void {
+    for(const session of decisionTable?.sessions.values()??[])paintBranchSession(session);
     const pin=pinnedCards,tree=views.get('tree');if(!pin || !tree || pin.epoch!==indexVersion || mode!=='medical-validation')return;
     pin.payload.verdict=pinnedVerdict(pin.verdictCaseIds);
     void tree.panel.webview.postMessage({type:'routeVerdict',gen:tree.gen,token:pin.token,verdict:pin.payload.verdict});
   }
-  async function pinnedVerdictMenu(token: unknown): Promise<void> {
-    const pin=pinnedCards,tree=views.get('tree'),sidecar=mvSidecarPath,revision=mvRevision,version=indexVersion,generation=tree?.gen;
+  async function pinnedVerdictMenu(token: unknown, session?: BranchSession): Promise<void> {
+    const pin=session?session.pin:pinnedCards,tree=session?.view??views.get('tree'),sidecar=mvSidecarPath,revision=mvRevision,version=indexVersion,generation=tree?.gen;
     if(!pin || !tree || pin.token!==token || pin.epoch!==version || mode!=='medical-validation' || !sidecar || !pin.verdictCaseIds.length)return;
     const current=pinnedVerdict(pin.verdictCaseIds);
     const pick=await vscode.window.showQuickPick(REVIEW_ORDER.map(state=>({label:REVIEW_LABEL[state],state,description:state===current.state?'current group verdict':''})),{placeHolder:`Set verdict for all ${pin.verdictCaseIds.length} cases reaching this result`});
-    if(pinnedCards!==pin || indexVersion!==version || mvRevision!==revision || mvSidecarPath!==sidecar || views.get('tree')!==tree || tree.gen!==generation || mode!=='medical-validation') { void vscode.window.setStatusBarMessage('Medical Validation: review changed — verdict not applied',3000);return; }
-    void tree.panel.webview.postMessage({type:'routeVerdictFocus',gen:generation,token:pin.token});
+    if((session?(!branchSessionCurrent(session)||session.pin!==pin):pinnedCards!==pin) || indexVersion!==version || mvRevision!==revision || mvSidecarPath!==sidecar || (!session&&views.get('tree')!==tree) || tree.gen!==generation || mode!=='medical-validation') { void vscode.window.setStatusBarMessage('Medical Validation: review changed — verdict not applied',3000);return; }
+    postBranch(session,{type:'routeVerdictFocus',gen:generation,token:pin.token});
     if(!pick)return;
     const {map,changed}=setAllReviewState(reviewByCaseId,pin.verdictCaseIds,pick.state);
     if(!changed || !persistMv(map,notesByCaseId))return;
@@ -2780,17 +3115,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     finally { scrollSuppressPane=undefined; }
     pinCards(next.caseId,next.routeId,'branch-navigation',false,next.traversalKey);
   }
-  function pinCards(caseId: string, routeId: string, focusRequest?: string, showQuestions = false, traversalKey?: string, priorPin = pinnedCards): void {
-    const view = views.get("tree"), sv = scenarioByCaseId.get(caseId);
+  function pinCards(caseId: string, routeId: string, focusRequest?: string, showQuestions = false, traversalKey?: string, priorPin?: BranchPin, session?: BranchSession): void {
+    if (session && !branchSessionCurrent(session)) return;
+    priorPin ??= session ? session.pin : pinnedCards;
+    const view = session?.view ?? views.get("tree"), sv = scenarioByCaseId.get(caseId);
     const route = routesForCase(caseId).find(r => r.terminalId === routeId);
     if (!view || !sv || !route || mode !== "medical-validation") return;
     const options=treeTraversalEntries()?.filter(e=>e.caseId===caseId && e.route.terminalId===routeId);
     const traversal=traversalKey===undefined ? options?.[0] : options?.find(e=>treeTraversalSignature(e)===traversalKey);
     if (!traversal) return;
     const selectedTraversalKey=treeTraversalSignature(traversal);
-    const neighbors=branchNeighbors({caseId,routeId,traversalKey:selectedTraversalKey});
+    const neighbors=session ? branchNavigation(session) : branchNeighbors({caseId,routeId,traversalKey:selectedTraversalKey});
     if (!neighbors) return;
-    clearTreeFocus();
+    if (!session) clearTreeFocus();
     const resolveKey = whenKeyResolver(sv);
     const q = buildRouteQuestionnaire(sv, route, buildResolveValueTypes(), sv.decision?.libraryName, { conceptShape: buildConceptShapeResolver(), defExpr: buildDefExprResolver() });
     const built = buildRouteCards(q, sv, resolveKey, (lib, name, nodeId, criteria) => {
@@ -2844,33 +3181,40 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       concepts: conceptLayer, defExpr: buildDefExprResolver(), guardOutlines,
       answerOptionsByConcept: answerOptionsForDisplay(conceptLayer), answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer),
     };
-    const expanded = expandQuestionInputs(expandTraversalCriteria(expandedGuardWhens,traversal,crlStructure,disclosureOptions), built.cards, crlStructure, disclosureOptions);
-    if (expanded.size !== expandedGuardWhens.size) { expandedGuardWhens = expanded; renderPane('tree',undefined,undefined,focusRequest); }
+    const disclosureSet = session?.expanded ?? expandedGuardWhens;
+    const expanded = expandQuestionInputs(expandTraversalCriteria(disclosureSet,traversal,crlStructure,disclosureOptions), built.cards, crlStructure, disclosureOptions);
+    if (expanded.size !== disclosureSet.size) {
+      if (session) { session.expanded = expanded; renderBranchSession(session,focusRequest); return; }
+      expandedGuardWhens = expanded; renderPane('tree',undefined,undefined,focusRequest);
+    }
     const leafMarks = leafBucketsFromQuestionnaire(q.questions, resolveKey, sv.conceptTruth, view.leafConcepts);
     const selectedIds = new Set(route.nodeIds);
     const marks = { yesKeys: leafMarks.yesKeys, noKeys: leafMarks.noKeys,
       conditions: conditionTruthKeys(sv.tree, id => selectedIds.has(id) ? resolveKey(id) : undefined) };
     const token = randomUUID();
-    const verdictCaseIds=caseIdsThroughReviewNode(route.nodeKeys[route.nodeKeys.length-1]);
+    const verdictCaseIds=session ? [...new Set(session.row.cases.map(entry=>entry.caseId))] : caseIdsThroughReviewNode(route.nodeKeys[route.nodeKeys.length-1]);
     const paint=treeFocusPaint([traversal],route.nodeKeys.at(-1)!,view.focusNodes ?? {});
-    const payload = { token, pathNodeKeys:paint.nodeKeys, pathGroupKeys:paint.groupKeys, pathGroupOutcomes:paint.groupOutcomes, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:neighbors.index+1,total:neighbors.total}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
+    const payload = { token, pathNodeKeys:paint.nodeKeys, pathGroupKeys:paint.groupKeys, pathGroupOutcomes:paint.groupOutcomes, verdict:pinnedVerdict(verdictCaseIds), showQuestions, authoritativeDrafts:true, navigation:{previous:!!neighbors.previous,next:!!neighbors.next,current:typeof neighbors.index==='bigint'?String(neighbors.index+1n):neighbors.index+1,total:typeof neighbors.total==='bigint'?String(neighbors.total):neighbors.total,...(typeof neighbors.index==='bigint'?{countLabel:`${neighbors.index+1n} of ${neighbors.total}`}:{})}, marks, cards: built.cards, label: `${sv.case.name}: ${route.activity ?? route.terminalKind}`, routeKeys: route.nodeKeys,
       pinKey: route.nodeKeys[route.nodeKeys.length - 1], note: q.note, terminalKind: route.terminalKind };
-    pinnedCards = { token, epoch: indexVersion, caseId, routeId, traversalKey:selectedTraversalKey, traversal, verdictCaseIds, payload, targets: built.targets, answerTargets };
-    void view.panel.webview.postMessage({ type: "routeCards", gen: view.gen, ...payload, focusRequest });
-    if(branchQuestionnaire.isOpen)branchQuestionnaire.update(payload);
-    driveLeafMarks();
+    const nextPin = { token, epoch: indexVersion, caseId, routeId, traversalKey:selectedTraversalKey, traversal, verdictCaseIds, payload, targets: built.targets, answerTargets };
+    if (session) { session.pin=nextPin; session.renderToken=token; session.ready=false; }
+    else pinnedCards=nextPin;
+    postBranch(session,{ type: "routeCards", gen: view.gen, ...payload, focusRequest });
+    if(branchQuestionnaire.isOpen && branchQuestionnaireOwner===session)branchQuestionnaire.update(payload);
+    if (session) paintBranchSession(session); else driveLeafMarks();
   }
   function hasPendingWording(): boolean { const src = currentCel && findPolicySrc(currentCel); if (!src) return false; const p = pendingPresentationProposals(src); return !!(p.pending || p.unreadable); }
   // REFACTOR:grounded: MV Q/A Save records intent only, never publishes KE-owned content.
-  async function saveCard(msg: { token?: unknown; key?: string; fields?: unknown; answer?: unknown }): Promise<void> {
-    const pin=pinnedCards,view=views.get('tree'),cel=currentCel;
+  async function saveCard(msg: { token?: unknown; key?: string; fields?: unknown; answer?: unknown }, session?: BranchSession): Promise<void> {
+    if (session && !branchSessionCurrent(session)) return;
+    const pin=session ? session.pin : pinnedCards,view=session?.view ?? views.get('tree'),cel=currentCel;
     if(!pin || !view || !cel || pin.epoch!==indexVersion || msg.token!==pin.token || !msg.key || mode!=='medical-validation')return;
     const answer=msg.answer as AnswerChange|undefined,target=pin.targets.get(msg.key),answerTarget=pin.answerTargets.get(msg.key);
     const fields=msg.fields as {questionText?:unknown;questionDescription?:unknown}|undefined;
     if(answer ? !answerTarget : !target || typeof fields?.questionText!=='string' || typeof fields.questionDescription!=='string')return;
     const result=(ok:boolean,message:string)=>{
-      branchQuestionnaire.post({type:'routeCardSaveResult',token:pin.token,key:msg.key,ok,message});
-      void view.panel.webview.postMessage({type:'routeCardSaveResult',gen:view.gen,token:pin.token,key:msg.key,ok,message});
+      if(branchQuestionnaireOwner===session)branchQuestionnaire.post({type:'routeCardSaveResult',token:pin.token,key:msg.key,ok,message});
+      postBranch(session,{type:'routeCardSaveResult',gen:view.gen,token:pin.token,key:msg.key,ok,message});
       if(!ok)void vscode.window.showErrorMessage(message);
     };
     try {
@@ -2884,12 +3228,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const card=pin.payload.cards.find((c:any)=>c.id===msg.key);
       if(card){card.editing=false;delete card.answerDraft;delete card.draftText;delete card.draftDescription;}
       reloadReviewFlags();renderTreeChrome();driveFlagBadges();
-      pinCards(pin.caseId,pin.routeId,undefined,pin.payload.showQuestions,pin.traversalKey,pin);
+      pinCards(pin.caseId,pin.routeId,undefined,pin.payload.showQuestions,pin.traversalKey,pin,session);
     }catch(error){result(false,error instanceof Error?error.message:String(error));}
   }
   // REFACTOR:grounded: status/revert actions are bound to a captured Q/A request in the current pin.
-  function qaRequestAction(msg:{token?:unknown;key?:string;requestId?:unknown;value?:unknown}):void {
-    const pin=pinnedCards,cel=currentCel;
+  function qaRequestAction(msg:{token?:unknown;key?:string;requestId?:unknown;value?:unknown}, session?: BranchSession):void {
+    if (session && !branchSessionCurrent(session)) return;
+    const pin=session ? session.pin : pinnedCards,cel=currentCel;
     if(!pin || !cel || pin.epoch!==indexVersion || msg.token!==pin.token || mode!=='medical-validation')return;
     const card=pin.payload.cards.find((c:any)=>c.id===msg.key);
     const ids=card?[card.questionRequest?.id,...card.answerChoices.map((c:any)=>c.request?.id)]:[];
@@ -2898,7 +3243,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       assertMvWriteAllowed();const dir=flagStoreDir(cel);if(!dir)throw new Error('No MV flag store.');
       changeQaRequest(dir,msg.requestId,msg.value as 'revert'|'fixed'|'approved'|'open');
       reloadReviewFlags();renderTreeChrome();driveFlagBadges();
-      pinCards(pin.caseId,pin.routeId,undefined,pin.payload.showQuestions,pin.traversalKey,pin);
+      pinCards(pin.caseId,pin.routeId,undefined,pin.payload.showQuestions,pin.traversalKey,pin,session);
     }catch(error){void vscode.window.showErrorMessage(error instanceof Error?error.message:String(error));}
   }
 
@@ -2974,13 +3319,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     pane: Pane,
     msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string; state?: string; gid?: string; tag?: unknown; summary?: unknown; stub?: unknown; fields?: unknown; token?: unknown; html?: unknown; assignments?: unknown; dirty?: unknown; epoch?: unknown; caseId?: string; routeId?: string; category?: unknown; routeToken?: unknown; questionnaireOpen?: unknown; requestId?: unknown },
   ): void {
+    if(pane==='tree'&&handleDecisionTableMessage(msg))return;
     const v = views.get(pane);
     if (!v) return;
     if (pane === "tree" && msg.gen === v.gen) {
       if (msg.type === 'treeFocus' && typeof msg.key === 'string') { focusTreeNode(msg.key); return; }
       if (msg.type === 'cycleTreeFocus' && typeof msg.key === 'string' && typeof msg.dir === 'string') { cycleTreeFocus(msg.key, msg.dir, msg.token); return; }
-      if (msg.type === 'pinFirstRoute' && typeof msg.key === 'string' && typeof msg.token === 'string' && mode === 'medical-validation') { void selectRoutesThroughNode(msg.key, msg.token, true); return; }
-      if (msg.type === 'selectAndPinRoute' && typeof msg.key === 'string' && typeof msg.token === 'string' && mode === 'medical-validation') { void selectRoutesThroughNode(msg.key, msg.token); return; }
+      if (msg.type === 'pinFirstRoute' && typeof msg.key === 'string' && typeof msg.token === 'string' && mode === 'medical-validation') { openDecisionTableAt(msg.key); return; }
+      if (msg.type === 'selectAndPinRoute' && typeof msg.key === 'string' && typeof msg.token === 'string' && mode === 'medical-validation') { openDecisionTableAt(msg.key); return; }
       if (msg.type === "unpinRoute") { routeSelectionRequest++; pinnedCards = undefined; branchQuestionnaire.close(); driveLeafMarks(); return; }
       if (msg.type === 'routeCardDraft') { acceptCardDraft(msg);return; }
       if (msg.type === 'routeVerdictMenu') { void pinnedVerdictMenu(msg.token);return; }
@@ -3360,7 +3706,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     views.set(pane, v);
     panel.onDidDispose(() => {
       if (pane === "tree") disclosureFocus = undefined;
-      if (pane === 'tree') clearTreeFocus();
+      if (pane === 'tree') { closeDecisionTable();clearTreeFocus(); }
       for (const d of disposables) d.dispose();
       if (views.get(pane) !== v) return;
       coord.disposePane(pane);
@@ -3497,6 +3843,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // currently open — the MV-only questionnaire in cockpit mode, or a pane dropped on a mode switch whose onDidDispose
     // hasn't pruned `views` yet — is a clean no-op (no render to a stale/disposing webview). Same for applyShowKeys below.
     for (const pane of PANES) renderPane(pane);
+    refreshDecisionTableAfterRebuild();
     // disc 355 [critical]: a same-policy rebuild bumped indexVersion — re-stamp the surviving action drawer's ver (else its
     // actions fail a stale guard forever). AFTER the render loop (disc 360 [important]): the drawer's `targetPresent` reads the
     // tree substrate `renderPane` just refreshed, so it can't disagree with the (post-render) gold node-link.
@@ -3527,6 +3874,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
   function resetToEmpty(message: string): void {
+    closeDecisionTable();
     clearTreeFocus();
     pinnedCards = undefined;
     branchQuestionnaire.close();
@@ -3749,6 +4097,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  `configSection(targetMode)` + the matching pane spec; `failedCriteriaMode` stays SHARED under `crl.cockpit`. */
   function openPanel(targetMode: "cockpit" | "medical-validation", celPath: string): void {
     if(mvEditBusy){void vscode.window.showInformationMessage("Wait for the policy edit to finish before switching policies.");return;}
+    closeDecisionTable();flagDrawerSession=undefined;
     clearFlagDraft("retarget"); // #210 (disc 239): a (re)show/retarget SETTLES any pending agent elicitation + drops the draft
     branchQuestionnaire.close();
     pinnedCards=undefined;
@@ -4094,8 +4443,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  criterion. TWO shapes: a ROOT criterion `when` ({nodeKey} whose guard outline's TOP expr is a criterion → derived via
    *  `topCriterion`) OR a NON-ROOT `flow-crit-row` ({criterionOccurrence}, identity carried in the reveal). `bodyHash` is the
    *  body the reviewer SAW (from the render) — the stale-guard baseline `applyCriterionVerdict` compares to the live hash. */
-  function resolveCriterionFromReveal(revealKey: string): { lib: string; name: string; bodyHash: string; elided: boolean } | undefined {
-    const hit = views.get("tree")?.reveals[revealKey];
+  function resolveCriterionFromReveal(revealKey: string, tree: PaneView | undefined = views.get("tree")): { lib: string; name: string; bodyHash: string; elided: boolean } | undefined {
+    const hit = tree?.reveals[revealKey];
     if (!hit) return undefined;
     if (isCriterionOccurrenceHit(hit)) return { ...hit.criterionOccurrence }; // non-root: identity + in-situ elided carried in the reveal
     if ("nodeKey" in hit) {
@@ -4120,10 +4469,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (the reviewable set — excludes ambiguous duplicate-name cases; an errored case still matches at interior when-nodes).
    *  EVERY no-op exit emits a transient status note — the webview has already suppressed the native menu, so a silent return
    *  would be a dead right-click (reachable mid-rebuild `!crlMaps`, or a stale-MV webview posting after a retarget). */
-  async function nodeVerdictMenu(revealKey: string): Promise<void> {
+  async function nodeVerdictMenu(revealKey: string, session?: BranchSession): Promise<void> {
     const note = (msg: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${msg}`, 3000);
     if (mode !== "medical-validation" || !crlMaps || !mvSidecarPath) return note("not ready"); // no sidecar → applyVerdict can't persist; note here (else a feedback-less dead pick)
-    const tree = views.get("tree");
+    const tree = session?.view ?? views.get("tree");
     const hit = tree?.reveals[revealKey]; // trusted: looked up by opaque key, not a semantic key from the webview
     if (!tree || !hit) return note("no node here");
     const semanticKey = isSubQuestionHit(hit)
@@ -4135,18 +4484,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           : undefined;
     if (semanticKey === undefined) return note("this node has no reviewable cases");
     const ver = indexVersion, sidecar = mvSidecarPath;
-    const caseIds = caseIdsThroughReviewNode(semanticKey);
+    const caseIds = caseIdsThroughReviewNode(semanticKey,tree).filter(id=>!session||session.row.cases.some(entry=>entry.caseId===id));
     if (caseIds.length === 0) return note("no reviewable cases run through this node");
-    await pickVerdictLoop(caseIds, ver, sidecar);
+    const generation=tree.gen;
+    await pickVerdictLoop(caseIds, ver, sidecar, session ? ()=>branchSessionCurrent(session)&&session.view.gen===generation : undefined);
   }
 
   /** Criterion review shares the verdict vocabulary while retaining identity/body-hash persistence across occurrences. */
-  async function criterionEncodingMenu(revealKey: string): Promise<void> {
+  async function criterionEncodingMenu(revealKey: string, session?: BranchSession): Promise<void> {
     const note = (msg: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${msg}`, 3000);
     if (mode !== "medical-validation" || !mvSidecarPath) return note("not ready"); // no sidecar → can't persist
     // #233 Todo 2b: resolve the criterion identity from EITHER a root `when` ({nodeKey}→topCriterion) or a non-root crit-row
     // ({criterionOccurrence}). `ident.bodyHash` = the body the reviewer SAW; `live` = the current canonical facts (elided + state).
-    const ident = resolveCriterionFromReveal(revealKey);
+    const ident = resolveCriterionFromReveal(revealKey,session?.view??views.get("tree"));
+    const generation=session?.view.gen;
     if (!ident) return note("not a criterion node");
     const openHash = ident.bodyHash; // captured at open — the body the reviewer is judging (disc 320 review [important] 1)
     const openSidecar = mvSidecarPath; // captured at open — a policy switch during the pick must not write the old target
@@ -4165,7 +4516,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       value,
       ...(desc ? { description: desc } : {}),
     });
-    const tree = views.get("tree");
+    const tree = session?.view??views.get("tree");
     const displayBefore = tree ? criterionReviewProjection(tree).states : {};
     const displayPass = tree && tree.criterionOccurrences.some(o => o.lib === ident.lib && o.name === ident.name && displayBefore[o.gid] === "pass");
     const passDesc = seenElided ? "body truncated here — review where fully shown" : cur === "pass" ? "current" : displayPass ? "display checked from passing reviews; encoding not recorded" : undefined;
@@ -4174,10 +4525,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       { placeHolder: `Criterion verdict — all occurrences` },
     );
     if (!pick) return;
-    if (mvSidecarPath !== openSidecar) return note("policy changed — reopen the menu"); // a retarget during the pick
+    if ((session&&(!branchSessionCurrent(session)||session.view.gen!==generation)) || mvSidecarPath !== openSidecar) return note("policy changed — reopen the menu"); // a retarget during the pick
     if (pick.value === "pass" && seenElided) return note("review the full criterion before marking Pass");
     if (!applyCriterionVerdict(ident.lib, ident.name, pick.value, openHash, seenElided)) return note("couldn't save — the criterion may have changed; reopen the menu");
-    const currentTree = views.get("tree");
+    const currentTree = session?.view??views.get("tree");
     const displayAfter = pick.value === "unreviewed" && currentTree ? criterionReviewProjection(currentTree).states : {};
     const fallback = currentTree && currentTree.criterionOccurrences.some(o => o.lib === ident.lib && o.name === ident.name && displayAfter[o.gid] === "pass");
     note(fallback ? "Encoding verdict cleared; display remains checked from passing reviews. Use Pending to hold review." : `Criterion verdict: ${REVIEW_LABEL[pick.value]}`);
@@ -4224,8 +4575,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The flag targets a reveal hit offers (GAP 3): a decision ROOT → the decision (object); a `when` → BOTH the concept
    *  (object, all uses) AND this condition (occurrence, decision+key); a recommend-activity LEAF → this recommendation
    *  (occurrence). A menu shows one "Add flag on <label>" per choice. `[]` → not flaggable (verdict-only). */
-  function flagTargetChoices(hit: WebviewHit): FlagTargetChoice[] {
-    const tree = views.get("tree");
+  function flagTargetChoices(hit: WebviewHit, tree: PaneView | undefined = views.get("tree")): FlagTargetChoice[] {
     if (!tree) return [];
     const conceptChoice = (o: { lib: string; name: string }): FlagTargetChoice => ({ kind: "concept", name: o.name, lib: o.lib, label: `the concept "${o.name}" (every use)`, shortLabel: `the concept "${o.name}" (every use)` });
     if (isCriterionOccurrenceHit(hit)) {
@@ -4282,12 +4632,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** The combined node menu (right-click): verdict (existing) + Add-flag (flaggable nodes). A non-flaggable node routes
    *  straight to the verdict flow (unchanged), preserving Todo #217. */
-  async function nodeMenu(revealKey: string): Promise<void> {
+  async function nodeMenu(revealKey: string, session?: BranchSession): Promise<void> {
     if (mode !== "medical-validation") return;
-    const tree = views.get("tree");
+    const tree = session?.view??views.get("tree");
+    const generation=tree?.gen;
     const hit = tree?.reveals[revealKey];
     if (!tree || !hit) return flagNote("no node here");
-    const choices = flagTargetChoices(hit);
+    const choices = flagTargetChoices(hit,tree);
     // #224 ii.3 Slice 2b / #233 Todo 2b: a criterion offers a model-level "Verdict…" review. TWO shapes: a ROOT
     // criterion `when` ({nodeKey} whose guard outline's TOP expr is a criterion, via topCriterion) OR a NON-ROOT crit-row
     // ({criterionOccurrence}). A root criterion `when` still yields its "this condition" OCCURRENCE flag choice (only the
@@ -4295,9 +4646,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // A non-root crit-row is NOT a case-bearing node (no fired-path `when`) → it offers ONLY the encoding review.
     const rootGo = "nodeKey" in hit ? guardOutlines.get(hit.nodeKey) : undefined;
     const isCriterion = (rootGo !== undefined && topCriterion(rootGo.expr) !== undefined) || isCriterionOccurrenceHit(hit);
-    const hasCaseVerdict = !isCriterion;
-    if (choices.length === 0 && !isCriterion) return nodeVerdictMenu(revealKey); // otherwise / use-decision → verdict only, unchanged
-    if (choices.length === 0 && isCriterion && !hasCaseVerdict) return criterionEncodingMenu(revealKey); // non-root crit-row → straight to encoding (no single-item menu)
+    const hasCaseVerdict = !isCriterion && (!session || session.row.cases.length>0);
+    if (choices.length === 0 && !isCriterion) { if(hasCaseVerdict)await nodeVerdictMenu(revealKey,session);return; } // otherwise / use-decision → verdict only, unchanged
+    if (choices.length === 0 && isCriterion && !hasCaseVerdict) return criterionEncodingMenu(revealKey,session); // non-root crit-row → straight to encoding (no single-item menu)
     const ver = indexVersion; // capture BEFORE the menu — a retarget mid-menu must not act on this (now-old) hit
     const cel = currentCel;
     // Case verdict OR criterion verdict + one "Add flag on <target>" per choice — a `when` offers BOTH the
@@ -4311,28 +4662,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       { placeHolder: "Medical Validation" },
     );
     if (!pick) return;
-    if (indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the menu");
-    if (pick.act === "verdict") return nodeVerdictMenu(revealKey); // revealKey is gen-scoped; nodeVerdictMenu re-validates
-    if (pick.act === "criterion") return criterionEncodingMenu(revealKey); // revealKey re-validated inside
+    if ((session&&(!branchSessionCurrent(session)||session.view.gen!==generation)) || indexVersion !== ver || currentCel !== cel || mode !== "medical-validation") return flagNote("policy changed — reopen the menu");
+    if (pick.act === "verdict") return nodeVerdictMenu(revealKey,session); // revealKey is gen-scoped; nodeVerdictMenu re-validates
+    if (pick.act === "criterion") return criterionEncodingMenu(revealKey,session); // revealKey re-validated inside
     // Option A: the target is chosen HERE (native quick-pick); the drawer opens on the RESOLVED target. The webview never
     // names a target (trusted-input discipline). `openFlagDrawer` is a standalone seam — the editor agent (EPIC #210)
     // resolves the target itself and calls it directly, so the flag command has ONE entry point for both paths.
     if (pick.choice) {
       if (!(await guardDrawerDiscard())) return; // Todo 3/5: a new create drawer would abandon an in-progress edit OR the grid's picks — confirm first
-      openFlagDrawer({ target: pick.choice });
+      openFlagDrawer({ target: pick.choice },session);
     }
   }
 
   /** Resolve grey/yellow badge actions from the current tree, never the selected case's anchor. */
-  async function nodeFlagAction(revealKey: string, gid: string, generation: number, category: 'validation'|'extraction' = 'validation'): Promise<void> {
-    const tree = views.get("tree");
+  async function nodeFlagAction(revealKey: string, gid: string, generation: number, category: 'validation'|'extraction' = 'validation', session?: BranchSession): Promise<void> {
+    const tree = session?.view??views.get("tree");
     const hit = tree?.reveals[revealKey];
     const ver = indexVersion, cel = currentCel;
-    const current = () => mode === "medical-validation" && views.get("tree") === tree && tree?.gen === generation && indexVersion === ver && currentCel === cel;
+    const current = () => mode === "medical-validation" && (session?branchSessionCurrent(session):views.get("tree")===tree) && tree?.gen === generation && indexVersion === ver && currentCel === cel;
     if (!current() || !tree || !hit || !tree.flaggableGids.includes(gid)) return;
-    if (flagsByGid.get(gid)?.some(f => f.category === category)) return openNodeFlags(gid, category);
+    if ((session?.flagsByGid??flagsByGid).get(gid)?.some(f => f.category === category)) return openNodeFlags(gid, category, session);
     if (category === 'extraction') return flagNote('no KE flags on this node');
-    const choices = flagTargetChoices(hit);
+    const choices = flagTargetChoices(hit,tree);
     if (!choices.length) return flagNote("no flag target on this node");
     const choice = choices.length === 1 ? choices[0] : (await vscode.window.showQuickPick(
       choices.map(target => ({ label: `$(flag) ${target.label}`, target })),
@@ -4341,8 +4692,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!choice || !current()) return;
     if (!(await guardDrawerDiscard()) || !current()) return;
     // A watcher may have loaded a new flag while the chooser or discard prompt was open.
-    if (flagsByGid.get(gid)?.some(f => f.category === category)) return openNodeFlags(gid, category);
-    openFlagDrawer({ target: choice });
+    if ((session?.flagsByGid??flagsByGid).get(gid)?.some(f => f.category === category)) return openNodeFlags(gid, category, session);
+    openFlagDrawer({ target: choice },session);
   }
 
   /** Post the current `flagDraft` to the tree pane's dedicated `#flagDrawer` region (or an EMPTY region to clear it). The
@@ -4493,8 +4844,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** The ENTRY toggle (disc 359): reclicking the flag whose drawer is already open CLOSES it; a different flag SWITCHES. Used by
    *  the node-badge + list entry paths ONLY — NOT `openFlagActionView` itself (Todo 3's Cancel→return-to-view calls that directly
    *  and must not toggle-close). (Todo 3: a "lose changes" guard will gate the switch/close when an edit has unsaved text.) */
-  function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined, reveal = false): void {
+  function toggleFlagActionView(flag: MvFlag, ver: number, cel: string | undefined, reveal = false, session?: BranchSession): void {
     flagChangeSummaries.clear();
+    if(session&&!branchSessionCurrent(session))return;
+    flagDrawerSession=session;
     if (!reveal && flagActionView && flagActionView.flag.id === flag.id) return closeFlagActionView();
     openFlagActionView(flag, ver, cel);
     if (reveal) driveFlagNodeHighlight(true);
@@ -4867,8 +5220,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** #211 — open the create-flag drawer on a RESOLVED target (the ONE agent seam). Captures the policy identity for the
    *  commit stale-guards, then renders the drawer. Standalone: both the right-click (Option A) and the editor agent call
    *  this directly. MV-only. */
-  function openFlagDrawer(prefill: FlagDraftPrefill): void {
+  function openFlagDrawer(prefill: FlagDraftPrefill, session?: BranchSession): void {
     if (mode !== "medical-validation") return;
+    if(session&&!branchSessionCurrent(session))return;
+    flagDrawerSession=session;
     settleDrawer({ status: "cancelled", reason: "replaced" }); // #210 (disc 239): a NEW drawer supersedes any pending elicitation
     flagActionView = undefined; // mutual exclusion: the create drawer supersedes an open action drawer (one `#flagDrawer` slot)
     flagEditDraft = undefined; // …and an open edit form (Todo 3)
@@ -5002,8 +5357,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  case (its row shows the live verdict) → pick a verdict → re-show the case list with the updated verdict → Esc to finish
    *  (the faithful native realization of "per-case dropdowns"). Every await is stale-guarded (a rebuild / policy retarget /
    *  mode change between open and choice must not write to the wrong sidecar). */
-  async function pickVerdictLoop(caseIds: string[], ver: number, sidecar: string | undefined): Promise<void> {
-    const stale = (): boolean => indexVersion !== ver || mvSidecarPath !== sidecar || mode !== "medical-validation";
+  async function pickVerdictLoop(caseIds: string[], ver: number, sidecar: string | undefined, rowCurrent?: () => boolean): Promise<void> {
+    const stale = (): boolean => (rowCurrent!==undefined&&!rowCurrent()) || indexVersion !== ver || mvSidecarPath !== sidecar || mode !== "medical-validation";
     // EVERY stale exit surfaces a note (never a silent return) — the webview already suppressed the native menu, so a bare
     // return would be a dead right-click. An Esc/cancel is NOT stale (a deliberate user dismissal) and gets no note.
     const staleNote = (): void => void vscode.window.setStatusBarMessage("Medical Validation: cases changed — verdict not applied", 3000);
@@ -5368,8 +5723,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   async function captureTreeDom(): Promise<{ ok: true; html: string } | { ok: false; note: string }> {
     const tree = views.get("tree");
     if (!tree) return { ok: false, note: "open the tree pane first" };
-    if (!model) return { ok: false, note: "open a policy first — there's no decision tree to export" };
-    if (!tree.acked) return { ok: false, note: "the tree is still rendering — try again" }; // acked ⇒ the overlay drives have RUN (posted before this request → FIFO-ahead of it), so the captured DOM is fully overlaid — the same host→webview ordering the overlay system relies on
+    if (!model && !decisionTable) return { ok: false, note: "open a policy first — there's no decision tree to export" };
+    const capturedTable=decisionTable?.suspended?undefined:decisionTable,frozenManifest=tableManifest();
+    if(capturedTable&&!frozenManifest)return{ok:false,note:'the table is still rendering — try again'};
+    if (!capturedTable && !tree.acked) return { ok: false, note: "the tree is still rendering — try again" }; // Legacy single-tree readiness; table capture uses its own final-layout manifest.
     if (snapshotCapture.pending) return { ok: false, note: "a snapshot export is already in progress" };
     // FREEZE the identity so a re-render / policy retarget during the round-trip can't hand back a superseded DOM or mislabel it.
     const capturedTree = tree;
@@ -5390,7 +5747,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     clearTimeout(timer);
     if (raw === undefined) return { ok: false, note: "couldn't capture the tree (it may still be rendering) — try again" };
     // The capture must still be OF the tree/policy the user is looking at — a render/retarget mid-round-trip invalidates it.
-    if (views.get("tree") !== capturedTree || capturedTree.gen !== capturedGen || currentCel !== capturedCel) {
+    if (views.get("tree") !== capturedTree || currentCel !== capturedCel
+      || (capturedTable ? decisionTable!==capturedTable||tableManifest()!==frozenManifest : (!!decisionTable&&!decisionTable.suspended)||capturedTree.gen !== capturedGen)) {
       return { ok: false, note: "the tree changed while capturing — try again" };
     }
     const screened = screenCapturedDom(raw); // trust boundary: the payload crossed the webview→host channel into a CSP-inline file
@@ -5412,7 +5770,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (!cap.ok) return void vscode.window.setStatusBarMessage(`Tree snapshot: ${cap.note}`, 4000);
       const src = currentCel ? findPolicySrc(currentCel) : undefined;
       const policyId = (src ? policyIdFromSrc(src) : undefined) ?? policyLabel(); // policy-dir identity, else the .cel basename
-      const html = renderFlowSnapshotDocument({ flowHtml: cap.html, styleCss: FLOW_STYLE, title: `${policyId ?? "decision"} — decision tree` });
+      const html = renderFlowSnapshotDocument({ flowHtml: cap.html, styleCss: FLOW_STYLE+DECISION_TABLE_STYLE, title: `${policyId ?? "decision"} — decision tree` });
       const defaultDir = src ?? (currentCel ? dirname(currentCel) : undefined); // policy src dir, else the .cel's own dir (multi-root safe — NOT the first workspace folder)
       const defaultUri = defaultDir ? vscode.Uri.file(join(defaultDir, snapshotFileName(policyId))) : undefined;
       const target = await vscode.window.showSaveDialog({ defaultUri, filters: { "HTML page": ["html"] }, title: "Export tree snapshot" });
@@ -5843,6 +6201,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     {
       dispose: () => {
         cockpitDisposed = true;
+        closeDecisionTable();
         branchQuestionnaire.close();
         dependencyWatchers.forEach(w=>w.dispose());dependencyWatchers=[];dependencyWatchKey='';watcher?.dispose();
         flagsWatcher?.dispose();
@@ -6260,7 +6619,7 @@ ${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${RO
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 const COCKPIT_WEBVIEW_BODY =
-  `const v=options.bridge;const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;let gen=-1;` +
+  `const v={postMessage:m=>options.bridge.postMessage(options.tableRow?{gen,...m}:m)};const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;let gen=-1;` +
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
   `const aff=()=>{const ts=fld.querySelector('[data-flag-tag]');if(!ts)return;const tg=ts.value;for(const g of fld.querySelectorAll('[data-flag-field-for]')){g.hidden=g.getAttribute('data-flag-field-for')!==tg;}};` +
@@ -6301,10 +6660,10 @@ const COCKPIT_WEBVIEW_BODY =
   `const treeFocusUi=(${installUnpinnedTreeFocus.toString()})(root,v,()=>gen,()=>!!pinnedFlowKey,(keys,outcomes)=>logicUi.treeRoute(keys,outcomes));` +
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
-  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)fld.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===pinnedFlowKey));let note=root.querySelector('[data-flow-pin-notice]');if(!note){note=document.createElement('div');note.setAttribute('data-flow-pin-notice','');root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);uncertaintyVisibility(keep,pinnedRouteKeys,uncertaintyDisclosures);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
+  `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)fld.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===(root.hasAttribute('data-flow-scope-key')?root.dataset.flowScopeKey:pinnedFlowKey)));let note=root.querySelector('[data-flow-pin-notice]');if(!note){note=document.createElement('div');note.setAttribute('data-flow-pin-notice','');root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);uncertaintyVisibility(keep,pinnedRouteKeys,uncertaintyDisclosures);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
   `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
   `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
-  `const toggleFlowPin=k=>{pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
+  `const toggleFlowPin=k=>{if(options.tableRow){v.postMessage({type:'pinFirstRoute',gen,key:k,token:String(++pinFocusVersion)});return;}pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
   // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
@@ -6366,7 +6725,7 @@ const COCKPIT_WEBVIEW_BODY =
   // flag-list selection requests reveal; node clicks, edits and refreshes keep the viewport.
   // A target wider than the visible strip is left-aligned; revealing never changes zoom.
   `else if(m.type==='flagHl'){if(m.gen!==gen)return;` +
-  `for(const fe of document.querySelectorAll('.flag-current'))fe.classList.remove('flag-current');` +
+  `for(const fe of root.querySelectorAll('.flag-current'))fe.classList.remove('flag-current');` +
   `var flagTarget=null,flagVisible=[];for(const id of (m.gids||[])){const el=document.getElementById(id);if(el){el.classList.add('flag-current');if(el.getClientRects().length){flagVisible.push(el);if(!flagTarget)flagTarget=el;}}}` +
   `if(m.reveal===true){document.querySelector('.flag-target-note')?.remove();if(!flagTarget&&(m.gids||[]).some(id=>document.getElementById(id))&&root.classList.contains('flow-has-pin')){const panel=document.querySelector('.flag-drawer');if(panel){const note=document.createElement('p');note.className='flag-target-note';note.setAttribute('role','status');note.textContent='This flag is on another result. Unpin the current result to see it.';panel.prepend(note);}}}` +
   `if(m.reveal===true&&flagTarget){const panel=document.querySelector('.flag-drawer'),right=panel?panel.getBoundingClientRect().left:document.documentElement.clientWidth,alreadyVisible=flagVisible.some(el=>{const r=el.getBoundingClientRect();return r.left>=12&&r.right<=right-12&&r.top>=0&&r.bottom<=window.innerHeight;});if(!alreadyVisible){flagTarget.scrollIntoView({block:'center',inline:'center'});const rect=flagTarget.getBoundingClientRect(),left=Math.max(12,(right-rect.width)/2);document.scrollingElement.scrollLeft+=rect.left-left;}}}` +
@@ -6399,7 +6758,8 @@ const COCKPIT_WEBVIEW_BODY =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}}` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
+  `else if(m.type==='modeledBranch'){if(m.gen!==gen)return;routeCardUi.reset();treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=[];pinnedGroupKeys=[];pinnedGroupOutcomes=[];pinnedRouteLabel=m.label;currentRouteLabel=m.label;applyFlowPin();applyZoom();if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
   `else if(m.type==='unpinnedTreeFocus'){treeFocusUi.show(m);}` +
   `else if(m.type==='clearTreeFocus'){if(m.gen===gen)treeFocusUi.reset();}` +
   `else if(m.type==='branchQuestionnaireState'){if(m.gen===gen)routeCardUi.questionnaireState(m.open,m.focusToken,m.requestId);}` +

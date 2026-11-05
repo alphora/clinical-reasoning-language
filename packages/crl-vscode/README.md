@@ -186,9 +186,20 @@ Pin a route and show Questions in the tree, or open its CRL questionnaire. Expan
 Shared terminology affects every displayed consumer. Adding an answer asks whether it qualifies for each question. Coding identities stay fixed when editing wording. Deletion lists newly invalid saved examples before applying and retains their data for repair. Nonlocal CRL terminology and external CodeSystem answers show a read-only explanation. Open review cards refresh; an existing interactive FHIR session requires Restart against the new definitions.
 
 
+## Decision Table in Medical Review
+
+<!-- REFACTOR:grounded: focus selects source scope; rows reuse the compact branch presentation. -->
+Focus a tree node to show its pin, then click the pin to open all modeled branches below that node as stacked branch views. Pinning a terminal opens one branch. The glowing suggested pin retains its existing behavior; other pins appear only on focus. Shift does not reveal pins. The pin at the selected scope closes the table.
+
+**Shallower** broadens the scope to its parent; **Deeper** narrows it to a selected continuation. **Previous rows / Next rows** page through at most 20 branches at a time. Each row keeps its compact layout, questions, answer groups, flags and verdict controls. Rows share zoom and the page scroll area; they do not add aligned columns or long connecting lines.
+
+Each row identifies the actual test case supplying its answers. **Choose case** inspects another case covering that same branch. Question drafts stay with their branch and case. The Result Questionnaire stays with the row that opened it; inspecting another row does not replace it. Changing its owner's case updates that questionnaire. Paging alone retains its owner and drafts. Choosing an off-row flag from the policy list temporarily shows the full tree; **Return to Decision Table** restores the table with its pending edits.
+
+A modeled branch without produced test evidence shows a coverage error, with no invented answers or passing verdict. A failing expected-result assertion is shown separately from missing branch coverage. Showing uncertainty can reveal additional underlying branches; a hidden uncovered branch forces its guard visible. Snapshots include the displayed page and static text for its visible question cards. Wait until every displayed row finishes rendering before exporting.
+
 ## Uncertainty checks in Medical Review
 
 <!-- REFACTOR:grounded: UI operations belong in viewer documentation; CRL authoring syntax lives in the kit. -->
 A compatible policy can mark an existing uncertainty guard in its CRL presentation. Supported guards normally show the ordinary terminal with a small **U** control. Click U, or focus it and press Enter/Space, to show the original guard and both alternatives. An inspected uncertainty outcome initially shows the check too. U can collapse it while retaining that case's actual terminal, including Unmet. Disclosure preferences persist while browsing the same policy model. U changes the layout without centering or panning. Unavailable, conflicting or error evidence and flags that would be hidden keep the original check visible. Unmarked policies and unsupported shapes keep the full tree.
 
-While pinned, revealing U shows the alternate branch without marking it as executed or changing the case. Deliberate navigation to a hidden source/flag target reveals it. Snapshots capture the current view: U indicators are static, and a collapsed snapshot discloses the omitted checks. Expand checks in the live tree before exporting to include their branches.
+In the Decision Table, revealing U adds the alternate modeled branch with its own actual case evidence. A terminal-only scope remains one row. Deliberate navigation to a hidden source/flag target reveals it. Snapshots capture the current view: U indicators are static, and a collapsed snapshot discloses the omitted checks. Expand checks in the live tree before exporting to include their branches.

@@ -17,7 +17,7 @@ Stop an existing debug session before launching again to load the rebuilt code.
 
 Open `medical-validation.code-workspace`, then run **CRL: Show Medical Validation** and select Bleph. Opening this folder directly also works, using your configured panes. The workspace file opens the source, CRL Questionnaire, FHIR Questionnaire, and tree panes. The repository's **Run Bleph Medical Validation** debugger configuration opens this workspace.
 
-Select a case and pin its result to inspect the questions on that route. Use **Next** to traverse results and the questionnaire icon to open the Result Questionnaire. Expand descriptions and answer choices to inspect the source-specific wording. Review the corresponding source text, clinical answers, and result before setting a verdict.
+Focus **Cosmetic Surgical Purpose** and click its pin to inspect six stacked branch views. Focus **Upper Blepharoplasty Under Review** and pin it for four branches, or pin a terminal for one. Use Shallower/Deeper to change scope. Ordinary pins appear only on focus; the glowing suggestion remains. Expanding U in the six-row table reveals the seventh underlying branch. Each row shows its actual test case; Choose case inspects another covering case. Use **Next** to traverse results and the questionnaire icon to open the Result Questionnaire. Expand descriptions and answer choices to inspect the source-specific wording. Review the corresponding source text, clinical answers, and result before setting a verdict.
 
 The open KE flag under `src/medical-validation/flags/` is a labeled UI demonstration. It lets you test inspecting and resolving an authoring flag in MV. Saved example verdicts in `review-samples/` are separate from active review state.
 
