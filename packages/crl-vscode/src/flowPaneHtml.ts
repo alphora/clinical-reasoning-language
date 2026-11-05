@@ -38,7 +38,7 @@ const OUTLINE_BASE = 16; // x offset of an indent-0 outline row from its `when`'
 const OUTLINE_INDENT = 15; // x added per indent level
 const OUTLINE_ADVANCE = 0.7; // slot units an outline row advances the global cursor (compact; sized for OUTLINE_H + ~6.7px gap over ROW)
 const OUTLINE_NODE_W = 150; // a leaf box in the outline (narrower than a decision NODE_W, since it indents)
-const INPUT_NODE_W = 210; // reserve separate in-row question and MV/KE flag gutters, even before flags arrive
+const INPUT_NODE_W = 180; // REFACTOR:grounded: compact default with room for question and MV/KE flag gutters
 const OUTLINE_H = 34; // a leaf box height in the outline — sized for up to TWO wrapped lines (#208)
 const OUTLINE_LABEL_MAX = 20; // chars PER LINE before wrapping/truncation (the min that de-collides the screenshot's outline leaves + box-fit margin)
 
@@ -1104,7 +1104,7 @@ export function renderFlowPane(
       uncertaintyMarkup +
       (canOpenDecision
         ? `<g data-flow-open-decision="${escapeHtml(n.delegatedDecisionKey!)}" role="button" tabindex="0" aria-label="Go to shared decision"><title>Go to shared decision</title><rect x="${x+NODE_W-24}" y="${y+8}" width="20" height="22" rx="3"/><text x="${x+NODE_W-20}" y="${y+24}">↗</text></g>` : "") +
-      (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + NODE_W + 6}" y="${y - 18}" width="22" height="22" rx="4"/><path d="M${x + NODE_W + 12} ${y - 13} h10 l-2 6 l3 3 h-12 l3-3 z M${x + NODE_W + 17} ${y - 4} v5"/></g>` : "") +
+      (isLeafEnd || n.kind === "when" ? `<g class="flow-pin" data-flow-pin="${escapeHtml(n.nodeKey)}" role="button" tabindex="0" aria-label="Pin or unpin this executed route" aria-pressed="false"><title>Pin or unpin this executed route</title><rect x="${x + NODE_W + 6}" y="${y - 30}" width="22" height="22" rx="4"/><path d="M${x + NODE_W + 12} ${y - 25} h10 l-2 6 l3 3 h-12 l3-3 z M${x + NODE_W + 17} ${y - 16} v5"/></g>` : "") +
       `</g>`;
   }
 

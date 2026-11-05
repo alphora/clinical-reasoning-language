@@ -15,8 +15,8 @@ export function installFlowPinVisibility(root: HTMLElement, tableRow = false) {
         pin=doc.createElementNS('http://www.w3.org/2000/svg','g');pin.setAttribute('class','flow-pin');pin.dataset.flowPin=node.dataset.flowKey;
         pin.setAttribute('role','button');pin.setAttribute('tabindex','0');
         const title=doc.createElementNS('http://www.w3.org/2000/svg','title'),hit=doc.createElementNS('http://www.w3.org/2000/svg','rect'),path=doc.createElementNS('http://www.w3.org/2000/svg','path');
-        for(const [key,value]of Object.entries({x:x+6,y:y-18,width:22,height:22,rx:4}))hit.setAttribute(key,String(value));
-        path.setAttribute('d',`M${x+12} ${y-13} h10 l-2 6 l3 3 h-12 l3-3 z M${x+17} ${y-4} v5`);
+        for(const [key,value]of Object.entries({x:x+6,y:y-30,width:22,height:22,rx:4}))hit.setAttribute(key,String(value));
+        path.setAttribute('d',`M${x+12} ${y-25} h10 l-2 6 l3 3 h-12 l3-3 z M${x+17} ${y-16} v5`);
         pin.append(title,hit,path);node.append(pin);
       }
       node.classList.toggle('flow-pin-focus',!tableRow&&node===focused);
