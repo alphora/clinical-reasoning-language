@@ -7,7 +7,8 @@ import {resolve,dirname,relative,join} from 'node:path';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
-import {loadFlags,flagStoreDir} from '@smile-digital-health/crl';
+import {loadFlags,flagStoreDir,nodeKey,conceptDeclRef} from '@smile-digital-health/crl';
+import {buildAnswerContributions,contributionsForOccurrences} from './answerContributions.ts';
 import {planTerminologyEdit} from '@smile-digital-health/crl/language-services';
 import {resolveAnswerTarget} from './answerEditing.ts';
 import {saveQuestionRequest,saveAnswerRequest,changeQaRequest,overlayQaRequests} from './qaFlagEditing.ts';
@@ -15,14 +16,15 @@ import {qaFixture} from './qaFlagEditingFixture.mjs';
 const source=ts.createSourceFile('cockpit.ts',readFileSync(fileURLToPath(new URL('./correspondenceCockpit.ts',import.meta.url)),'utf8'),ts.ScriptTarget.Latest,true),bodies=new Map();
 function scan(n){if(ts.isFunctionDeclaration(n)&&n.name)bodies.set(n.name.text,n.getText(source));ts.forEachChild(n,scan);}scan(source);
 function harness(f){
+ // This minimal pin serves Save/status tests. Pin-construction tests replace it before installing real pinCards.
  const posts=[],errors=[],pin={epoch:1,token:'pin',caseId:'case',routeId:'route',traversalKey:'traversal',payload:{showQuestions:true,cards:[f.card()]},targets:new Map([['q',f.wording()]]),answerTargets:new Map([['q',f.answer()]])};
- const c=vm.createContext({Error,Map,JSON,relative,dirname,resolve,currentCel:'fixture.cel',mode:'medical-validation',indexVersion:1,pinnedCards:pin,
+ const c=vm.createContext({Error,Map,JSON,relative,dirname,resolve,currentCel:'fixture.cel',mode:'medical-validation',indexVersion:1,pinnedCards:pin,branchQuestionnaireOwner:undefined,
   views:new Map([['tree',{gen:1,panel:{webview:{postMessage:m=>posts.push(m)}}}]]),branchQuestionnaire:{post:m=>posts.push(m)},
   assertMvWriteAllowed:()=>{},resolveCelSuite:()=>({ok:true,suite:{projectRoot:f.root}}),flagStoreDir:()=>f.flags,saveQuestionRequest,saveAnswerRequest,changeQaRequest,
   reloadReviewFlags:()=>{},renderTreeChrome:()=>{},driveFlagBadges:()=>{},pinCards:()=>{},
   coordinateDirectEdit:()=>{throw Error('MV must not publish source');},
   vscode:{window:{showErrorMessage:m=>errors.push(m)}}});
- for(const name of ['saveCard','qaRequestAction'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,c);
+ for(const name of ['postBranch','saveCard','qaRequestAction'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,c);
  return{c,posts,errors,pin};
 }
 // @kit mv-wording-patches:mv-only-save
@@ -48,7 +50,7 @@ test('actual pin construction retains deletion review controls after remaining v
   const source=f.term.replace('- code is `no` display is `No`.','- system is `urn:external`.\n- code is `no` display is `No`.');writeFileSync(f.terms,source);
   const flag=saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'delete',system:f.system,code:'yes'});
   writeFileSync(f.terms,planTerminologyEdit(source,{operation:'delete',library:'Terms',terminology:'Options',canonicalBase:'http://example.org/qa',system:f.system,code:'yes'}).candidateSource);
-  const card=f.card(),posts=[],route={terminalId:'route',nodeIds:[],nodeKeys:['terminal']};
+  const card={...f.card(),occurrences:[]},posts=[],route={terminalId:'route',nodeIds:[],nodeKeys:['terminal']};
   card.answerChoices=card.answerChoices.filter(c=>c.code==='no');card.answerChoices[0].system='urn:external';
   const c=vm.createContext({randomUUID,JSON,Map,Set,mode:'medical-validation',pinnedCards:undefined,indexVersion:1,currentCel:'fixture.cel',wordingSources:new Map(),crlStructure:[],conceptLayer:[],guardOutlines:[],expandedGuardWhens:new Set(),crlMaps:undefined,flagsList:loadFlags(f.flags).flags,
    views:new Map([['tree',{gen:1,panel:{webview:{postMessage:m=>posts.push(m)}}}]]),scenarioByCaseId:new Map([['case',{case:{name:'Case'},tree:{}}]]),
@@ -57,8 +59,9 @@ test('actual pin construction retains deletion review controls after remaining v
    buildRouteCards:()=>({cards:[card],targets:new Map()}),definitionValueInputs:()=>{},resolveCelSuite:()=>({ok:true,suite:{projectRoot:f.root,policyPath:f.policy}}),resolveAnswerTarget,overlayQaRequests,
    answerOptionsForDisplay:()=>{},answersFromTerminologyForDisplay:()=>{},expandTraversalCriteria:s=>s,expandQuestionInputs:s=>s,
    leafBucketsFromQuestionnaire:()=>({yesKeys:[],noKeys:[]}),conditionTruthKeys:()=>[],caseIdsThroughReviewNode:()=>[],pinnedVerdict:()=> 'pending',treeFocusPaint:()=>({nodeKeys:[],groupKeys:[],groupOutcomes:[]}),
-   branchQuestionnaire:{isOpen:false},driveLeafMarks:()=>{}});
-  vm.runInContext(transformSync(bodies.get('pinCards'),{loader:'ts',target:'es2022'}).code,c);c.pinCards('case','route',undefined,true,'traversal');
+   branchQuestionnaire:{isOpen:false},branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',nodeKey,conceptDeclRef,buildAnswerContributions,contributionsForOccurrences,driveLeafMarks:()=>{}});
+  for(const name of ['postBranch','questionModeFor','syncQuestionPanel','pinCards'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,c);
+  c.pinCards('case','route',undefined,true,'traversal');
   assert.equal(posts.length,1);const rendered=posts[0].cards[0];assert.equal(rendered.answerEditor.editable,false);
   const deleted=rendered.answerChoices.find(c=>c.code==='yes');assert.equal(deleted.request.id,flag.id);assert.equal(deleted.pendingDelete,true);assert.equal(deleted.editable,false);
   assert.equal(c.pinnedCards.answerTargets.get('q').editable,false);
@@ -71,9 +74,9 @@ test('actual pin handles local requests alongside imported read-only question an
   writeFileSync(join(dir,'package.json'),JSON.stringify({name:'imported',version:'1.0.0',crl:{libraries:['remote.crl']}}));
   const remote='library "Remote".\nterminology "Remote Options":\n- system is `urn:external`.\n- code is `remote` display is `Remote answer`.\nconcept "Remote Q":\n- shape is Record.\n- type is Observation.\n- value type is CodeableConcept.\n- code is `remote-q`.\n- value domain is answer options.\n- shape reduction is most recent.\n- value from is "Remote Options".\npresentation for "Remote Q":\n- question text is "Imported question?".\n';
   writeFileSync(join(dir,'remote.crl'),remote);writeFileSync(f.policy,f.source.replace('library "L".','library "L".\ninclude "Remote".'));
-  const local=f.card(),flag=saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Requested Yes',description:''});
+  const local={...f.card(),occurrences:[]},flag=saveAnswerRequest(f.root,f.flags,f.answer(),{operation:'update',system:f.system,code:'yes',display:'Requested Yes',description:''});
   const imported=resolveAnswerTarget(f.policy,'Remote','Remote Q');assert.equal(imported.editable,false);
-  const remoteCard={id:'remote',library:'Remote',concept:'Remote Q',text:'Imported question?',description:'',value:'Remote answer',answerChoices:imported.members.map(m=>({...m,selected:true}))};
+  const remoteCard={id:'remote',library:'Remote',concept:'Remote Q',occurrences:[],text:'Imported question?',description:'',value:'Remote answer',answerChoices:imported.members.map(m=>({...m,selected:true}))};
   const h=harness(f),route={terminalId:'route',nodeIds:[],nodeKeys:['terminal']};
   Object.assign(h.c,{randomUUID,Set,pinnedCards:undefined,wordingSources:new Map(),crlStructure:[],conceptLayer:[],guardOutlines:[],expandedGuardWhens:new Set(),crlMaps:undefined,flagsList:loadFlags(f.flags).flags,
    scenarioByCaseId:new Map([['case',{case:{name:'Case'},tree:{}}]]),routesForCase:()=>[route],treeTraversalEntries:()=>[{caseId:'case',route}],treeTraversalSignature:()=> 'traversal',branchNeighbors:()=>({index:0,total:1}),clearTreeFocus:()=>{},
@@ -81,8 +84,9 @@ test('actual pin handles local requests alongside imported read-only question an
    buildRouteCards:()=>({cards:[local,remoteCard],targets:new Map([['remote',{filePath:join(dir,'remote.crl'),library:'Remote',concept:'Remote Q',owners:{},editable:false}]])}),definitionValueInputs:()=>{},resolveCelSuite:()=>({ok:true,suite:{projectRoot:f.root,policyPath:f.policy}}),resolveAnswerTarget,overlayQaRequests,
    answerOptionsForDisplay:()=>{},answersFromTerminologyForDisplay:()=>{},expandTraversalCriteria:s=>s,expandQuestionInputs:s=>s,
    leafBucketsFromQuestionnaire:()=>({yesKeys:[],noKeys:[]}),conditionTruthKeys:()=>[],caseIdsThroughReviewNode:()=>[],pinnedVerdict:()=> 'pending',treeFocusPaint:()=>({nodeKeys:[],groupKeys:[],groupOutcomes:[]}),
-   branchQuestionnaire:{isOpen:false},driveLeafMarks:()=>{}});
-  vm.runInContext(transformSync(bodies.get('pinCards'),{loader:'ts',target:'es2022'}).code,h.c);h.c.pinCards('case','route',undefined,true,'traversal');
+   branchQuestionnaire:{isOpen:false},branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',nodeKey,conceptDeclRef,buildAnswerContributions,contributionsForOccurrences,driveLeafMarks:()=>{}});
+  for(const name of ['postBranch','questionModeFor','syncQuestionPanel','pinCards'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts',target:'es2022'}).code,h.c);
+  h.c.pinCards('case','route',undefined,true,'traversal');
   assert.equal(h.posts.length,1);const cards=h.posts[0].cards;assert.equal(cards[0].answerChoices[0].request.id,flag.id);assert.equal(cards[1].answerEditor.editable,false);assert.equal(cards[1].questionRequest,undefined);assert.equal(cards[1].answerChoices[0].display,'Remote answer');
  }finally{f.close();}
 });

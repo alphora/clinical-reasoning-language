@@ -1,8 +1,50 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.48.
+Updates since CRL 6.4.41 through 6.4.49.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.49 — Explore and compare policy paths
+
+### Compare paths in a Decision Table
+
+Select a node, then click its glowing yellow pin to see its downstream branches stacked in one view\. Use Shallower and Deeper to broaden or narrow the comparison\. Pinning an outcome shows one branch\. Branches without a test case are marked with a coverage error\.
+
+![Two fictional policy paths stacked in Decision Table, with a yellow scope pin and inline questions in the first row\.](decision-table.png)
+
+The familiar branch view is repeated for each path\. This example uses fictional questions and answers\.
+
+### Keep questions beside the path you are reviewing
+
+The question\-results icon cycles through a separate panel, questions inside the branch, and off\. The first row opens its question panel automatically\. If you move from a row using the panel to a row with questions switched off, the panel follows you\. The saved FHIR Questionnaire follows the focused row\. Both questionnaires can remain visible beside the tree\. Input groups keep your expand or collapse choice\.
+
+### See which answers feed each path
+
+Expand Answers under a question to see its choices grouped by the path they contribute to\. Each question has its own groups\. The headings use the connector colors and show the next outcome when it is known\. Green and red identify the paths\.
+
+![Two treatment checks show different groups of answers under green and red path headings\.](answer-paths.png)
+
+The same answer can contribute to different paths at different checks\. The example is fictional\.
+
+### Show uncertainty checks when you need them
+
+For policies prepared with marked uncertainty checks, the U control inside an outcome node shows or hides the check\. A blue border indicates that it is shown\. Some checks stay visible when needed for the selected case or a review flag\. Showing or hiding changes the view only\.
+
+![A fictional policy tree with uncertainty checks expanded and blue\-bordered U controls inside outcome nodes\.](uncertainty-checks.png)
+
+Use U to inspect the uncertainty check associated with an outcome\.
+
+### Open the policy source documents
+
+Choose Source documents in Medical Validation to list the selected policy's Source and Refined source files\. Select a file to open it in its usual editor, including the document viewers supplied in your workspace\.
+
+### Keep the tree reachable beside a flag
+
+While a flag panel is open, pan farther to bring nodes clear of the panel\. Opening the panel keeps your current position\. Selecting a flag from the flag list can still navigate to its target\.
+
+### A reminder about multiple flags
+
+Already available in 6\.4\.48, a node can hold several flags\. Click its flag icon to choose the flag to read\. To add another, right\-click the node and choose Add flag on the intended target\.
 
 ## 6.4.48 — Simpler review flags
 

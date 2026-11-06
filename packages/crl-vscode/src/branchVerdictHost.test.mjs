@@ -7,7 +7,7 @@ import ts from 'typescript';
 import {transformSync} from 'esbuild';
 import {allRouteVerdictsApproved} from './branchVerdict.ts';
 const source=ts.createSourceFile('cockpit.ts',readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
-let body;function visit(n){if(ts.isFunctionDeclaration(n)&&n.name?.text==='pinnedVerdictMenu')body=n.getText(source);ts.forEachChild(n,visit);}visit(source);
+let body,postBranch;function visit(n){if(ts.isFunctionDeclaration(n)&&n.name?.text==='pinnedVerdictMenu')body=n.getText(source);if(ts.isFunctionDeclaration(n)&&n.name?.text==='postBranch')postBranch=n.getText(source);ts.forEachChild(n,visit);}visit(source);
 test('policy completion includes every frozen case, not only the pinned group or painted cases',()=>{
  let overlay;function find(n){if(ts.isFunctionDeclaration(n)&&n.name?.text==='driveDoneOverlay')overlay=n.getText(source);ts.forEachChild(n,find);}find(source);
  const messages=[],context=vm.createContext({views:new Map([['tree',{gen:9,leafConcepts:{},panel:{webview:{postMessage:m=>messages.push(m)}}}]]),
@@ -38,7 +38,7 @@ test('QR verdict saves refresh paint without route selection or tree reconstruct
   persistMv:map=>{calls.push(['save',map]);return true;},renderPane:pane=>calls.push(['render',pane]),renderTreeChrome:()=>calls.push(['chrome']),driveDoneOverlay:()=>calls.push(['overlay']),cockpitAgentBridge:{notifyChanged:()=>calls.push(['notify'])},
   dispatch:()=>{throw Error('Route selection must not change after verdict');},
  });
- vm.runInContext(transformSync(body,{loader:'ts',target:'es2022'}).code,context);await context.pinnedVerdictMenu('pin');
+ vm.runInContext(transformSync(postBranch+'\n'+body,{loader:'ts',target:'es2022'}).code,context);await context.pinnedVerdictMenu('pin');
  assert.deepEqual(calls,[['focus','routeVerdictFocus'],['save',{a:'pass',b:'pass'}],['render','worklist'],['chrome'],['overlay'],['notify']]);
 });
 
@@ -61,7 +61,7 @@ test('actual verdict-save host paths immediately refresh complete criterion pain
   renderPane:()=>{},renderTreeChrome:()=>{},dispatch:()=>{},computeCriterionVerdictUpdate,
  });
  context.persistMv=(cases,_notes,criteria)=>{context.reviewByCaseId=cases;if(criteria)context.criterionVerdicts=criteria;return true;};
- vm.runInContext(transformSync(texts.join('\n'),{loader:'ts',target:'es2022'}).code,context);
+ vm.runInContext(transformSync(postBranch+'\n'+texts.join('\n'),{loader:'ts',target:'es2022'}).code,context);
  assert.deepEqual([...context.litNodeKeysForCase('left',cases[0],new Set())].sort(),['falseOperand','input','owner'],'false operand menu sees the same cases as review paint');
  context.applyVerdict('left','pass');
  assert(messages.filter(m=>m.type==='markReviewOverlay').at(-1).pass.includes('owner'),'mixed-verdict owner retains existing green route highlight');

@@ -164,7 +164,7 @@ test('host prevents concurrent pickers, accepts cancellation and resets the busy
 test('actual toolbar click delegate posts an action without accepting a file path or render token', () => {
   const script = ts.createSourceFile('webview.js', COCKPIT_WEBVIEW_SCRIPT, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS); let callback;
   function walk(node) {
-    if (ts.isCallExpression(node) && node.expression.getText(script) === 'fcc.addEventListener' && node.arguments[0]?.text === 'click') callback = node.arguments[1];
+    if (ts.isCallExpression(node) && node.expression.getText(script) === 'listen' && node.arguments[0]?.getText(script) === 'fcc' && node.arguments[1]?.text === 'click') callback = node.arguments[2];
     ts.forEachChild(node, walk);
   }
   walk(script); assert.ok(callback);

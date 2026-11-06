@@ -9,6 +9,8 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
 import {AnswerCaseImpactError} from './answerEditing.ts';
+import {nodeKey,conceptDeclRef} from '@smile-digital-health/crl';
+import {buildAnswerContributions,contributionsForOccurrences} from './answerContributions.ts';
 
 const source=ts.createSourceFile('cockpit.ts',readFileSync(fileURLToPath(new URL('./correspondenceCockpit.ts',import.meta.url)),'utf8'),ts.ScriptTarget.Latest,true),bodies=new Map();
 function scan(n){if(ts.isFunctionDeclaration(n)&&n.name)bodies.set(n.name.text,n.getText(source));ts.forEachChild(n,scan);}scan(source);
@@ -63,11 +65,16 @@ test('approval rechecks definitions and refuses a new revision until the reviewe
 });
 test('FHIR remount identity changes with effective stale status while native bytes stay unchanged',()=>{
  let body;function find(n){if(ts.isVariableDeclaration(n)&&n.name.getText(source)==='post'&&n.initializer?.getText(source).includes('effectiveStale'))body=n.getText(source);ts.forEachChild(n,find);}find(source);assert.ok(body);
- const messages=[],c=vm.createContext({createHash,v:{gen:1,panel:{webview:{postMessage:m=>messages.push(m)}}},gen:1,indexVersion:1,key:'case',label:'Case',currentDefinitions:{state:'current',digest:'same'},unrenderableQuestionnaireFeatures:()=>[]});
+ const messages=[],view={gen:1,panel:{webview:{postMessage:m=>messages.push(m)}}},inspection={identity:'inspection'};
+ let currentInspection=inspection,resyncs=0;
+ const c=vm.createContext({createHash,view,views:new Map([['fhirQuestionnaire',view]]),inspection,fhirInspectionContext:()=>currentInspection,syncFhirInspection:()=>resyncs++,gen:1,indexVersion:1,key:'case',label:'Case',currentDefinitions:{state:'current',digest:'same'},unrenderableQuestionnaireFeatures:()=>[]});
  vm.runInContext(transformSync("var "+body.replace("const definitionState=","var definitionState=")+";",{loader:'ts'}).code,c);const q={resourceType:'Questionnaire'};c.post(q,undefined,undefined,false);c.currentDefinitions.state='drift';c.post(q,undefined,undefined,false);
  assert.notEqual(messages[0].key,messages[1].key);assert.equal(messages[0].stale,false);assert.equal(messages[1].stale,true);
  c.currentDefinitions.state='checking';c.post(q,undefined,undefined,false);assert.equal(messages[2].stale,false);assert.equal(messages[2].definitionState,'checking');
  c.currentDefinitions.state='unknown';c.post(q,undefined,undefined,false);assert.equal(messages[3].stale,false);assert.equal(messages[3].definitionState,'unknown');
+ currentInspection={identity:'different-row'};c.post(q,undefined,undefined,false);assert.equal(messages.length,4);assert.equal(resyncs,1,'obsolete row reads trigger a fresh inspection');
+ currentInspection=inspection;view.gen=2;c.post(q,undefined,undefined,false);assert.equal(messages.length,4,'obsolete pane generations are dropped');
+ view.gen=1;c.views.delete('fhirQuestionnaire');c.post(q,undefined,undefined,false);assert.equal(messages.length,4,'closed panes receive no stale read');
 });
 
 test('a note save cannot restore approvals from before a direct edit when sidecar refresh failed',()=>{
@@ -95,7 +102,7 @@ test('legacy reviews remain available when direct-edit layout and pinned-date co
 
 function pinFixture(detached){
  const target={filePath:'/artifact/src/crl/input.crl',library:'L',concept:'B',context:{decision:'Review',criteria:[]}};
- const old={id:'old-B',library:'L',concept:'B',ownerKey:'B-owner',text:'B?',description:'Details',editing:true,editingOwner:'B-owner',draftText:'Unsaved B',draftDescription:'Retain this'};
+ const old={id:'old-B',library:'L',concept:'B',ownerKey:'B-owner',occurrences:[],text:'B?',description:'Details',editing:true,editingOwner:'B-owner',draftText:'Unsaved B',draftDescription:'Retain this'};
  const preserved={caseId:'case',routeId:'route',payload:{cards:[old]},targets:new Map([['old-B',target]])};
  const fresh={...old,id:'new-B'};for(const k of ['editing','editingOwner','draftText','draftDescription'])delete fresh[k];
  const attached=[],other=[],route={terminalId:'route',nodeIds:[],nodeKeys:['terminal'],activity:'Refer'};
@@ -105,8 +112,8 @@ function pinFixture(detached){
   whenKeyResolver:()=>()=>undefined,buildRouteQuestionnaire:()=>({questions:[]}),buildResolveValueTypes:()=>{},buildConceptShapeResolver:()=>{},buildDefExprResolver:()=>{},
   buildRouteCards:()=>({cards:[fresh],targets:new Map([['new-B',target]])}),definitionValueInputs:()=>{},answerOptionsForDisplay:()=>{},answersFromTerminologyForDisplay:()=>{},expandTraversalCriteria:s=>s,expandQuestionInputs:s=>s,
   leafBucketsFromQuestionnaire:()=>({yesKeys:[],noKeys:[]}),conditionTruthKeys:()=>[],caseIdsThroughReviewNode:()=>[],pinnedVerdict:()=> 'pending',treeFocusPaint:()=>({nodeKeys:[],groupKeys:[],groupOutcomes:[]}),
-  branchQuestionnaire:{isOpen:detached,update:p=>other.push(p)},driveLeafMarks:()=>{}});
- install(c,['pinCards']);return {c,preserved,fresh,target,attached,other};
+  branchQuestionnaire:{isOpen:detached,open:p=>other.push(p)},branchQuestionnaireOwner:undefined,legacyQuestionMode:detached?'panel':'inline',nodeKey,conceptDeclRef,buildAnswerContributions,contributionsForOccurrences,driveLeafMarks:()=>{}});
+ install(c,['postBranch','questionModeFor','syncQuestionPanel','pinCards']);return {c,preserved,fresh,target,attached,other};
 }
 for(const detached of [false,true])test(`preserving refresh sends an unsaved question draft to the ${detached?'detached':'attached'} questionnaire`,()=>{
  const f=pinFixture(detached);f.c.pinCards('case','route',undefined,true,'traversal',f.preserved);

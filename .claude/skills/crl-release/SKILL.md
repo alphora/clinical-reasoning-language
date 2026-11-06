@@ -239,6 +239,17 @@ partial release that looks complete.
 | **npm tarball** `@smile-digital-health/crl` (core + CLI + driver) | `npm install` | `release.yml` on `release: published` |
 | **catalog + CRLCommon.cql + pattern catalog md** | GitHub release assets | **you, by hand** |
 
+The npm publication job downloads the qualified release `.tgz` and `SHA256SUMS`,
+checks the release tag, archive checksum, package identity and required runtime payloads, then publishes
+that exact archive with lifecycle scripts disabled. Keep the full test prerequisite.
+The archive's `main`, `bin`, `exports` and `types` must equal the tagged source manifest.
+Local Gates B/C establish byte-level source/archive/installed correspondence; the publication job
+checks identity and inventory against that qualified archive.
+Before every release, execute the exact workflow verification block against the `.tgz` to be attached
+and its checksum manifest. Rehearse failing checksum, identity and missing-payload controls whenever
+this boundary changes. Asset retries allow five attempts with 100 seconds of total backoff.
+A workspace rebuild is a separate artifact.
+
 The MCP server and the `$apply` driver have **no independent release** — they ride inside the vsix and
 the npm tarball. That is precisely why Gate B inspects both archives: a product with no release of its
 own is a product nothing checks.
@@ -264,15 +275,20 @@ own is a product nothing checks.
    `git checkout main && git merge --ff-only --no-overwrite-ignore develop && git push`.
 5. **Lightweight** tag `vX.Y.Z` on main (prior tags are lightweight, not annotated); push it.
 6. `gh release create vX.Y.Z --title … --notes-file tmp/… --target main <assets>` — published, not
-   draft. Publishing is what FIRES `release.yml`. Assets:
+   draft. Attach every asset in this invocation, supplying `SHA256SUMS` first and the npm tarball second.
+   Publishing fires `release.yml`, whose bounded download retry handles partial attachment visibility. Assets:
    - `packages/crl-vscode/crl-language-support-<ver>.vsix`
    - `smile-digital-health-crl-<ver>.tgz` (`npm pack -w @smile-digital-health/crl`)
    - `packages/crl-vscode/dist/catalog.json`
    - `packages/crl/src/cql-emitter/catalog/CRLCommon.cql`
    - `packages/crl/src/cql-emitter/catalog/inference-pattern-catalog.md`
    - `crl-release-notes-<ver>.html` and `crl-release-notes-<ver>.md` — generated from the same catalog as the installed reader.
-   - **`SHA256SUMS`** — `sha256sum <each asset> > SHA256SUMS`. Without it a consumer can only hash
-     their own download, which proves their fetch and not the published bytes.
+   - `authoring-kit.json` and `authoring-kit.md` — the exact audited export checked through both installed MCP entry points.
+   - `runtime-identities.json` — immutable source, package, engine, contained runtime and qualification identities.
+   - **`SHA256SUMS`** — stage the ten payloads in one flat release-assets directory. Hash their exact
+     bytes and emit exactly ten lines using lowercase SHA-256, two spaces and the bare uploaded filename.
+     Verify the exact allowlist and line count before upload. The consumer also accepts a binary `*`
+     marker, while path-prefixed names fail. Without this manifest a consumer can only hash its own download.
 7. **Watch `release.yml` to green.** A red CI after publish is a FAILED release, not a footnote: the
    GitHub release looks complete while the npm tarball never shipped.
 
@@ -282,10 +298,10 @@ own is a product nothing checks.
   repo secret expired. npm tokens carry an expiry now. Claude cannot see or set it; the operator
   regenerates (granular, `@smile-digital-health` read+write, or a classic Automation token) and updates
   the secret. The GitHub release and its assets are unaffected — only npm is blocked.
-- **`npm ci` lockfile errors** — already handled: both jobs use `npm install`, because the lockfile is
+- **`npm ci` lockfile errors** — the test job uses `npm install`, because the lockfile is
   generated on Windows and linux `npm ci` rejects it over platform-resolved optional deps. The reason
   is recorded in `release.yml` itself; do not "fix" it back to `npm ci` without regenerating the
-  lockfile on linux first.
+  lockfile on linux first. The publication job consumes the qualified archive directly.
 - **Re-publishing the same version after fixing the workflow:** a job re-run reuses the ORIGINAL commit
   and workflow version, so `gh run rerun` does NOT pick up your fix. Instead:
   `gh release delete vX.Y.Z --yes --cleanup-tag` → re-tag at the fixed `main` HEAD → `gh release create`

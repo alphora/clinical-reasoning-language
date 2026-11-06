@@ -273,7 +273,7 @@ test('real Bleph terminals and nonterminal prefixes exclude every off-route stru
   assert.ok(terminalKeys.length>=6);
   const pinnedRoutes=entries.filter(e=>rendered.focusNodes[e.route.nodeKeys.at(-1)]?.terminal).map(e=>({caseId:e.caseId,routeId:e.route.terminalId,leafKey:e.route.nodeKeys.at(-1),traversalKey:treeTraversalSignature(e)}));
   const expected=terminalKeys.flatMap(key=>terminalTraversals(entries,key));
-  assert.equal(cm.scenarios.scenarios.length,16);assert.equal(expected.length,6);
+  assert.equal(cm.scenarios.scenarios.length,18);assert.equal(expected.length,7);
   for(const entry of entries){
     const current={caseId:entry.caseId,routeId:entry.route.terminalId},neighbors=traversalRouteNeighbors(pinnedRoutes,current,terminalKeys);
     assert.equal(neighbors.total,expected.length);

@@ -41,11 +41,13 @@ test('the Bleph MV example is discoverable and its native forms match its MV cas
     assert.equal(findPolicySrc(file.path), mv.suite.policySrc);
     names.push(...file.graph.cel.statements.filter(s => s.type === 'CELCase').map(s => s.name));
   }
-  assert.equal(names.length, 16, 'L34194 clinical route examples');
+  assert.equal(names.filter(name => !name.startsWith('DEMO')).length, 16, 'L34194 clinical route examples');
+  assert.equal(names.filter(name => name.startsWith('DEMO')).length, 2, 'synthetic uncertainty display examples');
   const manifest = JSON.parse(readFileSync(join(example, 'tests/results/questionnaire-manifest-mv.json'), 'utf8'));
   assert.ok(Number.isFinite(Date.parse(manifest.generatedAt)));
-  assert.equal(manifest.provenance.crlVersion, "6.4.36");
-  assert.equal(manifest.provenance.producerJarSha256, "8bf5d9e704ee7d9cd429e59c43b1c2259294a4f5586fe39c4625b34d92bbac9b");
+  // The tree-display example was regenerated under 6.4.48. Fresh post-bump native results are a separate release gate.
+  assert.equal(manifest.provenance.crlVersion, "6.4.48");
+  assert.equal(manifest.provenance.producerJarSha256, "2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa");
   assert.match(manifest.provenance.runtimeSha256, /^[a-f0-9]{64}$/);
   assert.match(manifest.provenance.definitionClosureSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(manifest.cases.map(c => c.caseName).sort(), names.sort());
@@ -62,13 +64,13 @@ test('the Bleph MV example is discoverable and its native forms match its MV cas
   const regression = resolveCelSuite(example, 'regression');
   assert.equal(regression.ok, true, JSON.stringify(regression.diagnostics));
   assert.ok(regression.suite.files.some(f => f.role === 'regression'));
-  assert.equal(regression.suite.files.reduce((n, f) => n + f.graph.cel.statements.filter(s => s.type === 'CELCase').length, 0), 46, 'clinical examples plus engineering controls');
+  assert.equal(regression.suite.files.reduce((n, f) => n + f.graph.cel.statements.filter(s => s.type === 'CELCase').length, 0), 52, 'clinical examples, synthetic uncertainty examples and engineering controls');
   assert.deepEqual(regression.suite.files.filter(f => f.role === 'mv').map(f => f.sourceFile), mv.suite.files.map(f => f.sourceFile));
 });
 
 test('the Bleph debugger opens the maintained MV workspace', () => {
   const launches = JSON.parse(readFileSync(join(root, '.vscode/launch.json'), 'utf8'));
-  const launch = launches.configurations.find(c => c.name === 'Run Bleph Medical Validation (isolated)');
+  const launch = launches.configurations.find(c => c.name === 'Run Bleph Medical Validation');
   assert.ok(launch);
   for(const config of launches.configurations){
     assert.equal(config.args.filter(a=>a.startsWith('--user-data-dir=')).length,1);
@@ -93,7 +95,7 @@ test('the L34194 native delivery stays bound to its source snapshot and emitted 
  const sources=['crl','cel','cql','anchor-source','provenance','source','refined-source'].flatMap(name=>files(join(base,name))).map(p=>[relative(base,p).replaceAll('\\','/'),p.endsWith('.docx')?readFileSync(p).toString('base64'):readFileSync(p,'utf8').replaceAll('\r\n','\n')]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
  const config=JSON.parse(readFileSync(join(example,'package.json'),'utf8')).crl;
  // Update this evidence binding only after source/result regeneration and native verification.
- assert.equal(createHash('sha256').update(JSON.stringify({sources,config})).digest('hex'),'bd3cb97fab36477b0caf42ca5e46d924c109c4bb82e974b21cfdfa28ead81103');
+ assert.equal(createHash('sha256').update(JSON.stringify({sources,config})).digest('hex'),'08de657324829b4488f5828821e2d82075d9a87ef7aec95b03a6b0bcfa87b26d');
  const data=JSON.parse(readFileSync(join(example,'tests/data/fhir/cel-data-manifest.json'),'utf8'));
  const results=JSON.parse(readFileSync(join(example,'tests/results/questionnaire-manifest-mv.json'),'utf8'));
  assert.deepEqual(data.cases.map(c=>c.caseId).sort(),results.cases.map(c=>c.caseId).sort());
@@ -108,7 +110,7 @@ test('the Bleph example includes the complete matching FHIR definition set',()=>
  const list=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?list(join(dir,e.name)):[join(dir,e.name)]);
  const base=join(example,'src/fhir');
  assert.deepEqual(list(base).map(p=>relative(base,p).replaceAll('\\','/')).sort(),emitted.fhir.resources.map(r=>r.relativePath.replaceAll('\\','/')).sort());
- assert.equal(emitted.fhir.resources.length,26);
+ assert.equal(emitted.fhir.resources.length,27);
  for(const r of emitted.fhir.resources){
   const file=join(base,r.relativePath);
   assert.deepEqual(JSON.parse(readFileSync(file,'utf8')),r.resource);
@@ -149,15 +151,22 @@ test('L34194 cases select the correct procedure evidence and preserve unanswered
   assert.ok(checked.runs.every(r=>r.status==='pass'),JSON.stringify(checked.runs.filter(r=>r.status!=='pass')));
   return checked.runs;
  });
- assert.equal(runs.length,46);
- assert.equal(runs.filter(r=>r.expected?.pause).length,14);
+ assert.equal(runs.length,52);
+ assert.equal(runs.filter(r=>r.expected?.pause).length,15);
  for(const [name,upper] of [
   ['Upper blepharoplasty — pseudo-MRD 2.0 mm or less',true],
   ['Ptosis repair — actual-margin MRD 2.0 mm or less',false],
  ]){
   const run=runs.find(r=>r.case===name);
   assert.equal(run.produced[0].recommendation,'certify.Met');
-  assert.match(run.produced[0].viaWhen,upper?/Upper Blepharoplasty Evidence/:/Blepharoptosis Repair Evidence/);
+  const traceNodes=nodes=>nodes.flatMap(node=>[node,...traceNodes(node.children??[])]);
+  const evidence=traceNodes(run.trace).find(node=>node.conditionTrace?.criterion?.name===(upper?'Upper Blepharoplasty Evidence':'Blepharoptosis Repair Evidence'));
+  assert.equal(evidence?.satisfied,true,'the selected procedure evidence is satisfied');
+  assert.equal(traceNodes(run.trace).some(node=>node.conditionTrace?.criterion?.name===(upper?'Blepharoptosis Repair Evidence':'Upper Blepharoplasty Evidence')),false,'the other procedure evidence is not reached');
+  if(upper){
+   assert.equal(run.produced[0].viaWhen,null,'ordinary upper evidence reaches the uncertainty guard otherwise arm');
+   assert.equal(traceNodes(run.trace).find(node=>node.conditionTrace?.criterion?.name==='Upper Branch Has Uncertainty')?.satisfied,false);
+  }else assert.equal(run.produced[0].viaWhen,'Blepharoptosis Repair Evidence');
   assert.equal(run.trace[0].concept,'Cosmetic Surgical Purpose');
   assert.equal(run.trace[0].satisfied,false);
   assert.equal(run.trace[1].conditionTrace.criterion.name,'Functional Necessity Documented');

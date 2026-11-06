@@ -3,8 +3,12 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
+import {nodeKey,conceptDeclRef} from '@smile-digital-health/crl';
+import {buildAnswerContributions,contributionsForOccurrences} from './answerContributions.ts';
 const source=ts.createSourceFile('cockpit.ts',readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
-const bodies=new Map();function visit(n){if(ts.isFunctionDeclaration(n)&&['treeTraversalEntries','focusTreeNode','selectTreeTraversal','toggleCriterionExpand','branchOrder','branchNeighbors','pinCards','navigatePinnedBranch','selectRoutesThroughNode','onWebviewMessage','markLeaves'].includes(n.name?.text))bodies.set(n.name.text,n.getText(source));ts.forEachChild(n,visit);}visit(source);
+const names=['treeTraversalEntries','focusTreeNode','selectTreeTraversal','toggleCriterionExpand','branchOrder','branchNeighbors','pinCards','navigatePinnedBranch','selectRoutesThroughNode','onWebviewMessage','markLeaves','handleDecisionTableMessage','postBranch','questionModeFor','postQuestionMode','publishQuestionModes','closeQuestionPanel','syncQuestionPanel','setQuestionDisplayMode'];
+const bodies=new Map();function visit(n){if(ts.isFunctionDeclaration(n)&&names.includes(n.name?.text)){assert.ok(!bodies.has(n.name.text),'unique production closure '+n.name.text);bodies.set(n.name.text,n.getText(source));}ts.forEachChild(n,visit);}visit(source);
+for(const name of names)assert.ok(bodies.has(name),'production closure '+name);
 
 test('pinned markLeaves recomputes nodes and group outcomes once against current render geometry',()=>{
  const messages=[],v={gen:2,focusNodes:{current:true},panel:{webview:{postMessage:m=>messages.push(m)}}},traversal={id:'actual'},calls=[];
@@ -37,7 +41,7 @@ test('terminal traversal opens only its criteria before repaint, keeping selecti
 
 test('pin reveals actual question INPUT before marking and sends cards against the replacement generation',()=>{
  const calls=[],sv={case:{name:'Case'},tree:[],conceptTruth:[]},route={terminalId:'result',nodeIds:['n'],nodeKeys:['root','leaf']};
- const tree={gen:1,leafConcepts:{old:true},panel:{webview:{postMessage:m=>calls.push(['post',m])}}},cards=[{id:'q'}];
+ const tree={gen:1,leafConcepts:{old:true},panel:{webview:{postMessage:m=>calls.push(['post',m])}}},cards=[{id:'q',library:'L',concept:'Q',occurrences:[]}];
  const c=vm.createContext({currentCel:undefined,views:new Map([['tree',tree]]),scenarioByCaseId:new Map([['case',sv]]),routesForCase:()=>[route],mode:'medical-validation',
   clearTreeFocus:()=>calls.push(['clear']),whenKeyResolver:()=>id=>id,buildRouteQuestionnaire:()=>({questions:[]}),buildResolveValueTypes:()=>{},buildConceptShapeResolver:()=>{},buildDefExprResolver:()=>{},
   treeTraversalEntries:()=>[{caseId:'case',route}],treeTraversalSignature:()=> 'traversal',treeFocusPaint:()=>({nodeKeys:['root','leaf'],groupKeys:['group']}),expandTraversalCriteria:current=>current,
@@ -46,8 +50,8 @@ test('pin reveals actual question INPUT before marking and sends cards against t
   renderPane:(...args)=>{calls.push(['render',...args]);tree.gen++;tree.leafConcepts={fresh:true};},
   leafBucketsFromQuestionnaire:(_q,_r,_truth,leaves)=>{assert.equal(leaves,tree.leafConcepts);assert.ok(leaves.fresh);calls.push(['marks']);return {yesKeys:[],noKeys:[]};},
   conditionTruthKeys:()=>[],randomUUID:()=> 'pin-token',branchNeighbors:()=>({index:0,total:1}),caseIdsThroughReviewNode:()=>['case'],pinnedVerdict:()=>{},indexVersion:3,
-  branchQuestionnaire:{isOpen:false},driveLeafMarks:()=>calls.push(['drive']),pinnedCards:undefined});
- vm.runInContext(transformSync(bodies.get('pinCards'),{loader:'ts'}).code,c);
+  branchQuestionnaire:{isOpen:false},branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',nodeKey,conceptDeclRef,buildAnswerContributions,contributionsForOccurrences,driveLeafMarks:()=>calls.push(['drive']),pinnedCards:undefined});
+ for(const name of ['postBranch','questionModeFor','syncQuestionPanel','pinCards'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
  c.pinCards('case','result','initial-click',true);
  assert.deepEqual(calls.map(x=>x[0]),['clear','render','marks','post','drive']);assert.deepEqual(calls[1],['render','tree',undefined,undefined,'initial-click']);
  assert.equal(calls[3][1].gen,2);assert.equal(calls[3][1].focusRequest,'initial-click');assert.equal(calls[3][1].cards,cards);
@@ -81,11 +85,18 @@ test('disclosure and result navigation suppress selection pans before their fina
 test('RQ host round-trips each click identity and ignores stale route requests',()=>{
  const messages=[],pane={isOpen:false,open(){this.isOpen=true;},close(){this.isOpen=false;}};
  const tree={gen:2,panel:{webview:{postMessage:m=>messages.push(m)}}};
- const c=vm.createContext({views:new Map([['tree',tree]]),pinnedCards:{token:'route',epoch:1,payload:{}},indexVersion:1,mode:'medical-validation',branchQuestionnaire:pane});
- vm.runInContext(transformSync(bodies.get('onWebviewMessage'),{loader:'ts'}).code,c);
- for(const id of ['click1','click2'])c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'route',requestId:id});
- assert.deepEqual(messages.map(m=>[m.open,m.focusToken,m.requestId]),[[true,'route','click1'],[false,'route','click2']]);
- c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'old-route',requestId:'stale'});assert.equal(messages.length,2);
+ const c=vm.createContext({views:new Map([['tree',tree]]),pinnedCards:{token:'route',epoch:1,payload:{}},indexVersion:1,mode:'medical-validation',branchQuestionnaire:pane,
+  branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',decisionTable:undefined});
+ for(const name of ['handleDecisionTableMessage','postBranch','questionModeFor','postQuestionMode','publishQuestionModes','closeQuestionPanel','syncQuestionPanel','setQuestionDisplayMode','onWebviewMessage'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
+ for(const [id,questionMode] of [['click1','panel'],['click2','inline'],['click3','off']]){
+  c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'route',requestId:id,questionMode});
+  assert.equal(messages.filter(m=>m.type==='branchQuestionnaireState').at(-1).questionMode,questionMode);
+  assert.equal(c.pinnedCards.payload.questionMode,questionMode);
+  assert.equal(c.pinnedCards.payload.showQuestions,questionMode==='inline');
+ }
+ assert.deepEqual(messages.filter(m=>m.requestId).map(m=>[m.open,m.questionMode,m.focusToken,m.requestId]),[[true,'panel','route','click1'],[false,'inline','route','click2'],[false,'off','route','click3']]);
+ const count=messages.length;
+ c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'old-route',requestId:'stale',questionMode:'panel'});assert.equal(messages.length,count);
 });
 test('first-route pinning suppresses the selection pan before constructing its cards',async()=>{
  const calls=[],tree={gen:2};

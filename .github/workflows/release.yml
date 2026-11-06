@@ -115,6 +115,8 @@ jobs:
     name: Publish core (@smile-digital-health/crl) to npm
     runs-on: ubuntu-latest
     needs: test-release
+    permissions:
+      contents: read
     if: github.event_name == 'release' && github.event.action == 'published' && !github.event.release.draft && !github.event.release.prerelease
     steps:
       - uses: actions/checkout@v4
@@ -123,23 +125,72 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org/'
-      # `npm install`, not `npm ci`: the committed package-lock.json is generated on Windows, and linux `npm ci` (strict)
-      # rejects it over platform-resolved optional deps (esbuild/@emnapi/@types/node variants). `npm install` tolerates the
-      # diff and is what the test-release job already uses successfully on the same runner. (A linux-generated lock would let
-      # us restore `npm ci` here.)
-      - name: Install dependencies (workspaces)
-        run: npm install
-      - name: Build core
-        run: npm run build -w @smile-digital-health/crl
-      - name: Pack and verify
+      # REFACTOR:grounded: publish the installed-qualified archive attached to this release.
+      - name: Download and verify qualified core archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          npm pack -w @smile-digital-health/crl --dry-run
-          echo "Verifying package contents..."
-          npm pack -w @smile-digital-health/crl
-          PACKAGE_FILE=$(ls -t smile-digital-health-crl-*.tgz | head -1)
-          tar -ztvf "$PACKAGE_FILE"
-          echo "Package contents verified."
+          set -euo pipefail
+          VERSION="$(node -p "require('./packages/crl/package.json').version")"
+          test "$RELEASE_TAG" = "v$VERSION" || { echo "Release tag $RELEASE_TAG does not match v$VERSION"; exit 1; }
+          SDK_ASSET="smile-digital-health-crl-$VERSION.tgz"
+          SDK_DIR="$RUNNER_TEMP/crl-qualified-npm"
+          mkdir -p "$SDK_DIR"
+          downloaded=false
+          for attempt in 1 2 3 4 5; do
+            if gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$SDK_ASSET" --pattern SHA256SUMS --dir "$SDK_DIR" --clobber \
+              && [ -f "$SDK_DIR/$SDK_ASSET" ] && [ -f "$SDK_DIR/SHA256SUMS" ]; then
+              downloaded=true
+              break
+            fi
+            echo "Release assets unavailable on attempt $attempt of 5"
+            if [ "$attempt" -lt 5 ]; then sleep $((attempt * 10)); fi
+          done
+          test "$downloaded" = true || { echo "Qualified release assets could not be downloaded"; exit 1; }
+          node --input-type=module - "$SDK_DIR" "$SDK_ASSET" "$VERSION" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import assert from 'node:assert/strict';
+          const [directory, asset, version] = process.argv.slice(2);
+          const entries = readFileSync(join(directory, 'SHA256SUMS'), 'utf8').split(/\r?\n/)
+            .map(line => /^([0-9a-f]{64}) [ *](.+)$/.exec(line)).filter(entry => entry?.[2] === asset);
+          assert.equal(entries.length, 1, 'Exactly one checksum must identify the qualified archive');
+          const archive = join(directory, asset);
+          assert.equal(createHash('sha256').update(readFileSync(archive)).digest('hex'), entries[0][1], 'Archive SHA-256');
+          const manifest = JSON.parse(execFileSync('tar', ['-xOf', archive, 'package/package.json'], { encoding: 'utf8' }));
+          assert.equal(manifest.name, '@smile-digital-health/crl', 'Qualified package name');
+          assert.equal(manifest.version, version, 'Qualified package version');
+          const taggedManifest = JSON.parse(readFileSync('packages/crl/package.json', 'utf8'));
+          for (const field of ['main', 'bin', 'exports', 'types']) {
+            assert.deepEqual(manifest[field], taggedManifest[field], 'Published ' + field + ' must match tagged source');
+          }
+          const files = execFileSync('tar', ['-tf', archive], { encoding: 'utf8' }).trim().split(/\r?\n/);
+          assert.equal(new Set(files).size, files.length, 'Archive entries must be unique');
+          const targets = value => typeof value === 'string' ? [value]
+            : value && typeof value === 'object' ? Object.values(value).flatMap(targets) : [];
+          const required = [
+            ...targets(manifest.main), ...targets(manifest.bin), ...targets(manifest.exports), ...targets(manifest.types),
+            ...['session', 'nativeWorker', 'ownedProcess', 'driver', 'runtimeFingerprint', 'produce', 'runProducer', 'spawn']
+              .map(name => 'dist/results/' + name + '.js'),
+            ...['ApplyDriver.class', 'ApplyDriver.java', 'ApplyWorker.class', 'ApplyWorker.java', 'ApplyDriver.build.json', 'windows-owned-process.ps1']
+              .map(name => 'dist/results/driver/' + name),
+            'dist/cli/run-mcp-server.js',
+            'dist/authoring-kit/index.js', 'dist/flag-change-summary.schema.json',
+            'dist/cql-emitter/catalog/CRLCommon.cql', 'dist/cql-emitter/catalog/CaseFeatureCommon.cql',
+            'dist/cql-emitter/catalog/FHIRHelpers.cql',
+          ];
+          for (const target of required) {
+            const relative = target.replace(/^\.\//, '');
+            assert(files.includes('package/' + relative), 'Required package payload: ' + relative);
+          }
+          console.log(`Verified ${asset} ${entries[0][1]}`);
+          NODE
+          printf 'SDK_PATH=%s\n' "$SDK_DIR/$SDK_ASSET" >> "$GITHUB_ENV"
       - name: Publish to npm
-        run: npm publish -w @smile-digital-health/crl
+        run: npm publish "$SDK_PATH" --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
