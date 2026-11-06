@@ -7,11 +7,12 @@ import { spawn } from 'node:child_process';
 
 export const browserExecutable = [process.env.CRL_BROWSER_EXECUTABLE,
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  '/usr/bin/chromium', '/usr/bin/google-chrome'].find(path => path && existsSync(path));
+  '/usr/bin/google-chrome', '/usr/bin/chromium'].find(path => path && existsSync(path));
 
 /** Own an isolated browser and temporary profile; never connect to the operator's browser. */
 export async function browserFixture(html) {
   if (!browserExecutable) throw Error('No test browser executable');
+  const startedAt = Date.now();
   const root = mkdtempSync(join(tmpdir(), 'crl-browser-'));
   const file = join(root, 'fixture.html'); writeFileSync(file, html);
   // Hosted Linux runners can restrict Chrome's namespace sandbox. These browser processes load only generated test fixtures.
@@ -36,6 +37,7 @@ export async function browserFixture(html) {
   };
   try {
     const port = await until(() => /DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)/.exec(stderr)?.[1], 'owned debug port');
+    if (process.env.GITHUB_ACTIONS === 'true') console.log('Test browser ready: ' + browserExecutable + ' in ' + (Date.now() - startedAt) + 'ms');
     const target = await until(async () => (await (await fetch('http://127.0.0.1:' + port + '/json')).json()).find(t => t.type === 'page'), 'page');
     const socket = new WebSocket(target.webSocketDebuggerUrl); sockets.add(socket);
     await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
