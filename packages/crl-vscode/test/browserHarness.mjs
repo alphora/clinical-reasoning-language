@@ -14,19 +14,25 @@ export async function browserFixture(html) {
   if (!browserExecutable) throw Error('No test browser executable');
   const root = mkdtempSync(join(tmpdir(), 'crl-browser-'));
   const file = join(root, 'fixture.html'); writeFileSync(file, html);
+  // Hosted Linux runners can restrict Chrome's namespace sandbox. These browser processes load only generated test fixtures.
+  const runnerArgs = process.platform === 'linux' && process.env.GITHUB_ACTIONS === 'true' ? ['--no-sandbox'] : [];
   const child = spawn(browserExecutable, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-    '--remote-debugging-port=0', '--user-data-dir=' + join(root, 'profile'), pathToFileURL(file).href], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-  let stderr = '', spawnError;
+    ...runnerArgs, '--remote-debugging-port=0', '--user-data-dir=' + join(root, 'profile'), pathToFileURL(file).href], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '', spawnError, exited;
   child.stderr.on('data', value => { stderr += value; }); child.on('error', error => { spawnError = error; });
+  child.on('close', (code, signal) => { exited = { code, signal }; });
+  const diagnostics = () => 'executable: ' + browserExecutable + '\n' + (stderr.length <= 3500 ? stderr
+    : stderr.slice(0, 2500) + '\n...[stderr truncated]...\n' + stderr.slice(-1000));
   const sockets = new Set();
   const until = async (fn, label) => {
     const end = Date.now() + 15000;
     while (Date.now() < end) {
       if (spawnError) throw spawnError;
+      if (exited) throw Error('Browser exited: ' + JSON.stringify(exited) + '\n' + diagnostics());
       const value = await fn(); if (value) return value;
       await new Promise(resolve => setTimeout(resolve, 30));
     }
-    throw Error('Browser timeout: ' + label + '\n' + stderr.slice(-1000));
+    throw Error('Browser timeout: ' + label + '\n' + diagnostics());
   };
   try {
     const port = await until(() => /DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)/.exec(stderr)?.[1], 'owned debug port');
