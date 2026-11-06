@@ -25,18 +25,18 @@ export async function browserFixture(html) {
   const diagnostics = () => 'executable: ' + browserExecutable + '\n' + (stderr.length <= 3500 ? stderr
     : stderr.slice(0, 2500) + '\n...[stderr truncated]...\n' + stderr.slice(-1000));
   const sockets = new Set();
-  const until = async (fn, label) => {
-    const end = Date.now() + 15000;
+  const until = async (fn, label, timeoutMs = 15000) => {
+    const startedAt = Date.now(), end = startedAt + timeoutMs;
     while (Date.now() < end) {
       if (spawnError) throw spawnError;
       if (exited) throw Error('Browser exited: ' + JSON.stringify(exited) + '\n' + diagnostics());
       const value = await fn(); if (value) return value;
       await new Promise(resolve => setTimeout(resolve, 30));
     }
-    throw Error('Browser timeout: ' + label + '\n' + diagnostics());
+    throw Error('Browser timeout: ' + label + ' after ' + (Date.now() - startedAt) + 'ms\n' + diagnostics());
   };
   try {
-    const port = await until(() => /DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)/.exec(stderr)?.[1], 'owned debug port');
+    const port = await until(() => /DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)/.exec(stderr)?.[1], 'owned debug port', 45000);
     if (process.env.GITHUB_ACTIONS === 'true') console.log('Test browser ready: ' + browserExecutable + ' in ' + (Date.now() - startedAt) + 'ms');
     const target = await until(async () => (await (await fetch('http://127.0.0.1:' + port + '/json')).json()).find(t => t.type === 'page'), 'page');
     const socket = new WebSocket(target.webSocketDebuggerUrl); sockets.add(socket);

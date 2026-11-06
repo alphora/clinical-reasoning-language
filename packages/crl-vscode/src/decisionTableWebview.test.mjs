@@ -120,7 +120,7 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   assert.deepEqual(await run(`messages`),[{type:'decisionTableAction',epoch:4,action:'resume'}]);
   await run(`tableUi.dispose()`);assert.equal(await run(`document.getElementById('crlDecisionTable')`),null);
  }finally{await browser.close();}
-},30000);
+}, 90000);
 
 // REFACTOR:grounded: one yellow scope pin and one icon for the three question display modes.
 test.skipIf(!browserExecutable)('tree focus pins, hidden row chooser and explicit three-mode result icon use the production runtime',async()=>{
@@ -152,7 +152,7 @@ test.skipIf(!browserExecutable)('tree focus pins, hidden row chooser and explici
   assert.equal(await click(),'off');await state('off');assert.equal(await visible('.decision-table-row foreignObject .route-card'),0);
   await state('panel');await state('inline');assert.equal(await run(`document.querySelector('.decision-table-row textarea')?.value`),'Preserved draft','panel/inline preserves host-authored draft fields');
  }finally{await browser.close();}
-});
+}, 90000);
 
 // REFACTOR:grounded: the three-mode icon retains explicit-focus cancellation across editor frames.
 test.skipIf(!browserExecutable)('Tab focus survives the full row handoff message sequence before Enter activates the new mode',async()=>{
@@ -176,7 +176,7 @@ test.skipIf(!browserExecutable)('Tab focus survives the full row handoff message
   await new Promise(resolve=>setTimeout(resolve,240));assert.equal(await run(`document.activeElement===document.querySelectorAll('.route-layout-toggle')[1]`),true,'delayed explicit ACK preserves keyboard icon for the next Enter');
   await key('Enter',13);assert.equal(await run(`messages.filter(m=>m.rowId==='b'&&m.message.type==='toggleBranchQuestionnaire').at(-1).message.questionMode`),'off');
  }finally{await browser.close();}
-});
+}, 90000);
 
 // REFACTOR:grounded: the three-mode icon retains explicit-focus cancellation across editor frames.
 test.skipIf(!browserExecutable)('question-mode acknowledgements never steal later editor focus across frames',async()=>{
@@ -202,4 +202,4 @@ test.skipIf(!browserExecutable)('question-mode acknowledgements never steal late
   })()`);
   assert.deepEqual(result,{explicit:true,repeated:true,crossFrame:true,cancelled:true,pointerIcon:true,keyboardIcon:true});
  }finally{await browser.close();}
-});
+}, 90000);

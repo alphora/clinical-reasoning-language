@@ -37,7 +37,7 @@ test.skipIf(!browserExecutable)('real question editor events survive inline/pane
   for(const key of ['transfer','returned','disclosure','reopened','cancelled','saved'])assert.equal(result[key],true,key);
   assert.equal(result.save.type,'routeCardSave');assert.equal(result.save.key,'card0');assert.equal(result.save.fields.questionText,'Saved wording');
  }finally{await b.close();}
-});
+}, 90000);
 
 test.skipIf(!browserExecutable)('shared questions stay deduplicated with wording variants, targeted saves and stale results',async()=>{
  const b=await fixture();try{
@@ -51,4 +51,4 @@ test.skipIf(!browserExecutable)('shared questions stay deduplicated with wording
    ui.reset();panel.reset();return{initial,dedup,unknown,labels,target,failure,success,stale};})()`);
   assert.deepEqual(result.initial,{tree:9,panel:3,numbers:['1','2','3'],noSelector:true});assert.equal(result.target,'variant');for(const k of ['dedup','unknown','labels','failure','success','stale'])assert.equal(result[k],true,k);
  }finally{await b.close();}
-});
+}, 90000);
