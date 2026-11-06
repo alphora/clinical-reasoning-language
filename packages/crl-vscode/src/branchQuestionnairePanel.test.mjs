@@ -23,6 +23,18 @@ test('new questionnaires open beyond existing editor groups',()=>{
  delete vscode.window.tabGroups;
  assert.equal(nextQuestionnaireColumn(),-2);
 });
+
+test('Result Questionnaire opens beside the tree on creation and reopening',()=>{
+ let treeColumn=1;
+ const pane=createBranchQuestionnairePanel(()=>{},()=>{},()=>treeColumn+1);
+ pane.open({token:'first',cards:[]});
+ assert.equal(vscode.__panels.at(-1).column.viewColumn,2);
+ pane.close();
+ treeColumn=3;
+ pane.open({token:'second',cards:[]});
+ assert.equal(vscode.__panels.at(-1).column.viewColumn,4);
+ pane.close();
+});
 test('pane handshake replays newest branch and stale panels cannot write or close replacements',()=>{
  const messages=[];let closes=0;const pane=createBranchQuestionnairePanel(m=>messages.push(m),()=>closes++);
  pane.open({token:'one',cards:[]});const old=vscode.__panels.at(-1);

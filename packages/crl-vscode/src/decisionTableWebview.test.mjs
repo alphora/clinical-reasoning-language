@@ -69,6 +69,8 @@ test.skipIf(!browserExecutable)('two browser runtimes isolate rendering, actions
   await message({type:'requestSnapshot',token:'capture'});
   const html=await run(`messages.findLast(m=>m.type==='snapshotDom').html`);
   assert.equal(screenCapturedDom(html).ok,true);assert.match(html,/A draft/);assert.match(html,/Coverage error example/);assert.doesNotMatch(html,/<foreignObject|<textarea|<input/i);
+  const terminalLabels=await run(`const captured=new DOMParser().parseFromString(${JSON.stringify(html)},'text/html');[...captured.querySelectorAll('.decision-table-row')].map(row=>[...row.querySelectorAll('[data-flow-terminal]')].filter(node=>!node.closest('[hidden],.flow-focus-hidden')).map(node=>node.textContent).join(' '));`);
+  assert(terminalLabels.length===2 && terminalLabels.every(label=>label.includes('Met')),'each exported row retains its visible terminal outcome');
   assert.equal(await run(`savedRow.querySelectorAll('foreignObject .route-card').length`),2);
   assert.equal(html.split('A draft').length-1,1,'only the visible occurrence editor is exported');
   await message(row('a',{...pin,token:'closed',authoritativeDrafts:true,cards:[{...pin.cards[0],editing:false,draftText:'HIDDEN PRIVATE DRAFT'}]}));
@@ -135,6 +137,7 @@ test.skipIf(!browserExecutable)('tree focus pins, hidden row chooser and explici
   await message(layout);const row=(id,message)=>({type:'decisionTableRow',epoch:7,rowId:id,message});
   await message(row('a',{type:'render',gen:1,indexVersion:1,mode:'medical-validation',html:a.html}));await message(row('b',{type:'render',gen:2,indexVersion:1,mode:'medical-validation',html:b.html}));
   assert.equal(await run(`document.querySelectorAll('[data-table-case-selection][hidden]').length`),2);assert.equal(await visible('.decision-table-row-label button'),0);
+  assert.equal(await visible('.decision-table-row-label'),0,'terminal outcome is displayed in the branch rather than repeated above it');
   assert.equal(await run(`document.querySelectorAll('.decision-table-row-label button').length`),2,'picker capability retained');
   const pin={type:'routeCards',gen:1,token:'a-pin',pinKey:'end',routeKeys:['D','w','end'],cards:[{id:'q',ownerKey:'w',library:'L',concept:'Q',criterionPaths:[[{lib:'L',name:'C'}]],text:'Question?',answer:'yes',editable:true,editing:true,draftText:'Preserved draft',draftDescription:'Description',answerDraft:{kind:'boolean',value:true}}],questionMode:'off',authoritativeDrafts:true,label:'Case A'};
   await message(row('a',pin));await message(row('b',{...pin,gen:2,token:'b-pin',label:'Case B'}));

@@ -109,7 +109,7 @@ export function installDecisionTableWebview(
       let row = rows.get(description.id);
       if (!row) {
         const element = doc.createElement('section'); element.className = 'decision-table-row';
-        const header = doc.createElement('div'); header.className = 'decision-table-row-label';
+        const header = doc.createElement('div'); header.className = 'decision-table-row-label'; header.hidden = true;
         const label = doc.createElement('span'), caseLabel=doc.createElement('span'), selection=doc.createElement('span'), cases = doc.createElement('button'); cases.type = 'button'; cases.textContent = 'Choose case';
         // REFACTOR:grounded: retain the picker and evidence, hide only its row UI.
         selection.dataset.tableCaseSelection='';selection.hidden=true;selection.append(caseLabel,cases);
@@ -164,7 +164,7 @@ export const DECISION_TABLE_STYLE = `
 #crlDecisionTable[hidden],.cockpit-root[hidden],#root[hidden]{display:none!important}
 .decision-table-controls{display:flex;align-items:center;gap:8px;position:sticky;left:0;top:0;background:var(--vscode-editor-background,#1e1e1e);padding:8px 0;z-index:5;white-space:normal;flex-wrap:wrap}
 .decision-table-row{border-bottom:1px solid var(--vscode-panel-border,#454545);padding:12px 0 20px;white-space:normal;width:max-content;min-width:100%;box-sizing:border-box}
-.decision-table-row-label{display:flex;gap:12px;align-items:center;padding-bottom:8px;position:sticky;left:0;width:fit-content}
+.decision-table-row-label{display:flex;gap:12px;align-items:center;padding-bottom:8px;position:sticky;left:0;width:fit-content}.decision-table-row-label[hidden]{display:none}
 .decision-table-error{color:var(--vscode-errorForeground,#f48771);white-space:pre-wrap;margin:6px 0}
 .decision-table-row .flow-zoom{display:none}.decision-table-static-cards{max-width:800px;white-space:pre-wrap}
 `;

@@ -2806,7 +2806,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(message.type==='routeCardSave' || message.type==='routeCardAnswerSave')void saveCard(message,session);
     else if(message.type==='routeCardDraft')acceptCardDraft(message,true,session);
     else if(message.type==='qaRequestAction')qaRequestAction(message,session);
-  }, onBranchQuestionnaireClosed);
+  }, onBranchQuestionnaireClosed, () => {
+    const treeColumn = views.get('tree')?.panel.viewColumn;
+    return treeColumn === undefined ? undefined : treeColumn + 1;
+  });
   /** REFACTOR:grounded: UI mode is host-owned; open is panel telemetry, never a second preference. */
   function questionModeFor(session?: BranchSession): QuestionDisplayMode {return session?.questionMode??(session?'off':legacyQuestionMode);}
   function hasBranchQuestionCase(session: BranchSession): boolean {
@@ -2842,7 +2845,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(questionModeFor(session)!=='panel'||branchQuestionnaireOwner!==session)return;
     const pin=session?session.pin:pinnedCards;
     if(pin&&pin.epoch===indexVersion&&(!session||(branchSessionCurrent(session)&&pin.caseId===session.caseId&&pin.routeId===session.routeId))){
+      const opening = !branchQuestionnaire.isOpen;
       pin.payload.questionMode='panel';pin.payload.showQuestions=false;branchQuestionnaire.open(pin.payload);
+      if (opening) {
+        const treeColumn = views.get('tree')?.panel.viewColumn;
+        const fhir = views.get('fhirQuestionnaire')?.panel;
+        if (fhir && treeColumn !== undefined) fhir.reveal(treeColumn + 2, true);
+      }
     }else closeQuestionPanel(true); // A missing current-case payload stays pending; never borrow prior case data.
   }
   function setQuestionDisplayMode(session: BranchSession|undefined, requested: QuestionDisplayMode): void {
@@ -3268,7 +3277,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       answerOptionsByConcept: answerOptionsForDisplay(conceptLayer), answersFromByConcept: answersFromTerminologyForDisplay(conceptLayer),
     };
     const disclosureSet = session?.expanded ?? expandedGuardWhens;
-    const expanded = expandQuestionInputs(expandTraversalCriteria(disclosureSet,traversal,crlStructure,disclosureOptions), built.cards, crlStructure, disclosureOptions);
+    // REFACTOR:grounded: reveal a new pin's questions once; same-pin refresh preserves manual disclosures.
+    const sameTraversal = priorPin?.epoch === indexVersion && priorPin.caseId === caseId &&
+      priorPin.routeId === routeId && priorPin.traversalKey === selectedTraversalKey;
+    const expanded = sameTraversal ? disclosureSet :
+      expandQuestionInputs(expandTraversalCriteria(disclosureSet,traversal,crlStructure,disclosureOptions), built.cards, crlStructure, disclosureOptions);
     if (expanded.size !== disclosureSet.size) {
       if (session) { session.expanded = expanded; renderBranchSession(session,focusRequest); return; }
       expandedGuardWhens = expanded; renderPane('tree',undefined,undefined,focusRequest);
@@ -3761,7 +3774,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(mode!=='medical-validation')return;
     const existing=views.get(pane);
     if(existing) { dispatch({type:'setPaneVisible',pane,visible:false});existing.panel.dispose(); }
-    else { ensurePane(pane,nextQuestionnaireColumn());dispatch({type:'setPaneVisible',pane,visible:true});renderPane(pane); }
+    else {
+      const treeColumn = views.get('tree')?.panel.viewColumn;
+      const column = pane === 'fhirQuestionnaire' && branchQuestionnaire.isOpen && treeColumn !== undefined
+        ? treeColumn + 2 : nextQuestionnaireColumn();
+      ensurePane(pane,column);dispatch({type:'setPaneVisible',pane,visible:true});renderPane(pane);
+    }
     renderTreeChrome();
   }
   function ensurePane(pane: Pane, column?: vscode.ViewColumn): PaneView {

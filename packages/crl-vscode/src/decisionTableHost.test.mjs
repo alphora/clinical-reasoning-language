@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { createHash } from 'node:crypto';
 import { caseDisplayName } from './caseDisplayName.ts';
+import { treeTraversalSignature } from './unpinnedTreeFocus.ts';
 import { branchMessageIsCurrent, branchCaptureManifest } from './decisionTableSessions.ts';
 const source=ts.createSourceFile('cockpit.ts',readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
 function host(names,environment,result,deps={}){
@@ -236,18 +237,18 @@ test('an unexpected loader rejection reports a diagnostic and path instead of le
 
 // REFACTOR:grounded: execute the real host mode/owner/focus handlers with the panel's synchronous close callback.
 function questionHost(){
- const a=row('a'),b=row('b'),empty=row('empty'),rows=[a,b,empty],opens=[],posts=[];
+ const a=row('a'),b=row('b'),empty=row('empty'),rows=[a,b,empty],opens=[],posts=[],moves=[];
  for(const r of rows){r.questionMode='off';r.caseId=r.id+'Case';r.routeId=r.id+'Route';r.pin.payload.token=r.pin.token;r.pin.payload.authoritativeDrafts=true;r.pin.payload.cards[0].draftText=r.id+' unsaved';}
  empty.caseId=empty.routeId=undefined;empty.row.cases=[];empty.pin=undefined;
  const h=host(['focusBranchSession','syncQuestionPanel','closeQuestionPanel','setQuestionDisplayMode','handleDecisionTableMessage'],`
  let mode='medical-validation',indexVersion=1,legacyQuestionMode='off',focusedBranchSession,branchQuestionnaireOwner,pinnedCards;
  const decisionTable={epoch:'table',sessions:new Map(deps.rows.map(r=>[r.id,r]))},scenarioByCaseId=new Map([['aCase',{}],['bCase',{}]]);
- const branchMessageIsCurrent=deps.branchMessageIsCurrent,views=new Map([['tree',{gen:1,panel:{webview:{postMessage:m=>deps.posts.push(m)}}}]]);
+ const branchMessageIsCurrent=deps.branchMessageIsCurrent,views=new Map([['tree',{gen:1,panel:{viewColumn:2,webview:{postMessage:m=>deps.posts.push(m)}}}],['fhirQuestionnaire',{panel:{reveal:(...args)=>deps.moves.push(args)}}]]);
  const syncFhirInspection=()=>{},coord={ready(){}},paintBranchSession=()=>{};let opened=false;
  const branchQuestionnaire={get isOpen(){return opened},open:payload=>{if(!payload?.token)throw Error('Empty panel payload');opened=true;deps.opens.push(payload);},close:()=>{if(!opened)return;opened=false;onBranchQuestionnaireClosed();}};`,
  `return{set:setQuestionDisplayMode,focus:focusBranchSession,sync:syncQuestionPanel,close:closeQuestionPanel,manualClose:()=>branchQuestionnaire.close(),legacy:()=>legacyQuestionMode,setLegacy:mode=>{legacyQuestionMode=mode},
- message:handleDecisionTableMessage,owner:()=>branchQuestionnaireOwner,open:()=>opened};`,{rows,opens,posts});
- return{...h,a,b,empty,opens,posts};
+ message:handleDecisionTableMessage,owner:()=>branchQuestionnaireOwner,open:()=>opened};`,{rows,opens,posts,moves});
+ return{...h,a,b,empty,opens,posts,moves};
 }
 test('three explicit question modes share host draft state and manual/inline closure cannot reset intended mode',()=>{
  const h=questionHost();h.setLegacy('inline');h.set(h.a,'panel');assert.equal(h.a.questionMode,'panel');assert.equal(h.owner(),h.a);assert(h.open());
@@ -296,4 +297,51 @@ test('programmatic token-refresh close preserves intent, and panel-to-inline use
 test('an inline destination keeps its explicit mode instead of receiving an unrequested panel transfer',()=>{
  const h=questionHost();h.set(h.b,'inline');h.focus(h.a);h.set(h.a,'panel');h.focus(h.b);
  assert.equal(h.b.questionMode,'inline');assert.equal(h.a.questionMode,'panel');assert.equal(h.owner(),h.a);
+});
+
+// REFACTOR:grounded: rebuilding the same pin preserves manually folded question inputs.
+test('same-pin refresh preserves disclosures while a new case, route or source reveals its questions',()=>{
+ const session=row('a');session.expanded=new Set();session.pin.payload.cards=[];
+ session.pin.traversalKey=treeTraversalSignature({route:{nodeKeys:['end']}});
+ const h=host(['pinCards'],`
+ let indexVersion=1,mode='medical-validation',currentCel,pinnedCards,expandedGuardWhens=new Set(),legacyQuestionMode='off';
+ const views=new Map([['tree',deps.session.view]]),scenarioByCaseId=new Map([['aCase',{case:{name:'A'},tree:[]}]]),crlStructure=[],conceptLayer=[],guardOutlines=new Map(),crlMaps=undefined;
+ const route={terminalId:'aRoute',nodeIds:[],nodeKeys:['end'],terminalKind:'Met'},traversal={caseId:'aCase',route};
+ const routesForCase=()=>[route],treeTraversalEntries=()=>[traversal],treeTraversalSignature=deps.treeTraversalSignature;
+ const branchSessionCurrent=()=>true,branchNavigation=()=>({index:0,total:1}),branchNeighbors=()=>({index:0,total:1}),clearTreeFocus=()=>{},caseIdsThroughReviewNode=()=>[],driveLeafMarks=()=>{},whenKeyResolver=()=>()=>undefined;
+ const buildRouteQuestionnaire=()=>({questions:[]}),buildResolveValueTypes=()=>()=>{},buildConceptShapeResolver=()=>()=>{},buildDefExprResolver=()=>()=>{};
+ const buildRouteCards=()=>({cards:[],targets:new Map()}),buildAnswerContributions=()=>new Map(),definitionValueInputs=()=>new Map();
+ const answerOptionsForDisplay=()=>new Map(),answersFromTerminologyForDisplay=()=>new Map();
+ let reveals=0,renders=0;
+ const expandTraversalCriteria=state=>{reveals++;return new Set([...state,'input']);},expandQuestionInputs=state=>state;
+ const renderBranchSession=()=>{renders++;},leafBucketsFromQuestionnaire=()=>({yesKeys:[],noKeys:[]}),conditionTruthKeys=()=>[];
+ const treeFocusPaint=()=>({nodeKeys:[],groupKeys:[],groupOutcomes:[]}),pinnedVerdict=()=>{},randomUUID=()=> 'new-token';
+ const postBranch=()=>{},syncQuestionPanel=()=>{},paintBranchSession=()=>{},questionModeFor=()=> 'off';
+ `,`return{pin:(prior,legacy=false)=>pinCards('aCase','aRoute',undefined,false,undefined,prior,legacy?undefined:deps.session),reveals:()=>reveals,renders:()=>renders,legacyState:()=>expandedGuardWhens};`,{session,treeTraversalSignature});
+ const original={...session.pin};
+ h.pin(original);assert.equal(h.reveals(),0,'same current pin keeps manually collapsed Input');assert.equal(h.renders(),0);
+ h.pin(original,true);assert.equal(h.reveals(),0,'legacy pin refresh also preserves manual disclosures');assert.equal(h.legacyState().size,0);
+ for(const changed of [undefined,{...original,caseId:'other'},{...original,routeId:'other'},
+   {...original,epoch:0}]){
+   session.expanded=new Set();session.pin=undefined;
+   h.pin(changed);assert(session.expanded.has('input'),'new pin reveals question ancestry');
+ }
+ assert.equal(h.reveals(),4);assert.equal(h.renders(),4);
+});
+
+// REFACTOR:grounded: both questionnaires occupy distinct columns beside the tree.
+test('opening Result moves the existing FHIR pane after it, while row updates preserve placement',()=>{
+ const h=questionHost();h.set(h.a,'panel');assert.deepEqual(h.moves,[[4,true]]);
+ h.focus(h.a);h.focus(h.b);assert.equal(h.moves.length,1,'same open panel is reused across rows');
+ h.manualClose();h.set(h.b,'panel');assert.deepEqual(h.moves,[[4,true],[4,true]]);
+});
+
+test('FHIR opened with Result already visible uses the following column',()=>{
+ const h=host(['toggleQuestionnairePane'],`
+ const mode='medical-validation',views=new Map([['tree',{panel:{viewColumn:2}}]]),branchQuestionnaire={isOpen:true};
+ const created=[],ensurePane=(pane,column)=>created.push([pane,column]),dispatch=()=>{},renderPane=()=>{},renderTreeChrome=()=>{},nextQuestionnaireColumn=()=>8;
+ `,`return{toggle:toggleQuestionnairePane,created,setOpen:value=>{branchQuestionnaire.isOpen=value}};`);
+ h.toggle('fhirQuestionnaire');assert.deepEqual(h.created,[['fhirQuestionnaire',4]]);
+ h.toggle('questionnaire');assert.deepEqual(h.created.at(-1),['questionnaire',8]);
+ h.setOpen(false);h.toggle('fhirQuestionnaire');assert.deepEqual(h.created.at(-1),['fhirQuestionnaire',8]);
 });
