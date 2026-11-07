@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { transformSync } from 'esbuild';
 import { vi, afterEach } from 'vitest';
-import { listSourceDocuments, showSourceDocuments } from './sourceDocuments.ts';
+import { listSourceDocuments, resolveSourceDocument, showSourceDocuments } from './sourceDocuments.ts';
 import { findPolicySrc } from './provenanceFindings.ts';
 import { COCKPIT_WEBVIEW_SCRIPT } from './correspondenceCockpit.ts';
 
@@ -126,20 +126,22 @@ test('a selected nested folder swapped to an outside junction is not followed at
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cockpit = ts.createSourceFile('cockpit.ts', readFileSync(join(here, 'correspondenceCockpit.ts'), 'utf8'), ts.ScriptTarget.Latest, true);
-let openFunction;
-function visit(node) { if (ts.isFunctionDeclaration(node) && node.name?.text === 'openPolicySourceDocuments') openFunction = node; ts.forEachChild(node, visit); }
+let openFunction, toolbarFunction;
+function visit(node) { if (ts.isFunctionDeclaration(node) && node.name?.text === 'openPolicySourceDocuments') openFunction = node; if (ts.isFunctionDeclaration(node) && node.name?.text === 'openToolbarSourceDocument') toolbarFunction = node; ts.forEachChild(node, visit); }
 visit(cockpit);
 function host(f, pick = async items => items.find(x => x.document)) {
   const messages = [], opens = [], pickers = [];
   const c = vm.createContext({
     mode: 'medical-validation', currentCel: f.file('cel', 'broken.cel', 'invalid CEL syntax'), sourceDocumentsBusy: false,
-    findPolicySrc, showSourceDocuments,
+    findPolicySrc, showSourceDocuments, resolveSourceDocument,
+    openReadonlySourceDocument: async (file, validate) => { validate(); opens.push(['vscode.open', { fsPath: file, scheme: 'file' }, { viewColumn: -2, preview: false }]); },
     vscode: { QuickPickItemKind: { Separator: -1 }, ViewColumn: { Beside: -2 }, Uri: { file: fsPath => ({ fsPath, scheme: 'file' }) },
       window: { showQuickPick: async (items, options) => { pickers.push([items, options]); return pick(items); }, showInformationMessage: x => messages.push(x), showWarningMessage: x => messages.push(x), setStatusBarMessage: x => messages.push(x) },
       commands: { executeCommand: async (...args) => { opens.push(args); } },
     },
   });
   assert.ok(openFunction); vm.runInContext(transformSync(openFunction.getText(cockpit), { loader: 'ts' }).code, c);
+  assert.ok(toolbarFunction); vm.runInContext(transformSync(toolbarFunction.getText(cockpit), { loader: 'ts' }).code, c);
   return { c, messages, opens, pickers };
 }
 test('actual host adapter uses layout only, groups choices and opens the default editor beside MV without preview', async () => {
@@ -180,4 +182,26 @@ test('source documents command is contributed and registered independently of th
   const source = readFileSync(join(here, 'correspondenceCockpit.ts'), 'utf8');
   assert.match(source, /const sourceDocumentsCmd = vscode.commands.registerCommand\("crl.medicalValidation.openSourceDocuments", \(\) => void openPolicySourceDocuments\(\)\)/);
   assert.match(source, /context.subscriptions.push\([\s\S]*sourceDocumentsCmd,/);
+});
+
+test('direct toolbar route uses an owned token/index and rechecks identity after async readonly setup', async () => {
+  const f=fixture();try{
+    const file=f.file('source','a.pdf'),h=host(f);
+    h.c.sourceDocumentsSnapshot={cel:h.c.currentCel,src:f.src,token:'owned',documents:listSourceDocuments(f.src).documents};
+    await h.c.openToolbarSourceDocument('wrong',0);await h.c.openToolbarSourceDocument('owned',-1);await h.c.openToolbarSourceDocument('owned',99);assert.equal(h.opens.length,0);
+    await h.c.openToolbarSourceDocument('owned',0);assert.equal(h.opens[0][1].fsPath,realpathSync(file));assert.equal(h.pickers.length,0);
+    let complete;h.c.openReadonlySourceDocument=async(file,validate)=>{await new Promise(resolve=>complete=resolve);validate();h.opens.push(['unexpected']);};
+    const pending=h.c.openToolbarSourceDocument('owned',0);await vi.waitFor(()=>assert.ok(complete));h.c.currentCel='different policy';complete();await pending;
+    assert.equal(h.opens.length,1);assert.match(h.messages.at(-1),/selected policy changed/);
+  }finally{f.close();}
+});
+
+test('direct toolbar route rejects a source-root junction retargeted during readonly setup',async()=>{
+  const f=fixture();try{
+    const first=join(f.root,'first'),second=join(f.root,'second');mkdirSync(first);mkdirSync(second);writeFileSync(join(first,'a.pdf'),'first');writeFileSync(join(second,'a.pdf'),'second');
+    const link=join(f.src,'source');f.link(first,link);const h=host(f);
+    h.c.sourceDocumentsSnapshot={cel:h.c.currentCel,src:f.src,token:'owned',documents:listSourceDocuments(f.src).documents};
+    h.c.openReadonlySourceDocument=async(file,validate)=>{unlinkSync(link);symlinkSync(second,link,process.platform==='win32'?'junction':'dir');validate();h.opens.push(['unexpected']);};
+    await h.c.openToolbarSourceDocument('owned',0);assert.equal(h.opens.length,0);assert.match(h.messages.at(-1),/no longer available/);
+  }finally{f.close();}
 });

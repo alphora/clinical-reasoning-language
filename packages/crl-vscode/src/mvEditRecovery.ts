@@ -1,6 +1,15 @@
 // REFACTOR:grounded (Medical Review): recover local filesystem publication; KELP owns lock and Save recovery.
 import {readScopeOperation,writeScopeOperation} from './mvScopeCoordinator';
 import {MvEditTransaction} from './mvEditTransaction';
+import type {ScopeOperation} from './mvScopeCoordinator';
+
+export function scopeNeedsRecovery(operation: ScopeOperation): boolean {
+ return !operation.localComplete && ['planning','locked','acquiring','scope-outcome-unknown','publishing','local-applied','save-failed','save-in-flight','save-outcome-unknown'].includes(operation.phase);
+}
+
+export function scopeHasRetainedLocks(operation: ScopeOperation): boolean {
+ return [...operation.acquired,...operation.attempted??[]].some(key=>!operation.released?.includes(key) && !operation.preExisting.includes(key));
+}
 
 
 export async function reconcileScopeOperation(file:string,root:string){

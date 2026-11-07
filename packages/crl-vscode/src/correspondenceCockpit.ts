@@ -1,6 +1,8 @@
 import { buildAnswerContributions, contributionsForOccurrences } from "./answerContributions";
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
-import { showSourceDocuments, type SourceDocument } from './sourceDocuments';
+import { listSourceDocuments, resolveSourceDocument, showSourceDocuments, type SourceDocument } from './sourceDocuments';
+import { openReadonlySourceDocument } from './sourceDocumentOpener';
+import { hasReviewEditHistory, renderMvTreeChrome, MV_TREE_CHROME_STYLE } from './mvTreeChrome';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
 import { applyKeFlagAction, keFlagRevision, keFlagContentRevision, isKeAnswerSavedError } from './flagWorkflowStore';
@@ -179,7 +181,7 @@ import {resolveAnswerTarget,type AnswerTarget,type AnswerChange} from "./answerE
 import { graphWordingSources, resolveSourceWordingTarget, pendingPresentationProposals, withdrawPresentationProposal, type WordingTarget } from "./presentationProposal";
 import { mvPublicationOptions } from './mvDirectEdit';
 import { inspectScopeOperations } from './mvScopeCoordinator';
-import { reconcileScopeOperation } from './mvEditRecovery';
+import { reconcileScopeOperation, scopeNeedsRecovery, scopeHasRetainedLocks } from './mvEditRecovery';
 import { inspectMvEdits } from './mvEditTransaction';
 import { MvDefinitionFreshness, type DefinitionFreshness } from './mvDefinitionFreshness';
 import { conditionTruthKeys, projectFlowStructure } from "./flowProjection";
@@ -526,6 +528,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // webview for `#root`). Single-flight, settle-once; the pure state machine lives in snapshotCapture.ts.
   const snapshotCapture = new SnapshotCapture();
   let sourceDocumentsBusy = false;
+  let sourceDocumentsSnapshot: { cel: string; src: string; token: string; documents: SourceDocument[] } | undefined;
   let snapshotExporting = false; // command-level single-flight: guards the WHOLE export (capture → dialog → write), so a second toolbar click while the save dialog is open can't stack two dialogs
   // #224 ii.3 Slice 2: nodeKeys of single-criterion `when`s the user has EXPANDED (default: all collapsed). Ephemeral —
   // not persisted (reload → all-collapsed-with-verdict is the desired steady state). NodeKeys are case-independent, so
@@ -588,6 +591,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // all its occurrences + cases); the live render's `criterionOccurrences` + `guardOutlines` supply the bodyHash for staleness.
   let criterionVerdicts: Record<string, PersistedCriterionVerdict> = {};
   let mvEditBusy = false, mvDeferredRebuild = false, mvRecoveryBlock: string | undefined, mvSaveNotice: string | undefined;
+  let mvRecoveryAvailable = false;
   const definitionFreshness = new MvDefinitionFreshness();
   let currentDefinitions: DefinitionFreshness = {state:'checking',message:'Checking current policy definitions.'};
   let modelDefinitionDigest:string|undefined;
@@ -625,6 +629,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
   function loadEditRecovery(root: string): void {
     mvRecoveryBlock=undefined;mvSaveNotice=undefined;
+    mvRecoveryAvailable=false;
     try {
       const storage=editStorage(root);
       const inspection=inspectMvEdits(join(storage,'transactions'),root,true);
@@ -633,9 +638,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const operations=join(storage,'operations');
       const inspected=inspectScopeOperations(operations,root);
       if(inspected.errors.length)throw new Error(inspected.errors.map(e=>`${e.file}: ${e.message}`).join('; '));
+      mvRecoveryAvailable=inspected.operations.some(o=>scopeNeedsRecovery(o.operation)||scopeHasRetainedLocks(o.operation))
+        || inspection.transactions.some(tx=>['prepared','publishing','recovery-required'].includes(tx.state.phase) && !inspected.operations.some(o=>o.operation.transactionDirectory===tx.directory));
       const unknown=inspected.operations.filter(o=>['planning','locked','acquiring','scope-outcome-unknown','publishing','save-in-flight','save-outcome-unknown'].includes(o.operation.phase));
       if(incomplete.length || unknown.length)mvRecoveryBlock='A prior policy edit requires recovery or KELP outcome reconciliation. Open Medical Review edit recovery before saving changes.';
-    }catch(error){mvRecoveryBlock=`Medical Review recovery evidence cannot be read: ${String(error)}`;}
+    }catch(error){mvRecoveryAvailable=true;mvRecoveryBlock=`Medical Review recovery evidence cannot be read: ${String(error)}`;}
   }
   let mvDefinitionRevision: MedicalReviewDefinitionRevision | undefined;
   // #211 create-flag drawer — the in-flight flag draft (the resolved target + prefill + the policy identity captured at
@@ -1195,7 +1202,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const sourceDocumentsBtn = mode === "medical-validation" ? `<div class="fc-toggle"><button class="fc-toggle-btn" data-open-source-documents title="Open a Source or Refined source document">Source documents…</button></div>` : "";
     const definitionMessage=definitionStatusMessage();
     const definitionStatus=mode==='medical-validation' && definitionMessage?`<div role="status" class="fc-gaps">${escapeHtml(definitionMessage)}</div>`:'';
-    return definitionStatus + progress + toggle + diverterToggle + exportBtn + sourceDocumentsBtn + reviewVerdictsBtn + questionnaires + (mode==='medical-validation'?'<div class="fc-toggle"><button class="fc-toggle-btn" data-mv-edit-action="history">Review edit history</button><button class="fc-toggle-btn" data-mv-edit-action="recovery">Edit recovery</button></div>':'') + banner + flowLegendChrome(mode);
+    if (mode !== 'medical-validation') return definitionStatus + progress + toggle + diverterToggle + exportBtn + sourceDocumentsBtn + reviewVerdictsBtn + questionnaires + banner + flowLegendChrome(mode);
+    const src = currentCel && findPolicySrc(currentCel);
+    const documents = src ? listSourceDocuments(src) : { documents: [], complete: true, warnings: [] };
+    const token = randomUUID();
+    sourceDocumentsSnapshot = src && currentCel ? { cel: currentCel, src, token, documents: documents.documents } : undefined;
+    const highlighting = `<div class="fc-toggle" title="Compare the selected test case with its expected result. A correctly expected Unmet result is a passing test."><span class="fc-toggle-label">Highlight:</span>`
+      + `<button class="fc-toggle-btn${failedCriteriaMode === 'blocking' ? ' fc-active' : ''}" data-fc-mode="blocking" aria-pressed="${failedCriteriaMode === 'blocking'}" title="Highlight conditions or earlier matches that prevented the test's expected result">Expected-result blockers</button>`
+      + `<button class="fc-toggle-btn${failedCriteriaMode === 'all' ? ' fc-active' : ''}" data-fc-mode="all" aria-pressed="${failedCriteriaMode === 'all'}" title="Highlight every evaluated false condition, including conditions on other branches">All unmet conditions</button></div>`;
+    const explanation = diverterToggle.replace('Details:', 'Explain outcome:');
+    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
+  }
+
+  async function openToolbarSourceDocument(token: unknown, index: unknown): Promise<void> {
+    const snapshot = sourceDocumentsSnapshot;
+    if (!snapshot || mode !== 'medical-validation' || currentCel !== snapshot.cel || token !== snapshot.token || !Number.isSafeInteger(index) || (index as number) < 0) return;
+    const document = snapshot.documents[index as number];
+    if (!document) return;
+    try {
+      const file = resolveSourceDocument(snapshot.src, document);
+      await openReadonlySourceDocument(file, () => {
+        if (currentCel !== snapshot.cel || mode !== 'medical-validation' || findPolicySrc(snapshot.cel) !== snapshot.src) throw Error('The selected policy changed. Open the source document from the current tree.');
+        if (resolveSourceDocument(snapshot.src, document) !== file) throw Error('The source document changed while opening. Refresh the tree and try again.');
+      });
+    } catch (error) { void vscode.window.showWarningMessage(`Could not open source document: ${error instanceof Error ? error.message : String(error)}`); }
   }
 
   /** Open the selected policy's source documents using its folder layout and default editors. */
@@ -1213,10 +1243,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       void vscode.window.showWarningMessage('Could not locate the source folders for this policy.');
       return;
     }
+    const cel = currentCel;
+    let documentsAtOpen: readonly SourceDocument[] = [];
     sourceDocumentsBusy = true;
     try {
       await showSourceDocuments(src, {
         choose: async (documents, options) => {
+          documentsAtOpen = documents;
           const items: (vscode.QuickPickItem & { document?: SourceDocument })[] = [];
           let group: SourceDocument['group'] | undefined;
           for (const document of documents) {
@@ -1232,7 +1265,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
           });
           return chosen?.document;
         },
-        open: file => vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file), { viewColumn: vscode.ViewColumn.Beside, preview: false }),
+        open: file => openReadonlySourceDocument(file, () => {
+          if (currentCel !== cel || mode !== 'medical-validation') throw Error('The selected policy changed. Reopen Source documents.');
+          const document = documentsAtOpen.find(document => document.filePath === file);
+          if (!document || resolveSourceDocument(src, document) !== file) throw Error('The source document changed. Reopen Source documents.');
+        }),
         message: (text, level) => { void (level === 'warning' ? vscode.window.showWarningMessage(text) : vscode.window.showInformationMessage(text)); },
       });
     } finally { sourceDocumentsBusy = false; }
@@ -3390,10 +3427,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     try{
       const inspection=inspectMvEdits(join(storage,'transactions'),root),transactions=inspection.transactions,ops=join(storage,'operations');
       const operationInspection=inspectScopeOperations(ops,root),operations=operationInspection.operations;
-      const choices:{label:string;description:string;detail?:string;operation?:typeof operations[number];transaction?:typeof transactions[number];inspectFile?:string;locks?:boolean}[]=operations.filter(o=>!o.operation.localComplete && ['planning','locked','acquiring','scope-outcome-unknown','publishing','local-applied','save-failed','save-in-flight','save-outcome-unknown'].includes(o.operation.phase)).map(o=>({label:String(o.operation.phase),description:o.operation.id,operation:o}));
+      const choices:{label:string;description:string;detail?:string;operation?:typeof operations[number];transaction?:typeof transactions[number];inspectFile?:string;locks?:boolean}[]=operations.filter(o=>scopeNeedsRecovery(o.operation)).map(o=>({label:String(o.operation.phase),description:o.operation.id,operation:o}));
       for(const error of inspection.errors)choices.push({label:'Unreadable edit journal',description:error.directory,detail:error.message,inspectFile:join(error.directory,'journal.json')});
       for(const error of operationInspection.errors)choices.push({label:'Unreadable scope operation',description:error.file,detail:error.message,inspectFile:error.file});
-      for(const o of operations.filter(o=>[...o.operation.acquired,...o.operation.attempted??[]].some(k=>!o.operation.released?.includes(k) && !o.operation.preExisting.includes(k)) && (o.operation.localComplete || !['planning','locked','acquiring','scope-outcome-unknown','publishing','local-applied','save-failed','save-in-flight','save-outcome-unknown'].includes(o.operation.phase))))choices.push({label:'View edit scope status',description:o.operation.id,detail:`${o.operation.phase}: ${[...new Set([...o.operation.acquired,...o.operation.attempted??[]])].filter(k=>!o.operation.released?.includes(k) && !o.operation.preExisting.includes(k)).join(', ')}${o.operation.detail?' | '+o.operation.detail:''}`,operation:o,locks:true});
+      for(const o of operations.filter(o=>scopeHasRetainedLocks(o.operation) && !scopeNeedsRecovery(o.operation)))choices.push({label:'View edit scope status',description:o.operation.id,detail:`${o.operation.phase}: ${[...new Set([...o.operation.acquired,...o.operation.attempted??[]])].filter(k=>!o.operation.released?.includes(k) && !o.operation.preExisting.includes(k)).join(', ')}${o.operation.detail?' | '+o.operation.detail:''}`,operation:o,locks:true});
       for(const tx of transactions.filter(t=>['prepared','publishing','recovery-required'].includes(t.state.phase)))if(!operations.some(o=>o.operation.transactionDirectory===tx.directory))choices.push({label:tx.state.phase,description:tx.state.id,transaction:tx});
       if(!choices.length){loadEditRecovery(root);if(inspection.errors.length)throw new Error(inspection.errors.map(e=>`${e.directory}: ${e.message}`).join('; '));void vscode.window.showInformationMessage('No interrupted edit needs recovery. Locally applied edits can be saved through KELP.');renderTreeChrome();return;}
       const choice=await vscode.window.showQuickPick(choices,{placeHolder:'Recover an interrupted edit or reconcile its KELP Save outcome'});
@@ -3548,6 +3585,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // #(tree-snapshot) Todo 2 — the tree webview's reply to `requestSnapshot` (only the TREE pane is a valid source). The
       // coordinator ignores a stale/late token; the payload is COERCED to string here + fully screened in captureTreeDom.
       snapshotCapture.resolve(msg.token, typeof msg.html === "string" ? msg.html : undefined);
+    } else if (msg.type === "openToolbarSourceDocument" && pane === "tree") {
+      void openToolbarSourceDocument(msg.token, msg.idx);
     } else if (msg.type === "openSourceDocuments" && pane === "tree") {
       void openPolicySourceDocuments();
     } else if (msg.type === "exportSnapshot" && pane === "tree") {
@@ -6517,7 +6556,7 @@ export function paneShellFragments(
   return { head, bodyScripts };
 }
 
-function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string): string {
+export function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string): string {
   const nonce = randomBytes(16).toString("base64");
   const styleNonce = randomBytes(16).toString("base64");
   const csp = cockpitPaneCsp(pane, { nonce, styleNonce, cspSource });
@@ -6608,6 +6647,7 @@ function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string):
 .failed-criterion-preempt::after{content:" ◂ diverted here";color:var(--vscode-charts-yellow,#d29922);font-size:.85em;opacity:.9}
 #fcChrome{white-space:normal}
 #fcChrome:empty{display:none}
+${MV_TREE_CHROME_STYLE}
 #flagDrawer:empty{display:none}
 /* #211 create-flag drawer — a fixed right-side panel (mirrors .cel-notes-drawer), in its OWN #flagDrawer region so a
    tree re-render never wipes it. Column layout; the fields scroll; the actions pin to the bottom. z-index sits ABOVE the
@@ -7050,7 +7090,7 @@ const COCKPIT_WEBVIEW_BODY =
   `window.addEventListener('pointerup',()=>{if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
   `root.addEventListener('click',(e)=>{if(fpMoved){fpMoved=false;e.stopPropagation();e.preventDefault();}},true);` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
-  `fcc.addEventListener('click',(e)=>{const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
+  `fcc.addEventListener('click',(e)=>{const documentButton=e.target.closest&&e.target.closest('[data-source-document]');if(documentButton){e.preventDefault();if(!documentButton.disabled)v.postMessage({type:'openToolbarSourceDocument',token:documentButton.getAttribute('data-source-token'),idx:Number(documentButton.getAttribute('data-source-document'))});return;}const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
   // disc 164: the produced-path diverter overlay on/off toggle (MV chrome).
   `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +

@@ -67,6 +67,15 @@ export function listSourceDocuments(policySrc: string, limits: { maxEntries?: nu
   return result;
 }
 
+/** Re-resolve the exact listed identity, including its source root, on every open. */
+export function resolveSourceDocument(policySrc: string, document: SourceDocument): string {
+  const current = listSourceDocuments(policySrc).documents.find(item => item.group === document.group && item.relativePath === document.relativePath && item.filePath === document.filePath && item.sourceRoot === document.sourceRoot);
+  if (!current || !lstatSync(current.filePath).isFile()) throw Error('That source document is no longer available. Refresh the tree and try again.');
+  const file = realpathSync(current.filePath);
+  if (!within(document.sourceRoot, file)) throw Error('That source document moved outside its listed folder. Reopen Source documents.');
+  return file;
+}
+
 export async function showSourceDocuments(policySrc: string, ui: SourceDocumentUi): Promise<void> {
   try {
     const listing = listSourceDocuments(policySrc);
