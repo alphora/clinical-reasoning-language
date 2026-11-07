@@ -43,13 +43,15 @@ export function renderMvTreeChrome(input: MvTreeChrome): string {
   const history = input.history ? '<button class="fc-toggle-btn" data-mv-edit-action="history">Edit history</button>' : '';
   const recovery = input.recovery ? '<button class="fc-toggle-btn mv-attention" data-mv-edit-action="recovery">Recover interrupted edit</button>' : '';
   const warning = !input.documents.complete ? `<div class="mv-toolbar-notice" role="status">${escape(input.documents.warnings.join(' '))}</div>` : '';
-  const actions = `<div class="fc-toggle mv-document-buttons">${documents}</div>${input.tools}${input.questionnaires}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>` + (history || recovery ? `<div class="fc-toggle">${history}${recovery}</div>` : '');
+  const actions = `${input.tools}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>${input.questionnaires}`
+    + (history || recovery ? `<div class="fc-toggle">${history}${recovery}</div>` : '')
+    + `<div class="fc-toggle mv-document-buttons">${documents}</div>`;
   return `<div class="mv-toolbar">${group('Status', input.status + warning)}${group('Actions', actions)}${group('Legend', input.legend)}</div>`;
 }
 
 export const MV_TREE_CHROME_STYLE = `
-.mv-toolbar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px 26px;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
-.mv-toolbar-group{min-width:0;max-width:100%}.mv-toolbar-status{flex:0 1 180px}.mv-toolbar-actions{flex:1 1 400px}.mv-toolbar-legend{flex:0 1 345px}
+.mv-toolbar{display:grid;grid-template-columns:minmax(110px,140px) minmax(270px,1fr) minmax(240px,300px);align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
+.mv-toolbar-group{min-width:0;max-width:100%}
 .mv-toolbar-heading{font:600 13px var(--vscode-font-family,sans-serif);margin:0 0 9px;color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
 .mv-toolbar .fc-toggle{flex-wrap:wrap;gap:5px;padding:0 0 7px}.mv-toolbar .fc-toggle-label{opacity:1;color:var(--vscode-descriptionForeground,#aaa)}
 .mv-toolbar .fc-toggle-btn{white-space:normal;overflow-wrap:anywhere;min-height:24px}.mv-toolbar .fc-toggle-btn:disabled{opacity:.5;cursor:default}

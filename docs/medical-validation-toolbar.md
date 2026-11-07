@@ -1,12 +1,12 @@
 # Medical Validation toolbar
 
 The tree header has three groups: **Status**, **Actions**, and **Legend**.
-They appear side by side where space permits and wrap at narrower widths.
+They stay side by side in one row; narrow panes scroll the header horizontally.
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
-Actions include direct Source and Refined source document buttons, review
-verdicts, snapshot export, and the three questionnaire controls. A group with
+Actions are ordered: review verdicts, snapshot export, highlighting, outcome
+explanation, the three questionnaire controls, then source files. A group with
 several documents has one named button per file. An empty group is disabled;
 incomplete discovery is disclosed rather than reported as empty.
 

@@ -6,13 +6,19 @@ import { renderMvTreeChrome, hasReviewEditHistory, MV_TREE_CHROME_STYLE } from '
 import { scopeNeedsRecovery, scopeHasRetainedLocks } from './mvEditRecovery.ts';
 
 const input = () => ({status:'Reviewed 0/11',highlighting:'Highlight controls',explanation:'Explain outcome',tools:'Tools',questionnaires:'Questionnaires',legend:'Legend entries',documents:{documents:[],complete:true,warnings:[]},documentToken:'owned-token',history:false,recovery:false});
-test('groups status, actions and legend horizontally with gold text emphasis and responsive wrapping', () => {
+test('keeps status, actions and legend in one grid row with gold text emphasis', () => {
   const html=renderMvTreeChrome(input());
   assert.match(html,/aria-label="Status"[\s\S]*aria-label="Actions"[\s\S]*aria-label="Legend"/);
-  assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar\{display:flex;flex-wrap:wrap/);
+  assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar\{display:grid;grid-template-columns:/);
+  assert.match(MV_TREE_CHROME_STYLE,/overflow-x:auto/);
   assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar-heading\{[^}]*text-shadow:[^}]*#ffd54f/);
   assert.doesNotMatch(html,/data-mv-edit-action/);
   assert.equal((html.match(/disabled/g)||[]).length,2);
+});
+test('orders actions as tools, highlighting, outcome, questionnaires, optional editing, then sources', () => {
+  const x=input();x.tools='Review verdicts / Export snapshot';x.history=true;
+  const html=renderMvTreeChrome(x);
+  assert.match(html,/Review verdicts \/ Export snapshot[\s\S]*Highlight controls[\s\S]*Explain outcome[\s\S]*Questionnaires[\s\S]*Edit history[\s\S]*mv-document-buttons/);
 });
 test('direct source buttons use escaped names and host indices, never paths; empty/unreadable state is honest', () => {
   const x=input();x.documents={complete:false,warnings:['Cannot read <source>'],documents:[
