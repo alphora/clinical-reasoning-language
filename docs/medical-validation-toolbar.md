@@ -1,7 +1,8 @@
 # Medical Validation toolbar
 
-The tree header has three groups: **Status**, **Actions**, and **Legend**.
-They stay side by side in one row; narrow panes scroll the header horizontally.
+The tree header has two columns: **Actions** on the left, with **Status** above
+**Legend** on the right. Actions has room for the Highlight buttons together
+and the three questionnaire buttons together. Narrow panes scroll the header horizontally.
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 

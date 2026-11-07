@@ -46,11 +46,12 @@ export function renderMvTreeChrome(input: MvTreeChrome): string {
   const actions = `${input.tools}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>${input.questionnaires}`
     + (history || recovery ? `<div class="fc-toggle">${history}${recovery}</div>` : '')
     + `<div class="fc-toggle mv-document-buttons">${documents}</div>`;
-  return `<div class="mv-toolbar">${group('Status', input.status + warning)}${group('Actions', actions)}${group('Legend', input.legend)}</div>`;
+  return `<div class="mv-toolbar">${group('Actions', actions)}<div class="mv-toolbar-context">${group('Status', input.status + warning)}${group('Legend', input.legend)}</div></div>`;
 }
 
 export const MV_TREE_CHROME_STYLE = `
-.mv-toolbar{display:grid;grid-template-columns:minmax(110px,140px) minmax(270px,1fr) minmax(240px,300px);align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
+.mv-toolbar{display:grid;grid-template-columns:minmax(510px,1fr) 230px;align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
+.mv-toolbar-context{display:flex;flex-direction:column;gap:18px;min-width:0}
 .mv-toolbar-group{min-width:0;max-width:100%}
 .mv-toolbar-heading{font:600 13px var(--vscode-font-family,sans-serif);margin:0 0 9px;color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
 .mv-toolbar .fc-toggle{flex-wrap:wrap;gap:5px;padding:0 0 7px}.mv-toolbar .fc-toggle-label{opacity:1;color:var(--vscode-descriptionForeground,#aaa)}

@@ -6,9 +6,9 @@ import { renderMvTreeChrome, hasReviewEditHistory, MV_TREE_CHROME_STYLE } from '
 import { scopeNeedsRecovery, scopeHasRetainedLocks } from './mvEditRecovery.ts';
 
 const input = () => ({status:'Reviewed 0/11',highlighting:'Highlight controls',explanation:'Explain outcome',tools:'Tools',questionnaires:'Questionnaires',legend:'Legend entries',documents:{documents:[],complete:true,warnings:[]},documentToken:'owned-token',history:false,recovery:false});
-test('keeps status, actions and legend in one grid row with gold text emphasis', () => {
+test('puts wider actions left and status above legend right, retaining gold emphasis', () => {
   const html=renderMvTreeChrome(input());
-  assert.match(html,/aria-label="Status"[\s\S]*aria-label="Actions"[\s\S]*aria-label="Legend"/);
+  assert.match(html,/aria-label="Actions"[\s\S]*mv-toolbar-context[\s\S]*aria-label="Status"[\s\S]*aria-label="Legend"/);
   assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar\{display:grid;grid-template-columns:/);
   assert.match(MV_TREE_CHROME_STYLE,/overflow-x:auto/);
   assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar-heading\{[^}]*text-shadow:[^}]*#ffd54f/);
