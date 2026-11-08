@@ -731,6 +731,8 @@ check("MV legend groups review, conditions, navigation, logic and flags; cockpit
   assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
   // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
   assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 5, "review, conditions, navigation, groups and flags each have a labeled section");
+  assert.match(mv,/ANY OF \/ ALL OF/);assert.doesNotMatch(mv,/fc-group-colors|flow-group-teal|flow-group-orange/,'group types do not imply fixed truth colors');
+  assert.match(mv,/>KE<\/text>[\s\S]*KE flags/);assert.doesNotMatch(mv,/KE Authoring/);
   assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
 });
 check("#218 legend: swatch tokens are the SAME shared consts as the paint — key can't drift from the tree (extracted-equality)", () => {

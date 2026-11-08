@@ -1270,7 +1270,7 @@ export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string
   return `<div class="fc-legend" role="group" aria-label="Tree color key">` +
     `<span class="fc-legend-group"><b>Review</b>`+chip("fc-sw-todo","To do",false)+chip("fc-sw-pass","Pass",false)+chip("fc-sw-fail","Fail",false)+chip("fc-sw-pending","Pending",false)+`</span>`+
     `<span class="fc-legend-group"><b>Condition</b>`+chip("fc-sw-true","True",false)+chip("fc-sw-false","False",false)+`<span class="fc-lg">? Unanswered</span></span>`+
-    `<span class="fc-legend-group"><b>Navigation</b>`+chip("fc-sw-focus","Focus",false)+chip("fc-sw-inferred","Inferred",false)+chip("fc-sw-ring","Selected path",false)+`</span><span class="fc-legend-group"><b>Groups</b><span class="fc-group-colors"><i class="flow-group-teal">━</i> ANY OF <i class="flow-group-orange">━</i> ALL OF</span></span><span class="fc-legend-group"><b>Flags</b>`+chip("fc-sw-flag-open","Open",false)+chip("fc-sw-pass","Resolved",false)+`<span class="fc-lg">KE Authoring</span></span></div>`;
+    `<span class="fc-legend-group"><b>Navigation</b>`+chip("fc-sw-focus","Focus",false)+chip("fc-sw-inferred","Inferred",false)+chip("fc-sw-ring","Selected path",false)+`</span><span class="fc-legend-group"><b>Groups</b><span class="fc-lg" title="Evaluated ANY OF and ALL OF connectors use the True/False colors above">ANY OF / ALL OF</span></span><span class="fc-legend-group"><b>Flags</b>`+chip("fc-sw-flag-open","Open",false)+chip("fc-sw-pass","Resolved",false)+`<span class="fc-lg" title="Flags raised by the knowledge engineer, for example to request clarification"><svg class="fc-ke-mark" width="17" height="12" viewBox="0 0 17 12" aria-hidden="true"><g class="flow-flag-authoring" data-flag-state="open"><rect width="17" height="12" rx="3"/><text x="8.5" y="9">KE</text></g></svg>KE flags</span></span></div>`;
 
 }
 
@@ -1506,6 +1506,7 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   // which would fade the chips too). `fc-lg-gap` splits the row into 3 concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path].
   `.fc-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:780px;gap:8px 24px;padding:10px 0;font-size:11px;color:var(--vscode-foreground,#ccc)}.fc-legend-group{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fc-legend-group b{font-weight:600;min-width:66px;color:var(--vscode-descriptionForeground,#aaa)}.fc-sw-todo{background:var(--vscode-descriptionForeground,#999)}.fc-sw-focus{background:var(--flow-focus-color,#fff)}.fc-sw-flag-open{background:#e6c200}` +
   `.fc-legend .fc-lg{display:inline-flex;align-items:center}` +
+  `.fc-legend .fc-ke-mark{margin-right:3px}` +
   `.fc-legend .fc-lg-gap{margin-left:8px}` +
   `.fc-legend .fc-sw{display:inline-block;width:9px;height:9px;margin-right:3px;border-radius:2px;box-sizing:border-box}` +
   `.fc-legend .fc-sw-pass{background:${TOK_VERDICT_PASS}}` +
