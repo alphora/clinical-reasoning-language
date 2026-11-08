@@ -1,0 +1,14 @@
+M	docs/medical-validation-toolbar.md
+M	package-lock.json
+M	package.json
+M	packages/crl-vscode/media/release-notes/README.md
+M	packages/crl-vscode/media/release-notes/catalog.json
+M	packages/crl-vscode/package.json
+M	packages/crl-vscode/src/correspondenceCockpit.ts
+M	packages/crl-vscode/src/decisionTableHost.test.mjs
+M	packages/crl-vscode/src/flowPaneHtml.test.mjs
+M	packages/crl-vscode/src/flowPaneHtml.ts
+M	packages/crl/package.json
+M	packages/crl/src/authoring-kit/tests/coverage.md
+A	packages/crl-vscode/media/release-notes/source-panel-left.png
+A	packages/crl/src/authoring-kit/tests/maintenance-mv-legend-left-release-paths.txt

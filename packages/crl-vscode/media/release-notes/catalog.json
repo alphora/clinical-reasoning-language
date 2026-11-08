@@ -110,6 +110,23 @@
           "description": "When a branch passes review, its shared steps on the same path also show as passed in other Decision Table rows, including steps before the pin. Different paths keep their own review colors. A failed outcome remains failed even when its earlier shared steps passed."
         }
       ]
+    },
+    {
+      "version": "6.4.51",
+      "title": "Keep policy review panels in order",
+      "features": [
+        {
+          "title": "Read the source beside the tree",
+          "description": "Highlighted Source opens immediately to the left of the Decision Tree or Decision Table. The question panels stay to the right, and the tree keeps the remaining space. You can close and reopen the source panel from Show Panel.",
+          "image": "source-panel-left.png",
+          "alt": "Sample workspace with Highlighted Source on the left, the Decision Table in the middle, and both question panels on the right.",
+          "caption": "The source, decision paths and questions remain visible together. This demonstration uses sample artifacts."
+        },
+        {
+          "title": "Read a simpler group legend",
+          "description": "ANY OF and ALL OF each have one glowing line sample. The duplicate paired lines have been removed."
+        }
+      ]
     }
   ]
 }

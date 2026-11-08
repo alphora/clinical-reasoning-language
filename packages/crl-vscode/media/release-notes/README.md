@@ -1,8 +1,22 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.50.
+Updates since CRL 6.4.41 through 6.4.51.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.51 — Keep policy review panels in order
+
+### Read the source beside the tree
+
+Highlighted Source opens immediately to the left of the Decision Tree or Decision Table\. The question panels stay to the right, and the tree keeps the remaining space\. You can close and reopen the source panel from Show Panel\.
+
+![Sample workspace with Highlighted Source on the left, the Decision Table in the middle, and both question panels on the right\.](source-panel-left.png)
+
+The source, decision paths and questions remain visible together\. This demonstration uses sample artifacts\.
+
+### Read a simpler group legend
+
+ANY OF and ALL OF each have one glowing line sample\. The duplicate paired lines have been removed\.
 
 ## 6.4.50 — A clearer policy review workspace
 

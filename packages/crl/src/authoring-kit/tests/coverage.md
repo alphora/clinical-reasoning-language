@@ -1,3 +1,24 @@
+## MV panel correction release 6.4.51 — bounded UI maintenance
+
+Reviewed implementation delta: released baseline `658482345baf9187206feba674f26cea34c5f3c7`
+through accepted local feature `df0709644b2faa32a1a075d93ccc359c31f87880`.
+The complete delta plus pending release metadata/media is inventoried in
+`maintenance-mv-legend-left-release-paths.txt`. The earlier audited-revision
+interval is covered by the preceding maintenance sections. Schema 2.46, canonical
+kit content/hash and its audit stamp remain unchanged; this is not a new full audit.
+
+| Owning changes and assertions | Disposition |
+| --- | --- |
+| `correspondenceCockpit.ts`, `decisionTableHost.test.mjs`: separate Source column before Tree with Result/FHIR preserved; manual closure; delayed focus and duplicate opens; stale policy during focus; timeout/listener cleanup/retry; closed or retargeted tree during split; user-occupied group and split error retry | Not author-facing. Editor focus/group ownership and current-policy display checks do not change authoring, questions, clinical inputs, guidance or evaluation. Existing pane renderer and width controller are reused. |
+| `flowPaneHtml.ts` and its test: exactly one glowing swatch per ANY OF/ALL OF label | Not author-facing. The human legend changes only; authored group operators, condition truth, execution and connector painting do not change. |
+| `docs/medical-validation-toolbar.md`, release catalog/README/sample screenshot and version manifests/lock | Not author-facing. Human documentation and software identity only. No new tagged claim, language fixture, kit rule or shared reference artifact. |
+
+No @kit tags are added or removed. The existing five owning modules passed 154
+checks, and actual regular-checkout Code 1.145.2 verified Source/Tree/Result/FHIR
+order, panel reopen/depth widths and one glowing swatch per group. That is accepted
+local UI evidence, not installed-release or customer clinical qualification.
+Release 6.4.51 separately qualifies its packaged and installed entry points.
+
 <!-- REFACTOR:grounded (#328): bounded maintenance interval; no installed-release claim. -->
 
 ## MV workspace release 6.4.50 — bounded UI maintenance
