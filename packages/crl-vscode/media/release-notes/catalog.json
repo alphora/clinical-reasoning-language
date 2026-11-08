@@ -1,6 +1,6 @@
 {
   "baselineVersion": "6.4.41",
-  "deployedBaselineVersion": "6.4.41",
+  "deployedBaselineVersion": "6.4.48",
   "releases": [
     {
       "version": "6.4.46",
@@ -87,6 +87,27 @@
         {
           "title": "A reminder about multiple flags",
           "description": "Already available in 6.4.48, a node can hold several flags. Click its flag icon to choose the flag to read. To add another, right-click the node and choose Add flag on the intended target."
+        }
+      ]
+    },
+    {
+      "version": "6.4.50",
+      "title": "A clearer policy review workspace",
+      "features": [
+        {
+          "title": "Find review controls and policy files",
+          "description": "Review actions are grouped together, with status and the legend alongside them. Open Source and Refined source files directly from their named buttons. Show Panel lets you open or close Highlighted Source, and Show Questionnaire groups the questionnaire controls. The legend shows the KE flag badge and the green/red lines used by both ANY OF and ALL OF.",
+          "image": "review-toolbar.png",
+          "alt": "Medical Validation toolbar with Status and Legend on the left, grouped review actions and direct policy document buttons on the right.",
+          "caption": "A fictional example of the review controls and source document buttons."
+        },
+        {
+          "title": "Keep the tree in view",
+          "description": "Questionnaire panels and Highlighted Source open at compact, matching widths, leaving the remaining space for the tree or Decision Table. These defaults return when you reopen the table or use Shallower and Deeper. Selecting another row keeps your manual width adjustments."
+        },
+        {
+          "title": "See shared review progress across rows",
+          "description": "When a branch passes review, its shared steps on the same path also show as passed in other Decision Table rows, including steps before the pin. Different paths keep their own review colors. A failed outcome remains failed even when its earlier shared steps passed."
         }
       ]
     }

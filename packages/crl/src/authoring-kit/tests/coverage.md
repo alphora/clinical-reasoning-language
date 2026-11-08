@@ -1,5 +1,29 @@
 <!-- REFACTOR:grounded (#328): bounded maintenance interval; no installed-release claim. -->
 
+## MV workspace release 6.4.50 — bounded UI maintenance
+
+Reviewed baseline `db2d77ec3a2251ae8bab94accd6df826175e86fa` (6.4.49) through
+`47a1108468c7e69403b500e0342e34c2d2e24151` is identified by the release source
+history; the complete changed-path inventory is `maintenance-mv-workspace-release-paths.txt`.
+This interval and the 6.4.50 legend correction are UI-only. The existing schema2.46
+content hash and audit stamp remain unchanged; this is not a new full audit or a
+claim of installed-release qualification.
+
+| Changed paths and owning evidence | Disposition |
+| --- | --- |
+| `crl-vscode/src/correspondenceCockpit.ts`, `mvTreeChrome.ts`, `mvTreeChrome.test.mjs`, `test/mvTreeChrome.browser.cjs` | Not author-facing: review-control placement, human legend and button wording, direct document buttons and panel toggles. No authoring declaration, flag payload, MCP tool or emitted behavior changes. |
+| `sourceDocuments.ts`, `sourceDocuments.test.mjs`, `sourceDocumentOpener.ts`, `sourceDocumentOpener.test.mjs`, `mvEditRecovery.ts` | Not author-facing: document discovery, original-URI opening with scoped editor read-only defaults, and visibility of existing recovery actions. Source bytes and authoring contracts unchanged. The editor setting does not establish PDF/DOCX viewer enforcement. |
+| `mvPaneLayout.ts`, `mvPaneLayout.test.mjs`, `branchQuestionnairePanel.ts`, `interactiveQuestionnairePanel.ts`, `interactiveQuestionnairePanel.test.mjs`, `decisionTableHost.test.mjs` | Not author-facing: compact editor-group defaults, topology/epoch ownership, panel disposal and lifecycle controls. Ordinary focus preserves manual widths; current policy/case ownership and native requests remain unchanged. |
+| `routeReviewMatch.ts`, `routeReviewMatch.test.mjs`, `decisionTableVerdictPaint.test.mjs`, host paint changes | Not author-facing: projection of stored human review verdicts across repeated nodes with the same outgoing branch. Opposite branches, terminal votes, coverage errors and clinical evaluation retain their separate meanings. |
+| `flowPaneHtml.ts`, `flowPaneHtml.test.mjs`, toolbar/review-color documentation and release-notes media | Not author-facing: visible KE flag identification and evaluated True/False line samples for both logic group types. Existing syntax, evaluation and manual group emphasis unchanged. |
+| Version manifests/lockfile and generated release notes | Not author-facing: release identity and user documentation. No kit content/navigation/tag/assertion or runtime dependency change. |
+
+Core implementation, grammar, CQL/FHIR emission and native runtime paths are
+unchanged from 6.4.49. The earlier interval from the recorded audit revision is
+covered by the existing Decision Table maintenance below. Retain its evidence
+limits; final release archives, installed entry points and runtime identity
+comparison are qualified separately by the release process.
+
 ## Decision Table control probe ownership — evidence correction, 2026-11-05
 
 REFACTOR:grounded: bounded UI/test-evidence maintenance from `01214dad2e297eaa74f8528baccc5e8e30f83649`; the reviewed target and execution receipts are recorded in discussion1298 and the implementing commit. This is not a new full kit audit. The saved schema2.46 audit stamp and author-facing content are unchanged. No CRL/CQL/FHIR/native behavior, kit tag or claim is added or retired.

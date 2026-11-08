@@ -11,6 +11,7 @@ import {transformSync} from 'esbuild';
 import {AnswerCaseImpactError} from './answerEditing.ts';
 import {nodeKey,conceptDeclRef} from '@smile-digital-health/crl';
 import {buildAnswerContributions,contributionsForOccurrences} from './answerContributions.ts';
+import {scopeNeedsRecovery,scopeHasRetainedLocks} from './mvEditRecovery.ts';
 
 const source=ts.createSourceFile('cockpit.ts',readFileSync(fileURLToPath(new URL('./correspondenceCockpit.ts',import.meta.url)),'utf8'),ts.ScriptTarget.Latest,true),bodies=new Map();
 function scan(n){if(ts.isFunctionDeclaration(n)&&n.name)bodies.set(n.name.text,n.getText(source));ts.forEachChild(n,scan);}scan(source);
@@ -19,7 +20,7 @@ function harness(){
  const root=path.resolve('synthetic-host-policy'),messages=[],errors=[],rebuilds=[];let finish,choose,saves=0,recoveries=0;
  const work=new Promise(resolve=>finish=()=>resolve({state:'saved'}));
  const view={gen:1,panel:{webview:{postMessage:m=>messages.push(m)}}};
- const c=vm.createContext({AnswerCaseImpactError,...path,randomUUID,createHash,isDeepStrictEqual,Error,process,console,mvRevision:1,reviewByCaseId:{a:"pass"},notesByCaseId:{},criterionVerdicts:{},definitionFreshness:{inputFiles:[]},mvEditBusy:false,mvDeferredRebuild:false,mvRecoveryBlock:undefined,
+ const c=vm.createContext({AnswerCaseImpactError,scopeNeedsRecovery,scopeHasRetainedLocks,...path,randomUUID,createHash,isDeepStrictEqual,Error,process,console,mvRevision:1,reviewByCaseId:{a:"pass"},notesByCaseId:{},criterionVerdicts:{},definitionFreshness:{inputFiles:[]},mvEditBusy:false,mvDeferredRebuild:false,mvRecoveryBlock:undefined,
   currentCel:path.join(root,'src/cel/mv/review.cel'),mode:'medical-validation',indexVersion:1,mvSidecarPath:path.join(root,'src/medical-validation/policy.json'),
   pinnedCards:{epoch:1,token:'pin',targets:new Map([['question',{concept:'Q'}]])},views:new Map([['tree',view]]),reviewGridSnapshot:undefined,reviewGridDirty:false,
   context:{extensionPath:'/synthetic/extension',extensionMode:2},

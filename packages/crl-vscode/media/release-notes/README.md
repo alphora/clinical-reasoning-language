@@ -1,8 +1,26 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.49.
+Updates since CRL 6.4.41 through 6.4.50.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.50 — A clearer policy review workspace
+
+### Find review controls and policy files
+
+Review actions are grouped together, with status and the legend alongside them\. Open Source and Refined source files directly from their named buttons\. Show Panel lets you open or close Highlighted Source, and Show Questionnaire groups the questionnaire controls\. The legend shows the KE flag badge and the green/red lines used by both ANY OF and ALL OF\.
+
+![Medical Validation toolbar with Status and Legend on the left, grouped review actions and direct policy document buttons on the right\.](review-toolbar.png)
+
+A fictional example of the review controls and source document buttons\.
+
+### Keep the tree in view
+
+Questionnaire panels and Highlighted Source open at compact, matching widths, leaving the remaining space for the tree or Decision Table\. These defaults return when you reopen the table or use Shallower and Deeper\. Selecting another row keeps your manual width adjustments\.
+
+### See shared review progress across rows
+
+When a branch passes review, its shared steps on the same path also show as passed in other Decision Table rows, including steps before the pin\. Different paths keep their own review colors\. A failed outcome remains failed even when its earlier shared steps passed\.
 
 ## 6.4.49 — Explore and compare policy paths
 

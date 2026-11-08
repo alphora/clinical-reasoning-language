@@ -83,10 +83,10 @@ test('disclosure and result navigation suppress selection pans before their fina
  calls.length=0;c.navigatePinnedBranch('next','pin');assert.deepEqual(calls,[['select','tree'],['pin','two','leaf','branch-navigation',false,'variant']]);assert.equal(c.scrollSuppressPane,undefined);
 });
 test('RQ host round-trips each click identity and ignores stale route requests',()=>{
- const messages=[],pane={isOpen:false,open(){this.isOpen=true;},close(){this.isOpen=false;}};
+ const messages=[],layoutRequests=[],pane={isOpen:false,open(){this.isOpen=true;},close(){this.isOpen=false;}};
  const tree={gen:2,panel:{webview:{postMessage:m=>messages.push(m)}}};
  const c=vm.createContext({views:new Map([['tree',tree]]),pinnedCards:{token:'route',epoch:1,payload:{}},indexVersion:1,mode:'medical-validation',branchQuestionnaire:pane,
-  branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',decisionTable:undefined});
+  branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',decisionTable:undefined,mvPaneLayout:{request:()=>layoutRequests.push(true)}});
  for(const name of ['handleDecisionTableMessage','postBranch','questionModeFor','postQuestionMode','publishQuestionModes','closeQuestionPanel','syncQuestionPanel','setQuestionDisplayMode','onWebviewMessage'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
  for(const [id,questionMode] of [['click1','panel'],['click2','inline'],['click3','off']]){
   c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'route',requestId:id,questionMode});
@@ -97,6 +97,7 @@ test('RQ host round-trips each click identity and ignores stale route requests',
  assert.deepEqual(messages.filter(m=>m.requestId).map(m=>[m.open,m.questionMode,m.focusToken,m.requestId]),[[true,'panel','route','click1'],[false,'inline','route','click2'],[false,'off','route','click3']]);
  const count=messages.length;
  c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'old-route',requestId:'stale',questionMode:'panel'});assert.equal(messages.length,count);
+ assert.equal(layoutRequests.length,1,'only the admitted panel opening requests default widths');
 });
 test('first-route pinning suppresses the selection pan before constructing its cards',async()=>{
  const calls=[],tree={gen:2};

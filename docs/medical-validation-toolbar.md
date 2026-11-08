@@ -6,8 +6,8 @@ and the three questionnaire buttons together. Narrow panes scroll the header hor
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
-ANY OF and ALL OF are group types, not colors. Evaluated group connectors use
-the Condition key's True/False colors. The **KE** badge identifies flags raised
+ANY OF and ALL OF each show green and red line samples. Evaluated group connectors
+use the Condition key's True/False colors. The **KE** badge identifies flags raised
 by the knowledge engineer; Open and Resolved describe flag status.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
