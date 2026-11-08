@@ -346,16 +346,63 @@ test('FHIR opened with Result already visible uses the following column',()=>{
  h.setOpen(false);h.toggle('fhirQuestionnaire');assert.deepEqual(h.created.at(-1),['fhirQuestionnaire',8]);
 });
 
-test('Highlighted Source toggles the real source pane and manual closure clears its active state',()=>{
- const h=host(['toggleQuestionnairePane','ensurePane'],`
- const mode='medical-validation',views=new Map(),created=[],visibility=[],paint=[];
- const vscode={Uri:{joinPath:()=>({})},window:{createWebviewPanel:()=>{const panel={webview:{onDidReceiveMessage:()=>({dispose(){}})},onDidDispose:fn=>panel.closed=fn,dispose:()=>panel.closed()};created.push(panel);return panel;}}};
- const context={extensionUri:{}},cockpitViewType=p=>p,paneTitle=p=>p,columnFor=()=>1,nextQuestionnaireColumn=()=>3,shellHtml=()=>'',onWebviewMessage=()=>{},coord={setPaneCapability(){},disposePane(){}},
+function sourcePaneHost(options={}){
+ return host(['toggleQuestionnairePane','openHighlightedSourceLeft','focusTreeForHighlightedSource','ensurePane'],`
+ let mode='medical-validation',currentCel='policy',indexVersion=1,cockpitDisposed=false,highlightedSourceOpening=false;
+ const created=[],visibility=[],paint=[],errors=[],calls=[],listeners=new Set();let disposedListeners=0;
+ const treeGroup={viewColumn:1,tabs:['tree']},resultGroup={viewColumn:2,tabs:['result']},fhirGroup={viewColumn:3,tabs:['fhir']};
+ let groups=[treeGroup,resultGroup,fhirGroup],active=fhirGroup;
+ const tree={panel:{viewColumn:1,active:false,reveal(){calls.push('reveal');if(!deps.delayFocus)focus();},onDidChangeViewState(fn){listeners.add(fn);return{dispose(){listeners.delete(fn);disposedListeners++;}}}}};
+ function focus(){active=treeGroup;tree.panel.active=true;for(const fn of [...listeners])fn();}
+ function renumber(){groups.forEach((g,i)=>g.viewColumn=i+1);tree.panel.viewColumn=treeGroup.viewColumn;}
+ const views=new Map([['tree',tree]]),branchQuestionnaire={isOpen:true};
+ const vscode={Uri:{joinPath:()=>({})},commands:{async executeCommand(name){calls.push(name);await deps.beforeSplit?.();if(deps.failSplit?.())throw Error('split failed');
+  const next={viewColumn:0,tabs:[]};groups.splice(groups.indexOf(active),0,next);renumber();active=next;tree.panel.active=false;deps.afterSplit?.(next);
+ }},window:{tabGroups:{get all(){return groups},get activeTabGroup(){return active}},showErrorMessage:e=>errors.push(e),
+ createWebviewPanel(type,title,options){const group=groups.find(g=>g.viewColumn===options.viewColumn);group.tabs.push(type);
+  const panel={viewColumn:options.viewColumn,webview:{onDidReceiveMessage:()=>({dispose(){}})},onDidDispose:fn=>panel.closed=fn,dispose(){group.tabs=group.tabs.filter(t=>t!==type);panel.closed();if(!group.tabs.length){groups=groups.filter(g=>g!==group);renumber();}}};created.push(panel);return panel;}}};
+ const context={extensionUri:{}},cockpitViewType=p=>p,paneTitle=p=>p,columnFor=()=>1,nextQuestionnaireColumn=()=>9,shellHtml=()=>'',onWebviewMessage=()=>{},coord={setPaneCapability(){},disposePane(){}},
  dispatch=event=>visibility.push(event),renderPane=()=>{},renderTreeChrome=()=>paint.push(views.has('source'));
- `,`return{toggle:toggleQuestionnairePane,created,views,visibility,paint};`);
- h.toggle('source');assert(h.views.has('source'));assert.equal(h.created.length,1);assert.equal(h.paint.at(-1),true);
+ `,`return{open:openHighlightedSourceLeft,toggle:toggleQuestionnairePane,created,views,visibility,paint,errors,calls,focus,
+  get listenerCount(){return listeners.size},get disposedListeners(){return disposedListeners},get groups(){return groups},
+  stale(){currentCel='new-policy';},closeTree(){views.delete('tree');}};`,options);
+}
+
+test('Highlighted Source inserts a separate column before tree, preserving both right questionnaires and manual closure',async()=>{
+ const h=sourcePaneHost();await h.open();assert(h.views.has('source'));assert.equal(h.created.length,1);assert.equal(h.paint.at(-1),true);
+ assert.deepEqual(h.groups.map(g=>g.tabs),[['source'],['tree'],['result'],['fhir']]);assert.equal(h.created[0].viewColumn,1);
  h.toggle('source');assert(!h.views.has('source'));assert.equal(h.paint.at(-1),false);assert.equal(h.visibility.at(-1).visible,false);
- h.toggle('source');h.created.at(-1).dispose();assert(!h.views.has('source'));assert.equal(h.paint.at(-1),false);assert.equal(h.visibility.at(-1).pane,'source');
+ await h.open();h.created.at(-1).dispose();assert(!h.views.has('source'));assert.equal(h.paint.at(-1),false);assert.equal(h.visibility.at(-1).pane,'source');
+ assert.equal(h.listenerCount,0);assert.equal(h.disposedListeners,2);
+});
+
+test('Highlighted Source waits for confirmed tree focus and coalesces duplicate pending opens',async()=>{
+ const h=sourcePaneHost({delayFocus:true});const first=h.open(),second=h.open();await second;
+ assert.equal(h.created.length,0);assert(!h.calls.includes('workbench.action.newGroupLeft'));assert.equal(h.listenerCount,1);
+ h.focus();await first;assert.equal(h.created.length,1);assert.equal(h.calls.filter(c=>c==='workbench.action.newGroupLeft').length,1);assert.equal(h.listenerCount,0);
+});
+
+test('retargeting while tree focus is pending never splits or opens an old source',async()=>{
+ const h=sourcePaneHost({delayFocus:true});const opening=h.open();h.stale();h.focus();await opening;
+ assert.equal(h.created.length,0);assert(!h.calls.includes('workbench.action.newGroupLeft'));assert.equal(h.errors.length,0);assert.equal(h.listenerCount,0);
+});
+
+test('tree-focus timeout disposes its listener and permits a later retry',async()=>{
+ const h=sourcePaneHost({delayFocus:true});await h.open();assert.equal(h.created.length,0);assert.equal(h.errors.length,1);assert.equal(h.listenerCount,0);
+ const retry=h.open();h.focus();await retry;assert.equal(h.created.length,1);
+});
+
+test('closing or retargeting the tree during group creation cannot open stale source content',async()=>{
+ for(const action of ['stale','closeTree']){
+  let resume;const split=new Promise(resolve=>resume=resolve),h=sourcePaneHost({beforeSplit:()=>split});const opening=h.open();
+  await new Promise(resolve=>setTimeout(resolve,0));h[action]();resume();await opening;assert.equal(h.created.length,0);assert.equal(h.errors.length,0);
+ }
+});
+
+test('a newly occupied group is preserved and split errors remain retryable',async()=>{
+ const occupied=sourcePaneHost({afterSplit:g=>g.tabs.push('user-tab')});await occupied.open();assert.equal(occupied.created.length,0);assert(occupied.groups.some(g=>g.tabs.includes('user-tab')));assert.equal(occupied.errors.length,1);
+ let fail=true;const retry=sourcePaneHost({failSplit:()=>fail});await retry.open();assert.equal(retry.created.length,0);assert.equal(retry.errors.length,1);
+ fail=false;await retry.open();assert.equal(retry.created.length,1);
 });
 
 test('closing a table restores support widths even with Result Questionnaire already off',()=>{

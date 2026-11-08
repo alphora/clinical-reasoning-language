@@ -731,8 +731,11 @@ check("MV legend groups review, conditions, navigation, logic and flags; cockpit
   assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
   // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
   assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 5, "review, conditions, navigation, groups and flags each have a labeled section");
-  for(const label of ['ANY OF','ALL OF'])assert(mv.includes(`<i class="fc-sw fc-sw-true" aria-hidden="true"></i><i class="fc-sw fc-sw-false" aria-hidden="true"></i>${label}`),'each group shows both evaluated truth colors');
-  assert.doesNotMatch(mv,/fc-group-colors|flow-group-teal|flow-group-orange/,'group types do not imply fixed truth colors');
+  const groupRow=mv.split('<b>Groups</b>')[1].split('<span class="fc-legend-group"><b>Flags</b>')[0];
+  assert.equal((groupRow.match(/<i /g)||[]).length,2,'one connector swatch per group');
+  assert.match(groupRow,/<i class="fc-sw fc-sw-true" aria-hidden="true"><\/i>ANY OF/);
+  assert.match(groupRow,/<i class="fc-sw fc-sw-false" aria-hidden="true"><\/i>ALL OF/);
+  assert.doesNotMatch(groupRow,/flow-group-teal|flow-group-orange/);
   assert.match(mv,/>KE<\/text>[\s\S]*KE flags/);assert.doesNotMatch(mv,/KE Authoring/);
   assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
 });

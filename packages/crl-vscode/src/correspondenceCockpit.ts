@@ -3844,10 +3844,59 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     );
   }
 
+  let highlightedSourceOpening = false;
+  function focusTreeForHighlightedSource(panel: vscode.WebviewPanel, current: () => boolean): Promise<boolean> {
+    return new Promise(resolve => {
+      let settled = false, timer: ReturnType<typeof setTimeout> | undefined, listener: vscode.Disposable | undefined;
+      const finish = (focused: boolean) => {
+        if (settled) return;
+        settled = true; if (timer) clearTimeout(timer); listener?.dispose(); resolve(focused);
+      };
+      const check = () => {
+        if (!current()) finish(false);
+        else if (panel.active && panel.viewColumn === vscode.window.tabGroups.activeTabGroup.viewColumn) finish(true);
+      };
+      listener = panel.onDidChangeViewState(check);
+      timer = setTimeout(() => finish(false), 1500);
+      try { panel.reveal(panel.viewColumn, false); check(); } catch { finish(false); }
+    });
+  }
+  async function openHighlightedSourceLeft(): Promise<void> {
+    if (highlightedSourceOpening) return;
+    const tree = views.get('tree'), cel = currentCel, version = indexVersion;
+    if (!tree || tree.panel.viewColumn === undefined) return;
+    const samePolicy = () => !cockpitDisposed && mode === 'medical-validation' && currentCel === cel
+      && indexVersion === version && views.get('tree') === tree;
+    const current = () => samePolicy() && !views.has('source');
+    highlightedSourceOpening = true;
+    try {
+      if (!await focusTreeForHighlightedSource(tree.panel, current)) {
+        if (current()) throw new Error('Could not focus the Decision Tree. Please try again.');
+        return;
+      }
+      if (!current() || !tree.panel.active || vscode.window.tabGroups.activeTabGroup.viewColumn !== tree.panel.viewColumn) return;
+      const before = new Set(vscode.window.tabGroups.all);
+      await vscode.commands.executeCommand('workbench.action.newGroupLeft');
+      if (!current()) return;
+      const added = vscode.window.tabGroups.all.filter(group => !before.has(group));
+      const target = added.length === 1 ? added[0] : undefined;
+      if (!target || target.tabs.length || target.viewColumn + 1 !== tree.panel.viewColumn)
+        throw new Error('The editor layout changed while opening Highlighted Source. Please try again.');
+      ensurePane('source', target.viewColumn);
+      dispatch({type:'setPaneVisible',pane:'source',visible:true}); renderPane('source');
+      if (vscode.window.tabGroups.activeTabGroup === target) tree.panel.reveal(tree.panel.viewColumn, false);
+    } catch (error) {
+      if (samePolicy()) void vscode.window.showErrorMessage(`Could not open Highlighted Source: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      highlightedSourceOpening = false;
+      if (!cockpitDisposed) { renderTreeChrome(); mvPaneLayout.request(); }
+    }
+  }
   function toggleQuestionnairePane(pane: 'source'|'questionnaire'|'fhirQuestionnaire'): void {
     if(mode!=='medical-validation')return;
     const existing=views.get(pane);
     if(existing) { dispatch({type:'setPaneVisible',pane,visible:false});existing.panel.dispose(); }
+    else if (pane === 'source') { void openHighlightedSourceLeft(); return; }
     else {
       const treeColumn = views.get('tree')?.panel.viewColumn;
       const column = pane === 'fhirQuestionnaire' && branchQuestionnaire.isOpen && treeColumn !== undefined

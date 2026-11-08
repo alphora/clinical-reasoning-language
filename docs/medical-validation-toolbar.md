@@ -6,8 +6,8 @@ and the three questionnaire buttons together. Narrow panes scroll the header hor
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
-ANY OF and ALL OF each show green and red line samples. Evaluated group connectors
-use the Condition key's True/False colors. The **KE** badge identifies flags raised
+ANY OF has one green glowing line sample and ALL OF one red glowing line sample,
+using the same styles as the Condition key. The **KE** badge identifies flags raised
 by the knowledge engineer; Open and Resolved describe flag status.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
@@ -32,8 +32,9 @@ not change clinical evaluation, conditions, or answers.
 The tree and Decision Table use the remaining editor width. Result Questionnaire,
 FHIR Questionnaire, CRL Questionnaire, Interactive FHIR Questionnaire, and
 Highlighted Source each default to about 380 pixels when open in separate columns.
-Smaller windows reduce the support columns equally. Highlighted Source toggles
-the existing highlighted source viewer; Source documents opens reference files.
+Smaller windows reduce the support columns equally. Highlighted Source opens the
+existing highlighted source viewer immediately left of the tree. Result and FHIR
+Questionnaires remain to its right. Source documents opens reference files.
 
 Opening, closing, or rearranging panels and changing Decision Table depth restore
 these defaults. Ordinary row selection and focusing another panel preserve manual
