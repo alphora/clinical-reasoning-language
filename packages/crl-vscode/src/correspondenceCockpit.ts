@@ -1,5 +1,6 @@
 import { buildAnswerContributions, contributionsForOccurrences } from "./answerContributions";
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
+import { createRouteReviewMatcher } from './routeReviewMatch';
 import { listSourceDocuments, resolveSourceDocument, showSourceDocuments, type SourceDocument } from './sourceDocuments';
 import { openReadonlySourceDocument } from './sourceDocumentOpener';
 import { hasReviewEditHistory, renderMvTreeChrome, MV_TREE_CHROME_STYLE } from './mvTreeChrome';
@@ -2982,11 +2983,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const perCase=buildReviewPerCase(ids,id=>scenarioByCaseId.get(id)?.status,
       ()=>caseReviewReach(session.row.pathKeys,view.focusNodes??{}));
     const review=deriveReviewOverlay(reviewByCaseId,perCase,key=>leaves.has(key));
-    // Repeated route nodes keep their policy-wide review color in every row, including before the pin.
+    // Repeated route nodes share review color only for the same outgoing connector, including before the pin.
     // Terminals and definition-body approval retain their existing row/local and criterion contracts.
-    const sharedKeys=new Set(session.row.pathKeys.filter(key=>!leaves.has(key)));
+    const matcher=createRouteReviewMatcher(crlStructure,session.row.pathKeys);
+    const sharedKeys=new Set([...matcher.keys].filter(key=>!leaves.has(key)));
     const sharedCases=buildReviewPerCase(Object.keys(reviewByCaseId),id=>scenarioByCaseId.get(id)?.status,
-      id=>routesForCase(id).flatMap(route=>route.nodeKeys).filter(key=>sharedKeys.has(key)));
+      id=>routesForCase(id).flatMap(route=>matcher.matchingKeys(route.nodeKeys)).filter(key=>sharedKeys.has(key)));
     const sharedReview=deriveReviewOverlay(reviewByCaseId,sharedCases,key=>leaves.has(key));
     for(const key of sharedKeys)for(const state of ['pass','fail','pending','error'] as const){
       review[state].delete(key);if(sharedReview[state].has(key))review[state].add(key);

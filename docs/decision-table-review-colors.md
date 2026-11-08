@@ -1,14 +1,20 @@
 # Decision Table review colors
 
-A repeated interior route node has the same review color in every applicable
-row, including copies to the left of the pin. Review contributions come from
+A repeated interior route node shares review color only with copies that take
+the same outgoing branch, including copies to the left of the pin. A reviewed
+left-taking copy does not color an unreviewed right-taking copy. Different
+continuations within the same outgoing branch can still share that node's color.
+Review contributions come from
 current test cases throughout the policy, including cases outside the visible
-page or pin scope. Nodes are matched by their structure identity, not their label.
+page or pin scope. Conditional nodes are matched by structure identity and the
+connector's Yes/No direction, not by labels, terminal outcomes or which side of
+the screen currently contains a node. Nonconditional nodes retain identity-based
+sharing. An incomplete or ambiguous conditional path cannot supply a shared vote.
 
 The existing review precedence applies:
 
 - A passing reviewed path keeps a shared interior node green, even when another
-  path through it has a failing or pending verdict.
+  path through the same outgoing branch has a failing or pending verdict.
 - With no passing path, a failing reviewed path paints that interior node red.
 - Pending contributes its color when no decided verdict reaches the node.
 - Unreviewed cases do not contribute a color; clearing verdicts removes their paint.
