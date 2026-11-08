@@ -50,14 +50,14 @@ export function renderMvTreeChrome(input: MvTreeChrome): string {
 }
 
 export const MV_TREE_CHROME_STYLE = `
-.mv-toolbar{display:grid;grid-template-columns:230px minmax(510px,1fr);align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
-.mv-toolbar-context{display:flex;flex-direction:column;gap:18px;min-width:0}
+.mv-toolbar{display:grid;grid-template-columns:max-content minmax(510px,1fr);align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
+.mv-toolbar-context{display:flex;flex-direction:column;gap:18px;min-width:310px}
 .mv-toolbar-group{min-width:0;max-width:100%}
 .mv-toolbar-heading{font:600 13px var(--vscode-font-family,sans-serif);margin:0 0 9px;color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
 .mv-toolbar-subheading{font-size:12px;margin-top:8px}
 .mv-toolbar .fc-toggle{flex-wrap:wrap;gap:5px;padding:0 0 7px}.mv-toolbar .fc-toggle-label{opacity:1;color:var(--vscode-descriptionForeground,#aaa)}
 .mv-toolbar .fc-toggle-btn{white-space:normal;overflow-wrap:anywhere;min-height:24px}.mv-toolbar .fc-toggle-btn:disabled{opacity:.5;cursor:default}
 .mv-toolbar .fc-toggle-btn:focus-visible{outline:1px solid var(--vscode-focusBorder,#007fd4);outline-offset:2px}
-.mv-toolbar .fc-legend{display:flex;flex-direction:column;gap:8px;padding:0;max-width:none}.mv-toolbar .fc-legend-group{gap:7px}
+.mv-toolbar .fc-legend{display:flex;flex-direction:column;gap:8px;padding:0;max-width:none}.mv-toolbar .fc-legend-group{gap:7px;flex-wrap:nowrap;white-space:nowrap}
 .mv-toolbar .mv-progress{margin:0 0 7px}.mv-toolbar-notice{font-size:12px;overflow-wrap:anywhere}.mv-toolbar .mv-attention{color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
 `;
