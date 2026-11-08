@@ -1,13 +1,14 @@
 # Medical Validation toolbar
 
-The tree header has two columns: **Actions** on the left, with **Status** above
-**Legend** on the right. Actions has room for the Highlight buttons together
+The tree header has two columns: **Status** above **Legend** on the left, with
+**Actions** on the right. Actions has room for the Highlight buttons together
 and the three questionnaire buttons together. Narrow panes scroll the header horizontally.
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
-explanation, the three questionnaire controls, then source files. A group with
+explanation, the three questionnaire controls, then source files under the
+**Source documents** subgroup heading. A group with
 several documents has one named button per file. An empty group is disabled;
 incomplete discovery is disclosed rather than reported as empty.
 

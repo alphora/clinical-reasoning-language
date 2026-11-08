@@ -6,14 +6,15 @@ import { renderMvTreeChrome, hasReviewEditHistory, MV_TREE_CHROME_STYLE } from '
 import { scopeNeedsRecovery, scopeHasRetainedLocks } from './mvEditRecovery.ts';
 
 const input = () => ({status:'Reviewed 0/11',highlighting:'Highlight controls',explanation:'Explain outcome',tools:'Tools',questionnaires:'Questionnaires',legend:'Legend entries',documents:{documents:[],complete:true,warnings:[]},documentToken:'owned-token',history:false,recovery:false});
-test('puts wider actions left and status above legend right, retaining gold emphasis', () => {
+test('puts status above legend left and wider actions right, retaining gold emphasis', () => {
   const html=renderMvTreeChrome(input());
-  assert.match(html,/aria-label="Actions"[\s\S]*mv-toolbar-context[\s\S]*aria-label="Status"[\s\S]*aria-label="Legend"/);
+  assert.match(html,/mv-toolbar-context[\s\S]*aria-label="Status"[\s\S]*aria-label="Legend"[\s\S]*aria-label="Actions"/);
   assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar\{display:grid;grid-template-columns:/);
   assert.match(MV_TREE_CHROME_STYLE,/overflow-x:auto/);
   assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar-heading\{[^}]*text-shadow:[^}]*#ffd54f/);
   assert.doesNotMatch(html,/data-mv-edit-action/);
   assert.equal((html.match(/disabled/g)||[]).length,2);
+  assert.match(html,/<h3[^>]*mv-toolbar-subheading[^>]*>Source documents<\/h3>[\s\S]*mv-document-buttons/);
 });
 test('orders actions as tools, highlighting, outcome, questionnaires, optional editing, then sources', () => {
   const x=input();x.tools='Review verdicts / Export snapshot';x.history=true;

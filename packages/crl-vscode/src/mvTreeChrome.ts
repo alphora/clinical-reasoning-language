@@ -45,15 +45,16 @@ export function renderMvTreeChrome(input: MvTreeChrome): string {
   const warning = !input.documents.complete ? `<div class="mv-toolbar-notice" role="status">${escape(input.documents.warnings.join(' '))}</div>` : '';
   const actions = `${input.tools}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>${input.questionnaires}`
     + (history || recovery ? `<div class="fc-toggle">${history}${recovery}</div>` : '')
-    + `<div class="fc-toggle mv-document-buttons">${documents}</div>`;
-  return `<div class="mv-toolbar">${group('Actions', actions)}<div class="mv-toolbar-context">${group('Status', input.status + warning)}${group('Legend', input.legend)}</div></div>`;
+    + `<section aria-labelledby="mv-source-documents-heading"><h3 id="mv-source-documents-heading" class="mv-toolbar-heading mv-toolbar-subheading">Source documents</h3><div class="fc-toggle mv-document-buttons">${documents}</div></section>`;
+  return `<div class="mv-toolbar"><div class="mv-toolbar-context">${group('Status', input.status + warning)}${group('Legend', input.legend)}</div>${group('Actions', actions)}</div>`;
 }
 
 export const MV_TREE_CHROME_STYLE = `
-.mv-toolbar{display:grid;grid-template-columns:minmax(510px,1fr) 230px;align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
+.mv-toolbar{display:grid;grid-template-columns:230px minmax(510px,1fr);align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
 .mv-toolbar-context{display:flex;flex-direction:column;gap:18px;min-width:0}
 .mv-toolbar-group{min-width:0;max-width:100%}
 .mv-toolbar-heading{font:600 13px var(--vscode-font-family,sans-serif);margin:0 0 9px;color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
+.mv-toolbar-subheading{font-size:12px;margin-top:8px}
 .mv-toolbar .fc-toggle{flex-wrap:wrap;gap:5px;padding:0 0 7px}.mv-toolbar .fc-toggle-label{opacity:1;color:var(--vscode-descriptionForeground,#aaa)}
 .mv-toolbar .fc-toggle-btn{white-space:normal;overflow-wrap:anywhere;min-height:24px}.mv-toolbar .fc-toggle-btn:disabled{opacity:.5;cursor:default}
 .mv-toolbar .fc-toggle-btn:focus-visible{outline:1px solid var(--vscode-focusBorder,#007fd4);outline-offset:2px}
