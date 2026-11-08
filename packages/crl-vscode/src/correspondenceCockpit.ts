@@ -2981,14 +2981,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const ids=[...new Set(session.row.cases.map(entry=>entry.caseId))],leaves=collectDispositionLeafKeys(crlStructure);
     const perCase=buildReviewPerCase(ids,id=>scenarioByCaseId.get(id)?.status,
       ()=>caseReviewReach(session.row.pathKeys,view.focusNodes??{}));
-    const review=deriveReviewOverlay(reviewByCaseId,perCase,key=>leaves.has(key)),projection=criterionReviewProjection(view);
+    const review=deriveReviewOverlay(reviewByCaseId,perCase,key=>leaves.has(key));
+    // Repeated route nodes keep their policy-wide review color in every row, including before the pin.
+    // Terminals and definition-body approval retain their existing row/local and criterion contracts.
+    const sharedKeys=new Set(session.row.pathKeys.filter(key=>!leaves.has(key)));
+    const sharedCases=buildReviewPerCase(Object.keys(reviewByCaseId),id=>scenarioByCaseId.get(id)?.status,
+      id=>routesForCase(id).flatMap(route=>route.nodeKeys).filter(key=>sharedKeys.has(key)));
+    const sharedReview=deriveReviewOverlay(reviewByCaseId,sharedCases,key=>leaves.has(key));
+    for(const key of sharedKeys)for(const state of ['pass','fail','pending','error'] as const){
+      review[state].delete(key);if(sharedReview[state].has(key))review[state].add(key);
+    }
+    const projection=criterionReviewProjection(view);
     for(const [key,node] of Object.entries(view.focusNodes??{}))if(node.outline)review.pass.delete(key);
     for(const key of projection.pass){review.pass.add(key);review.fail.delete(key);review.pending.delete(key);}
     for(const key of projection.blocked)if(view.focusNodes?.[key]?.outline)review.pass.delete(key);
     const allPass=ids.length>0&&ids.every(id=>reviewByCaseId[id]==='pass');
     postBranch(session,{type:'markReviewOverlay',gen:view.gen,
       pass:segmentsFor(view,[...review.pass]).segmentIds,fail:segmentsFor(view,[...review.fail]).segmentIds,
-      pending:segmentsFor(view,[...review.pending]).segmentIds,error:segmentsFor(view,session.row.error?[session.row.terminalKey]:[...review.error]).segmentIds,
+      pending:segmentsFor(view,[...review.pending]).segmentIds,error:segmentsFor(view,[...new Set([...review.error,...(session.row.error?[session.row.terminalKey]:[])])]).segmentIds,
       allPassLeaves:allPass?segmentsFor(view,[session.row.terminalKey]).segmentIds:[],policyRoutesApproved:decisionTable!.model.uncoveredRows===0n && allRouteVerdictsApproved((scenarios?.scenarios??[]).map(sc=>{const id=caseIdByName[caseViewKey(sc.case)];return duplicateScenarioNames.has(caseViewKey(sc.case))||!id?'unreviewed':reviewByCaseId[id]??'unreviewed';}))});
     const placement=flagPlacementFor(view,flagsList);session.flagsByGid=placement.byGid;
     postBranch(session,{type:'flagBadges',gen:view.gen,flaggableGids:view.flaggableGids,gids:placement.gids,
