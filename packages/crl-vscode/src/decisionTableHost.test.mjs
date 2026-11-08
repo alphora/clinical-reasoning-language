@@ -12,7 +12,7 @@ function host(names,environment,result,deps={}){
  const found=new Map();
  const visit=node=>{if(ts.isFunctionDeclaration(node)&&node.name&&names.includes(node.name.text))found.set(node.name.text,node.getText(source));ts.forEachChild(node,visit);};visit(source);
  for(const name of names)assert(found.has(name),'production closure '+name);
- const code=ts.transpileModule(environment+'\n'+[...found.values()].join('\n')+'\n'+result,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+ const code=ts.transpileModule('const mvPaneLayout={request:()=>deps.layoutRequests?.push(true)};\n'+environment+'\n'+[...found.values()].join('\n')+'\n'+result,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
  return new Function('deps',code)({branchMessageIsCurrent,branchCaptureManifest,...deps});
 }
 const row=(id)=>({id,epoch:'table',sourceVersion:1,generation:3,mounted:true,ready:false,renderToken:id+'-pin',view:{gen:3,acked:false,panel:{webview:{postMessage(){}}}},row:{cases:[{caseId:id+'Case',route:{terminalId:id+'Route'}}]},pin:{token:id+'-pin',epoch:1,caseId:id+'Case',routeId:id+'Route',verdictCaseIds:[id+'Case'],payload:{cards:[{id:'q',text:'Question'}]},targets:new Map([['q',{}]])},drafts:new Map()});
@@ -156,7 +156,7 @@ test('suspending/closing restores legacy selection; resuming restores the row; r
 
 // Exercise the actual lifecycle callers, not test-only state transitions.
 test('production table lifecycle preserves focus or replaces it after page/fold and rejects pending obsolete native reads',async()=>{
- const loads=[],posts=[],disposed=[];let picked;
+ const loads=[],posts=[],disposed=[],layoutRequests=[];let picked;
  const makeRow=(id,caseIds=[id+'Case'])=>({id,rootKey:'root',label:id,cases:caseIds.map(caseId=>({caseId,route:{terminalId:id+'Route',nodeKeys:[]}}))});
  const a=makeRow('a',['aCase','aSecond']),b=makeRow('b'),c=makeRow('c');
  const wide={scope:{nodeKey:'wide'},totalRows:21n,parent:undefined,children:[],rows:offset=>offset===20n?[c]:[a,b],underlyingRow:id=>[a,b,c].find(row=>row.id===id)};
@@ -179,9 +179,9 @@ test('production table lifecycle preserves focus or replaces it after page/fold 
  `return{reconcile:reconcileDecisionTable,focus:focusBranchSession,context:fhirInspectionContext,choose:chooseBranchCase,suspend:suspendDecisionTable,
  action:action=>decisionTableAction({epoch:decisionTable.epoch,action}),close:closeDecisionTable,rebuild:()=>{indexVersion++;renderRebuiltPanes();},
  row:id=>decisionTable.sessions.get(id),table:()=>decisionTable,display:setQuestionDisplayMode,owner:()=>branchQuestionnaireOwner,selectCase:id=>{state.selection.caseId=id},setLegacy:mode=>{legacyQuestionMode=mode},legacy:()=>legacyQuestionMode,panelOpen:()=>panelOpen,lastPanel:()=>lastPanelPayload,
- pinRow:id=>{const row=decisionTable.sessions.get(id);row.pin={token:id+':'+row.caseId,epoch:indexVersion,caseId:row.caseId,routeId:row.routeId,payload:{token:id+':'+row.caseId,caseId:row.caseId,cards:[{id:'q',draftText:'Saved host draft'}]}};syncQuestionPanel(row);return row.pin}};`,{loads,posts,disposed,wide,folded,createHash,pick:()=>picked});
+ pinRow:id=>{const row=decisionTable.sessions.get(id);row.pin={token:id+':'+row.caseId,epoch:indexVersion,caseId:row.caseId,routeId:row.routeId,payload:{token:id+':'+row.caseId,caseId:row.caseId,cards:[{id:'q',draftText:'Saved host draft'}]}};syncQuestionPanel(row);return row.pin}};`,{loads,posts,disposed,wide,folded,createHash,layoutRequests,pick:()=>picked});
  h.setLegacy('panel');h.reconcile(wide.scope);assert.equal(h.legacy(),'off','new table cancels even unopened legacy panel intent');assert.equal(loads.at(-1).compartment,'aCase-directory');assert.equal(h.row('a').questionMode,'panel','first top covered row defaults panel');assert.equal(h.row('b').questionMode,'off','other rows default off');
- h.focus(h.row('b'));const pendingB=loads.at(-1);h.reconcile(wide.scope);assert.equal(h.context().caseId,'bCase','visible focused row is retained');
+ const sizingAfterEntry=layoutRequests.length;assert(sizingAfterEntry>0);h.focus(h.row('b'));assert.equal(layoutRequests.length,sizingAfterEntry,'ordinary row focus retains manually chosen widths');const pendingB=loads.at(-1);h.reconcile(wide.scope);assert.equal(h.context().caseId,'bCase','visible focused row is retained');
  assert.equal(loads.at(-1),pendingB,'same focus reconcile does not reload');
  h.row('a').caseId='removedCase';h.selectCase('aSecond');h.reconcile(wide.scope);assert.equal(h.row('a').caseId,'aSecond','an existing row remaps its removed case using worklist preference');h.selectCase('bCase');
  await h.action('nextPage');assert.equal(h.context().caseId,'cCase','page removal chooses a current visible row');assert.equal(h.row('c').questionMode,'panel','paging from panel owner hands panel to focused replacement');assert.equal(h.row('b').questionMode,'off');
@@ -189,7 +189,7 @@ test('production table lifecycle preserves focus or replaces it after page/fold 
  await h.action('previousPage');assert.equal(h.context().caseId,'bCase','replacement prefers the selected case when no focused row remains visible');h.selectCase('legacy');h.focus(h.row('b'));const foldedB=loads.at(-1);
  h.reconcile(folded.scope);assert.equal(h.context().caseId,'aSecond','fold removal retains the remapped case in the remaining row');assert.equal(h.row('a').questionMode,'panel','folding away a panel owner follows focus');
  foldedB.resolve(fullNative('folded B',6));await settle();assert(!posts.some(p=>p.q?.id==='folded B'));
- h.reconcile(wide.scope);h.display(h.row('b'),'inline');h.focus(h.row('b'));assert.equal(h.owner(),h.row('a'),'inline destination does not silently transfer panel');
+ const beforeDepth=layoutRequests.length;await h.action('shallower');assert.equal(h.table().scope.nodeKey,'wide');assert(layoutRequests.length>beforeDepth,'shallower resets widths');wide.children=[{scope:folded.scope,label:'folded',count:1n}];await h.action('deeper');assert.equal(h.table().scope.nodeKey,'folded');assert(layoutRequests.length>beforeDepth+1,'deeper resets widths');h.reconcile(wide.scope);h.display(h.row('b'),'inline');h.focus(h.row('b'));assert.equal(h.owner(),h.row('a'),'inline destination does not silently transfer panel');
  await h.action('nextPage');assert.equal(h.owner(),undefined,'panel owner left off-page is closed, not orphaned');assert.equal(h.row('a').questionMode,'off');assert.equal(h.row('c').questionMode,'off','page change from inline does not reapply initial panel default');
  await h.action('previousPage');h.focus(h.row('a'));assert.equal(h.row('a').questionMode,'off','default is not reapplied when returning to an existing table');
  picked=1;await h.choose(h.row('a'));assert.equal(h.context().caseId,'aSecond');assert.equal(loads.at(-1).compartment,'aSecond-directory');
@@ -344,4 +344,25 @@ test('FHIR opened with Result already visible uses the following column',()=>{
  h.toggle('fhirQuestionnaire');assert.deepEqual(h.created,[['fhirQuestionnaire',4]]);
  h.toggle('questionnaire');assert.deepEqual(h.created.at(-1),['questionnaire',8]);
  h.setOpen(false);h.toggle('fhirQuestionnaire');assert.deepEqual(h.created.at(-1),['fhirQuestionnaire',8]);
+});
+
+test('Highlighted Source toggles the real source pane and manual closure clears its active state',()=>{
+ const h=host(['toggleQuestionnairePane','ensurePane'],`
+ const mode='medical-validation',views=new Map(),created=[],visibility=[],paint=[];
+ const vscode={Uri:{joinPath:()=>({})},window:{createWebviewPanel:()=>{const panel={webview:{onDidReceiveMessage:()=>({dispose(){}})},onDidDispose:fn=>panel.closed=fn,dispose:()=>panel.closed()};created.push(panel);return panel;}}};
+ const context={extensionUri:{}},cockpitViewType=p=>p,paneTitle=p=>p,columnFor=()=>1,nextQuestionnaireColumn=()=>3,shellHtml=()=>'',onWebviewMessage=()=>{},coord={setPaneCapability(){},disposePane(){}},
+ dispatch=event=>visibility.push(event),renderPane=()=>{},renderTreeChrome=()=>paint.push(views.has('source'));
+ `,`return{toggle:toggleQuestionnairePane,created,views,visibility,paint};`);
+ h.toggle('source');assert(h.views.has('source'));assert.equal(h.created.length,1);assert.equal(h.paint.at(-1),true);
+ h.toggle('source');assert(!h.views.has('source'));assert.equal(h.paint.at(-1),false);assert.equal(h.visibility.at(-1).visible,false);
+ h.toggle('source');h.created.at(-1).dispose();assert(!h.views.has('source'));assert.equal(h.paint.at(-1),false);assert.equal(h.visibility.at(-1).pane,'source');
+});
+
+test('closing a table restores support widths even with Result Questionnaire already off',()=>{
+ const layoutRequests=[];
+ const h=host(['closeDecisionTable'],`
+ let decisionTable={sessions:new Map()},focusedBranchSession,branchQuestionnaireOwner;
+ const syncFhirInspection=()=>{},branchQuestionnaire={close(){}},snapshotCapture={settleEmpty(){}},coord={disposePane(){}},views=new Map();
+ `,`return{close:closeDecisionTable};`,{layoutRequests});
+ h.close();assert.equal(layoutRequests.length,1);h.close();assert.equal(layoutRequests.length,1,'already closed is inert');
 });

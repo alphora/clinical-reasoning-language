@@ -17,6 +17,7 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
   const close = () => { const old=current;if(!old)return;preferredColumn=old.viewColumn??preferredColumn;current=undefined;payload=undefined;ready=false;old.dispose();onClosed(); };
   return {
     get isOpen() { return !!current; }, post, close,
+    get layoutPanel() { return current; },
     update(value: any) { payload=value;post({type:'routeCards',...value}); },
     open(value: any) {
       if(current){payload=value;post({type:'routeCards',...value});return;}

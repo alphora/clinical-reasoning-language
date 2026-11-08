@@ -1,6 +1,7 @@
 import { buildAnswerContributions, contributionsForOccurrences } from "./answerContributions";
 import { caseReviewReach, criterionReviewMembership, projectCriterionReview } from './criterionReviewProjection';
 import { createRouteReviewMatcher } from './routeReviewMatch';
+import { createMvPaneLayout } from './mvPaneLayout';
 import { listSourceDocuments, resolveSourceDocument, showSourceDocuments, type SourceDocument } from './sourceDocuments';
 import { openReadonlySourceDocument } from './sourceDocumentOpener';
 import { hasReviewEditHistory, renderMvTreeChrome, MV_TREE_CHROME_STYLE } from './mvTreeChrome';
@@ -473,7 +474,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let cockpitDisposed = false;
   function interactivePanelChanged(): void {
     // Policy retargeting finishes synchronously before this refresh reads its review/flag state.
-    queueMicrotask(() => { if (!cockpitDisposed) renderTreeChrome(); });
+    queueMicrotask(() => { if (!cockpitDisposed) { renderTreeChrome(); mvPaneLayout.request(); } });
   }
   const interactiveQuestionnaire = createInteractiveQuestionnairePanel(context, unrenderableQuestionnaireFeatures,interactivePublication,interactivePanelChanged);
   function interactivePublication(cel:string):ReturnType<typeof mvPublicationOptions>|{} {
@@ -789,6 +790,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const applyPaneOrder = (): void => {
     const open = paneOrder.filter((p) => views.has(p));
     open.forEach((pane, i) => views.get(pane)?.panel.reveal(ORDERED_COLUMNS[i] ?? vscode.ViewColumn.One, true));
+    mvPaneLayout.request();
   };
 
   /** Reconcile OPEN panels to the (normalized) paneOrder, then place columns. Unlike applyPaneOrder (reorder-only), this
@@ -1199,7 +1201,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         : "";
     // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
     // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
-    const questionnaires=mode==='medical-validation'?`<div class="fc-toggle">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn${interactiveQuestionnaire.isOpen?" fc-active":""}" data-interactive-questionnaire aria-pressed="${interactiveQuestionnaire.isOpen}">Interactive FHIR Questionnaire</button></div>`:'';
+    const questionnaires=mode==='medical-validation'?`<div class="fc-toggle mv-questionnaires"><span class="fc-toggle-label">Show Questionnaire:</span> <span class="mv-questionnaire-buttons">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn${interactiveQuestionnaire.isOpen?" fc-active":""}" data-interactive-questionnaire aria-pressed="${interactiveQuestionnaire.isOpen}">Interactive FHIR Questionnaire</button></span></div>`:'';
     const sourceDocumentsBtn = mode === "medical-validation" ? `<div class="fc-toggle"><button class="fc-toggle-btn" data-open-source-documents title="Open a Source or Refined source document">Source documents…</button></div>` : "";
     const definitionMessage=definitionStatusMessage();
     const definitionStatus=mode==='medical-validation' && definitionMessage?`<div role="status" class="fc-gaps">${escapeHtml(definitionMessage)}</div>`:'';
@@ -1212,7 +1214,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       + `<button class="fc-toggle-btn${failedCriteriaMode === 'blocking' ? ' fc-active' : ''}" data-fc-mode="blocking" aria-pressed="${failedCriteriaMode === 'blocking'}" title="Highlight conditions or earlier matches that prevented the test's expected result">Expected-result blockers</button>`
       + `<button class="fc-toggle-btn${failedCriteriaMode === 'all' ? ' fc-active' : ''}" data-fc-mode="all" aria-pressed="${failedCriteriaMode === 'all'}" title="Highlight every evaluated false condition, including conditions on other branches">All unmet conditions</button></div>`;
     const explanation = diverterToggle.replace('Details:', 'Explain outcome:');
-    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
+    const panels = `<div class="fc-toggle"><span class="fc-toggle-label">Show Panel:</span><button class="fc-toggle-btn${views.has('source') ? ' fc-active' : ''}" data-highlighted-source aria-pressed="${views.has('source')}">Highlighted Source</button></div>`;
+    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, panels, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
   }
 
   async function openToolbarSourceDocument(token: unknown, index: unknown): Promise<void> {
@@ -2848,6 +2851,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const treeColumn = views.get('tree')?.panel.viewColumn;
     return treeColumn === undefined ? undefined : treeColumn + 1;
   });
+  // REFACTOR:grounded: resize only owned horizontal siblings, without replacing any editor group or tab.
+  const mvPaneLayout = createMvPaneLayout(() => {
+    const tree = views.get('tree')?.panel;
+    if (cockpitDisposed || mode !== 'medical-validation' || !tree) return;
+    const support = [views.get('source')?.panel, views.get('questionnaire')?.panel,
+      views.get('fhirQuestionnaire')?.panel, branchQuestionnaire.layoutPanel, interactiveQuestionnaire.layoutPanel]
+      .filter((panel): panel is vscode.WebviewPanel => !!panel);
+    return { epoch: `${currentCel}:${indexVersion}`, tree: {identity: tree, column: tree.viewColumn},
+      support: support.map(panel => ({identity: panel, column: panel.viewColumn})),
+      groups: vscode.window.tabGroups.all.map(group => ({identity: group, column: group.viewColumn})) };
+  }, <T>(name: string, value?: import('./mvPaneLayout').EditorLayout) => vscode.commands.executeCommand<T>(name, ...(value ? [value] : [])),
+  error => console.warn('CRL: could not apply Medical Validation pane widths', error));
+  context.subscriptions.push(mvPaneLayout,
+    vscode.window.tabGroups.onDidChangeTabGroups(() => mvPaneLayout.groupsChanged()),
+    vscode.window.tabGroups.onDidChangeTabs(() => mvPaneLayout.groupsChanged()));
   /** REFACTOR:grounded: UI mode is host-owned; open is panel telemetry, never a second preference. */
   function questionModeFor(session?: BranchSession): QuestionDisplayMode {return session?.questionMode??(session?'off':legacyQuestionMode);}
   function hasBranchQuestionCase(session: BranchSession): boolean {
@@ -2865,6 +2883,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     postQuestionMode();for(const session of decisionTable?.sessions.values()??[])postQuestionMode(session);
   }
   function onBranchQuestionnaireClosed(): void {
+    mvPaneLayout.request();
     const owner=branchQuestionnaireOwner;branchQuestionnaireOwner=undefined;
     if(owner?.questionMode==='panel'){owner.questionMode='off';postQuestionMode(owner,true);}
     else if(!owner&&legacyQuestionMode==='panel')legacyQuestionMode='off';
@@ -2889,6 +2908,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         const treeColumn = views.get('tree')?.panel.viewColumn;
         const fhir = views.get('fhirQuestionnaire')?.panel;
         if (fhir && treeColumn !== undefined) fhir.reveal(treeColumn + 2, true);
+        mvPaneLayout.request();
       }
     }else closeQuestionPanel(true); // A missing current-case payload stays pending; never borrow prior case data.
   }
@@ -3057,6 +3077,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(created&&focused&&hasBranchQuestionCase(focused))setQuestionDisplayMode(focused,'panel');
     postDecisionTableLayout();
     for(const id of table.visible)renderBranchSession(table.sessions.get(id)!);
+    mvPaneLayout.request();
   }
   /** Explicit off-scope flag navigation preserves current and dormant per-case drafts and RQ ownership. */
   function suspendDecisionTable(): void {
@@ -3070,6 +3091,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     decisionTable=undefined;focusedBranchSession=undefined;syncFhirInspection();branchQuestionnaire.close();branchQuestionnaireOwner=undefined;snapshotCapture.settleEmpty();
     for(const session of table.sessions.values())coord.disposePane(session.coordinatorKey);
     void views.get('tree')?.panel.webview.postMessage({type:'decisionTable',active:false});
+    mvPaneLayout.request();
   }
   /** Keep the production rebuild render/reconcile ordering explicit and regression-testable. */
   function renderRebuiltPanes(): void {
@@ -3487,6 +3509,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         postQuestionMode(undefined,false,pinnedCards.token,typeof msg.requestId==='string'?msg.requestId:undefined);return;
       }
       if(msg.type==='toggleQuestionnairePane' && (msg.value==='questionnaire'||msg.value==='fhirQuestionnaire')){toggleQuestionnairePane(msg.value);return;}
+      if(msg.type==='toggleHighlightedSource'){toggleQuestionnairePane('source');return;}
       if(msg.type==='openInteractiveQuestionnaire' && mode==='medical-validation' && currentCel){interactiveQuestionnaire.toggle(currentCel);return;}
       if (msg.type === "routeCardSave" || msg.type === "routeCardAnswerSave") { void saveCard(msg); return; }
       if (msg.type === "qaRequestAction") { qaRequestAction(msg);return; }
@@ -3821,7 +3844,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     );
   }
 
-  function toggleQuestionnairePane(pane: 'questionnaire'|'fhirQuestionnaire'): void {
+  function toggleQuestionnairePane(pane: 'source'|'questionnaire'|'fhirQuestionnaire'): void {
     if(mode!=='medical-validation')return;
     const existing=views.get(pane);
     if(existing) { dispatch({type:'setPaneVisible',pane,visible:false});existing.panel.dispose(); }
@@ -3832,6 +3855,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       ensurePane(pane,column);dispatch({type:'setPaneVisible',pane,visible:true});renderPane(pane);
     }
     renderTreeChrome();
+    mvPaneLayout.request();
   }
   function ensurePane(pane: Pane, column?: vscode.ViewColumn): PaneView {
     let v = views.get(pane);
@@ -3867,11 +3891,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (views.get(pane) !== v) return;
       coord.disposePane(pane);
       views.delete(pane);
-      if(pane==='questionnaire'||pane==='fhirQuestionnaire') {
+      if(pane==='source'||pane==='questionnaire'||pane==='fhirQuestionnaire') {
         dispatch({type:'setPaneVisible',pane,visible:false});
         if(pane==='questionnaire'){questionNodeIds=[];currentQuestionIndex=-1;clearAllThisNode();}
         renderTreeChrome();
       }
+      mvPaneLayout.request();
       // #211: the flag drawer lives in the tree pane's own region — if that pane is torn down mid-draft, drop the host
       // draft too (else `flagDraft` lingers invisible + uncommittable; a fresh tree panel wouldn't re-show it).
       if (pane === "tree") {
@@ -3885,6 +3910,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     });
     // #210 Todo C: a tree pane (re)opened without a click still changes perceivability — refresh the chip off the new state.
     if (pane === "tree") cockpitAgentBridge.notifyChanged();
+    mvPaneLayout.request();
     return v;
   }
 
@@ -7102,7 +7128,7 @@ const COCKPIT_WEBVIEW_BODY =
   `window.addEventListener('pointerup',()=>{if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
   `root.addEventListener('click',(e)=>{if(fpMoved){fpMoved=false;e.stopPropagation();e.preventDefault();}},true);` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
-  `fcc.addEventListener('click',(e)=>{const documentButton=e.target.closest&&e.target.closest('[data-source-document]');if(documentButton){e.preventDefault();if(!documentButton.disabled)v.postMessage({type:'openToolbarSourceDocument',token:documentButton.getAttribute('data-source-token'),idx:Number(documentButton.getAttribute('data-source-document'))});return;}const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
+  `fcc.addEventListener('click',(e)=>{const documentButton=e.target.closest&&e.target.closest('[data-source-document]');if(documentButton){e.preventDefault();if(!documentButton.disabled)v.postMessage({type:'openToolbarSourceDocument',token:documentButton.getAttribute('data-source-token'),idx:Number(documentButton.getAttribute('data-source-document'))});return;}const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const hs=e.target.closest&&e.target.closest('[data-highlighted-source]');if(hs){e.preventDefault();v.postMessage({type:'toggleHighlightedSource',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
   // disc 164: the produced-path diverter overlay on/off toggle (MV chrome).
   `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +

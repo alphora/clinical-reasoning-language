@@ -7,7 +7,8 @@ Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
-explanation, the three questionnaire controls, then source files under the
+explanation, **Show Panel: Highlighted Source**, **Show Questionnaire:** with
+the three questionnaire controls, then source files under the
 **Source documents** subgroup heading. A group with
 several documents has one named button per file. An empty group is disabled;
 incomplete discovery is disclosed rather than reported as empty.
@@ -21,6 +22,19 @@ Highlighting compares the selected test with its expected result:
 
 A correctly expected Unmet result is still a passing test. These controls do
 not change clinical evaluation, conditions, or answers.
+
+## Editor panel defaults
+
+The tree and Decision Table use the remaining editor width. Result Questionnaire,
+FHIR Questionnaire, CRL Questionnaire, Interactive FHIR Questionnaire, and
+Highlighted Source each default to about 380 pixels when open in separate columns.
+Smaller windows reduce the support columns equally. Highlighted Source toggles
+the existing highlighted source viewer; Source documents opens reference files.
+
+Opening, closing, or rearranging panels and changing Decision Table depth restore
+these defaults. Ordinary row selection and focusing another panel preserve manual
+resizing. Width updates preserve unrelated editor columns and nested grid structure;
+panels placed in separate rows or sharing a column are left in their user layout.
 
 Edit history appears when wording-edit receipts or legacy proposals exist.
 Recovery appears when inspection finds recovery work, retained scope locks,

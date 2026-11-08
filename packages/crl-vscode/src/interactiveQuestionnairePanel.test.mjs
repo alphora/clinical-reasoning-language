@@ -93,9 +93,10 @@ test('the actual chrome callback waits for retargeting to finish and is inert af
  const ast=ts.createSourceFile('host.ts',host,ts.ScriptTarget.Latest,true);
  const root=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='registerCorrespondenceCockpit');
  const fn=root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='interactivePanelChanged');
- const pending=[],painted=[];let policy='old';
- const c=vm.createContext({queueMicrotask:f=>pending.push(f),cockpitDisposed:false,renderTreeChrome:()=>painted.push(policy)});
+ const pending=[],painted=[],widthRequests=[];let policy='old';
+ const c=vm.createContext({queueMicrotask:f=>pending.push(f),cockpitDisposed:false,renderTreeChrome:()=>painted.push(policy),mvPaneLayout:{request:()=>widthRequests.push(policy)}});
  vm.runInContext(transformSync(fn.getText(ast),{loader:'ts',target:'es2022'}).code,c);
  c.interactivePanelChanged();assert.deepEqual(painted,[]);policy='new';pending.shift()();assert.deepEqual(painted,['new']);
  c.interactivePanelChanged();c.cockpitDisposed=true;pending.shift()();assert.deepEqual(painted,['new']);
+ assert.deepEqual(widthRequests,['new'],'open/close restores widths only after retargeting, never after disposal');
 });

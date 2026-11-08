@@ -17,9 +17,9 @@ test('puts status above legend left and wider actions right, retaining gold emph
   assert.match(html,/<h3[^>]*mv-toolbar-subheading[^>]*>Source documents<\/h3>[\s\S]*mv-document-buttons/);
 });
 test('orders actions as tools, highlighting, outcome, questionnaires, optional editing, then sources', () => {
-  const x=input();x.tools='Review verdicts / Export snapshot';x.history=true;
+  const x=input();x.tools='Review verdicts / Export snapshot';x.history=true;x.panels='Show Panel: Highlighted Source';
   const html=renderMvTreeChrome(x);
-  assert.match(html,/Review verdicts \/ Export snapshot[\s\S]*Highlight controls[\s\S]*Explain outcome[\s\S]*Questionnaires[\s\S]*Edit history[\s\S]*mv-document-buttons/);
+  assert.match(html,/Review verdicts \/ Export snapshot[\s\S]*Highlight controls[\s\S]*Explain outcome[\s\S]*Show Panel: Highlighted Source[\s\S]*Questionnaires[\s\S]*Edit history[\s\S]*mv-document-buttons/);
 });
 test('direct source buttons use escaped names and host indices, never paths; empty/unreadable state is honest', () => {
   const x=input();x.documents={complete:false,warnings:['Cannot read <source>'],documents:[
