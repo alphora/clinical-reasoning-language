@@ -723,19 +723,14 @@ check("#208 render: a long label emits two <tspan>s in a NODE_H=44 box; a short 
 });
 
 // ── #218 the MV flow-pane color KEY (flowLegendChrome + shared-const drift-proofing) ──
-check("MV legend groups review, conditions, navigation, logic and flags; cockpit stays empty", () => {
+check("MV legend groups review, conditions, navigation and flags; cockpit stays empty", () => {
   const mv = flowLegendChrome("medical-validation");
   assert.equal(flowLegendChrome("cockpit"), "", "cockpit mode → no legend (MV-only, mirrors progress/diverterToggle gating)");
   for (const [cls, label] of [["fc-sw-pass", "Pass"], ["fc-sw-fail", "Fail"], ["fc-sw-pending", "Pending"], ["fc-sw-inferred", "Inferred"], ["fc-sw-ring", "Selected path"]])
     assert.ok(mv.includes(`class="fc-sw ${cls}" aria-hidden="true"></i>${label}`), `${label} chip present + swatch aria-hidden`);
   assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
-  // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
-  assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 5, "review, conditions, navigation, groups and flags each have a labeled section");
-  const groupRow=mv.split('<b>Groups</b>')[1].split('<span class="fc-legend-group"><b>Flags</b>')[0];
-  assert.equal((groupRow.match(/<i /g)||[]).length,2,'one connector swatch per group');
-  assert.match(groupRow,/<i class="fc-sw fc-sw-true" aria-hidden="true"><\/i>ANY OF/);
-  assert.match(groupRow,/<i class="fc-sw fc-sw-false" aria-hidden="true"><\/i>ALL OF/);
-  assert.doesNotMatch(groupRow,/flow-group-teal|flow-group-orange/);
+  assert.equal((mv.match(/class="fc-legend-group"/g) || []).length, 4, "review, conditions, navigation and flags each have a labeled section");
+  assert.doesNotMatch(mv, /<b>Groups<\/b>|ANY OF|ALL OF/, 'operator-specific color key is omitted');
   assert.match(mv,/>KE<\/text>[\s\S]*KE flags/);assert.doesNotMatch(mv,/KE Authoring/);
   assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
 });

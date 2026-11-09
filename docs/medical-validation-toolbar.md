@@ -6,9 +6,10 @@ and the three questionnaire buttons together. Narrow panes scroll the header hor
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
-ANY OF has one green glowing line sample and ALL OF one red glowing line sample,
-using the same styles as the Condition key. The **KE** badge identifies flags raised
-by the knowledge engineer; Open and Resolved describe flag status.
+The legend shows Review, Condition, Navigation and Flags. Condition colors also
+explain automatic group connector highlighting along a selected route. The **KE**
+badge identifies flags raised by the knowledge engineer; Open and Resolved describe
+flag status.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
 explanation, **Show Panel: Highlighted Source**, **Show Questionnaire:** with

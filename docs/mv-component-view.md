@@ -193,4 +193,4 @@ expanded Criterion icons follow their container’s right edge. Question badges
 leave space to the left of verdict controls. Repeated expansion/collapse restores
 and recomputes control placement without changing its owner or action.
 
-Mouse clicks add no temporary focus border. Existing node-focus halos remain, and active toggles retain blue borders. Keyboard focus remains visible. Verdict saves in Question–Result refresh the existing display without re-selecting the route or moving the viewport. Verdict and flag circles share a vertical centerline. The legend uses short labeled sections for Review, Condition, Navigation, Groups and Flags.
+Mouse clicks add no temporary focus border. Existing node-focus halos remain, and active toggles retain blue borders. Keyboard focus remains visible. Verdict saves in Question–Result refresh the existing display without re-selecting the route or moving the viewport. Verdict and flag circles share a vertical centerline. The legend uses short labeled sections for Review, Condition, Navigation and Flags.
