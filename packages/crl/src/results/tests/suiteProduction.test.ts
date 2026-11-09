@@ -18,11 +18,11 @@ vi.mock('../nativeWorker',async original=>{
   return {...real,withNativeRuntime:(spec:{signal?:AbortSignal},use:(runtime:unknown)=>Promise<unknown>)=>
     real.withDefaultNativeJob(()=>use({mode:'worker'}),spec.signal,undefined,false)};
 });
-vi.mock("../driver", () => ({ driverReady: () => ({ ok: true }) }));
+vi.mock("../driver", async original => ({ ...await original<typeof import("../driver")>(), driverReady: () => ({ ok: true }) }));
 vi.mock("../../emit-two-lane", () => ({ emitCrlTwoLane: (_path: string, options: {date?: string} = {}) => ({ success: true, cqlLibraries: [], fhir: { resources: [
   { resource: { resourceType: "PlanDefinition", id: "policy", type: { coding: [{ code: "workflow-definition" }] }, date: options.date ?? "2026-09-13", action: engine.hasInputs ? [{ input: [{ type: "Observation", profile: ["http://example.org/A"] }] }] : [] } },
 ] } }) }));
-vi.mock("../runProducer", () => ({ runOneCase: async (opts: { artifactRoot: string }, input: { caseName: string; compartmentId: string;repoPath:string }) => {
+vi.mock("../runProducer", () => ({ runOneCase: async (opts: { artifactRoot: string; evidence?: import("../batchEvidence").CaseEvidenceCapture }, input: { caseName: string; compartmentId: string;repoPath:string }) => {
   const call=++engine.calls;engine.active++;engine.peak=Math.max(engine.peak,engine.active);try{await engine.wait?.(input);}finally{engine.active--;}engine.inputChanged?.();
   const artifacts = ["Questionnaire", "QuestionnaireResponse"].map(resourceType => {
     const path = `tests/results/fhir/patient/${input.compartmentId}/${resourceType.toLowerCase()}/form.json`;
@@ -30,6 +30,11 @@ vi.mock("../runProducer", () => ({ runOneCase: async (opts: { artifactRoot: stri
     const file = join(opts.artifactRoot, path); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, bytes);
     return { path, resourceType, id: "form", sha256: suiteHash(bytes) };
   });
+  if(opts.evidence){
+    opts.evidence.request({operation:'applyR5',dataBundle:null,dataLocation:'repository',repositoryPath:input.repoPath});
+    const value={resourceType:'Parameters',parameter:[{name:'return',resource:{resourceType:'Bundle',entry:[{resource:{resourceType:'Task',id:input.compartmentId}}]}}]},bytes=Buffer.from(JSON.stringify(value));
+    opts.evidence.result({stdout:bytes.toString(),stderr:'',status:0,cleanupConfirmed:true,outputCapture:{origin:'worker-job-files',workerPid:1000+call,status:{kind:'worker-request',code:0},stdout:{bytes,observedBytes:bytes.length,retained:'all',complete:true},stderr:{bytes:Buffer.alloc(0),observedBytes:0,retained:'all',complete:true}}},value,{startedAt:'start',finishedAt:'finish',elapsedMs:1},'worker');
+  }
   return { caseName: input.caseName, compartmentDir: `patient/${input.compartmentId}`, state: engine.state, artifacts, ...(call === engine.uncertainAt ? {cleanupUncertain: true, state: "failed", reason: "cleanup unconfirmed"} : {}) };
 } }));
 
@@ -179,6 +184,27 @@ it('retains scratch through a preparation failure, active sibling and cancelled 
 it.each([0,-1,33,1.5,NaN])('refuses invalid worker limit%s before starting cases',async workerLimit=>{
   expect(await produceResults({...request(),workerLimit})).toMatchObject({ok:false,reason:expect.stringContaining('workerLimit')});expect(engine.calls).toBe(0);
 });
+it('six-worker capture indexes every original call; retry does not replay uncaptured retained successes',async()=>{
+  const {setNativeWorkerLimit}=await import('../nativeWorker');
+  for(let i=2;i<6;i++)put('src/cel/mv/extra'+i+'.cel',cel('Clinical Extra'+i,'extra'+i));
+  const evidenceRoot=join(root,'..',root.split(/[\\/]/).at(-1)+'-capture');roots.push(evidenceRoot);
+  engine.wait=()=>new Promise(resolve=>setTimeout(resolve,15));
+  try{
+    const result=await produceResults({...request(),workerLimit:6,evidenceRoot});expect(result.ok).toBe(true);if(!result.ok)throw Error(result.reason);
+    expect(result.workerPool).toMatchObject({workerLimit:6,nativeCalls:6});expect(engine.calls).toBe(6);expect(result.evidence?.complete).toBe(true);
+    const index=JSON.parse(readFileSync(result.evidence!.indexPath,'utf8'));expect(index.cases).toHaveLength(6);expect(new Set(index.cases.map((c:any)=>c.captureId)).size).toBe(6);
+    expect(index.cases.every((c:any)=>c.captureState==='complete'&&c.inputSha256&&c.files.repository&&c.files.parameters)).toBe(true);
+    const next=evidenceRoot+'-retry';roots.push(next);
+    const retry=await produceResults({...request(),retryFailed:true,evidenceRoot:next});expect(retry.ok).toBe(true);if(!retry.ok)throw Error(retry.reason);
+    expect(engine.calls).toBe(6);expect(retry.manifest.cases.every(c=>c.reused)).toBe(true);expect(retry.evidence?.complete).toBe(false);
+    expect(JSON.parse(readFileSync(retry.evidence!.indexPath,'utf8')).cases.every((c:any)=>c.captureState==='unavailable')).toBe(true);
+  }finally{await setNativeWorkerLimit(1);}
+});
+it('unsafe evidence root refuses before any native evaluation or result replacement',async()=>{
+  put('tests/results/sentinel.txt','preserve');
+  const result=await produceResults({...request(),evidenceRoot:join(root,'evidence')});expect(result.ok).toBe(false);expect(engine.calls).toBe(0);expect(readFileSync(join(root,'tests/results/sentinel.txt'),'utf8')).toBe('preserve');
+});
+
 it("accounts for cleanup uncertainty, skips pruning, and quarantines subsequent requests", async () => {
   put("src/cel/mv/c.cel", cel("Clinical C", "c"));
   expect(await produceResults(request())).toMatchObject({ok:true,failed:0});

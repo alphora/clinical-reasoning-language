@@ -15,6 +15,7 @@ import type { ProducerCaseEntry, ProducerCaseState } from "./manifest";
 import { jvmFlags, type JvmBounds } from "./spawn";
 import { driverArgs, driverReady } from "./driver";
 import type {NativeRuntime} from './nativeWorker';
+import type { CaseEvidenceCapture } from './batchEvidence';
 
 export interface RunOneCase {
   caseName: string;
@@ -34,6 +35,7 @@ export interface RunContext {
   /** Artifact root the results tree hangs from. */
   artifactRoot: string;
   runtime?:NativeRuntime;
+  evidence?: CaseEvidenceCapture;
 }
 
 /** What the engine returned, reduced to the two things a result consumer needs. */
@@ -174,9 +176,17 @@ export async function runOneCase(ctx: RunContext, c: RunOneCase): Promise<Produc
       timeoutMs: ctx.bounds.batchTimeoutMs,
       maxBytes: ctx.bounds.maxCapturedBytes,
       signal: ctx.signal,
+      ...(ctx.evidence ? {captureOutput:true} : {}),
     };
+  const startedAt=new Date().toISOString(),started=performance.now();
+  const mode=ctx.runtime?.mode??'isolated';
+  ctx.evidence?.request({schemaVersion:1,operation:'applyR5',kind:'invocation-descriptor',javaExe:ctx.javaExe,args,
+    nativeMode:mode,reservedWorkerPid:ctx.runtime?.pid??null,planDefinitionId:ctx.planDefinitionId,subjectReference:c.subjectReference,
+    dataBundle:null,dataLocation:'repository',repositoryPath:c.repoPath,bounds:ctx.bounds,startedAt});
   const proc=ctx.runtime?await ctx.runtime.run(args,options):await runNativeProcess(ctx.javaExe,args,options);
   const { stdout, stderr } = proc;
+  const params = parseDriverStdout(stdout);
+  ctx.evidence?.result(proc,params,{startedAt,finishedAt:new Date().toISOString(),elapsedMs:performance.now()-started},mode);
   const timedOut = proc.failure === "timeout";
   if (proc.failure && !timedOut) return {
     caseName: c.caseName, compartmentDir: `patient/${c.compartmentId}`, state: "failed",
@@ -184,7 +194,6 @@ export async function runOneCase(ctx: RunContext, c: RunOneCase): Promise<Produc
     ...(!proc.cleanupConfirmed ? { cleanupUncertain: true } : {}),
   };
 
-  const params = parseDriverStdout(stdout);
   const results = params ? extractResults(params) : {};
   const { state, reason } = classify(results, stderr, timedOut, proc.status, params !== undefined);
 

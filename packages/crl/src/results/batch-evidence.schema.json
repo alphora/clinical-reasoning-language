@@ -1,0 +1,450 @@
+{
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "operation": {
+      "const": "emit_results"
+    },
+    "batchId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "running",
+        "finished"
+      ]
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "producerVersion": {
+      "type": "string"
+    },
+    "suite": {
+      "type": "string"
+    },
+    "useCase": {
+      "type": "string"
+    },
+    "inputClock": {
+      "type": "string"
+    },
+    "definitionClosureSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "runtimeSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "planDefinitionId": {
+      "type": "string"
+    },
+    "runtime": {
+      "type": "object"
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "artifactBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "batchBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "artifactBytes",
+        "batchBytes"
+      ],
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "operation",
+    "batchId",
+    "state",
+    "complete",
+    "producerVersion",
+    "suite",
+    "useCase",
+    "inputClock",
+    "limits",
+    "files",
+    "cases",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CRL native batch evidence index v1",
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/|[A-Za-z]:|.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "bytes",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "stream": {
+      "type": "object",
+      "properties": {
+        "observedBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "retained": {
+          "enum": [
+            "all",
+            "prefix",
+            "tail",
+            "missing"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "diagnostic": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "observedBytes",
+        "retained",
+        "complete"
+      ],
+      "additionalProperties": false
+    },
+    "native": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "statusKind": {
+          "enum": [
+            "worker-request",
+            "worker-exit",
+            "process-exit",
+            "unavailable"
+          ]
+        },
+        "failure": {
+          "type": "string"
+        },
+        "cleanupConfirmed": {
+          "type": "boolean"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "finishedAt": {
+          "type": "string"
+        },
+        "elapsedMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "workerPid": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "status",
+        "statusKind",
+        "cleanupConfirmed",
+        "startedAt",
+        "finishedAt",
+        "elapsedMs"
+      ],
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "properties": {
+        "captureId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceFile": {
+          "type": "string"
+        },
+        "caseId": {
+          "type": "string"
+        },
+        "caseName": {
+          "type": "string"
+        },
+        "compartmentDir": {
+          "type": "string"
+        },
+        "inputSha256": {
+          "type": "string",
+          "pattern": "^$|^[a-f0-9]{64}$"
+        },
+        "captureState": {
+          "enum": [
+            "pending",
+            "capturing",
+            "complete",
+            "incomplete",
+            "unavailable"
+          ]
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/file"
+          }
+        },
+        "evaluation": {
+          "type": "object"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "native": {
+          "$ref": "#/$defs/native"
+        },
+        "streams": {
+          "type": "object",
+          "properties": {
+            "stdout": {
+              "$ref": "#/$defs/stream"
+            },
+            "stderr": {
+              "$ref": "#/$defs/stream"
+            }
+          },
+          "required": [
+            "stdout",
+            "stderr"
+          ],
+          "additionalProperties": false
+        },
+        "outputOrigin": {
+          "enum": [
+            "worker-job-files",
+            "owned-process-transport"
+          ]
+        },
+        "hostDiagnostics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestControlFormat": {
+          "enum": [
+            "worker-mailbox-utf8",
+            "windows-supervisor-base64-json"
+          ]
+        }
+      },
+      "required": [
+        "captureId",
+        "caseName",
+        "compartmentDir",
+        "inputSha256",
+        "captureState",
+        "files"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "captureState": {
+                "const": "complete"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "native",
+              "streams",
+              "outputOrigin",
+              "evaluation"
+            ],
+            "properties": {
+              "inputSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "files": {
+                "required": [
+                  "input",
+                  "repository",
+                  "request",
+                  "stdout",
+                  "stderr",
+                  "parameters"
+                ]
+              },
+              "native": {
+                "properties": {
+                  "cleanupConfirmed": {
+                    "const": true
+                  },
+                  "statusKind": {
+                    "enum": [
+                      "worker-request",
+                      "process-exit"
+                    ]
+                  },
+                  "status": {
+                    "type": "integer"
+                  }
+                },
+                "not": {
+                  "required": [
+                    "failure"
+                  ]
+                }
+              },
+              "streams": {
+                "properties": {
+                  "stdout": {
+                    "properties": {
+                      "complete": {
+                        "const": true
+                      },
+                      "retained": {
+                        "const": "all"
+                      }
+                    }
+                  },
+                  "stderr": {
+                    "properties": {
+                      "complete": {
+                        "const": true
+                      },
+                      "retained": {
+                        "const": "all"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "complete": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "definitionClosureSha256",
+          "runtimeSha256",
+          "planDefinitionId",
+          "runtime"
+        ],
+        "properties": {
+          "state": {
+            "const": "finished"
+          },
+          "errors": {
+            "maxItems": 0
+          },
+          "files": {
+            "required": [
+              "definitions",
+              "cql",
+              "sources"
+            ]
+          },
+          "cases": {
+            "items": {
+              "properties": {
+                "captureState": {
+                  "const": "complete"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "finished"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cases": {
+            "items": {
+              "properties": {
+                "captureState": {
+                  "enum": [
+                    "complete",
+                    "incomplete",
+                    "unavailable"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

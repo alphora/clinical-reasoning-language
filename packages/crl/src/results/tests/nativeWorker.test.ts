@@ -5,7 +5,7 @@ import path from 'node:path';
 import {driverArgs,driverDir} from '../driver';
 import {DEFAULT_BOUNDS} from '../spawn';
 import type {NativeRuntime,NativeSpec} from '../nativeWorker';
-const fake=vi.hoisted(()=>({launch:vi.fn(),count:0,duration:20,clean:true,crash:false,options:[] as any[],active:0,peak:0,probes:0,crashCall:undefined as string|undefined}));
+const fake=vi.hoisted(()=>({launch:vi.fn(),count:0,duration:20,clean:true,crash:false,options:[] as any[],active:0,peak:0,probes:0,crashCall:undefined as string|undefined,badResponse:false,unreadable:false}));
 vi.mock('../ownedProcess',()=>({runOwnedProcess:fake.launch}));
 let api:typeof import('../nativeWorker'),root:string,spec:NativeSpec,exitListeners:Set<(...args:any[])=>void>;
 const info='CRL_RUNTIME_INFO:'+['17','17.0.1','Vendor','VM','UTC','UTC','en','en','en'].map(s=>Buffer.from(s).toString('base64')).join('.');
@@ -14,7 +14,7 @@ beforeEach(async()=>{
  exitListeners=new Set(process.listeners('beforeExit'));
  vi.resetModules();api=await import('../nativeWorker');root=mkdtempSync(path.join(tmpdir(),'worker-tests-'));writeFileSync(path.join(root,'engine.jar'),'engine');
  spec={javaExe:process.execPath,engineJarPath:path.join(root,'engine.jar'),bounds:{...DEFAULT_BOUNDS,maxHeapMb:512,batchTimeoutMs:2000}};
- fake.count=0;fake.duration=20;fake.clean=true;fake.crash=false;fake.options=[];fake.active=0;fake.peak=0;fake.probes=0;fake.crashCall=undefined;
+ fake.count=0;fake.duration=20;fake.clean=true;fake.crash=false;fake.options=[];fake.active=0;fake.peak=0;fake.probes=0;fake.crashCall=undefined;fake.badResponse=false;fake.unreadable=false;
  fake.launch.mockImplementation((_exe:string,args:string[],options:any)=>new Promise(resolve=>{
   if(args[0]==='-version'||args.includes('--runtime-info')){fake.probes++;resolve({status:fake.clean?0:null,failure:fake.clean?undefined:'cleanup-unconfirmed',stdout:info,stderr:'',cleanupConfirmed:fake.clean});return;}
   if(!options.persistent){
@@ -32,9 +32,9 @@ beforeEach(async()=>{
    callActive=true;fake.active++;fake.peak=Math.max(fake.peak,fake.active);
    active=setTimeout(()=>{
     if(callActive){callActive=false;fake.active--;}
-    writeFileSync(path.join(logs,'stdout.log'),call);writeFileSync(path.join(logs,'stderr.log'),'');
+    if(fake.unreadable)mkdirSync(path.join(logs,'stdout.log'));else writeFileSync(path.join(logs,'stdout.log'),call);writeFileSync(path.join(logs,'stderr.log'),'');
     if(fake.crash||fake.crashCall===call){close(1);return;}
-    writeFileSync(path.join(dir,'response'),lines[0]+'\n0\n');
+    writeFileSync(path.join(dir,'response'),(fake.badResponse?'wrong-token':lines[0])+'\n0\n');
    },fake.duration);
   },2);
  }));
@@ -244,4 +244,41 @@ it('a downward resize rejects retirement failure after its draining active job s
  const jobError=expect(b).rejects.toMatchObject({code:'cleanup-unconfirmed'});
  await until(()=>pool.status().workerLimit===1);fake.clean=false;release();await jobError;await downError;await a;
  expect(pool.status().quarantined).toBe(true);
+});
+
+it.each(['badResponse','unreadable'] as const)('preserves available raw bytes before %s exception cleanup',async kind=>{
+  fake[kind]=true;
+  await api.withNativeRuntime(spec,async runtime=>{
+    const result=await runtime.run(driverArgs({jvmFlags:[],engineJarPath:spec.engineJarPath,loaderPath:driverDir(),repoPath:'actual-request',planDefinitionId:'D',subjectReference:'Patient/p'}),{timeoutMs:1000,maxBytes:65536,captureOutput:true});
+    expect(result.failure).toBe('spawn-error');expect(result.outputCapture?.requestControlFormat).toBe('worker-mailbox-utf8');expect(result.outputCapture?.requestControl?.toString()).toContain(Buffer.from('actual-request').toString('base64'));
+    expect(result.outputCapture?.stdout.complete).toBe(false);
+    if(kind==='badResponse')expect(result.outputCapture?.stdout.bytes?.toString()).toBe('actual-request');
+    else expect(result.outputCapture?.stdout.retained).toBe('missing');
+    expect(result.outputCapture?.diagnostics?.length).toBeGreaterThan(0);
+  });
+});
+it('evidence-only write failure inside a reservation does not retire its successful worker',async()=>{
+  const {BatchEvidenceWriter}=await import('../batchEvidence');
+  const evidenceRoot=path.join(root,'evidence'),input={caseName:'A',compartmentDir:'patient/a',compartmentId:'a',subjectReference:'Patient/a',resources:[]};
+  const writer=new BatchEvidenceWriter(evidenceRoot,{producerVersion:'test',suite:'mv',useCase:'prior-auth',inputClock:'clock'},[input]);
+  const repo=path.join(root,'repo.json');writeFileSync(repo,'{}');const capture=writer.begin(0,input,'D',repo);
+  mkdirSync(path.join(evidenceRoot,'cases',writer.index.cases[0].captureId,'stdout.bin'));
+  await api.withNativeRuntime(spec,async runtime=>{
+    const first=await runtime.run(driverArgs({jvmFlags:[],engineJarPath:spec.engineJarPath,loaderPath:driverDir(),repoPath:'A',planDefinitionId:'D',subjectReference:'Patient/a'}),{timeoutMs:1000,maxBytes:65536,captureOutput:true});
+    const pid=runtime.pid;capture.result(first,{resourceType:'Parameters',parameter:[]},{startedAt:'s',finishedAt:'f',elapsedMs:1},'worker');
+    expect(first.status).toBe(0);expect((await run(runtime,'B')).status).toBe(0);expect(runtime.pid).toBe(pid);expect(fake.count).toBe(1);
+  });
+  expect(writer.finish().complete).toBe(false);expect(writer.index.errors.length).toBeGreaterThan(0);
+});
+
+it('capture records actual replacement PID and separates unacknowledged worker exit from request status',async()=>{
+  await api.withNativeRuntime(spec,async runtime=>{
+    const old=runtime.pid;fake.crash=true;
+    const args=driverArgs({jvmFlags:[],engineJarPath:spec.engineJarPath,loaderPath:driverDir(),repoPath:'original',planDefinitionId:'D',subjectReference:'Patient/a'});
+    const failed=await runtime.run(args,{timeoutMs:1000,maxBytes:65536,captureOutput:true});
+    expect(failed.status).toBe(1);expect(failed.outputCapture).toMatchObject({workerPid:old,status:{kind:'worker-exit',code:1}});expect(failed.outputCapture?.stdout.complete).toBe(false);
+    fake.crash=false;
+    const recovered=await runtime.run(args,{timeoutMs:1000,maxBytes:65536,captureOutput:true});
+    expect(runtime.pid).not.toBe(old);expect(recovered.outputCapture).toMatchObject({workerPid:runtime.pid,status:{kind:'worker-request',code:0}});expect(fake.count).toBe(2);
+  });
 });

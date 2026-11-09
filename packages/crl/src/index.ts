@@ -689,3 +689,7 @@ export type {NativeWorkerPool,NativeWorkerPoolStatus} from "./results/nativeWork
 
 // REFACTOR:grounded: read-only condition metadata shares prepared execution semantics with consumers.
 export type { ConditionAnswerCheck, ConditionAnswerSubject, ConditionAnswerMember } from "./provenance/conditionAnswers";
+
+// Versioned same-call evidence contract for independent audit readers.
+export {batchEvidenceJsonSchema} from "./results/batchEvidence";
+export type {EvidenceReceipt, EvidenceFile, BatchEvidenceCase, BatchEvidenceIndex} from "./results/batchEvidence";

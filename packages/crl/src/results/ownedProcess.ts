@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { driverDir } from "./driver";
+import type { NativeOutputCapture } from './nativeOutput';
 
 export interface OwnedProcessOptions {
   timeoutMs: number;
@@ -12,6 +13,8 @@ export interface OwnedProcessOptions {
   /** Owner/cancellation supervision continues; active requests supply their own deadlines. */
   persistent?: boolean;
   unref?: boolean;
+  /** Preserve bounded original stream bytes from this same call. */
+  captureOutput?: boolean;
 }
 export interface OwnedProcessResult {
   stdout: string;
@@ -19,6 +22,7 @@ export interface OwnedProcessResult {
   status: number | null;
   failure?: "timeout" | "cancelled" | "output-limit" | "spawn-error" | "cleanup-unconfirmed";
   cleanupConfirmed: boolean;
+  outputCapture?: NativeOutputCapture;
 }
 export function runOwnedProcess(executable: string, args: readonly string[], options: OwnedProcessOptions): Promise<OwnedProcessResult> {
   if (options.signal?.aborted) return Promise.resolve({stdout:"",stderr:"",status:null,failure:"cancelled",cleanupConfirmed:true});
@@ -33,12 +37,19 @@ export function runOwnedProcess(executable: string, args: readonly string[], opt
     let stdout=Buffer.alloc(0), stderr=Buffer.alloc(0), totalOut=0, totalErr=0;
     let failure: OwnedProcessResult["failure"], status:number|null=null, done=false, ack:string|undefined;
     let stderrScan="", cleanupTimer:NodeJS.Timeout|undefined, groupPoll:NodeJS.Timeout|undefined;
+    let hostDiagnostic: string | undefined, nativeStderrBeforeError: Buffer | undefined;
     const finish = (confirmed:boolean) => {
       if(done) return; done=true; clearTimeout(timer); clearTimeout(cleanupTimer); clearTimeout(groupPoll);
       options.signal?.removeEventListener("abort",cancel);
       child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
       const cleanErr=stderr.toString("utf8").replace(new RegExp("\\r?\\n?CRL_JOB_DONE:"+token+":[^\\r\\n]*\\r?\\n?","g"),"");
-      resolve({stdout:stdout.toString("utf8"),stderr:cleanErr,status,failure:confirmed?failure:"cleanup-unconfirmed",cleanupConfirmed:confirmed});
+      const complete = confirmed && !failure && status !== null;
+      resolve({stdout:stdout.toString("utf8"),stderr:cleanErr,status,failure:confirmed?failure:"cleanup-unconfirmed",cleanupConfirmed:confirmed,
+        ...(options.captureOutput ? {outputCapture:{origin:'owned-process-transport' as const,status:{kind:'process-exit' as const,code:status},
+          ...(windows?{requestControl:Buffer.from(request),requestControlFormat:'windows-supervisor-base64-json' as const}:{}),
+          stdout:{bytes:stdout,observedBytes:totalOut,retained:totalOut>stdout.length?'tail' as const:'all' as const,complete:complete&&totalOut===stdout.length},
+          stderr:{bytes:nativeStderrBeforeError??stderr,observedBytes:totalErr,retained:totalErr>(nativeStderrBeforeError??stderr).length?'tail' as const:'all' as const,complete:complete&&totalErr===(nativeStderrBeforeError??stderr).length},
+          ...(hostDiagnostic?{diagnostics:[hostDiagnostic]}:{})}} : {})});
     };
     const groupGone = () => {
       if(!child.pid) return true;
@@ -72,7 +83,7 @@ export function runOwnedProcess(executable: string, args: readonly string[], opt
     };
     child.stdout.on("data",(chunk:Buffer)=>capture(chunk,false));
     child.stderr.on("data",(chunk:Buffer)=>capture(chunk,true));
-    child.on("error",error=>{ stderr=Buffer.from(String(error)); failure="spawn-error"; finish(true); });
+    child.on("error",error=>{ nativeStderrBeforeError=stderr;hostDiagnostic=String(error);stderr=Buffer.from(String(error)); failure="spawn-error"; finish(true); });
     child.on("exit",code=>{ if(!windows) {status=code; stop();} });
     const confirmGroup = () => {
       if (done) return;

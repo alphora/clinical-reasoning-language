@@ -7,6 +7,7 @@ import {type OwnedProcessOptions,type OwnedProcessResult} from './ownedProcess';
 import {runNativeProcess,NativeRuntimeError,assertNativeHealthy,reportNativeCleanup,nativeQuarantined,joinNativeSignals,subscribeNativeAbort} from './nativeProcess';
 import {driverArgs,driverDir,PROPERTIES_LAUNCHER} from './driver';
 import {jvmFlags,verifyJar,type JvmBounds} from './spawn';
+import {captureWorkerOutput} from './nativeOutput';
 
 export type NativeMode='worker'|'isolated';
 export interface NativeSpec {javaExe:string;engineJarPath:string;engineSha256?:string;bounds:JvmBounds;env?:NodeJS.ProcessEnv;signal?:AbortSignal;nativeMode?:NativeMode}
@@ -62,15 +63,16 @@ async function prepare(spec:NativeSpec,key:string,expectedInfo?:string):Promise<
 }
 async function runWorker(spec:NativeSpec,key:string,info:string,args:readonly string[],options:OwnedProcessOptions,onStart:()=>void):Promise<OwnedProcessResult>{
   const joined=joinNativeSignals([options.signal,spec.signal]);options={...options,signal:joined.signal};
-  let current:Worker|undefined,logs:string|undefined,reason:OwnedProcessResult['failure'],status:number|null=null;
+  let current:Worker|undefined,logs:string|undefined,reason:OwnedProcessResult['failure'],status:number|null=null,requestControl:Buffer|undefined,requestAcknowledged=false,dispatchedPid:number|undefined;
   try{
     checkStopped(options.signal);current=await prepare({...spec,signal:options.signal},key,info);
     const launcher=args.indexOf(PROPERTIES_LAUNCHER);if(launcher<0)throw new NativeRuntimeError('worker-protocol','Missing native launcher.');
     const call=args.slice(launcher+1);if(call.length!==3&&call.length!==8)throw new NativeRuntimeError('worker-protocol','Invalid native driver argument count.');
     const token=randomBytes(16).toString('hex');logs=path.join(current.dir,token);mkdirSync(logs);
     const body=[token,String(options.maxBytes),String(options.timeoutMs),Buffer.from(logs).toString('base64'),...call.map(s=>Buffer.from(s).toString('base64'))].join('\n')+'\n';
+    if(options.captureOutput)requestControl=Buffer.from(body);
     if(Buffer.byteLength(body)>65536)throw new NativeRuntimeError('worker-protocol','Native request control exceeds limit.');
-    writeFileSync(path.join(current.dir,'request.tmp'),body);renameSync(path.join(current.dir,'request.tmp'),path.join(current.dir,'request'));onStart();
+    writeFileSync(path.join(current.dir,'request.tmp'),body);renameSync(path.join(current.dir,'request.tmp'),path.join(current.dir,'request'));onStart();dispatchedPid=current.pid;
     const deadline=Date.now()+options.timeoutMs,response=path.join(current.dir,'response');
     while(true){
       if(options.signal?.aborted){reason='cancelled';break;}
@@ -78,7 +80,7 @@ async function runWorker(spec:NativeSpec,key:string,info:string,args:readonly st
       if(existsSync(response)){
         const lines=readFileSync(response,'utf8').trimEnd().split('\n');rmSync(response);
         if(lines.length!==2||lines[0]!==token||!['0','1'].includes(lines[1]))throw new NativeRuntimeError('worker-protocol','Invalid native response correlation.');
-        status=Number(lines[1]);break;
+        status=Number(lines[1]);requestAcknowledged=true;break;
       }
       if(current.exit){status=current.exit.status;reason=current.exit.failure??(status===124?'timeout':status===125?'output-limit':undefined);break;}
       await pause();
@@ -88,9 +90,20 @@ async function runWorker(spec:NativeSpec,key:string,info:string,args:readonly st
     let clean=true;
     if(reason||status!==0){current.abort.abort();const end=await current.closed;clean=end.cleanupConfirmed;if(!clean)reportNativeCleanup(false);}
     const stdout=read('stdout.log'),stderr=read('stderr.log');
+    const outputCapture=options.captureOutput?captureWorkerOutput(logs,options.maxBytes,requestAcknowledged&&!reason&&clean):undefined;
+    if(outputCapture){outputCapture.requestControl=requestControl;outputCapture.requestControlFormat='worker-mailbox-utf8';outputCapture.workerPid=dispatchedPid;
+      outputCapture.status=requestAcknowledged?{kind:'worker-request',code:status}:current?.exit?{kind:'worker-exit',code:current.exit.status}:{kind:'unavailable',code:null};}
     if(reason||status!==0){clean=await retire()&&clean;}else rmSync(logs,{recursive:true,force:true,maxRetries:3});
-    return {stdout,stderr,status,failure:clean?reason:'cleanup-unconfirmed',cleanupConfirmed:clean};
-  }catch(error){const clean=await retire();return {stdout:'',stderr:String(error),status:null,failure:clean?(error instanceof NativeRuntimeError&&error.code==='cancelled'?'cancelled':'spawn-error'):'cleanup-unconfirmed',cleanupConfirmed:clean};}finally{joined.dispose();}
+    return {stdout,stderr,status,failure:clean?reason:'cleanup-unconfirmed',cleanupConfirmed:clean,...(outputCapture?{outputCapture}:{})};
+  }catch(error){
+    // Preserve available bytes before retire removes the mailbox. Never read an active writer.
+    if(current){current.abort.abort();await current.closed;}
+    const outputCapture=options.captureOutput?captureWorkerOutput(logs,options.maxBytes,false):undefined;
+    if(outputCapture)outputCapture.diagnostics=[String(error).slice(0,500)];
+    if(outputCapture){outputCapture.requestControl=requestControl;outputCapture.requestControlFormat='worker-mailbox-utf8';outputCapture.workerPid=dispatchedPid;
+      outputCapture.status=requestAcknowledged?{kind:'worker-request',code:status}:current?.exit?{kind:'worker-exit',code:current.exit.status}:{kind:'unavailable',code:null};}
+    const clean=await retire();return {stdout:'',stderr:String(error),status:null,failure:clean?(error instanceof NativeRuntimeError&&error.code==='cancelled'?'cancelled':'spawn-error'):'cleanup-unconfirmed',cleanupConfirmed:clean,...(outputCapture?{outputCapture}:{})};
+  }finally{joined.dispose();}
 }
 
 /** Cancel queued work without touching the active lease; deadlines start at dispatch. */

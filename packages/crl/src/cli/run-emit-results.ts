@@ -55,6 +55,8 @@ FLAGS:
   --crl <file>         The CRL library the suite covers. Required.
   --use-case <name>    ${RESULT_USE_CASES.join(" | ")}. Required.
   --retry-failed       Retain compatible successes from the previous run; retry other cases.
+  --evidence-root <dir> New absolute private directory for bounded raw same-call native evidence.
+                       No replay; retained successes are marked capture-unavailable.
   --workers <n>       Independent-case worker limit (1..32); heap admission still applies.
   --case-timeout-ms <ms> Per-case timeout (default 600000; positive integer).
   --jar <path>         Engine jar. OPTIONAL — uses this build's identified cache.
@@ -71,11 +73,12 @@ FLAGS:
 
 EXIT CODES:
   0  The MV run completed without case failures.
-  2  At least one case failed, or the engine could not be run.
+  2  At least one case failed, the engine could not run, or requested evidence is incomplete.
   1  Bad arguments, or --enable was not given.
 `;
 
 interface Args {
+  evidenceRoot?: string;
   workerLimit?:number;
   caseTimeoutMs?: number;
   retryFailed?: boolean;
@@ -104,6 +107,7 @@ function parseArgs(argv: string[]): Args {
     else if (f === "--workers") a.workerLimit=Number(need(i++,f));
     else if (f === "--case-timeout-ms") a.caseTimeoutMs = Number(need(i++, f));
     else if (f === "--out") a.out = need(i++, f);
+    else if (f === "--evidence-root") a.evidenceRoot = need(i++, f);
     else if (f === "--enable") a.enable = true;
     else if (f === "--retry-failed") a.retryFailed = true;
     else if (f === "--no-prune") throw new Error("--no-prune is no longer supported; generated output is replaced. Use Git or a scratch output root.");
@@ -157,6 +161,7 @@ async function main(): Promise<void> {
   // right and a caller wrong, with the helper's tests green throughout.
   const outcome = await produceResults({
     celPath: a.cel,
+    evidenceRoot:a.evidenceRoot,
     retryFailed: a.retryFailed,
     crlPath: a.crl,
     useCase: a.useCase,
@@ -171,6 +176,7 @@ async function main(): Promise<void> {
 
   if (lifecycle.interrupted) return;
   if (!outcome.ok) {
+    if(outcome.evidence)process.stderr.write("evidence: "+JSON.stringify(outcome.evidence)+"\n");
     for (const d of outcome.detail ?? []) process.stderr.write(`  ${d}
 `);
     process.stderr.write(`${outcome.reason}
@@ -215,7 +221,8 @@ async function main(): Promise<void> {
       `manifest: ${outcome.manifestPath}\n` +
       `cases: ${outcome.manifest.cases.length}, failed: ${outcome.failed}\n`,
   );
-  process.exit(outcome.failed > 0 ? 2 : 0);
+  if(outcome.evidence)process.stdout.write('evidence: '+JSON.stringify(outcome.evidence)+'\n');
+  process.exit(outcome.failed > 0 || outcome.evidence?.complete===false ? 2 : 0);
 }
 
 main();

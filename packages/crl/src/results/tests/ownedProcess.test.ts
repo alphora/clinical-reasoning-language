@@ -87,3 +87,9 @@ describe("owned native processes",()=>{
     expect(r).toMatchObject({failure:"cancelled",cleanupConfirmed:true});
   });
 });
+
+it('opt-in capture retains exact bytes from the original invocation',async()=>{
+  const result=await runOwnedProcess(process.execPath,['-e','process.stdout.write(Buffer.from([0xff,0xfe,0,0x61]));process.stderr.write("native diagnostic")'],{timeoutMs:15000,maxBytes:65536,captureOutput:true});
+  expect(result.status).toBe(0);expect(result.outputCapture?.stdout.bytes).toEqual(Buffer.from([0xff,0xfe,0,0x61]));expect(result.outputCapture?.stdout.complete).toBe(true);
+  expect(result.outputCapture?.stderr.bytes?.toString()).toContain('native diagnostic');expect(result.outputCapture?.origin).toBe('owned-process-transport');
+},20000);

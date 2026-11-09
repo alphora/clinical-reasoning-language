@@ -41,8 +41,11 @@ import {withNativeRuntime,shutdownNativeRuntime,withNativeOperation,assertOutsid
 import { digest, runtimeFingerprint } from "./runtimeFingerprint";
 import { caseKey, readRetry, reusableCase, preflightOutputs, regressionRetryRoot, excludeMvDestination, canonicalOutputRoot } from "./retry";
 import { isImplementedUseCase, type ResultUseCase } from "./useCases";
+import { BatchEvidenceWriter, validateEvidenceRoot, type EvidenceReceipt } from './batchEvidence';
 
 export interface ProduceRequest {
+  /** New private directory for bounded evidence from these same native calls. No replay. */
+  evidenceRoot?: string;
   nativeMode?:NativeMode;
   /** Independent case concurrency in the same reusable native pool. Default retains configured limit1. */
   workerLimit?:number;
@@ -77,7 +80,7 @@ export interface ProduceRequest {
 }
 
 export type ProduceOutcome =
-  | { ok: false; reason: string; detail?: string[] }
+  | { ok: false; reason: string; detail?: string[]; evidence?: EvidenceReceipt }
   | {
       ok: true;
       manifest: ProducerManifest;
@@ -92,6 +95,7 @@ export type ProduceOutcome =
       skippedLinks: string[];
       failed: number;
       workerPool?:{workerLimit:number;workerPids:number[];nativeCalls:number;peakActiveCases:number;elapsedMs:number};
+      evidence?: EvidenceReceipt;
       java: { exe: string; major: number };
       /**
        * The engine jar that actually ran, and whether it was DEFAULTED.
@@ -172,6 +176,8 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
   req = { ...req, outRoot: canonicalOutputRoot(req.outRoot) };
   const selection = resolveCelSuite(req.celPath, purpose);
   if (!selection.ok) return { ok: false, reason: "Invalid CEL suite", detail: selection.diagnostics.map(d => d.message) };
+  let evidence:BatchEvidenceWriter|undefined;
+  const attachEvidence=(result:ProduceOutcome):ProduceOutcome=>evidence?{...result,evidence:evidence.finish(result.ok?undefined:result.reason)}:result;
   try {
     const suite = selection.suite;
     if (suite.policyPath && canonicalizeFsPath(req.crlPath) !== canonicalizeFsPath(suite.policyPath)) return { ok: false, reason: "crlPath must be the policy covered by every selected CEL file." };
@@ -182,12 +188,18 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
     preflightOutputs(req.outRoot, purpose, []);
     if (previous && !suite.files.length) throw new Error("Cannot retry an empty suite; run without retry.");
     if (req.signal?.aborted || nativeQuarantined()) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
+    if(req.evidenceRoot!==undefined){
+      const inputs=buildProducerInputs(emission.result);
+      if(inputs.diagnostics.length)return {ok:false,reason:'CEL cases have no native input',detail:inputs.diagnostics.map(d=>d.message)};
+      const root=validateEvidenceRoot(req.evidenceRoot,[suite.projectRoot,req.outRoot,path.dirname(path.resolve(req.crlPath))]);
+      evidence=new BatchEvidenceWriter(root,{producerVersion:req.crlVersion,suite:suite.purpose,useCase:req.useCase,inputClock:emission.clock},inputs.inputs);
+    }
     if (!suite.files.length) clearGeneratedDirectory(path.join(req.outRoot, "tests/results"));
-    const result = suite.files.length ? await produceCandidate(req, suite, emission, previous) : emptyResult(req, suite, emission);
-    if (!result.ok) return result;
+    const result = suite.files.length ? await produceCandidate(req, suite, emission, previous,evidence) : emptyResult(req, suite, emission);
+    if (!result.ok) return attachEvidence(result);
     mkdirSync(path.dirname(result.manifestPath), { recursive: true });
     writeFileSync(result.manifestPath, JSON.stringify(result.manifest, null, 2) + "\n");
-    if (nativeQuarantined()) return result; // Account for every case, but do not prune after uncertain cleanup.
+    if (nativeQuarantined()) return attachEvidence(result); // Account for every case, but do not prune after uncertain cleanup.
     // Existing results-tree cleanup, once for the complete selected case set.
     const scan = scanOrphans(req.outRoot, result.manifest);
     const { prunable, reportOnly } = splitOrphans(scan.orphans, req.useCase);
@@ -201,15 +213,15 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
       try { rmSync(path.join(req.outRoot, rel)); pruned.push(rel); }
       catch { reportOnly.push(rel); }
     }
-    return { ...result, pruned, orphaned: reportOnly.sort(), skippedLinks: scan.skippedLinks };
-  } catch (error) { return { ok: false, reason: String(error) }; }
+    return attachEvidence({ ...result, pruned, orphaned: reportOnly.sort(), skippedLinks: scan.skippedLinks });
+  } catch (error) { return attachEvidence({ ok: false, reason: String(error) }); }
 }
 
 function emptyResult(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission): Extract<ProduceOutcome, { ok: true }> {
   return { ok: true, manifest: { schemaVersion: 1, celLibrary: suite.purpose, useCase: req.useCase, generatedAt: emission.clock, provenance: { crlVersion: req.crlVersion }, cases: [] }, manifestPath: path.join(req.outRoot, suiteResultsManifestPath(suite.purpose)), notEmitted: [], pruned: [], orphaned: [], skippedLinks: [], failed: 0, java: { exe: "not invoked (empty suite)", major: 0 }, engineJar: { path: "not invoked (empty suite)", defaulted: req.jarPath === undefined } };
 }
 
-async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission, previous?: ProducerManifest): Promise<ProduceOutcome> {
+async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: CelSuiteEmission, previous?: ProducerManifest,evidence?:BatchEvidenceWriter): Promise<ProduceOutcome> {
   if (!isImplementedUseCase(req.useCase)) {
     return { ok: false, reason: `use case "${req.useCase}" has no driver yet` };
   }
@@ -324,6 +336,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     };
   }
   const planDefinitionId = String(roots[0].id);
+  evidence?.definitions(defs,cql,closure.definitionClosureSha256!,planDefinitionId,[req.crlPath,...suite.files.map(f=>f.path)]);
 
   preflightOutputs(req.outRoot, suite.purpose, inputs);
   const spec={javaExe:java.javaExe,engineJarPath:jarPath,engineSha256:jarCheck.sha256,bounds:req.bounds??DEFAULT_BOUNDS,signal:req.signal,nativeMode:req.nativeMode,env:environment};
@@ -337,6 +350,8 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   if(!runtime.sha256)return {ok:false,reason:runtime.reason??"Native runtime probe failed."};
   const definitionClosureSha256 = closure.definitionClosureSha256!;
   const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: jarCheck.sha256 });
+  evidence?.runtime({javaExe:java.javaExe,javaMajor:java.major,engineJarPath:jarPath,engineJarSha256:jarCheck.sha256,
+    fingerprintSha256:runtime.sha256,bounds:spec.bounds,nativeMode:req.nativeMode??'worker'},runtimeSha256);
   if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
       previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {
     return { ok: false, reason: "Cannot retry: definitions or runtime changed. Run without retry." };
@@ -371,6 +386,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
       if(repo.missingCql.length)return {...notRun(input,`no CQL available for ${repo.missingCql.join(", ")}`),state:"failed"};
       // Index-keyed even if a malformed compartment identity were repeated.
       const repoPath=path.join(scratch,index+".json");writeFileSync(repoPath,JSON.stringify(repo.bundle));
+      const capture=evidence?.begin(index,input,planDefinitionId,repoPath);
       const entry=await withNativeRuntime(spec,async native=>{
         const actual=await runtimeFingerprint(java.javaExe,jarPath,spec.bounds,req.signal,environment,native);
         if(!actual.cleanupConfirmed)reportNativeCleanup(false);
@@ -379,7 +395,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
         activeCases++;peakActiveCases=Math.max(peakActiveCases,activeCases);started=true;
         const before=native.calls??0;let counted=false;
         try{
-          const result=await runOneCase({javaExe:java.javaExe,signal:req.signal,engineJarPath:jarPath,bounds:spec.bounds,planDefinitionId,artifactRoot:req.outRoot,runtime:native},
+          const result=await runOneCase({javaExe:java.javaExe,signal:req.signal,engineJarPath:jarPath,bounds:spec.bounds,planDefinitionId,artifactRoot:req.outRoot,runtime:native,evidence:capture},
             {caseName:input.caseName,compartmentId:input.compartmentId,subjectReference:input.subjectReference,repoPath});
           nativeCalls+=(native.calls===undefined?1:native.calls-before);counted=true;
           if(result.cleanupUncertain)reportNativeCleanup(false);
@@ -396,11 +412,12 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
         ...(started&&error instanceof NativeRuntimeError&&!error.cleanupConfirmed?{cleanupUncertain:true}:{})};
     }
   };
-  const jobs=inputs.map((input,index)=>execute(input,index));
+  const jobs=inputs.map((input,index)=>execute(input,index).then(entry=>{evidence?.finishCase(index,entry);return entry;}));
   try{
     // No early Promise.all unwind may delete a sibling's input or omit a queued case.
     const settled=await Promise.allSettled(jobs);
     manifest.cases=settled.map((row,index)=>row.status==='fulfilled'?row.value:{...notRun(inputs[index],String(row.reason)),state:"failed"});
+    for(let index=0;index<settled.length;index++)if(settled[index].status==='rejected')evidence?.finishCase(index,manifest.cases[index]);
   }finally{await Promise.allSettled(jobs);rmSync(scratch,{recursive:true,force:true,maxRetries:3});}
   await drainRetiredNativeWorkers();
   const failed=manifest.cases.filter(entry=>entry.state!=="generated"&&entry.state!=="no-questionnaire").length;
