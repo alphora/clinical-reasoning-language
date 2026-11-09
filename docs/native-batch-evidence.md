@@ -98,6 +98,55 @@ containment/size/hash, matching input/definition/runtime context, request status
 and full raw outcomes. A matching filename, case name, form or summary is not
 proof. Do not trust expected dispositions as observations.
 
+## Runtime digest verification
+
+The producer retains its existing retry fingerprints. `digest(value)` means
+SHA-256 of the UTF-8 bytes of `JSON.stringify(value)`, without pretty printing,
+canonical key reordering or a trailing newline. Property insertion order matters.
+The outer binding is:
+
+```js
+runtimeSha256 = digest({
+  runtime: runtime.fingerprintSha256,
+  crlVersion: index.producerVersion,
+  jar: runtime.engineJarSha256
+});
+```
+
+The nested `fingerprintSha256` is calculated by `runtimeFingerprint.ts` as
+`digest({fields, environment, code, shipped})`, in that property order:
+
+- `fields`: the nine **base64-encoded strings**, in order, from the original
+  `CRL_RUNTIME_INFO:` line: `java.version`, `java.runtime.version`, `java.vendor`,
+  `java.vm.name`, `ZoneId.systemDefault().getId()`,
+  `TimeZone.getDefault().getID()`, then the language tags of the default,
+  DISPLAY and FORMAT locales. Do not decode/re-encode or normalize them.
+- `environment`: an object built from actual environment entries whose keys
+  match `/^(JAVA_TOOL_OPTIONS|JDK_JAVA_OPTIONS|_JAVA_OPTIONS|CLASSPATH|TZ|LANG|LC_.*|LOADER_.*|SPRING_.*)$/i`,
+  sorted using JavaScript `key.localeCompare(otherKey)`. Keys, casing and values
+  remain exactly as observed; absent variables are omitted.
+- `code`: `[basename, sha256(fileBytes)]` pairs for all `.js` files immediately
+  inside the executing runtime module's `__dirname`, sorted by basename using
+  JavaScript's default `.sort()`. In an extension this is the staged bundle
+  directory; in the SDK it is the results-module directory.
+- `shipped`: `[basename, sha256(fileBytes)]` pairs in this exact order:
+  `ApplyDriver.class`, `ApplyWorker.class`, `windows-owned-process.ps1`.
+
+Those nested arrays use basenames, not absolute paths. Environment **values**
+such as classpaths or JVM options can contain machine paths and are not
+normalized. `runtime.files` uses absolute paths as labels for the additional
+observed file-hash inventory; it is not the nested fingerprint's preimage.
+
+The index intentionally does not disclose environment values, which may contain
+credentials, or the complete runtime-info preimage. Therefore an independent
+reader can recompute the **outer** digest from the index, but cannot reconstruct
+the nested digest from this index alone. Verify that nested value against an
+independently supplied execution-context fingerprint, or recompute it where the
+original launcher output and environment are available. If that trusted context
+is required and unavailable, report runtime-context verification unavailable;
+a self-consistent outer digest does not establish an independently trusted
+runtime. This limitation does not justify another clinical evaluation.
+
 ## Storage protection
 
 Evidence can contain patient information and source content. Choose a protected
