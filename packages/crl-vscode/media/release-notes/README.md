@@ -1,8 +1,14 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.52.
+Updates since CRL 6.4.41 through 6.4.53.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.53 — More dependable policy validation
+
+### Keep validation consistent through review
+
+Policy validation can now check that results came from the expected validation tools and preserve the same policy calculations between testing and delivery\.
 
 ## 6.4.52 — A simpler decision\-tree legend
 

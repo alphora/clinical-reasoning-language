@@ -140,6 +140,16 @@
           "caption": "The condition samples keep their green and red glow. This view uses a demonstration policy."
         }
       ]
+    },
+    {
+      "version": "6.4.53",
+      "title": "More dependable policy validation",
+      "features": [
+        {
+          "title": "Keep validation consistent through review",
+          "description": "Policy validation can now check that results came from the expected validation tools and preserve the same policy calculations between testing and delivery."
+        }
+      ]
     }
   ]
 }
