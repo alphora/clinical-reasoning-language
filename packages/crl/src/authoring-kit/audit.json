@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "26a3413bf51b8679990c103fda6ce23f49f2b9b6",
-  "auditedSchemaVersion": "2.46",
-  "auditedContentHash": "ee5ba4d8bcd791aae1d3533593eeed225f4a7530be2c5102a52361c12f6fbd93",
-  "scope": "Schema 2.46 uncertainty guard display uses Presentation, with exact whole-guard scope and separate question answerability. Baseline17c4cd2d2c10f4311223fed71b7888c0057abb05. Three complete emitted-resource/CQL parity controls, original CRE expectations, source/editor/viewer and kit delivery evidence are recorded in coverage.md. No release, customer change or new native clinical qualification.",
+  "auditedRevision": "6232b83e89a8d53dbad7ccee5a743dfcd2de3314",
+  "auditedSchemaVersion": "2.47",
+  "auditedContentHash": "70ef410fef7cff81a1ffa70fe35ab42876bb1735be05f092732d94a3b51374e4",
+  "scope": "Schema 2.47 bounded native evidence maintenance from completed schema2.46 stamp26a3413bf51b8679990c103fda6ce23f49f2b9b6. Optional same-call raw capture, separate evidence/clinical state, no historical replay, independent source/runtime context and bounded private storage. Existing language/clinical/engine semantics unchanged. New owner capture mechanics138checks and kit/query187checks pass; exact interval/dispositions in coverage.md. Installed release/Linux and customer clinical qualification remain separate.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

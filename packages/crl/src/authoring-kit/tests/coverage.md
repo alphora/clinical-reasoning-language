@@ -8,8 +8,8 @@ Complete prior-stamp through implementation target
 intervals have their dispositions in the following maintenance sections. New
 implementation since released `154a1bace2c84d09c4016d19f885aac6aacf0b31` is the
 raw evidence boundary plus human legend cleanup; no compiler/clinical/Java/engine
-semantics change. Reviewed guidance target will be bound by the separate audit
-stamp after source review. Pending release metadata is not an audited SHA.
+semantics change. Reviewed guidance target `6232b83e89a8d53dbad7ccee5a743dfcd2de3314` is bound by the separate audit
+stamp. Pending release metadata is not an audited SHA.
 
 | Owning changes and actual assertions | Disposition |
 | --- | --- |
@@ -25,9 +25,8 @@ New owner tags: `produce-results:raw-same-call-evidence`,
 `produce-results:evidence-failure-separation`, `produce-results:evidence-no-replay`,
 `produce-results:evidence-parallel-retry`, `produce-results:raw-evidence-discovery`.
 No existing tag/clinical assertion/fixture is removed. Source implementation checks
-138 passed before this teaching update; pending source kit/query checks and final
-installed release qualification are recorded separately in discussion1341 and
-release receipts. No full prior claim census is restated or silently re-audited.
+138 passed before this teaching update; kit/query187checks pass after final guidance review. Final installed release
+qualification is recorded separately in discussions1341/1342 and release receipts. No full prior claim census is restated or silently re-audited.
 
 ## MV panel correction release 6.4.51 — bounded UI maintenance
 
