@@ -49,7 +49,7 @@ async function main(){
   const fixture=path.join(out,'preview');fs.cpSync(path.join(repo,'packages/crl/src/cre/tests/fixtures/condition-status'),fixture,{recursive:true});
   for(const tool of ['run_decision','render_scenario']){const r=await call(tool,{path:path.join(fixture,'cases.cel')});fs.writeFileSync(path.join(out,tool+'.json'),JSON.stringify(r,null,2));assert.equal(r.caseCount,3);assert.equal(r.passCount,3);assert.equal(r.failCount,0);assert.equal(r.errorCount,0);}stage('three generic preview cases');
   const native=path.join(out,'native');fs.cpSync(path.join(__dirname,'fixtures/native'),native,{recursive:true});
-  await call('emit_crl',{path:path.join(native,'src/crl/policy.crl'),out:path.join(native,'src')});const catalogPins=prepareCatalogProof(native,path.join(pkg,'dist/cql-emitter/catalog'));
+  await call('emit_crl',{path:path.join(native,'src/crl/policy.crl'),out:native});const catalogPins=prepareCatalogProof(native,path.join(pkg,'dist/cql-emitter/catalog'));
   const challenge=crypto.randomUUID(),probeWire=await wireCall('runtime-context','native_runtime_context',{challenge,caseTimeoutMs:120000});
   assert(!probeWire.isError);const probe=JSON.parse(probeWire.content.find(x=>x.type==='text').text);
   const pins={challenge,files:trustedFiles,engineSha:engineSource.sha256,version:receipt.packageVersion,javaExe,enginePath:jar,bounds:{maxHeapMb:1024,batchTimeoutMs:120000,maxCapturedBytes:1<<20}};const expectedRuntimeContext=verifyProbe(probe,pins);
