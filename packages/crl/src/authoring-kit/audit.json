@@ -2,6 +2,6 @@
   "auditedRevision": "cd7dbbcc40d59af4139710acd26e01ba6271a769",
   "auditedSchemaVersion": "2.48",
   "auditedContentHash": "66dc778106e7986e52b1a6f0a1d89c0993ffd2a51c982311441791695abea8db",
-  "scope": "Schema2.48 bounded deployment integrity maintenance from completed2.47 stamp6232b83e89a8d53dbad7ccee5a743dfcd2de3314. Supported independent same-process prebatch probe, immutable installation/startup drift boundary, four expected execution bindings, canonical shared CQL LF before qualification/delivery. Existing clinical/Java/engine semantics and historical retry fingerprints unchanged.267focusedownerchecks and7pureverifiernegativecontrols pass; removedboundsverification observed fail. Complete interval/dispositions in coverage.md; actual installed/Linux/Pipeline adoption remain separate gates.",
+  "scope": "Schema2.48 bounded deployment integrity maintenance from schema2.47: independent same-process prebatch context, immutable installation and execution binding, canonical shared CQL LF. Clinical/Java/engine semantics and retry fingerprints unchanged. Complete interval, findings and validation in coverage.md; installed/Linux/Pipeline adoption remain separate gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
