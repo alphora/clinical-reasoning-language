@@ -85,7 +85,7 @@ afterAll(async () => {
   if (connected) await client.close();
 });
 
-check("MCP tools: 23 registered (+ canonicalize_source; + #237/T3 check_fhir_ids; + emit_results)", async () => {
+check("MCP tools: exact 26-tool inventory including native_runtime_context", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -101,8 +101,8 @@ check("MCP tools: 23 registered (+ canonicalize_source; + #237/T3 check_fhir_ids
       "emit_crl_bundle",
       "emit_crl_fhir",
       "emit_results",
-      "native_runtime_context",
       "generate_provenance",
+      "native_runtime_context",
       "normalize_provenance",
       "package_fhir",
       "preview_presentation_edit",
