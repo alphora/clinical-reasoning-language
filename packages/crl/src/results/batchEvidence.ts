@@ -1,13 +1,13 @@
 /** Optional same-call evidence. Capture errors never become clinical/worker failures. */
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ProducerCaseInput } from './caseInput';
 import type { ProducerCaseEntry } from './manifest';
 import type { OwnedProcessResult } from './ownedProcess';
 import { assertSafePath, canonicalOutputRoot } from './retry';
 import { digest } from './runtimeFingerprint';
-import { driverDir } from './driver';
+import {runtimeFileIdentities} from './runtimeIdentity';
 export { default as batchEvidenceJsonSchema } from './batch-evidence.schema.json';
 
 export const EVIDENCE_LIMITS = { artifactBytes: 64 * 1024 * 1024, batchBytes: 512 * 1024 * 1024 } as const;
@@ -118,10 +118,7 @@ export class BatchEvidenceWriter {
   }
   runtime(value: Record<string, unknown>, runtimeSha256: string) {
     this.safe(() => {
-      const files = [...readdirSync(__dirname).filter(n => n.endsWith('.js')).map(n => path.join(__dirname, n)),
-        ...['ApplyDriver.class', 'ApplyWorker.class', 'windows-owned-process.ps1'].map(n => path.join(driverDir(), n))];
-      if (process.argv[1] && existsSync(process.argv[1])) files.push(process.argv[1]);
-      const identities = Object.fromEntries(files.map(file => [file, hash(readFileSync(file))]));
+      const identities=runtimeFileIdentities();
       this.index.runtime = { ...value, files: identities }; this.index.runtimeSha256 = runtimeSha256; this.persist();
     });
   }

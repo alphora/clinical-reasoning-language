@@ -1,0 +1,44 @@
+Baseline6232b83e89a8d53dbad7ccee5a743dfcd2de3314 -> release52HEAD40a0b767f0342e7b3c10faa55830835ce2402d01:
+M	package-lock.json
+M	package.json
+M	packages/crl-vscode/media/release-notes/README.md
+M	packages/crl-vscode/media/release-notes/catalog.json
+A	packages/crl-vscode/media/release-notes/condition-legend.png
+M	packages/crl-vscode/package.json
+M	packages/crl-vscode/src/mcp-server.test.mjs
+M	packages/crl/package.json
+M	packages/crl/scripts/qualification/batch-evidence.cjs
+M	packages/crl/src/authoring-kit/audit.json
+M	packages/crl/src/authoring-kit/tests/coverage.md
+M	packages/crl/src/cli/tests/run-mcp-server.test.mjs
+
+Current owned tracked implementation (untracked new owner modules/tests enumerated in review diff):
+M	.gitattributes
+M	docs/native-batch-evidence.md
+M	packages/crl-vscode/esbuild.js
+M	packages/crl-vscode/src/mcp-server.test.mjs
+M	packages/crl/scripts/copy-catalog.mjs
+M	packages/crl/scripts/qualification/expected-tools.json
+M	packages/crl/src/authoring-kit/index.ts
+M	packages/crl/src/authoring-kit/navigation.ts
+M	packages/crl/src/authoring-kit/tests/authoring-kit.test.ts
+M	packages/crl/src/authoring-kit/tests/coverage.md
+M	packages/crl/src/cli/tests/run-mcp-server.test.mjs
+M	packages/crl/src/cql-emitter/catalog/CRLCommon.cql
+M	packages/crl/src/cql-emitter/catalog/loadCatalog.ts
+M	packages/crl/src/index.ts
+M	packages/crl/src/mcp/nativeEvidence.test.ts
+M	packages/crl/src/mcp/server.ts
+M	packages/crl/src/results/batchEvidence.ts
+M	packages/crl/src/results/produce.ts
+M	packages/crl/src/results/tests/suiteProduction.test.ts
+
+New owned files (review1374completepatch):
+A	packages/crl/src/results/runtimePreparation.ts
+A	packages/crl/src/results/runtimeContext.ts
+A	packages/crl/src/results/runtimeIdentity.ts
+A	packages/crl/src/results/tests/runtimeIdentity.test.ts
+A	packages/crl/src/results/tests/catalogDelivery.test.ts
+A	packages/crl/src/cql-emitter/tests/catalogEol.test.ts
+A	packages/crl/scripts/qualification/runtime-context.cjs
+A	packages/crl/src/authoring-kit/tests/maintenance-runtime-context-lf-paths.txt

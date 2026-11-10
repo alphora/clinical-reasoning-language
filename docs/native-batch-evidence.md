@@ -147,6 +147,82 @@ is required and unavailable, report runtime-context verification unavailable;
 a self-consistent outer digest does not establish an independently trusted
 runtime. This limitation does not justify another clinical evaluation.
 
+## Independently observed runtime context (6.4.53)
+
+The maintained caller verifies the installed MCP entrypoint, runtime files, driver and engine
+against trusted released identities **before launch**, keeps that installation immutable for
+the server lifetime, and connects one MCP Client. Before each new batch, call
+`native_runtime_context` with a fresh `challenge` (1..256 characters), and the same optional
+`jarPath`, `jarSha256`, `caseTimeoutMs` that the following `emit_results` will use.
+Both tools require `CRL_ENABLE_RESULTS=1`. The probe may initialize/borrow a reusable JVM;
+it runs no policy, writes no clinical output, and makes zero clinical evaluations. Do not
+substitute a probe from a separate SDK process or a later batch result.
+
+Inspect the **original MCP response** before dispatch: reject transport errors, MCP `isError`,
+non-version1 `operation:native-runtime-context`, `ok:false`/`status:unavailable`, missing fields
+or a different challenge. Available receipts include `producerVersion`, `observedAt`,
+`processInstanceId`, `fingerprintSha256`, `runtimeSha256`, `executionSha256`, `execution`,
+`startupFilesSha256`, `files`, `engineJarSha256`, `javaMajor`, `clinicalEvaluations:0`.
+Errors carry `ok:false,status:unavailable,reason`; there is no evaluation or replay fallback.
+SDK callers use `inspectNativeRuntime`, passing their actual package `crlVersion`; MCP supplies it.
+
+Retain the original probe request/response/hash, independently verified launcher/install pins,
+transport/process identity, ordering/times, batch request/response/index hash and comparisons.
+Pass exactly these four independently obtained values to `emit_results.expectedRuntimeContext`:
+`{processInstanceId, fingerprintSha256, runtimeSha256, executionSha256}`. The SDK producer and
+regression producer accept the same option. A different process is refused at admission.
+Fingerprint/settings or startup-file drift refuses before results replacement and each bound
+clinical dispatch. Bound empty suites are refused without clearing prior results. Omitted
+expected context preserves ordinary behavior; it is not independent runtime verification.
+Retained retries keep existing fingerprints/zero-replay semantics. Old captures without the
+independent prior context remain verification-unavailable.
+
+The existing outer digest above is unchanged. `executionSha256 = digest(execution)` uses this
+property order: `javaExe` (absolute selected launcher), `javaRealPath`, `javaSha256` (launcher
+file bytes), `engineJarPath` (real path), `nativeMode`, `bounds`, `nodeExe`, `nodeVersion`.
+Bounds retain `maxHeapMb,batchTimeoutMs,maxCapturedBytes` in that order. All returned execution
+settings must match the batch, including timeout; worker count can differ without changing
+this binding. `index.runtime` records the process binding and, for bound batches, these four
+expected/verified values alongside its existing fields. Independently compare index runtime
+and full raw outcomes with the retained receipt/oracles; no producer-made audit verdict.
+
+`files` inventories every immediate `.js` file in the executing results-module directory
+(SDK) or staged bundle directory (VSIX), plus `ApplyDriver.class`, `ApplyWorker.class`
+and `windows-owned-process.ps1` in its driver directory, plus the actual `process.argv[1]`
+entrypoint if present. Resolve the entrypoint absolutely, deduplicate path labels, sort
+using JavaScript default string `.sort()`, and insert `[absolutePath,sha256(fileBytes)]`
+pairs into an object in that order. `startupFilesSha256 = digest(thatObject)` at module
+initialization. It is host-path-specific, not a portable release constant. Derive the known
+inventory from independently verified installed archive contents/launch configuration;
+never follow arbitrary returned paths as pin-verification authority. Startup read failure
+is retained without breaking nonnative module/tool loading; probe and bound execution
+remain unavailable for that process. Ordinary unbound native preparation keeps its
+existing structured driver/engine diagnostics.
+
+Both MCP calls resolve native bounds as `maxHeapMb:1024`, `batchTimeoutMs:600000`,
+`maxCapturedBytes:1048576`, with optional `caseTimeoutMs` replacing only the timeout.
+SDK explicit bounds use those same fields; serialize the bounds object in the documented
+order regardless of the caller's object insertion order. Client transport timeout is separate.
+The independent caller checks the returned settings against its intended selectors, not
+merely the digest's self-consistency.
+
+A startup file snapshot and checks for replacement/addition/removal detect accidental in-place
+updates while the process is alive. Files currently on disk alone do not prove loaded code.
+The trust boundary is the independently pinned, immutable installation and retained control
+plane. These receipts are not cryptographic attestation of memory, Node/JVM shared libraries
+or a hostile launcher. Raw environment values remain undisclosed.
+
+## Canonical shared CQL bytes
+
+CRLCommon, CaseFeatureCommon and FHIRHelpers are distributed and loaded as UTF-8 LF before
+standalone output, inlining into execution Libraries, closure hashing or native evaluation.
+Normal Git `eol=lf` delivery therefore keeps the exact qualified bytes. CRLCommon and
+CaseFeatureCommon already have corresponding emitted Libraries; FHIRHelpers remains standalone
+and engine-provided. Do not invent an extra Library for a byte comparison. Qualification checks
+standalone, actual embedded bytes where present, consumed CQL and normal Git blob identity.
+A post-evaluation CRLF/LF conversion or text-equivalence waiver does not repair earlier evidence.
+No CQL semantics, clinical input or frozen expected outcome changes are implied.
+
 ## Storage protection
 
 Evidence can contain patient information and source content. Choose a protected

@@ -25,7 +25,7 @@ import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitCrlTwoLane } from "../emit-two-lane";
 import { emitCrlBundle } from "../emit-bundle";
-import { produceResults, shutdownProducer } from "../results/produce";
+import { produceResults, shutdownProducer, inspectNativeRuntime, type ExpectedRuntimeContext } from "../results/produce";
 import { ENGINE_JAR_SOURCE, engineJarHelp } from "../results/spawn";
 import { RESULT_USE_CASES, isResultUseCase } from "../results/useCases";
 import { writeTwoLane, EmitWriteError } from "../emit-writers";
@@ -795,6 +795,19 @@ export function createServer(): McpServer {
     (args) => runDecision(args as { path: string; case?: string }),
   );
 
+  // REFACTOR:grounded: independent same-process control-plane context, never a clinical evaluation.
+  server.registerTool("native_runtime_context",{
+    title:"Inspect the actual native runtime without evaluating a policy",
+    description:"Probe the owned runtime in this MCP process before emit_results. Caller supplies a fresh nonce, retains this independent receipt on the SAME client/transport, verifies installed pins and passes its four expectedRuntimeContext bindings to emit_results. May initialize a reusable JVM; makes zero clinical evaluations. Installation must remain immutable for this process lifetime. No raw environment values or cryptographic attestation.",
+    inputSchema:{challenge:z.string().min(1).max(256),jarPath:z.string().min(1).optional(),jarSha256:z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),caseTimeoutMs:z.number().int().min(1).max(2147483647).optional()}
+  },async(args,extra)=>{
+    const fail=(reason:string)=>({isError:true,content:[{type:'text' as const,text:JSON.stringify({ok:false,status:'unavailable',reason})}]});
+    if(process.env.CRL_ENABLE_RESULTS!=="1")return fail("Native runtime inspection is disabled; enable CRL_ENABLE_RESULTS=1 and restart the client.");
+    if(args.jarPath!==undefined&&!isAbsolute(args.jarPath))return fail("jarPath must be an ABSOLUTE path.");
+    const result=await inspectNativeRuntime({...args,crlVersion:CRL_PACKAGE_VERSION,signal:extra.signal});
+    return {...(!result.ok?{isError:true}:{}),content:[{type:'text' as const,text:JSON.stringify(result)}]};
+  });
+
   server.registerTool(
     "emit_results",
     {
@@ -856,6 +869,7 @@ export function createServer(): McpServer {
             "ABSOLUTE output root the tests/results tree hangs from. Defaults to the project root " +
               "(nearest package.json). Must be absolute: the MCP server's working directory is not your workspace.",
           ),
+        expectedRuntimeContext:z.object({processInstanceId:z.string().min(1).max(256),fingerprintSha256:z.string().regex(/^[a-f0-9]{64}$/),runtimeSha256:z.string().regex(/^[a-f0-9]{64}$/),executionSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict().optional().describe("Independent native_runtime_context bindings from this SAME MCP process before the batch; mismatch refuses before evaluation. Use identical runtime selectors."),
         evidenceRoot:z.string().optional().describe("New absolute private directory outside source/output trees for bounded raw same-call native evidence. No extra evaluation. Retained retry successes have unavailable capture; incomplete evidence returns isError."),
         retryFailed: z.boolean().optional().describe("Retain compatible successful native results and retry remaining cases."),
         caseTimeoutMs: z.number().int().min(1).max(2147483647).optional().describe("Per-case timeout in milliseconds; default 600000."),
@@ -877,6 +891,7 @@ export function createServer(): McpServer {
           caseTimeoutMs?: number;
   workerLimit?:number;
   evidenceRoot?:string;
+  expectedRuntimeContext?:ExpectedRuntimeContext;
           signal?: AbortSignal;
         },
       ),
@@ -1786,6 +1801,7 @@ async function emitResults(args: {
   caseTimeoutMs?: number;
   workerLimit?:number;
   evidenceRoot?:string;
+  expectedRuntimeContext?:ExpectedRuntimeContext;
   signal?: AbortSignal;
 }): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   const err = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
@@ -1853,6 +1869,7 @@ async function emitResults(args: {
     caseTimeoutMs: args.caseTimeoutMs,
     workerLimit:args.workerLimit,
     evidenceRoot:args.evidenceRoot,
+    expectedRuntimeContext:args.expectedRuntimeContext,
     retryFailed: args.retryFailed,
     signal: args.signal,
     crlVersion: CRL_PACKAGE_VERSION,

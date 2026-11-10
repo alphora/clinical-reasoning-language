@@ -3,3 +3,6 @@ packages/crl/scripts/native-acceptance/batch-classes/*.class binary
 packages/crl/scripts/native-acceptance/BatchApplyDriver.java text eol=lf
 packages/crl/scripts/native-acceptance/ApplySessionDriver.java text eol=lf
 packages/crl/scripts/native-acceptance/session-classes/*.class binary
+
+# Shared executable catalog has identical bytes before evaluation and Git delivery.
+packages/crl/src/cql-emitter/catalog/*.cql text eol=lf

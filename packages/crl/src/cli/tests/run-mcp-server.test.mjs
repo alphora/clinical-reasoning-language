@@ -112,6 +112,7 @@ try {
       "emit_crl_bundle",
       "emit_crl_fhir",
       "emit_results",
+      "native_runtime_context",
       "generate_provenance",
       "normalize_provenance",
       "package_fhir",
@@ -416,8 +417,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.47");
-    assert.equal(kit.contentHash, "70ef410fef7cff81a1ffa70fe35ab42876bb1735be05f092732d94a3b51374e4");
+    assert.equal(kit.schemaVersion, "2.48");
+    assert.equal(kit.contentHash, "66dc778106e7986e52b1a6f0a1d89c0993ffd2a51c982311441791695abea8db");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);

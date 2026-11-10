@@ -7,7 +7,7 @@
 //
 // Single-threaded, sequential copy (E: Dev Drive I/O safety — no parallel
 // heavy writes).
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
+import { copyFileSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -37,7 +37,8 @@ if (missing.length > 0) {
 }
 
 for (const f of EXPECTED) {
-  copyFileSync(join(srcDir, f), join(dstDir, f));
+  // REFACTOR:grounded: distribute canonical LF before any consumer hashes or evaluates it.
+  writeFileSync(join(dstDir, f), readFileSync(join(srcDir, f), "utf8").replace(/\r\n?/g, "\n"));
   process.stdout.write(`copied catalog ${f} -> dist/cql-emitter/catalog/${f}\n`);
 }
 

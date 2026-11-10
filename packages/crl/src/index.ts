@@ -673,7 +673,7 @@ export type { CelSuite, CelSuiteFile } from "./cel/suite";
 export { buildSuiteExecutionModel } from "./provenance/cockpitModel";
 export { caseViewKey } from "./cre/viewModel";
 // REFACTOR:grounded (MV/KE): explicit KE application uses the existing native producer, without MV lifecycle writes.
-export { produceRegressionResults, produceResults, type ProduceRequest, type ProduceOutcome } from "./results/produce";
+export { inspectNativeRuntime, type RuntimeProbeRequest, type RuntimeProbeOutcome, type ExpectedRuntimeContext, produceRegressionResults, produceResults, type ProduceRequest, type ProduceOutcome } from "./results/produce";
 export { nativeResultsCurrent } from './results/current';
 export { emitCelSuite } from './cel/suiteEmit';
 export { resolveDefinedByTarget } from './cel/definedByResolve';

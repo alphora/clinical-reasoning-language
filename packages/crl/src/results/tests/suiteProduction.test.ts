@@ -5,14 +5,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 const suiteHash = (s: string) => createHash("sha256").update(s).digest("hex");
-import { produceResults, produceRegressionResults } from "../produce";
+import { produceResults, produceRegressionResults, inspectNativeRuntime } from "../produce";
 import { readSuiteResult } from "../readSuiteResult";
 import type { ProducerCaseState } from "../manifest";
 import { emitResultDefinitionClosure } from '../definitionClosure';
 
-const engine = vi.hoisted(() => ({ state: "generated" as ProducerCaseState, calls: 0, hasInputs: true, inputChanged: undefined as (() => void) | undefined, wait: undefined as ((input?:{repoPath:string;caseName:string}) => Promise<void>) | undefined, active:0,peak:0,fingerprints:0,prepFailAt:0,prepGate:undefined as Promise<void>|undefined,onPrepFail:undefined as (()=>void)|undefined, probeWait: undefined as Promise<void> | undefined, uncertainAt: 0 }));
-vi.mock("../spawn", async original => ({ ...await original<typeof import("../spawn")>(), verifyJar: () => ({ ok: true, hasLauncher: true, sha256: "engine-sha" }), resolveJavaAsync: async () => { await engine.probeWait; return { ok: true, javaExe: "fake-java", major: 21 }; } }));
-vi.mock("../runtimeFingerprint", async original => ({ ...await original<typeof import("../runtimeFingerprint")>(), runtimeFingerprint: async () => {engine.fingerprints++;if(engine.fingerprints===engine.prepFailAt){await engine.prepGate;engine.onPrepFail?.();throw new Error("preparation control failed");}return {sha256:"runtime",cleanupConfirmed:true};} }));
+const engine = vi.hoisted(() => ({ state: "generated" as ProducerCaseState, calls: 0, javaExe:"fake-java", hasInputs: true, inputChanged: undefined as (() => void) | undefined, wait: undefined as ((input?:{repoPath:string;caseName:string}) => Promise<void>) | undefined, active:0,peak:0,fingerprints:0,prepFailAt:0,prepGate:undefined as Promise<void>|undefined,onPrepFail:undefined as (()=>void)|undefined, probeWait: undefined as Promise<void> | undefined, uncertainAt: 0 }));
+vi.mock("../spawn", async original => ({ ...await original<typeof import("../spawn")>(), verifyJar: () => ({ ok: true, hasLauncher: true, sha256: "engine-sha" }), resolveJavaAsync: async () => { await engine.probeWait; return { ok: true, javaExe: engine.javaExe, major: 21 }; } }));
+vi.mock("../runtimeFingerprint", async original => ({ ...await original<typeof import("../runtimeFingerprint")>(), runtimeFingerprint: async () => {engine.fingerprints++;if(engine.fingerprints===engine.prepFailAt){await engine.prepGate;engine.onPrepFail?.();throw new Error("preparation control failed");}return {sha256:"a".repeat(64),cleanupConfirmed:true};} }));
 vi.mock('../nativeWorker',async original=>{
   const real=await original<typeof import('../nativeWorker')>();
   return {...real,withNativeRuntime:(spec:{signal?:AbortSignal},use:(runtime:unknown)=>Promise<unknown>)=>
@@ -55,7 +55,7 @@ case "Same name":
 - fact is "A".
 `;
 beforeEach(() => {
-  engine.state = "generated"; engine.calls = 0; engine.hasInputs = true; engine.inputChanged = undefined; engine.wait = undefined; engine.probeWait = undefined; engine.uncertainAt = 0;engine.active=0;engine.peak=0;engine.fingerprints=0;engine.prepFailAt=0;engine.prepGate=undefined;engine.onPrepFail=undefined;
+  engine.javaExe="fake-java";engine.state = "generated"; engine.calls = 0; engine.hasInputs = true; engine.inputChanged = undefined; engine.wait = undefined; engine.probeWait = undefined; engine.uncertainAt = 0;engine.active=0;engine.peak=0;engine.fingerprints=0;engine.prepFailAt=0;engine.prepGate=undefined;engine.onPrepFail=undefined;
   root = mkdtempSync(join(tmpdir(), "crl-suite-results-")); roots.push(root);
   put("package.json", JSON.stringify({ name: "results", version: "1.0.0", crl: { canonicalBase: "http://example.org/results" } }));
   put("src/crl/policy.crl", 'library "Policy".\nconcept "A":\n- shape is Record.\n- type is Observation.\n- value type is boolean.\n- code is `a`.\n');
@@ -206,6 +206,58 @@ it('unsafe evidence root refuses before any native evaluation or result replacem
   const result=await produceResults({...request(),evidenceRoot:join(root,'evidence')});expect(result.ok).toBe(false);expect(engine.calls).toBe(0);expect(readFileSync(join(root,'tests/results/sentinel.txt'),'utf8')).toBe('preserve');
 });
 
+// REFACTOR:grounded: the prebatch control plane is independent of captured results.
+async function observedContext(){
+ engine.javaExe=join(root,'java.exe');writeFileSync(engine.javaExe,'synthetic executable');
+ const jarPath=join(root,'engine.jar');writeFileSync(jarPath,'synthetic engine');
+ const probe=await inspectNativeRuntime({challenge:'independent-before-batch',crlVersion:'test',jarPath});
+ if(!probe.ok)throw Error(probe.reason);expect(probe.ok).toBe(true);
+ expect(engine.calls).toBe(0);expect(probe.clinicalEvaluations).toBe(0);
+ const {processInstanceId,fingerprintSha256,runtimeSha256,executionSha256}=probe;
+ return {jarPath,expectedRuntimeContext:{processInstanceId,fingerprintSha256,runtimeSha256,executionSha256}};
+}
+// @kit produce-results:independent-runtime-context
+it('independently probes before binding the same process and exact execution settings without clinical calls',async()=>{
+ const context=await observedContext();
+ const result=await produceResults({...request(),...context});expect(result.ok).toBe(true);expect(engine.calls).toBe(2);
+});
+it('accepts equivalent SDK execution bounds regardless of property insertion order',async()=>{
+ const c=await observedContext();const bounds={maxCapturedBytes:1<<20,batchTimeoutMs:600000,maxHeapMb:1024};
+ const result=await produceResults({...request(),...c,bounds});expect(result.ok).toBe(true);expect(engine.calls).toBe(2);
+});
+it.each(['processInstanceId','fingerprintSha256','runtimeSha256','executionSha256'] as const)('refuses changed expected context %s before replacement or evaluation',async key=>{
+ const c=await observedContext();c.expectedRuntimeContext[key]=key==='processInstanceId'?'different-process':'f'.repeat(64);
+ put('tests/results/keep.txt','old output');const result=await produceResults({...request(),...c});
+ expect(result.ok).toBe(false);expect(engine.calls).toBe(0);expect(readFileSync(join(root,'tests/results/keep.txt'),'utf8')).toBe('old output');
+});
+it.each(['mode','bounds','java-bytes','java-path'] as const)('binds execution configuration independently of identical Java reported defaults: %s',async kind=>{
+ const c=await observedContext();const extra:Partial<ReturnType<typeof request>>&{nativeMode?:'isolated';caseTimeoutMs?:number}={};
+ if(kind==='mode')extra.nativeMode='isolated';if(kind==='bounds')extra.caseTimeoutMs=123456;
+ if(kind==='java-bytes')writeFileSync(engine.javaExe,'replaced executable');
+ if(kind==='java-path'){engine.javaExe=join(root,'other-java.exe');writeFileSync(engine.javaExe,'synthetic executable');}
+ const result=await produceResults({...request(),...c,...extra});expect(result.ok).toBe(false);expect(engine.calls).toBe(0);
+});
+it('refuses bound empty suites without clearing saved results',async()=>{
+ const c=await observedContext();rmSync(join(root,'src/cel/mv/a.cel'));rmSync(join(root,'src/cel/mv/b.cel'));put('tests/results/keep.txt','old output');
+ const result=await produceResults({...request(),...c,celPath:root});expect(result.ok).toBe(false);expect(engine.calls).toBe(0);expect(readFileSync(join(root,'tests/results/keep.txt'),'utf8')).toBe('old output');
+});
+it('rechecks bound executable identity before each case without replaying earlier success',async()=>{
+ const c=await observedContext();engine.inputChanged=()=>writeFileSync(engine.javaExe,'changed between cases');
+ const result=await produceResults({...request(),...c});expect(result.ok).toBe(true);if(!result.ok)throw Error(result.reason);
+ expect(engine.calls).toBe(1);expect(result.failed).toBe(1);expect(result.manifest.cases.map(c=>c.state)).toEqual(['generated','failed']);
+});
+
+it('rejects malformed or cancelled context probes before runtime preparation',async()=>{
+ for(const challenge of ['', 'a'.repeat(257)])expect((await inspectNativeRuntime({challenge,crlVersion:'test'})).ok).toBe(false);
+ const controller=new AbortController();controller.abort();expect((await inspectNativeRuntime({challenge:'cancelled',crlVersion:'test',signal:controller.signal})).ok).toBe(false);
+ expect(engine.fingerprints).toBe(0);expect(engine.calls).toBe(0);
+});
+it('returns no raw environment values in the independent context receipt',async()=>{
+ vi.stubEnv('JAVA_TOOL_OPTIONS','-Dprivate.token=qualification-secret');
+ try{engine.javaExe=join(root,'java.exe');writeFileSync(engine.javaExe,'synthetic executable');const jarPath=join(root,'engine.jar');writeFileSync(jarPath,'synthetic engine');
+ const probe=await inspectNativeRuntime({challenge:'public-nonce',crlVersion:'test',jarPath});expect(probe.ok).toBe(true);expect(JSON.stringify(probe)).not.toContain('qualification-secret');expect(JSON.stringify(probe)).not.toContain('JAVA_TOOL_OPTIONS');expect(engine.calls).toBe(0);}
+ finally{vi.unstubAllEnvs();}
+});
 it("accounts for cleanup uncertainty, skips pruning, and quarantines subsequent requests", async () => {
   put("src/cel/mv/c.cel", cel("Clinical C", "c"));
   expect(await produceResults(request())).toMatchObject({ok:true,failed:0});

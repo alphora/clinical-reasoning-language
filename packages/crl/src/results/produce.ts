@@ -24,19 +24,17 @@ import { buildEngineRepoBundle } from "./repoBundle";
 import { runOneCase } from "./runProducer";
 import {
   DEFAULT_BOUNDS,
-  LAUNCHER_ENTRY,
-  MIN_JAVA_MAJOR,
-  ENGINE_JAR_SOURCE,
-  defaultEngineJarPath,
-  engineJarFetchCommand,
-  engineJarHelp,
-  resolveJavaAsync,
   resultBounds,
-  verifyJar,
   type JvmBounds,
 } from "./spawn";
-import {runNativeProcess,nativeQuarantined,reportNativeCleanup,subscribeNativeAbort} from "./nativeProcess";
-import { driverReady } from "./driver";
+import {nativeQuarantined,reportNativeCleanup,subscribeNativeAbort} from "./nativeProcess";
+import { prepareNativeRuntime } from './runtimePreparation';
+import { processInstanceId } from './runtimeIdentity';
+import { probeRuntimeContext, validateExpectedContext, verifyExpectedContext, type RuntimeProbeRequest, type ExpectedRuntimeContext } from './runtimeContext';
+export type {RuntimeProbeRequest,RuntimeProbeOutcome,ExpectedRuntimeContext} from './runtimeContext';
+export function inspectNativeRuntime(req:RuntimeProbeRequest){
+  return probeRuntimeContext(req,running||shuttingDown);
+}
 import {withNativeRuntime,shutdownNativeRuntime,withNativeOperation,assertOutsideNativeJob,checkNativeAdmission,setNativeWorkerLimit,nativeWorkerPoolStatus,drainRetiredNativeWorkers,NativeRuntimeError,type NativeMode} from './nativeWorker';
 import { digest, runtimeFingerprint } from "./runtimeFingerprint";
 import { caseKey, readRetry, reusableCase, preflightOutputs, regressionRetryRoot, excludeMvDestination, canonicalOutputRoot } from "./retry";
@@ -46,6 +44,8 @@ import { BatchEvidenceWriter, validateEvidenceRoot, type EvidenceReceipt } from 
 export interface ProduceRequest {
   /** New private directory for bounded evidence from these same native calls. No replay. */
   evidenceRoot?: string;
+  /** Independently obtained from inspectNativeRuntime in this same process before the batch. */
+  expectedRuntimeContext?:ExpectedRuntimeContext;
   nativeMode?:NativeMode;
   /** Independent case concurrency in the same reusable native pool. Default retains configured limit1. */
   workerLimit?:number;
@@ -132,6 +132,7 @@ async function guardedProduction(req: Omit<ProduceRequest, "outRoot" | "celPath"
   if (nativeQuarantined()) return { ok: false, reason: "Native cleanup was not confirmed; restart this server after checking its reported process failure." };
   if (running || shuttingDown) return { ok: false, reason: "Native producer is busy or shutting down." };
   if (req.signal?.aborted) return { ok: false, reason: "Native production cancelled." };
+  if(req.expectedRuntimeContext!==undefined){try{validateExpectedContext(req.expectedRuntimeContext);}catch(error){return {ok:false,reason:String(error)};}}
   if(req.workerLimit!==undefined){
     if(!Number.isSafeInteger(req.workerLimit)||req.workerLimit<1||req.workerLimit>32)return {ok:false,reason:"workerLimit must be an integer from1to32."};
     try{assertOutsideNativeJob("Producer worker-limit configuration");}catch(error){return {ok:false,reason:String(error)};}
@@ -180,6 +181,7 @@ async function produceSuiteResults(req: ProduceRequest, purpose: "mv" | "regress
   const attachEvidence=(result:ProduceOutcome):ProduceOutcome=>evidence?{...result,evidence:evidence.finish(result.ok?undefined:result.reason)}:result;
   try {
     const suite = selection.suite;
+    if(req.expectedRuntimeContext&&!suite.files.length)return {ok:false,reason:"Bound native production requires a nonempty CEL suite; existing results were preserved."};
     if (suite.policyPath && canonicalizeFsPath(req.crlPath) !== canonicalizeFsPath(suite.policyPath)) return { ok: false, reason: "crlPath must be the policy covered by every selected CEL file." };
     if (purpose === "regression" && req.retryFailed) excludeMvDestination(req.outRoot, suite.projectRoot);
     const previous = req.retryFailed ? readRetry(req.outRoot, purpose, req.useCase) : undefined;
@@ -231,73 +233,9 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   // hash — and the refusal that names the download URL sits AFTER the call they cannot make. As the
   // IEHP KE put it: "the gate is not the failure path — it is the signature." They recovered the URL
   // by reading back an agent-to-agent message thread, because it existed nowhere in the shipped tool.
-  const environment={...process.env};
-  const jarPath = req.jarPath ?? defaultEngineJarPath(environment);
-  if (!jarPath) {
-    return {
-      ok: false,
-      reason: "no engine jar: none was given and none is in the CRL engine cache",
-      detail: [...engineJarHelp(), "", "fetch it with:", `  ${engineJarFetchCommand()}`],
-    };
-  }
-  const jarCheck = verifyJar(jarPath, req.jarSha256 ?? ENGINE_JAR_SOURCE.sha256);
-  if (!jarCheck.ok) {
-    return {
-      ok: false,
-      reason: `engine jar unusable (${jarCheck.reason})`,
-      detail: [
-        ...(jarCheck.reason === "sha-mismatch" ? [`actual sha256: ${jarCheck.actualSha256}`] : []),
-        ...engineJarHelp(),
-      ],
-    };
-  }
-
-  // ⚠ PRECONDITIONS BELONG HERE, NOT IN THE PER-CASE LOOP. A missing driver or a launcher-less jar
-  // is one fact about the run, not N facts about N cases: checked per-case it yields a manifest of N
-  // identical `failed` entries and an `ok: true` envelope, which reads as "the policy produced
-  // nothing" rather than "we could not start". That mistranslation is the exact shape this file
-  // exists to prevent.
-  if (!jarCheck.hasLauncher) {
-    return {
-      ok: false,
-      reason: "engine jar has no Spring Boot PropertiesLauncher — it is not a supported engine build",
-      detail: [
-        `expected the zip entry ${LAUNCHER_ENTRY}`,
-        "that package moved in Spring Boot 3.2; a jar built against an older Boot will not launch this way",
-        ...engineJarHelp(),
-      ],
-    };
-  }
-
-  const driver = driverReady();
-  if (!driver.ok) {
-    return {
-      ok: false,
-      reason: `the compiled driver did not ship (${driver.reason})`,
-      detail: [`expected at ${driver.expectedAt}`, ...(driver.detail ?? [])],
-    };
-  }
-
-  // ⚠ The verified jar IS the jar executed — it goes on `-cp` directly. The classpath-containment
-  // check this replaces existed only because the user supplied a separate classpath that need not
-  // have contained it, which made `producerJarSha256` a claim about an artifact that never ran.
-  checkNativeAdmission((req.bounds??DEFAULT_BOUNDS).maxHeapMb);
-  const probe = async (exe: string): Promise<string | undefined> => {
-    if (req.signal?.aborted || nativeQuarantined()) return undefined;
-    const result = await runNativeProcess(exe, ["-version"], { timeoutMs: 15000, maxBytes: 65536, signal: req.signal,env:environment });
-    if (!result.cleanupConfirmed) reportNativeCleanup(false);
-    return result.failure || result.status !== 0 ? undefined : result.stderr + result.stdout;
-  };
-  const java = await resolveJavaAsync(environment, process.platform === "win32", probe);
-  if (nativeQuarantined()) return { ok: false, reason: "Java discovery cleanup could not be confirmed; native execution stopped." };
-  if (req.signal?.aborted) return { ok: false, reason: "Native production cancelled during Java discovery." };
-  if (!java.ok) {
-    return {
-      ok: false,
-      reason: java.reason === "too-old" ? `Java too old (${java.major}); need ${MIN_JAVA_MAJOR}+ (a JRE is enough)` : "no usable Java runtime found",
-    };
-  }
-
+  const prepared=await prepareNativeRuntime({...req,bounds:req.bounds??DEFAULT_BOUNDS});
+  if(!prepared.ok)return prepared;
+  const {environment,jarPath,java,spec}=prepared;
   const closure = emitResultDefinitionClosure(req.crlPath, req.definitionOptions);
   const two = closure.emitted;
   // ⚠ A partial definition closure makes the engine evaluate a different artifact from the one the CEL
@@ -339,7 +277,6 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   evidence?.definitions(defs,cql,closure.definitionClosureSha256!,planDefinitionId,[req.crlPath,...suite.files.map(f=>f.path)]);
 
   preflightOutputs(req.outRoot, suite.purpose, inputs);
-  const spec={javaExe:java.javaExe,engineJarPath:jarPath,engineSha256:jarCheck.sha256,bounds:req.bounds??DEFAULT_BOUNDS,signal:req.signal,nativeMode:req.nativeMode,env:environment};
   const workerPids=new Set<number>();
   // Release this short borrow before queueing cases: there is no suite-long reservation.
   const runtime=await withNativeRuntime(spec,async native=>{
@@ -349,8 +286,9 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   if(!runtime.cleanupConfirmed)reportNativeCleanup(false);
   if(!runtime.sha256)return {ok:false,reason:runtime.reason??"Native runtime probe failed."};
   const definitionClosureSha256 = closure.definitionClosureSha256!;
-  const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: jarCheck.sha256 });
-  evidence?.runtime({javaExe:java.javaExe,javaMajor:java.major,engineJarPath:jarPath,engineJarSha256:jarCheck.sha256,
+  const runtimeSha256 = digest({ runtime: runtime.sha256, crlVersion: req.crlVersion, jar: prepared.jarSha256 });
+  const context=req.expectedRuntimeContext?verifyExpectedContext(req.expectedRuntimeContext,prepared,runtime.sha256,req.crlVersion):undefined;
+  evidence?.runtime({processInstanceId,...context,javaExe:java.javaExe,javaMajor:java.major,engineJarPath:jarPath,engineJarSha256:prepared.jarSha256,
     fingerprintSha256:runtime.sha256,bounds:spec.bounds,nativeMode:req.nativeMode??'worker'},runtimeSha256);
   if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
       previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {
@@ -368,7 +306,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     useCase: req.useCase,
     generatedAt: new Date().toISOString(),
     provenance: {
-      crlVersion: req.crlVersion, producerJarSha256: jarCheck.sha256,
+      crlVersion: req.crlVersion, producerJarSha256: prepared.jarSha256,
       inputClock: emission.clock, runtimeSha256, definitionClosureSha256,
     },
     cases: [],
@@ -391,6 +329,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
         const actual=await runtimeFingerprint(java.javaExe,jarPath,spec.bounds,req.signal,environment,native);
         if(!actual.cleanupConfirmed)reportNativeCleanup(false);
         if(!actual.sha256||actual.sha256!==runtime.sha256)throw new NativeRuntimeError("runtime-fingerprint","Case owner differs from the frozen preflight runtime.",actual.cleanupConfirmed);
+        if(req.expectedRuntimeContext)verifyExpectedContext(req.expectedRuntimeContext,prepared,actual.sha256,req.crlVersion);
         if(nativeQuarantined()||req.signal?.aborted)return notRun(input,nativeQuarantined()?"Queue stopped: native cleanup unconfirmed.":"Production cancelled before this case.");
         activeCases++;peakActiveCases=Math.max(peakActiveCases,activeCases);started=true;
         const before=native.calls??0;let counted=false;

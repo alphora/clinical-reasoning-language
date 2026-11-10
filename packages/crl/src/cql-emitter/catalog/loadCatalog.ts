@@ -60,7 +60,8 @@ function catalogCandidates(fileName: string): string[] {
 function readCatalog(fileName: string): string {
   const candidates = catalogCandidates(fileName);
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return readFileSync(candidate, "utf8");
+    // REFACTOR:grounded: canonicalize before standalone, embedded and execution CQL diverge.
+    if (existsSync(candidate)) return readFileSync(candidate, "utf8").replace(/\r\n?/g, "\n");
   }
   throw new Error(
     `Catalog CQL "${fileName}" not found. The emitter ships the shared catalog ` +

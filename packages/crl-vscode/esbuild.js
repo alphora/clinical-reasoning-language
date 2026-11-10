@@ -202,7 +202,8 @@ async function build() {
           "Rebuild core (`npm run build -w @smile-digital-health/crl`), which runs `tsc && node scripts/copy-catalog.mjs`."
       );
     }
-    fs.copyFileSync(src, path.resolve(__dirname, "dist", name));
+    // REFACTOR:grounded: the VSIX carries exactly the canonical catalog used by emission.
+    fs.writeFileSync(path.resolve(__dirname, "dist", name), fs.readFileSync(src, "utf8").replace(/\r\n?/g, "\n"));
   }
 
   // ⚠ THE COMPILED DRIVER MUST TRAVEL WITH THE BUNDLE, IN A `driver/` SUBDIR. `emit_results`

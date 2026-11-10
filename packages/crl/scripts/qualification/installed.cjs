@@ -21,7 +21,7 @@ async function main(){
  receipt.kit={schema:installed.schemaVersion,hash:installed.contentHash,audit:installed.audit};stage('installed kit identity');
  // Bind source lifecycle controls to the actual installed runtime bytes.
  receipt.runtimeFiles={};
- for(const relative of [...['session','nativeWorker','ownedProcess','driver','runtimeFingerprint','produce','runProducer','spawn','batchEvidence','nativeOutput','nativeWorkerOwner'].map(n=>'results/'+n+'.js'),'results/batch-evidence.schema.json',...['ApplyDriver.class','ApplyDriver.java','ApplyWorker.class','ApplyWorker.java','ApplyDriver.build.json','windows-owned-process.ps1'].map(n=>'results/driver/'+n)]){
+ for(const relative of [...['session','nativeWorker','ownedProcess','driver','runtimeFingerprint','produce','runProducer','spawn','batchEvidence','nativeOutput','nativeWorkerOwner','runtimePreparation','runtimeContext','runtimeIdentity'].map(n=>'results/'+n+'.js'),'results/batch-evidence.schema.json',...['ApplyDriver.class','ApplyDriver.java','ApplyWorker.class','ApplyWorker.java','ApplyDriver.build.json','windows-owned-process.ps1'].map(n=>'results/driver/'+n)]){
   const bytes=fs.readFileSync(path.join(pkg,'dist',relative));
   assert.deepEqual(bytes,fs.readFileSync(path.join(repo,'packages/crl/dist',relative)),relative+' differs from source controls');
   receipt.runtimeFiles[relative]=hash(bytes);
@@ -35,6 +35,8 @@ async function main(){
  receipt.engine={...engineSource,path:jar};receipt.driverSha256=hash(fs.readFileSync(path.join(pkg,'dist/results/driver/ApplyDriver.class')));receipt.workerSha256=hash(fs.readFileSync(path.join(pkg,'dist/results/driver/ApplyWorker.class')));stage('pinned engine download');
  const env={...process.env,HOME:home,USERPROFILE:home,CRL_ENABLE_RESULTS:'1',CRL_TEST_PACKAGE:pkg,CRL_TEST_ENGINE:engineFile};
  const {Client}=load('@modelcontextprotocol/sdk/client/index.js'),{StdioClientTransport}=load('@modelcontextprotocol/sdk/client/stdio.js');
+ const server=path.join(pkg,'dist/cli/run-mcp-server.js'),{pinnedFiles,verifyProbe,verifyBoundIndex,contextNegativeControls,prepareCatalogProof,verifyConsumedCatalog}=require('./runtime-context.cjs');
+ const trustedFiles=pinnedFiles(path.join(pkg,'dist/results'),server),javaExe=path.join(process.env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java');
  const client=new Client({name:'remote-installed-qualification',version:'1'}),transport=new StdioClientTransport({command:process.execPath,args:[path.join(pkg,'dist/cli/run-mcp-server.js')],env,stderr:'pipe'});
  const log=fs.createWriteStream(path.join(out,'mcp-stderr.log'));transport.stderr?.pipe(log);
  const call=async(name,args,timeout=120000)=>{const r=await client.callTool({name,arguments:args},undefined,{timeout});assert(!r.isError,JSON.stringify(r));return JSON.parse(r.content.find(x=>x.type==='text').text);};
@@ -45,7 +47,16 @@ async function main(){
   const fixture=path.join(out,'preview');fs.cpSync(path.join(repo,'packages/crl/src/cre/tests/fixtures/condition-status'),fixture,{recursive:true});
   for(const tool of ['run_decision','render_scenario']){const r=await call(tool,{path:path.join(fixture,'cases.cel')});fs.writeFileSync(path.join(out,tool+'.json'),JSON.stringify(r,null,2));assert.equal(r.caseCount,3);assert.equal(r.passCount,3);assert.equal(r.failCount,0);assert.equal(r.errorCount,0);}stage('three generic preview cases');
   const native=path.join(out,'native');fs.cpSync(path.join(__dirname,'fixtures/native'),native,{recursive:true});
-  const r=await call('emit_results',{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,evidenceRoot:path.join(out,'native-evidence')},300000);
+  await call('emit_crl',{path:path.join(native,'src/crl/policy.crl'),out:path.join(native,'src')});const catalogPins=prepareCatalogProof(native,path.join(pkg,'dist/cql-emitter/catalog'));
+  const challenge=crypto.randomUUID(),probeWire=await client.callTool({name:'native_runtime_context',arguments:{challenge,caseTimeoutMs:120000}},undefined,{timeout:120000});
+  fs.writeFileSync(path.join(out,'runtime-context-mcp.json'),JSON.stringify(probeWire,null,2));assert(!probeWire.isError);const probe=JSON.parse(probeWire.content.find(x=>x.type==='text').text);
+  const pins={challenge,files:trustedFiles,engineSha:engineSource.sha256,version:receipt.packageVersion,javaExe,enginePath:jar,bounds:{maxHeapMb:1024,batchTimeoutMs:120000,maxCapturedBytes:1<<20}};const expectedRuntimeContext=verifyProbe(probe,pins);
+  const driftFile=path.join(pkg,'dist/results','__qualification-drift.js');assert(!fs.existsSync(driftFile));
+  try{fs.writeFileSync(driftFile,'// qualification-owned drift control\n');const bad=await client.callTool({name:'native_runtime_context',arguments:{challenge:'drift-control',caseTimeoutMs:120000}});assert(bad.isError);assert.match(JSON.parse(bad.content.find(x=>x.type==='text').text).reason,/Runtime files changed/);fs.writeFileSync(path.join(out,'runtime-drift-refusal.json'),JSON.stringify(bad,null,2));}
+  finally{fs.unlinkSync(driftFile);}
+  const mismatch=await client.callTool({name:'emit_results',arguments:{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,expectedRuntimeContext:{...expectedRuntimeContext,executionSha256:'f'.repeat(64)}}});
+  assert(mismatch.isError);assert(!fs.existsSync(path.join(native,'tests/results/questionnaire-manifest-mv.json')),'mismatch cannot publish results');
+  const r=await call('emit_results',{expectedRuntimeContext,celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,evidenceRoot:path.join(out,'native-evidence')},300000);
   fs.writeFileSync(path.join(out,'native-mcp.json'),JSON.stringify(r,null,2));assert(r.ok,JSON.stringify(r));assert.equal(r.failed,0);assert.equal(r.engineJar.defaulted,true);assert.equal(path.resolve(r.engineJar.path),path.resolve(jar));
   const manifest=read(r.manifestPath);assert.equal(manifest.cases.length,2);assert.equal(manifest.provenance.producerJarSha256,engineSource.sha256);
   assert.deepEqual(manifest.cases.map(c=>c.caseName).sort(),['Answered','Unanswered']);
@@ -63,12 +74,15 @@ async function main(){
   assert.equal(r.workerPool.nativeCalls,2);assert.equal(r.evidence.complete,true);
   const evidenceBytes=fs.readFileSync(r.evidence.indexPath);assert.equal(hash(evidenceBytes),r.evidence.sha256);const evidence=JSON.parse(evidenceBytes);
   const {verifyBatchEvidence,negativeControls}=require('./batch-evidence.cjs');
+  receipt.catalogIntegrity=verifyConsumedCatalog(path.dirname(r.evidence.indexPath),evidence,catalogPins);
+  verifyBoundIndex(evidence,probe);const contextControls=contextNegativeControls(probe,pins,evidence);
   const verified=verifyBatchEvidence(path.dirname(r.evidence.indexPath),evidence,manifest,engineSource.sha256);
   const controls=negativeControls(path.dirname(r.evidence.indexPath),evidence,manifest,engineSource.sha256,path.join(out,'evidence-negative-controls'));
   fs.writeFileSync(path.join(out,'evidence-negative-controls.json'),JSON.stringify(controls,null,2));
-  const retryWire=await client.callTool({name:'emit_results',arguments:{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,retryFailed:true,evidenceRoot:path.join(out,'retry-unavailable')}},undefined,{timeout:300000});
+  const retryWire=await client.callTool({name:'emit_results',arguments:{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,retryFailed:true,expectedRuntimeContext,evidenceRoot:path.join(out,'retry-unavailable')}},undefined,{timeout:300000});
   assert.equal(retryWire.isError,true);const retry=JSON.parse(retryWire.content.find(x=>x.type==='text').text);fs.writeFileSync(path.join(out,'retry-mcp.json'),JSON.stringify(retry,null,2));assert(retry.ok);assert.equal(retry.failed,0);assert.equal(retry.workerPool.nativeCalls,0);assert.equal(retry.evidence.complete,false);
   const retained=read(retry.evidence.indexPath);assert(retained.cases.every(c=>c.captureState==='unavailable'&&c.evaluation.reused&&!c.native));
+  receipt.runtimeContext={verified:true,probeReceiptSha256:hash(fs.readFileSync(path.join(out,'runtime-context-mcp.json'))),...expectedRuntimeContext,clinicalProbeCalls:0,negativeControls:contextControls};
   receipt.rawEvidence={originalNativeCalls:2,retryNativeCalls:0,...verified,negativeControls:controls.map(c=>c.name),indexSha256:r.evidence.sha256};
   stage('installed MCP native evidence and no-replay retry');
  }finally{await client.close();log.end();}
