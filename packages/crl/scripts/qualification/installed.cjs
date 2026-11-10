@@ -11,6 +11,7 @@ const load=createRequire(path.join(pkg,'package.json')),hash=x=>crypto.createHas
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const objects=x=>!x||typeof x!=='object'?[]:[x,...Object.values(x).flatMap(v=>Array.isArray(v)?v.flatMap(objects):objects(v))];
 fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(path.join(out,'qualification-started.json'),JSON.stringify({startedAt:new Date().toISOString(),packagePath:pkg}),{flag:'wx'});
 const receipt={passed:false,packagePath:pkg,packageVersion:load('./package.json').version,archiveSha256:hash(fs.readFileSync(archive)),sourceCommit:process.env.GITHUB_SHA||null,artifactMode:process.env.RELEASE_TAG?'release-asset':'source-build',releaseTag:process.env.RELEASE_TAG||null,platform:process.platform,stages:[]};
 const save=()=>fs.writeFileSync(path.join(out,'verification.json'),JSON.stringify(receipt,null,2));
 const stage=name=>{receipt.stages.push(name);save();console.log(name+' passed');};save();
@@ -39,7 +40,8 @@ async function main(){
  const trustedFiles=pinnedFiles(path.join(pkg,'dist/results'),server),javaExe=path.join(process.env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java');
  const client=new Client({name:'remote-installed-qualification',version:'1'}),transport=new StdioClientTransport({command:process.execPath,args:[path.join(pkg,'dist/cli/run-mcp-server.js')],env,stderr:'pipe'});
  const log=fs.createWriteStream(path.join(out,'mcp-stderr.log'));transport.stderr?.pipe(log);
- const call=async(name,args,timeout=120000)=>{const r=await client.callTool({name,arguments:args},undefined,{timeout});assert(!r.isError,JSON.stringify(r));return JSON.parse(r.content.find(x=>x.type==='text').text);};
+ const wireCall=async(label,name,args,timeout=120000)=>{const request={name,arguments:args};fs.writeFileSync(path.join(out,label+'-request.json'),JSON.stringify(request,null,2),{flag:'wx'});const r=await client.callTool(request,undefined,{timeout});fs.writeFileSync(path.join(out,label+'-mcp.json'),JSON.stringify(r,null,2),{flag:'wx'});return r;};
+ let callIndex=0;const call=async(name,args,timeout=120000)=>{const r=await wireCall('call-'+(++callIndex)+'-'+name,name,args,timeout);assert(!r.isError,JSON.stringify(r));return JSON.parse(r.content.find(x=>x.type==='text').text);};
  try{
   await client.connect(transport,{timeout:120000});
   const k=await call('authoring_kit',{view:'full'});const {view,complete,fullContentHash,...canonical}=k;assert.equal(complete,true);assert.equal(fullContentHash,installed.contentHash);assert.deepEqual(canonical,JSON.parse(JSON.stringify(installed))); // Compare the JSON wire shape; undefined properties are omitted.
@@ -48,13 +50,13 @@ async function main(){
   for(const tool of ['run_decision','render_scenario']){const r=await call(tool,{path:path.join(fixture,'cases.cel')});fs.writeFileSync(path.join(out,tool+'.json'),JSON.stringify(r,null,2));assert.equal(r.caseCount,3);assert.equal(r.passCount,3);assert.equal(r.failCount,0);assert.equal(r.errorCount,0);}stage('three generic preview cases');
   const native=path.join(out,'native');fs.cpSync(path.join(__dirname,'fixtures/native'),native,{recursive:true});
   await call('emit_crl',{path:path.join(native,'src/crl/policy.crl'),out:path.join(native,'src')});const catalogPins=prepareCatalogProof(native,path.join(pkg,'dist/cql-emitter/catalog'));
-  const challenge=crypto.randomUUID(),probeWire=await client.callTool({name:'native_runtime_context',arguments:{challenge,caseTimeoutMs:120000}},undefined,{timeout:120000});
-  fs.writeFileSync(path.join(out,'runtime-context-mcp.json'),JSON.stringify(probeWire,null,2));assert(!probeWire.isError);const probe=JSON.parse(probeWire.content.find(x=>x.type==='text').text);
+  const challenge=crypto.randomUUID(),probeWire=await wireCall('runtime-context','native_runtime_context',{challenge,caseTimeoutMs:120000});
+  assert(!probeWire.isError);const probe=JSON.parse(probeWire.content.find(x=>x.type==='text').text);
   const pins={challenge,files:trustedFiles,engineSha:engineSource.sha256,version:receipt.packageVersion,javaExe,enginePath:jar,bounds:{maxHeapMb:1024,batchTimeoutMs:120000,maxCapturedBytes:1<<20}};const expectedRuntimeContext=verifyProbe(probe,pins);
   const driftFile=path.join(pkg,'dist/results','__qualification-drift.js');assert(!fs.existsSync(driftFile));
-  try{fs.writeFileSync(driftFile,'// qualification-owned drift control\n');const bad=await client.callTool({name:'native_runtime_context',arguments:{challenge:'drift-control',caseTimeoutMs:120000}});assert(bad.isError);assert.match(JSON.parse(bad.content.find(x=>x.type==='text').text).reason,/Runtime files changed/);fs.writeFileSync(path.join(out,'runtime-drift-refusal.json'),JSON.stringify(bad,null,2));}
+  try{fs.writeFileSync(driftFile,'// qualification-owned drift control\n');const bad=await wireCall('runtime-drift-refusal','native_runtime_context',{challenge:'drift-control',caseTimeoutMs:120000});assert(bad.isError);assert.match(JSON.parse(bad.content.find(x=>x.type==='text').text).reason,/Runtime files changed/);}
   finally{fs.unlinkSync(driftFile);}
-  const mismatch=await client.callTool({name:'emit_results',arguments:{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,expectedRuntimeContext:{...expectedRuntimeContext,executionSha256:'f'.repeat(64)}}});
+  const mismatch=await wireCall('runtime-mismatch-refusal','emit_results',{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,expectedRuntimeContext:{...expectedRuntimeContext,executionSha256:'f'.repeat(64)}});
   assert(mismatch.isError);assert(!fs.existsSync(path.join(native,'tests/results/questionnaire-manifest-mv.json')),'mismatch cannot publish results');
   const r=await call('emit_results',{expectedRuntimeContext,celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,evidenceRoot:path.join(out,'native-evidence')},300000);
   fs.writeFileSync(path.join(out,'native-mcp.json'),JSON.stringify(r,null,2));assert(r.ok,JSON.stringify(r));assert.equal(r.failed,0);assert.equal(r.engineJar.defaulted,true);assert.equal(path.resolve(r.engineJar.path),path.resolve(jar));
@@ -79,8 +81,8 @@ async function main(){
   const verified=verifyBatchEvidence(path.dirname(r.evidence.indexPath),evidence,manifest,engineSource.sha256);
   const controls=negativeControls(path.dirname(r.evidence.indexPath),evidence,manifest,engineSource.sha256,path.join(out,'evidence-negative-controls'));
   fs.writeFileSync(path.join(out,'evidence-negative-controls.json'),JSON.stringify(controls,null,2));
-  const retryWire=await client.callTool({name:'emit_results',arguments:{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,retryFailed:true,expectedRuntimeContext,evidenceRoot:path.join(out,'retry-unavailable')}},undefined,{timeout:300000});
-  assert.equal(retryWire.isError,true);const retry=JSON.parse(retryWire.content.find(x=>x.type==='text').text);fs.writeFileSync(path.join(out,'retry-mcp.json'),JSON.stringify(retry,null,2));assert(retry.ok);assert.equal(retry.failed,0);assert.equal(retry.workerPool.nativeCalls,0);assert.equal(retry.evidence.complete,false);
+  const retryWire=await wireCall('retry','emit_results',{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,retryFailed:true,expectedRuntimeContext,evidenceRoot:path.join(out,'retry-unavailable')},300000);
+  assert.equal(retryWire.isError,true);const retry=JSON.parse(retryWire.content.find(x=>x.type==='text').text);fs.writeFileSync(path.join(out,'retry-decoded.json'),JSON.stringify(retry,null,2));assert(retry.ok);assert.equal(retry.failed,0);assert.equal(retry.workerPool.nativeCalls,0);assert.equal(retry.evidence.complete,false);
   const retained=read(retry.evidence.indexPath);assert(retained.cases.every(c=>c.captureState==='unavailable'&&c.evaluation.reused&&!c.native));
   receipt.runtimeContext={verified:true,probeReceiptSha256:hash(fs.readFileSync(path.join(out,'runtime-context-mcp.json'))),...expectedRuntimeContext,clinicalProbeCalls:0,negativeControls:contextControls};
   receipt.rawEvidence={originalNativeCalls:2,retryNativeCalls:0,...verified,negativeControls:controls.map(c=>c.name),indexSha256:r.evidence.sha256};

@@ -13,7 +13,7 @@ directory outside the checkout. The version must match the checked-out source.
 Without a release tag it builds and packs this checkout. Receipts distinguish
 `release-asset` from `source-build`; the latter does not prove release-asset identity.
 
-The runner verifies the full audited kit, the 25-tool MCP inventory and three
+The runner verifies the full audited kit, the 26-tool MCP inventory and three
 generic preview cases through the installed MCP server. Installed `emit_results`
 then exercises two generic cases, checking failure states, default engine selection,
 engine identity, per-case artifact hashes, exact Q/QR association and populated or
