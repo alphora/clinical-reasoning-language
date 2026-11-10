@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "6232b83e89a8d53dbad7ccee5a743dfcd2de3314",
-  "auditedSchemaVersion": "2.47",
-  "auditedContentHash": "70ef410fef7cff81a1ffa70fe35ab42876bb1735be05f092732d94a3b51374e4",
-  "scope": "Schema 2.47 bounded native evidence maintenance from completed schema2.46 stamp26a3413bf51b8679990c103fda6ce23f49f2b9b6. Optional same-call raw capture, separate evidence/clinical state, no historical replay, independent source/runtime context and bounded private storage. Existing language/clinical/engine semantics unchanged. New owner capture mechanics138checks and kit/query187checks pass; exact interval/dispositions in coverage.md. Installed release/Linux and customer clinical qualification remain separate.",
+  "auditedRevision": "cd7dbbcc40d59af4139710acd26e01ba6271a769",
+  "auditedSchemaVersion": "2.48",
+  "auditedContentHash": "66dc778106e7986e52b1a6f0a1d89c0993ffd2a51c982311441791695abea8db",
+  "scope": "Schema2.48 bounded deployment integrity maintenance from completed2.47 stamp6232b83e89a8d53dbad7ccee5a743dfcd2de3314. Supported independent same-process prebatch probe, immutable installation/startup drift boundary, four expected execution bindings, canonical shared CQL LF before qualification/delivery. Existing clinical/Java/engine semantics and historical retry fingerprints unchanged.267focusedownerchecks and7pureverifiernegativecontrols pass; removedboundsverification observed fail. Complete interval/dispositions in coverage.md; actual installed/Linux/Pipeline adoption remain separate gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
