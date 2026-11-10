@@ -1,6 +1,6 @@
-# Native batch evidence (development)
+# Native batch evidence
 
-This opt-in producer feature is not present in CRL 6.4.51. It preserves evidence
+CRL 6.4.52 adds this opt-in producer feature; it is absent from 6.4.51. It preserves evidence
 from the native calls already made by a batch; it never calls `$apply` again to
 obtain evidence and does not modify policy logic or certify clinical outcomes.
 

@@ -1,3 +1,34 @@
+## Native batch evidence — schema2.47 bounded maintenance (6.4.52)
+
+Prior completed stamp: `26a3413bf51b8679990c103fda6ce23f49f2b9b6`, schema2.46,
+content `ee5ba4d8bcd791aae1d3533593eeed225f4a7530be2c5102a52361c12f6fbd93`.
+Complete prior-stamp through implementation target
+`94dd03cb992cca5497df5bd74162fbfed436950c` path inventory is
+`maintenance-native-evidence-release-paths.txt`. Earlier UI/Decision Table/release
+intervals have their dispositions in the following maintenance sections. New
+implementation since released `154a1bace2c84d09c4016d19f885aac6aacf0b31` is the
+raw evidence boundary plus human legend cleanup; no compiler/clinical/Java/engine
+semantics change. Reviewed guidance target will be bound by the separate audit
+stamp after source review. Pending release metadata is not an audited SHA.
+
+| Owning changes and actual assertions | Disposition |
+| --- | --- |
+| `results/batchEvidence.ts`, `nativeOutput.ts`, JSON schema; `batchEvidence.test.ts`: duplicate case names retain separate identities; original repository/Task bytes and every descriptor hash; write failure preserves one native call and clinical Q/QR; no-form raw Task stays distinct; timeout/cancel/output-limit/uncertain cleanup incomplete; invalid UTF8 retained; retained/not-run unavailable; bounded total/artifact/partial/rename storage; every intermediate index schema-valid; unsafe linked/overlapping roots refused | Kit updated `produce-results`: optional same-call raw evidence, explicit capture failure and completeness limits, private bounded storage, no historical replay. Tests establish capture mechanics, not clinical correctness, universal runtime attestation or customer acceptance. |
+| `results/produce.ts`, `runProducer.ts`; `suiteProduction.test.ts`: six selected calls/index rows at workerLimit6, unchanged ordered clinical manifest; retry makes zero calls and marks retained success capture-unavailable; unsafe root rejected before results replacement | Kit updated same rule and retrieval terms for evidenceRoot/--evidence-root. Existing concurrency/retry guidance remains sufficient: no scheduling/clinical-state/default-limit change; evidence does not convert a retained result into a fresh evaluation. |
+| `nativeWorkerOwner.ts`, `ownedProcess.ts`; owning tests preserve exceptional original bytes/control before cleanup, identify unreadable logs; evidence failure does not retire successful worker; actual replacement PID and request-versus-worker-exit origin; real Node transport invalidUTF8 | Existing native-lifetime guidance sufficient. New capture provenance supports same-call evidence; the producer's synthetic worker tests do not certify medical outcomes. Windows raw transport can include supervisor protocol, which is labeled, not represented as pure JVM stderr. |
+| CLI/MCP/index exports, `nativeEvidence.test.ts` in both entrypoints: option discoverable/forwarded; incomplete capture produces CLI2/MCPisError even with clinical failed0; omitted option preserves prior result behavior | Kit updated default produce-results clause and main prose; query discovery checks optional evidence. Existing authored outcome-verification obligation unchanged. |
+| `docs/native-batch-evidence.md`: exact outer runtime digest matches preserved actual sample; changed version/property order mismatch; nested fingerprint lacks full runtime/env preimage | Kit updated limitation: nested hash requires separately trusted historical context, otherwise verification unavailable. Full consumed definitions/CQL are not a substitute for caller-owned original source/import provenance. No raw credentials disclosed, no automatic audit verdict. |
+| `flowPaneHtml.ts`/owning test, toolbar/component-view docs, release notes screenshot/catalog/version manifests/lock and prior release/UI files | Not author-facing: human Groups legend removed, conditional connector/clinical behavior unchanged. Existing prior-ledger dispositions apply to unchanged older files. No syntax, question, expected clinical oracle or reference artifact changed. |
+| `scripts/qualification/installed.cjs`, `batch-evidence.cjs` | Delivery qualification only: enables capture on the same existing two generic native calls and validates exact raw/derived parity, Task multiplicity/code, unanswered Q/QR, exact manifest inventory, file/binding identity and retry0calls. Mutated copied evidence exercises raw mismatch, contradictory Task, wrong/duplicate case, missing raw file and populated unanswered QR refusal without native calls. Does not add duplicate evaluations for capture. Fresh installed/Linux evidence is a release gate, not a source-test claim or blanket customer qualification. |
+
+New owner tags: `produce-results:raw-same-call-evidence`,
+`produce-results:evidence-failure-separation`, `produce-results:evidence-no-replay`,
+`produce-results:evidence-parallel-retry`, `produce-results:raw-evidence-discovery`.
+No existing tag/clinical assertion/fixture is removed. Source implementation checks
+138 passed before this teaching update; pending source kit/query checks and final
+installed release qualification are recorded separately in discussion1341 and
+release receipts. No full prior claim census is restated or silently re-audited.
+
 ## MV panel correction release 6.4.51 — bounded UI maintenance
 
 Reviewed implementation delta: released baseline `658482345baf9187206feba674f26cea34c5f3c7`

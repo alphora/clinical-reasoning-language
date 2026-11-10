@@ -622,7 +622,7 @@ Windows additionally detects owner loss through the Job Object supervisor.
 
 After emitting definitions, run `crl-package-fhir --project <directory>` or the `package_fhir` MCP tool. See [package metadata, contents and validation boundaries](../../docs/fhir-npm-packaging.md).
 
-### Native batch evidence (development)
+### Native batch evidence
 
 Optional `evidenceRoot` / `--evidence-root` preserves bounded raw output from the
 same native calls. See the [capture contract, limits and retry behavior](../../docs/native-batch-evidence.md).

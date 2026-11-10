@@ -44,6 +44,7 @@ function writer(inputs=[input('a')],limits?:{artifactBytes:number;batchBytes:num
 function repo(){const file=path.join(parent,'repository.json');writeFileSync(file,Buffer.from('{"resourceType":"Bundle","entry":[]}\n'));return file;}
 const evaluation=(id='a')=>({caseName:'Same name',sourceFile:id+'.cel',caseId:id,compartmentDir:'patient/'+id,state:'generated' as const});
 
+// @kit produce-results:raw-same-call-evidence
 it('indexes exact same-call repository/native Task bytes with duplicate case-name disambiguation',()=>{
   const w=writer([input('a'),input('b')]),repository=repo();
   for(let i=0;i<2;i++){
@@ -61,6 +62,7 @@ it('indexes exact same-call repository/native Task bytes with duplicate case-nam
   }
 });
 
+// @kit produce-results:evidence-failure-separation
 it('a capture-write failure preserves successful clinical outputs and makes exactly one native call',async()=>{
   const w=writer(),repository=repo(),capture=w.begin(0,input('a'),'policy',repository),run=vi.fn(async()=>result());
   control.failFile='stdout.bin';
@@ -99,6 +101,7 @@ it('retains original non-UTF8 bytes and explicitly identifies derived parsed JSO
   expect(readFileSync(path.join(w.root,w.index.cases[0].files.stderr.path))).toEqual(raw);
 });
 
+// @kit produce-results:evidence-no-replay
 it('retained successes and unexecuted cases remain unavailable, without new native calls',()=>{
   const w=writer([input('a'),input('b')]);w.finishCase(0,{...evaluation(),reused:true});w.finishCase(1,{...evaluation('b'),state:'not-run'});
   expect(w.finish().complete).toBe(false);expect(w.index.cases.map(c=>c.captureState)).toEqual(['unavailable','unavailable']);expect(w.index.cases[0].reason).toContain('not evaluated again');

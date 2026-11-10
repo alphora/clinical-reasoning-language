@@ -324,7 +324,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit).not.toHaveProperty("useCase");
     expect(kit).not.toHaveProperty("stage");
     expect(kit).not.toHaveProperty("chain");
-    expect(kit.schemaVersion).toBe("2.46");
+    expect(kit.schemaVersion).toBe("2.47");
     expect(kit.summary).toMatch(/Local decision support/);
   });
 
@@ -679,8 +679,8 @@ describe("authoring-kit — getAuthoringKit", () => {
   // There is no longer a way to re-pin that looks like routine test maintenance.
   it("the full content hash stays pinned for its kit version", () => {
     const kit = getAuthoringKit();
-    expect(kit.schemaVersion).toBe("2.46");
-    expect(kit.contentHash).toBe("ee5ba4d8bcd791aae1d3533593eeed225f4a7530be2c5102a52361c12f6fbd93");
+    expect(kit.schemaVersion).toBe("2.47");
+    expect(kit.contentHash).toBe("70ef410fef7cff81a1ffa70fe35ab42876bb1735be05f092732d94a3b51374e4");
   });
 
   // @kit criterion:description-navigation
@@ -1019,4 +1019,14 @@ describe("authoring-kit — the review-flags rule teaches the `medical-validatio
       for (const k of keys) expect(toolArgs.has(k) || flagFields.has(k)).toBe(true);
     }
   });
+});
+
+// @kit produce-results:raw-evidence-discovery
+it("serves same-call capture guidance with no replay and separate verification limits", async()=>{
+  const {queryAuthoringKit}=await import('../query');
+  const rule=getAuthoringKit().rules.find(r=>r.id==='produce-results')!;
+  for(const term of ['evidenceRoot','full raw native Parameters','same evaluations','capture unavailable','nested execution-context fingerprint','do not rerun a clinical evaluation']){
+    expect(rule.rule.toLowerCase()).toContain(term.toLowerCase());
+  }
+  const search=queryAuthoringKit({view:'search',query:'evidenceRoot'});expect(JSON.stringify(search)).toContain('rule:produce-results');
 });

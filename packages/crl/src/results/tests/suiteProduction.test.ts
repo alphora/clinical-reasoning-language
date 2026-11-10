@@ -184,6 +184,7 @@ it('retains scratch through a preparation failure, active sibling and cancelled 
 it.each([0,-1,33,1.5,NaN])('refuses invalid worker limit%s before starting cases',async workerLimit=>{
   expect(await produceResults({...request(),workerLimit})).toMatchObject({ok:false,reason:expect.stringContaining('workerLimit')});expect(engine.calls).toBe(0);
 });
+// @kit produce-results:evidence-parallel-retry
 it('six-worker capture indexes every original call; retry does not replay uncaptured retained successes',async()=>{
   const {setNativeWorkerLimit}=await import('../nativeWorker');
   for(let i=2;i<6;i++)put('src/cel/mv/extra'+i+'.cel',cel('Clinical Extra'+i,'extra'+i));

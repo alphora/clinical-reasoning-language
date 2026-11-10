@@ -21,7 +21,7 @@ async function main(){
  receipt.kit={schema:installed.schemaVersion,hash:installed.contentHash,audit:installed.audit};stage('installed kit identity');
  // Bind source lifecycle controls to the actual installed runtime bytes.
  receipt.runtimeFiles={};
- for(const relative of [...['session','nativeWorker','ownedProcess','driver','runtimeFingerprint','produce','runProducer','spawn'].map(n=>'results/'+n+'.js'),...['ApplyDriver.class','ApplyDriver.java','ApplyWorker.class','ApplyWorker.java','ApplyDriver.build.json','windows-owned-process.ps1'].map(n=>'results/driver/'+n)]){
+ for(const relative of [...['session','nativeWorker','ownedProcess','driver','runtimeFingerprint','produce','runProducer','spawn','batchEvidence','nativeOutput','nativeWorkerOwner'].map(n=>'results/'+n+'.js'),'results/batch-evidence.schema.json',...['ApplyDriver.class','ApplyDriver.java','ApplyWorker.class','ApplyWorker.java','ApplyDriver.build.json','windows-owned-process.ps1'].map(n=>'results/driver/'+n)]){
   const bytes=fs.readFileSync(path.join(pkg,'dist',relative));
   assert.deepEqual(bytes,fs.readFileSync(path.join(repo,'packages/crl/dist',relative)),relative+' differs from source controls');
   receipt.runtimeFiles[relative]=hash(bytes);
@@ -45,7 +45,7 @@ async function main(){
   const fixture=path.join(out,'preview');fs.cpSync(path.join(repo,'packages/crl/src/cre/tests/fixtures/condition-status'),fixture,{recursive:true});
   for(const tool of ['run_decision','render_scenario']){const r=await call(tool,{path:path.join(fixture,'cases.cel')});fs.writeFileSync(path.join(out,tool+'.json'),JSON.stringify(r,null,2));assert.equal(r.caseCount,3);assert.equal(r.passCount,3);assert.equal(r.failCount,0);assert.equal(r.errorCount,0);}stage('three generic preview cases');
   const native=path.join(out,'native');fs.cpSync(path.join(__dirname,'fixtures/native'),native,{recursive:true});
-  const r=await call('emit_results',{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000},300000);
+  const r=await call('emit_results',{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,evidenceRoot:path.join(out,'native-evidence')},300000);
   fs.writeFileSync(path.join(out,'native-mcp.json'),JSON.stringify(r,null,2));assert(r.ok,JSON.stringify(r));assert.equal(r.failed,0);assert.equal(r.engineJar.defaulted,true);assert.equal(path.resolve(r.engineJar.path),path.resolve(jar));
   const manifest=read(r.manifestPath);assert.equal(manifest.cases.length,2);assert.equal(manifest.provenance.producerJarSha256,engineSource.sha256);
   assert.deepEqual(manifest.cases.map(c=>c.caseName).sort(),['Answered','Unanswered']);
@@ -60,7 +60,17 @@ async function main(){
    const answers=objects(qrs[0]).filter(x=>x.linkId===items[0].linkId&&x.definition===items[0].definition);assert.equal(answers.length,1);
    if(c.caseName==='Answered')assert.deepEqual(answers[0].answer,[{valueBoolean:true}]);else assert(!answers[0].answer?.length);
   }
-  stage('installed MCP native emission');
+  assert.equal(r.workerPool.nativeCalls,2);assert.equal(r.evidence.complete,true);
+  const evidenceBytes=fs.readFileSync(r.evidence.indexPath);assert.equal(hash(evidenceBytes),r.evidence.sha256);const evidence=JSON.parse(evidenceBytes);
+  const {verifyBatchEvidence,negativeControls}=require('./batch-evidence.cjs');
+  const verified=verifyBatchEvidence(path.dirname(r.evidence.indexPath),evidence,manifest,engineSource.sha256);
+  const controls=negativeControls(path.dirname(r.evidence.indexPath),evidence,manifest,engineSource.sha256,path.join(out,'evidence-negative-controls'));
+  fs.writeFileSync(path.join(out,'evidence-negative-controls.json'),JSON.stringify(controls,null,2));
+  const retryWire=await client.callTool({name:'emit_results',arguments:{celPath:path.join(native,'src/cel/mv/cases.cel'),crlPath:path.join(native,'src/crl/policy.crl'),useCase:'prior-auth',caseTimeoutMs:120000,retryFailed:true,evidenceRoot:path.join(out,'retry-unavailable')}},undefined,{timeout:300000});
+  assert.equal(retryWire.isError,true);const retry=JSON.parse(retryWire.content.find(x=>x.type==='text').text);fs.writeFileSync(path.join(out,'retry-mcp.json'),JSON.stringify(retry,null,2));assert(retry.ok);assert.equal(retry.failed,0);assert.equal(retry.workerPool.nativeCalls,0);assert.equal(retry.evidence.complete,false);
+  const retained=read(retry.evidence.indexPath);assert(retained.cases.every(c=>c.captureState==='unavailable'&&c.evaluation.reused&&!c.native));
+  receipt.rawEvidence={originalNativeCalls:2,retryNativeCalls:0,...verified,negativeControls:controls.map(c=>c.name),indexSha256:r.evidence.sha256};
+  stage('installed MCP native evidence and no-replay retry');
  }finally{await client.close();log.end();}
  for(const [script,count] of [['session',6],['typed',4]]){
   const target=path.join(out,script),logFile=fs.openSync(path.join(out,script+'.log'),'w');
