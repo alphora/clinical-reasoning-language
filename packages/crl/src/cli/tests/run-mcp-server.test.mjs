@@ -85,7 +85,7 @@ await client.connect(transport);
 try {
   await check("FHIR package MCP + CLI archive roundtrip", () => checkFhirPackage(client, true));
   await check("Definition Bundle MCP composition and refusal", () => checkEmitBundle(client));
-  await check("MCP tools: 23 registered (+ #205 create_flag / set_flag_status; + #17 canonicalize_source; + #250 E normalize_provenance; + #237/T3 check_fhir_ids; + emit_results)", async () => {
+  await check("MCP tools: exact 26-tool inventory including native_runtime_context", async () => {
     const { tools } = await client.listTools();
     const native = tools.find(t => t.name === "emit_results").inputSchema.properties;
     assert.equal(native.workerLimit.type, "integer");
@@ -112,8 +112,8 @@ try {
       "emit_crl_bundle",
       "emit_crl_fhir",
       "emit_results",
-      "native_runtime_context",
       "generate_provenance",
+      "native_runtime_context",
       "normalize_provenance",
       "package_fhir",
       "preview_presentation_edit",
