@@ -1,6 +1,6 @@
 {
   "baselineVersion": "6.4.41",
-  "deployedBaselineVersion": "6.4.48",
+  "deployedBaselineVersion": "6.4.51",
   "releases": [
     {
       "version": "6.4.46",
@@ -125,6 +125,19 @@
         {
           "title": "Read a simpler group legend",
           "description": "ANY OF and ALL OF each have one glowing line sample. The duplicate paired lines have been removed."
+        }
+      ]
+    },
+    {
+      "version": "6.4.52",
+      "title": "A simpler decision-tree legend",
+      "features": [
+        {
+          "title": "Read the condition colors without a second group legend",
+          "description": "The legend now focuses on review status, navigation, flags and True/False conditions. ANY OF and ALL OF labels remain in the tree, where their connector colors follow the selected case and path.",
+          "image": "condition-legend.png",
+          "alt": "Medical Validation legend with review, True and False condition colors, navigation and flags; no separate ANY OF or ALL OF row.",
+          "caption": "The condition samples keep their green and red glow. This view uses a demonstration policy."
         }
       ]
     }

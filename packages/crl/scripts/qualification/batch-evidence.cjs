@@ -18,7 +18,7 @@ function verify(root,index,manifest,engineSha){
   const errors=all.filter(x=>x.resourceType==='OperationOutcome').flatMap(x=>x.issue||[]).filter(x=>['error','fatal'].includes(x.severity));assert.equal(errors.length,0,'native errors');
   assert(['Answered','Unanswered'].includes(c.caseName));assert.deepEqual(tasks.map(t=>t.description),c.caseName==='Answered'?['Synthetic met']:[],'exact native Task outcomes');
   for(const t of tasks){assert.deepEqual(t.code,{coding:[{system:'http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs',code:'send-message'}]});assert.equal(t.intent,'proposal');}
-  const qs=all.filter(x=>x.resourceType==='Questionnaire'),qrs=all.filter(x=>x.resourceType==='QuestionnaireResponse');assert.equal(qs.length,1);assert.equal(qrs.length,1);assert.equal(qrs[0].questionnaire,qs[0].url);
+  const qs=all.filter(x=>x.resourceType==='Questionnaire'),qrs=all.filter(x=>x.resourceType==='QuestionnaireResponse');assert.equal(qs.length,1);assert.equal(qrs.length,1);assert.equal(qrs[0].questionnaire,qs[0].version?qs[0].url+'|'+qs[0].version:qs[0].url,'raw QR binds the returned Questionnaire version');
   const items=objects(qs[0]).filter(x=>x.linkId&&x.type&&!['group','display'].includes(x.type));assert.equal(items.length,1);assert.equal(items[0].type,'boolean');
   const answers=objects(qrs[0]).filter(x=>x.linkId===items[0].linkId&&x.definition===items[0].definition);assert.equal(answers.length,1);
   if(c.caseName==='Answered')assert.deepEqual(answers[0].answer,[{valueBoolean:true}]);else assert(!answers[0].answer?.length,'Unanswered raw QR must remain unanswered');

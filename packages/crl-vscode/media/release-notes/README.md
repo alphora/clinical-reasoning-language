@@ -1,8 +1,18 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.51.
+Updates since CRL 6.4.41 through 6.4.52.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.52 — A simpler decision\-tree legend
+
+### Read the condition colors without a second group legend
+
+The legend now focuses on review status, navigation, flags and True/False conditions\. ANY OF and ALL OF labels remain in the tree, where their connector colors follow the selected case and path\.
+
+![Medical Validation legend with review, True and False condition colors, navigation and flags; no separate ANY OF or ALL OF row\.](condition-legend.png)
+
+The condition samples keep their green and red glow\. This view uses a demonstration policy\.
 
 ## 6.4.51 — Keep policy review panels in order
 
