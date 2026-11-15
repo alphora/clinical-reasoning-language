@@ -1,3 +1,5 @@
+import { emitCQLImports } from "../../imports/emit";
+import { planConditionBody } from "./planConditionTestHelpers";
 // REFACTOR:grounded - portable current-answer state without historical client reconstruction.
 import { describe, it, expect } from "vitest";
 import { resolve, join } from "node:path";
@@ -31,15 +33,16 @@ describe("passive current answer retention", () => {
     expect(retention).toHaveLength(kind==="progressive" ? 2 : 1);
     expect(retention.map((a:any)=>a.title)).toEqual(kind==="progressive" ? ["Retain available A","Retain available B"] : ["Retain available B"]);
     expect(pd.action[0].extension).toContainEqual({url:"http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",valueString:"any"});
+    const cql=emitCQLImports(fixture(kind));expect(cql.success,JSON.stringify(cql.errors)).toBe(true);
     for(const action of retention){
-      expect(action.condition[0].expression.language).toBe("text/cql");
-      expect(action.condition[0].expression.expression).toContain("else false");
-      expect(action.action[0].condition[0].expression.expression).toContain("exists ([Observation]");
+      expect(action.condition[0].expression.language).toBe("text/cql-identifier");
+      expect(planConditionBody(cql,pd,action.condition[0].expression)).toContain("else false");
+      expect(planConditionBody(cql,pd,action.action[0].condition[0].expression)).toContain("exists ([Observation]");
       expect(action.action[0].action[0].input).toHaveLength(1);
     }
     const profiles=resources.filter(r=>r.resourceType==="StructureDefinition");
     expect(profiles.filter(r=>/current-uncertainty|supplied-alternative/.test(r.id))).toEqual([]);
-    const expressions=walk(pd.action[0]).filter(x=>typeof x.language==="string" && "expression" in x);
+    const expressions=walk(pd).filter(x=>typeof x.language==="string" && "expression" in x);
     expect(expressions.length).toBeGreaterThan(1);
     expect(expressions.every(e=>e.language==="text/cql-identifier")).toBe(true);
     // No custom retention marker enters the portable FHIR contract.

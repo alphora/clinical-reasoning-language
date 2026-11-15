@@ -1,0 +1,8 @@
+library "Policy".
+criterion "Retained": - when ("Foreign"."Flagged").
+presentation for "Retained": - uncertainty guard passes when false.
+activity "Met": - request CPGTaskRequest. - with `Met`.
+activity "Unmet": - request CPGTaskRequest. - with `Unmet`.
+decision "Assess": first:
+- when "Retained" then recommend activity "Unmet".
+- otherwise then recommend activity "Met".

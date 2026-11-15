@@ -95,6 +95,14 @@ async function main(){
   const pids=result.rows.map(row=>row.runtime?.workerPid);assert(pids.every(pid=>Number.isSafeInteger(pid)&&pid>0));assert.equal(new Set(pids).size,1,script+' must reuse its installed worker');
   receipt[script+'WorkerPid']=pids[0];stage(script+' native steps');
  }
+ // REFACTOR:grounded - qualify changed emitter transport through the actual
+ // installed core, including both physical owners and native returned-pair clears.
+ const retentionOut=path.join(out,'retention-owners'),retentionLog=fs.openSync(path.join(out,'retention-owners.log'),'w');
+ try{execFileSync(process.execPath,[path.join(__dirname,'../native-acceptance/retention-owners.cjs'),retentionOut],{
+  env:{...env,CRL_RETENTION_CORE_ROOT:pkg},stdio:['ignore',retentionLog,retentionLog],timeout:300000});}finally{fs.closeSync(retentionLog);}
+ const retention=read(path.join(retentionOut,'summary.json'));assert(retention.passed);assert.equal(retention.rows.length,8);
+ assert(retention.rows.every(row=>row.runtime.packageVersion===receipt.packageVersion&&row.runtime.engineSha256===engineSource.sha256));
+ receipt.retention={passed:true,steps:8,owners:[...new Set(retention.rows.map(row=>row.owner))]};stage('Root and Interface native retention steps');
  receipt.passed=true;save();
 }
 main().catch(e=>{receipt.error=String(e.stack||e);save();console.error(e);process.exitCode=1;});

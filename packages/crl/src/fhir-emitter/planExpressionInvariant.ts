@@ -1,11 +1,9 @@
 import type { PerLibraryEmit } from "../imports/emit";
 import type { CRLError } from "../types/errors";
 import type { EmittedResource } from "./types";
-import { retentionExpressionProvenance } from "./generatedRetentionExpression";
 
 /** REFACTOR:grounded: authored PlanDefinition guards name definitions in their
- * actual bound owner. Compiler-generated current-answer transport predicates
- * carry checked in-memory provenance; arbitrary inline expressions remain refused. */
+ * actual bound owner, including compiler-generated current-answer transport. */
 export function applyPlanExpressionInvariant(
   resources: readonly EmittedResource[],
   manifest: readonly PerLibraryEmit[],
@@ -37,14 +35,6 @@ export function applyPlanExpressionInvariant(
       const obj = value as Record<string, unknown>;
       if (typeof obj.language === "string" && "expression" in obj) {
         const expression = obj.expression;
-        const generated = retentionExpressionProvenance(obj);
-        if (generated && obj.language === "text/cql" && expression === generated.text) {
-          const reference = typeof obj.reference === "string" ? obj.reference : pd.library?.[0];
-          const owner = reference ? libraries.get(unversioned(reference)) : undefined;
-          if (owner !== generated.owner || generated.names.some(name => !definitions.get(owner!)?.has(name))) errors.push({ type: "Validation",
-            kind: "dangling-plan-expression-define", message: "Generated retention expression has an unbound owner or condition definition." });
-          return;
-        }
         if (obj.language !== "text/cql-identifier" || typeof expression !== "string" || !expression) {
           errors.push({ type: "Validation", kind: "plan-expression-not-identifier",
             message: 'PlanDefinition "' + (entry.sourceName ?? entry.relativePath) + '" must use a CQL identifier for every expression.' });

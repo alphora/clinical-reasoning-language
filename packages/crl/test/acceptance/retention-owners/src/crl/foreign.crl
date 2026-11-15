@@ -1,0 +1,35 @@
+library "Foreign".
+terminology "Answers":
+- system is `urn:retention:answers`.
+- code is `yes` display is `Yes`.
+- code is `no` display is `No`.
+- code is `uncertain` display is `Uncertain`.
+terminology "Uncertain":
+- system is `urn:retention:answers`.
+- code is `uncertain`.
+concept "A":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `a`.
+- value domain is answer options.
+- value from is "Answers":
+  - not qualifying is `no`.
+- shape reduction is most recent.
+presentation for "A": - question text is "A?".
+concept "B":
+- shape is Record.
+- type is Observation.
+- value type is CodeableConcept.
+- code is `b`.
+- value domain is answer options.
+- value from is "Answers":
+  - not qualifying is `no`.
+- shape reduction is most recent.
+presentation for "B": - question text is "B?".
+concept "Flagged":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- definition is any available value of "A" and "B" in "Uncertain" using validity of "A".
+- shape reduction is most recent.

@@ -75,7 +75,7 @@ import { choiceGroupExtension } from "./presentationGroups";
  * step per round-5 gpt55 C1.
  */
 
-import { generatedRetentionExpression } from "./generatedRetentionExpression";
+import type { RetentionSlot } from "../emit/retentionPredicates";
 import type {
   Action,
   Activity,
@@ -191,8 +191,7 @@ export interface CaseFeatureInput {
 export type CaseFeatureInputResolver = (conceptName: ReferenceName) => readonly CaseFeatureInput[];
 
 /** Current answer slots used by passive computations; never gather an absent slot. */
-export interface CaseFeatureRetainedInput extends CaseFeatureInput { presenceExpression: string }
-export type CaseFeatureRetentionResolver = (conceptName: ReferenceName) => readonly CaseFeatureRetainedInput[];
+export type DecisionRetentionSlot = RetentionSlot & { input: CaseFeatureInput };
 
 // The CPG `cpg-input-text` / `cpg-input-description` extensions stamp a
 // human-askable label + description onto an action input (DTR pattern). Verified
@@ -388,7 +387,7 @@ export function emitDecisionPlanDefinition(
   isPublication: (ref: ReferenceName) => boolean = () => false,
   publicationGuardTarget: PublicationGuardTargetResolver = () => undefined,
   presentations?: PresentationCatalog,
-  caseFeatureRetentionResolver: CaseFeatureRetentionResolver = () => [],
+  retentionSlots: readonly DecisionRetentionSlot[] = [],
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -516,59 +515,16 @@ export function emitDecisionPlanDefinition(
     rootActions = [switchGroup];
   }
 
-  // Preserve supplied passive operands after their preceding route is established.
-  // An unresolved consumer can still retain inputs; an earlier unresolved guard pauses
-  // before downstream inputs, just as ordinary decision traversal does. These ordinary conditional input actions run alongside
-  // the original ordered group, never inside its first-match list.
-  const quote = (s: string) => `"${s.replace(/"/g, '\\"')}"`;
-  type Scope = { condition: BranchCondition; negated: boolean };
-  const retention: Record<string, unknown>[] = [], retained = new Set<string>();
-  const slots = new Map<string, { input: CaseFeatureRetainedInput; reaches: string[]; names: Set<string>; childInputs: Array<Record<string, unknown>> | undefined }>();
-  const visitRetention = (members: readonly BlockMember[], qualifier: BlockQualifier | undefined, parents: Scope[]) => {
-    const prior: Scope[] = [];
-    for (const member of members) {
-      const scope = [...parents, ...(qualifier === "first" ? prior : [])];
-      if (member.type === "WhenBlock") {
-        for (const atom of guardConceptClosure(member.condition, ctx.criterionIndex)) {
-          for (const input of caseFeatureRetentionResolver(normalizeLocalRef(atom.ref, ctx.libraryName))) {
-            // Already-gathered inputs retain their operative occurrence and scoped wording.
-            const gathered = [member.condition, ...scope.map(s => s.condition)]
-              .flatMap(condition => guardConceptClosure(condition, ctx.criterionIndex))
-              .flatMap(operand => ctx.caseFeatureInputResolver(operand.ref));
-            if (gathered.some(answer => answer.canonical === input.canonical)) continue;
-            const names = scope.map(s => planConditionDefineName(s.condition, s.negated, "branch"));
-            const key = JSON.stringify([input.canonical, names]);
-            if (retained.has(key)) continue;
-            retained.add(key);
-            // An unanswered earlier gate pauses before downstream population. Do not
-            // select later conflicting data just to retain a potentially relevant slot.
-            const reach = names.reduceRight((rest, name) => {
-              const ref = `${quote(ctx.guardQualifierLibraryName)}.${quote(name)}`;
-              return `if ${ref} then (${rest}) else false`;
-            }, "true");
-            const childInputs = buildActionInputs([atom.ref], { ...ctx, presentationCondition: member.condition,
-              caseFeatureInputResolver: () => [input] });
-            const slot = slots.get(input.canonical) ?? { input, reaches: [], names: new Set<string>(), childInputs };
-            slot.reaches.push(reach); names.forEach(name => slot.names.add(name)); slots.set(input.canonical, slot);
-          }
-        }
-        if (member.body.type === "BlockBody") visitRetention(member.body.statements, member.body.qualifier,
-          [...scope, { condition: member.condition, negated: false }]);
-        prior.push({ condition: member.condition, negated: true });
-      } else if (member.type === "OtherwiseBlock" && member.body.type === "BlockBody") {
-        visitRetention(member.body.statements, member.body.qualifier, scope);
-      }
-    }
-  };
-  visitRetention(decision.body.statements, decision.body.qualifier, []);
-  for (const { input, reaches, names, childInputs } of slots.values()) {
-    const reach = reaches.reduceRight((rest, item) => `if (${item}) then true else (${rest})`, "false");
-    retention.push({ title: `Retain available ${input.name}`, code: guidelineCareCode(),
-      condition: [{ kind: "applicability", expression: generatedRetentionExpression(reach, ctx.guardQualifierLibraryName, [...names]) }],
-      action: [{ title: `Current answer ${input.name}`, code: guidelineCareCode(),
-        condition: [{ kind: "applicability", expression: generatedRetentionExpression(input.presenceExpression, ctx.guardQualifierLibraryName) }],
-        action: [{ title: input.name, code: guidelineCareCode(), input: childInputs }] }] });
-  }
+  // REFACTOR:grounded - named predicates are emitted in the actual bound CQL
+  // owner by the same shared retention plan. Conditional input shape stays unchanged.
+  const retention = retentionSlots.map(({ input, condition, reach, presence }) => ({
+    title: `Retain available ${input.name}`, code: guidelineCareCode(),
+    condition: [{ kind: "applicability", expression: { language: "text/cql-identifier", expression: reach.name } }],
+    action: [{ title: `Current answer ${input.name}`, code: guidelineCareCode(),
+      condition: [{ kind: "applicability", expression: { language: "text/cql-identifier", expression: presence.name } }],
+      action: [{ title: input.name, code: guidelineCareCode(), input: buildActionInputs(guardConceptClosure(condition, ctx.criterionIndex).slice(0, 1).map(atom => atom.ref), {
+        ...ctx, presentationCondition: condition, caseFeatureInputResolver: () => [input],
+      }) }] }] }));
   if (retention.length) rootActions = [...rootActions, ...retention];
 
   const level = opts.capability ?? "publishable";

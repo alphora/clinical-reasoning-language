@@ -565,6 +565,7 @@ export function classifyBooleanTotality(
 /** The provenance of an emitted define, used by the proof's origin-matching + coverage model (§3). The enum
  *  is closed so "compare the ledger against ALL emitted define headers" has a bounded origin space. */
 export type DefineOrigin =
+  | "plan-retention-condition" // REFACTOR:grounded: current-answer transport boundary.
   | "plan-action-condition" // Compiler-only action-unless boundary; never an authored criterion.
   | "authored" // an authored concept's define (classified by `classifyBooleanTotality`)
   | "interface-facade" // `define "X": Inferences."X"` — total iff the aliased define is total
@@ -871,7 +872,7 @@ function originMatchesDischarge(origin: DefineOrigin, d: DischargeKind): boolean
     case "count-bare":
       return origin === "authored";
     case "boundary-coalesce":
-      return origin === "authored" || origin === "plan-action-condition";
+      return origin === "authored" || origin === "plan-action-condition" || origin === "plan-retention-condition";
     case "composite-delegated":
     case "member-existence-fold":
       return origin === "authored";

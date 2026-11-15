@@ -1,0 +1,9 @@
+{
+  "name": "retention-owners",
+  "private": true,
+  "version": "0.0.0",
+  "crl": {
+    "canonicalBase": "https://example.org/retention",
+    "date": "2026-11-14"
+  }
+}

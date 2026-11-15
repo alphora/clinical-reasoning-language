@@ -1,8 +1,10 @@
+import { publicationCaseFeatures } from "../emit/publicationInputs";
+import { publicationRetentionPlan } from "../emit/retentionPredicates";
 import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { checkPresentationReachability } from "./presentationReachability";
 import { createPresentationCatalog } from "../emit/presentation";
-import { publicationProducerOperands, supportsPublicationGuard } from "../emit/publicationProgram";
+import { supportsPublicationGuard } from "../emit/publicationProgram";
 /**
  * CRL → FHIR Definition emit — closure orchestrator (Todo 4 of #73).
  *
@@ -45,8 +47,7 @@ import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "..
 import { buildCriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
 import { guardDefineNameCollisions } from "../ast/guardDefines";
-import { conceptDependencies } from "../ast/conceptDependencies";
-import { hasLocalPublicationContribution, type PublicationDescriptor, type PublicationProgram } from "../emit/publicationProgram";
+import { hasLocalPublicationContribution, type PublicationDescriptor } from "../emit/publicationProgram";
 import { normalizeDispositionConfig } from "../dispositions";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
 import { emitCQLImportsFromPrepared, type SuppressedActivityBinding, type EmitImportsResult } from "../imports/emit";
@@ -80,7 +81,6 @@ import {
   ambiguousPolicyEntrypoint,
   type ActivityResolver,
   type CaseFeatureInputResolver,
-  type CaseFeatureRetentionResolver,
   type ConceptResolver,
   type DecisionResolver,
 } from "./decision";
@@ -432,31 +432,6 @@ export interface CaseFeatureCollection {
   inputsByCondition: Map<string, CollectedCodeIsConcept[]>;
   /** union of all collected concepts (deduped by name, first-seen order). */
   unionConcepts: CollectedCodeIsConcept[];
-}
-
-/** Gather admitted answer slots by declaration identity. Definitions retain the complete
- * dependency closure; question inputs follow only dependencies the producer can request. */
-function publicationCaseFeatures(program: PublicationProgram, source: string, ref: ReferenceName, purpose: "definitions" | "questions" | "dependencies"): PublicationDescriptor[] {
-  const seen = new Set<string>();
-  const result: PublicationDescriptor[] = [];
-  const visit = (owner: string, reference: ReferenceName): void => {
-    const declaration = program.declarations.lookupConcept(owner, reference);
-    if (declaration.kind !== "hit" || seen.has(declaration.identity.key)) return;
-    seen.add(declaration.identity.key);
-    const descriptor = program.get(declaration.identity.key);
-    if (descriptor !== undefined) {
-      if (purpose === "dependencies" || hasLocalPublicationContribution(descriptor)) result.push(descriptor);
-      // Available-value membership reads the supplied set without requesting absent answers.
-      // Keep its own coded answer above and its full definition/CQL closure in the other walk.
-      if (purpose === "questions" && descriptor.producer?.kind === "anyMembership" && descriptor.producer.availableValuesOnly) return;
-      // REFACTOR:grounded (#320, plan589): both BMI inputs remain answerable dependencies.
-      for (const operand of publicationProducerOperands(descriptor.producer)) visit(operand.sourceIdentity, operand.conceptName);
-      return;
-    }
-    for (const dependency of conceptDependencies(declaration.node)) visit(declaration.identity.sourceIdentity, dependency);
-  };
-  visit(source, ref);
-  return result;
 }
 
 // Exported for the F2 unit test (foreign-qualified-condition clobber). Not part
@@ -1970,27 +1945,7 @@ export function emitFhirDefClosure(
       return [...legacy, ...publicationInputs];
     };
 
-    const caseFeatureRetentionResolver: CaseFeatureRetentionResolver = (ref) => {
-      const answers = new Map<string, PublicationDescriptor>();
-      for (const consumer of publicationCaseFeatures(prepared.publications, lib.filePath, ref, "dependencies")) {
-        if (consumer.producer?.kind !== "anyMembership" || !consumer.producer.availableValuesOnly) continue;
-        for (const operand of publicationProducerOperands(consumer.producer)) {
-          for (const answer of publicationCaseFeatures(prepared.publications, operand.sourceIdentity, operand.conceptName, "definitions")) {
-            if (answer.profileUrl && answer.localCode) answers.set(answer.identity.key, answer);
-          }
-        }
-      }
-      const literal = (s: string) => `'${s.replace(/'/g, "\\'")}'`;
-      return [...answers.values()].map(answer => {
-        gatheredPublications.set(answer.identity.key, answer);
-        // Presence concerns an asserted answer record, including an explicit clear.
-        // Do not select or calculate unused data merely to preserve its wire slot.
-        const code = answer.localCode!;
-        return { name: answer.title, canonical: answer.profileUrl!, resourceType: answer.resourceType,
-          presentationOwner: presentationCatalogs.get(answer.identity.sourceIdentity),
-          presenceExpression: `exists ([Observation] O where exists (O.code.coding C where C.system.value = ${literal(code.system)} and C.code.value = ${literal(code.code)}))` };
-      });
-    };
+
 
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
@@ -2037,7 +1992,12 @@ export function emitFhirDefClosure(
           return target && entry ? { ...target, canonical: libraryCanonicalUrl(metadata, identityForEntry(entry)) } : undefined;
         },
         presentations,
-        caseFeatureRetentionResolver,
+        publicationRetentionPlan(prepared.publications, lib.filePath, lib.ast, decision).map(slot => {
+          const descriptor = slot.answer;
+          gatheredPublications.set(descriptor.identity.key, descriptor);
+          return { ...slot, input: { name: descriptor.title, canonical: descriptor.profileUrl!, resourceType: descriptor.resourceType,
+            presentationOwner: presentationCatalogs.get(descriptor.identity.sourceIdentity) } };
+        }),
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);

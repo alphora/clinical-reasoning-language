@@ -1,3 +1,4 @@
+import { appendRetentionDefines } from "./retentionDefines";
 import { answerTerminologyResolver } from "../emit/answerDomain";
 import { publicationProducerOperands } from "../emit/publicationProgram";
 import type {
@@ -1155,6 +1156,12 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
       ledgerEntries: emit.ledgerEntries,
     });
   }
+
+  // REFACTOR:grounded - both public emission paths receive the exact named
+  // transport conditions before Libraries embed or reference these CQL bytes.
+  const retentionErrors = appendRetentionDefines(prepared, cqlByLibrary);
+  if (retentionErrors.length) return { success: false, graph, importDiagnostics: graph.diagnostics,
+    cqlByLibrary: [], errors: retentionErrors };
 
   // #187 — ALWAYS append the three SHARED catalog libraries so every policy's
   // `cql/` folder ships `CRLCommon.cql`, `CaseFeatureCommon.cql`, and
