@@ -2,6 +2,6 @@
   "auditedRevision": "04657bd7222763eff9c466a8853314a79d702f67",
   "auditedSchemaVersion": "2.48",
   "auditedContentHash": "66dc778106e7986e52b1a6f0a1d89c0993ffd2a51c982311441791695abea8db",
-  "scope": "Schema2.48 bounded implementation maintenance: named owned native retention conditions preserve passive available-value semantics, imported answers, unchanged resubmission and explicit clear. Full interval and proof tiers in coverage.md. Engine, driver, session API and kit content unchanged; installed/Linux/publication remain separate release gates.",
+  "scope": "Schema 2.48 bounded implementation maintenance: named owned native retention conditions preserve passive available-value semantics, imported answers, unchanged resubmission and explicit clear. Full interval and proof tiers in coverage.md. Engine, driver, session API and kit content unchanged; installed/Linux/publication remain separate release gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
