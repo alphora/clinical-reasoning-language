@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "cd7dbbcc40d59af4139710acd26e01ba6271a769",
+  "auditedRevision": "04657bd7222763eff9c466a8853314a79d702f67",
   "auditedSchemaVersion": "2.48",
   "auditedContentHash": "66dc778106e7986e52b1a6f0a1d89c0993ffd2a51c982311441791695abea8db",
-  "scope": "Schema 2.48 bounded deployment integrity maintenance from schema2.47: independent same-process prebatch context, immutable installation and execution binding, canonical shared CQL LF. Clinical/Java/engine semantics and retry fingerprints unchanged. Complete interval, findings and validation in coverage.md; installed/Linux/Pipeline adoption remain separate gates.",
+  "scope": "Schema2.48 bounded implementation maintenance: named owned native retention conditions preserve passive available-value semantics, imported answers, unchanged resubmission and explicit clear. Full interval and proof tiers in coverage.md. Engine, driver, session API and kit content unchanged; installed/Linux/publication remain separate release gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
