@@ -1,6 +1,6 @@
 {
   "baselineVersion": "6.4.41",
-  "deployedBaselineVersion": "6.4.51",
+  "deployedBaselineVersion": "6.4.53",
   "releases": [
     {
       "version": "6.4.46",
@@ -148,6 +148,16 @@
         {
           "title": "Keep validation consistent through review",
           "description": "Policy validation can now check that results came from the expected validation tools and preserve the same policy calculations between testing and delivery."
+        }
+      ]
+    },
+    {
+      "version": "6.4.54",
+      "title": "More reliable uncertainty checks",
+      "features": [
+        {
+          "title": "Continue reviewing retained uncertain answers",
+          "description": "Fixed an error that prevented questionnaires from opening for some policies that check uncertainty in earlier answers. Retained uncertain answers remain available to review and correct."
         }
       ]
     }

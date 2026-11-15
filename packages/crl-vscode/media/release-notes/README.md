@@ -1,8 +1,14 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.53.
+Updates since CRL 6.4.41 through 6.4.54.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.54 — More reliable uncertainty checks
+
+### Continue reviewing retained uncertain answers
+
+Fixed an error that prevented questionnaires from opening for some policies that check uncertainty in earlier answers\. Retained uncertain answers remain available to review and correct\.
 
 ## 6.4.53 — More dependable policy validation
 
