@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildCRL } from "../../index";
 import { questionUnitSource } from "../../authoring-kit/questionUnitExample";
+import { quantityThresholdSource } from "../../authoring-kit/quantityThresholdExample";
+import { validateCRLImports } from "../../imports/validate";
 import { prepareSingleLibraryPublication } from "../publicationProgram";
 import { emitFhirDefFromPath } from "../../fhir-emitter/closureOrchestrator";
 import { emitCQLImports } from "../../imports/emit";
@@ -38,6 +40,23 @@ function objects(value: unknown): Record<string, any>[] {
   if (!value || typeof value !== "object") return [];
   return [value as Record<string, any>, ...Object.values(value).flatMap(v => Array.isArray(v) ? v.flatMap(objects) : objects(v))];
 }
+
+// @kit text-answers:quantity-thresholds-validation
+test.each(["%", "ms"])("ordinary validation accepts both inclusive Quantity operators for %s and rejects a spelled-out unit", unit => {
+  for (const comparison of ["at least", "at most"] as const) {
+    const source = quantityThresholdSource(unit, comparison, 55);
+    expect(validateCRLImports(fixture(source)).validationErrors).toEqual([]);
+    const bad = validateCRLImports(fixture(source.replace(`${comparison} 55 '${unit}'`, `${comparison} 55 milliseconds`)));
+    expect(bad.validationErrors.some(e => e.kind === "use-site-type-mismatch" && e.message.includes("unit 'milliseconds' is unsupported"))).toBe(true);
+  }
+});
+
+// @kit text-answers:question-unit
+test.each(["%", "ms"])("preparation rejects declared type %s against a threshold in the other dimension", unit => {
+  const source = quantityThresholdSource(unit, "at most", 55).replace(`Quantity '${unit}'`, `Quantity '${unit === "%" ? "ms" : "%"}'`);
+  const prepared = prepareSingleLibraryPublication(ast(source), { canonicalBase: "https://example.org/quantity", policyId: "quantity" });
+  expect(prepared.diagnostics.some(d => d.kind === "publication-quantity-unit-incompatible")).toBe(true);
+});
 
 // @kit text-answers:question-unit
 // REFACTOR:grounded (#328): typed units survive wording edits, not presentation inheritance.

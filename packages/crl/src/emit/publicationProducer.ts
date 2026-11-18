@@ -1,7 +1,7 @@
 import type { PublicationDescriptor } from "./publicationProgram";
 import type { PublicationCandidate } from "./publicationSelection";
 import { classifyPublicationMembership, type PublicationValueError } from "./publicationDomain";
-import { publicationQuantityAtLeast } from "./publicationQuantity";
+import { publicationQuantityAtLeast, publicationQuantityAtMost } from "./publicationQuantity";
 
 // REFACTOR:grounded (#320, review 562): unary production adds an inferred candidate. It never
 // reselects input, inherits its id, assigns Now(), or treats a missing value as false.
@@ -34,7 +34,7 @@ export function produceMembershipCandidate(
       message: "This publication has no membership producer.",
     };
   if (operand === undefined) return { kind: "none" };
-  const value = producer.kind === "quantityThreshold" ? publicationQuantityAtLeast(operand.resource.valueQuantity, producer.threshold)
+  const value = producer.kind === "quantityThreshold" ? (producer.comparison === "at-most" ? publicationQuantityAtMost : publicationQuantityAtLeast)(operand.resource.valueQuantity, producer.threshold)
     : classifyPublicationMembership(producer, operand.resource);
   if (value.kind === "error") return value;
   if (subjectReference.trim() === "")

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildCRL } from "../../index";
 import { prepareSingleLibraryPublication, adaptPublicationCandidate } from "../publicationProgram";
 import { adaptObservationPublicationCandidate, type PublicationObservationSource } from "../publicationSource";
-import { readPublicationQuantity, publicationQuantityAtLeast } from "../publicationQuantity";
+import { readPublicationQuantity, publicationQuantityAtLeast, publicationQuantityAtMost } from "../publicationQuantity";
+import { quantityThresholdSource } from "../../authoring-kit/quantityThresholdExample";
+import { matchNarrative } from "../../template-match/matcher";
 import { emitCQLFromAST } from "../../cql-emitter/emitCQL";
 import { emitPartitioned, FULL_PARTITION } from "../../cql-emitter/layeredEmit";
 import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
@@ -36,6 +38,61 @@ const measurement = (value: unknown = { value: 200, unit: "cm" }) => ({
   effectiveDateTime: "2026-09-01", ...(value === null ? {} : { valueQuantity: value }),
 });
 describe("Quantity publication", () => {
+  // @kit text-answers:quantity-thresholds
+  it.each(["%", "ms", "m", "kg/m2"])("preserves inclusive lower/upper boundaries and errors for %s", unit => {
+    const threshold = { value: 55, unit };
+    for (const [value, lower, upper] of [[54.99999999, false, true], [55, true, true], [55.00000001, true, false], [0, false, true], [-1, false, true]] as const) {
+      const q = { value, system: "http://unitsofmeasure.org", code: unit, unit: "display is not the code" };
+      expect(publicationQuantityAtLeast(q, threshold)).toEqual({ kind: "known", value: lower });
+      expect(publicationQuantityAtMost(q, threshold)).toEqual({ kind: "known", value: upper });
+    }
+    for (const compare of [publicationQuantityAtLeast, publicationQuantityAtMost]) {
+      expect(compare(null, threshold)).toEqual({ kind: "unknown" });
+      expect(compare({ unit }, threshold)).toEqual({ kind: "unknown" });
+      for (const bad of [{ value: 55 }, { value: 55, unit, system: "other" }, { value: 55, unit, comparator: "<" }, { value: 0.55, unit: "1" }, { value: 1, unit: "s" }, { value: 55, unit: "toString" }, { value: 55, unit: unit === "%" ? "ms" : "%" }, { value: 55.000000001, unit }, { value: 1000001, unit }])
+        expect(compare(bad, threshold).kind, JSON.stringify(bad)).toBe("error");
+    }
+  });
+  // @kit text-answers:quantity-thresholds
+  it.each(["%", "ms", "kg/m2"])("admits and emits exact selected-Quantity comparisons for %s", unit => {
+    for (const comparison of ["at least", "at most"] as const) {
+      const { ast } = prepare(quantityThresholdSource(unit, comparison, 55));
+      const program = prepareSingleLibraryPublication(ast, options);
+      expect(program.descriptors.find(d => d.producer?.kind === "quantityThreshold")?.producer).toMatchObject({ kind: "quantityThreshold", comparison: comparison.replace(" ", "-"), threshold: { value: 55, unit } });
+      const direct = emitCQLFromAST(ast, options);
+      expect(direct.success, JSON.stringify(direct.errors)).toBe(true);
+      expect(direct.result).toContain(`when '${unit}' then 1.0`);
+      const calls = direct.result!.split("\n").filter(line => !line.startsWith("define function ")).join("\n");
+      expect(calls).toContain(comparison === "at most" ? '"__CRL_PublicationProducer_v1_QuantityAtMostCandidate"(' : '"__CRL_PublicationProducer_v1_QuantityThresholdCandidate"(');
+      const partitioned = emitPartitioned(lowerLocalCodes(ast, options).ast, "Quantity Threshold Intake", options.policyId, FULL_PARTITION, options);
+      expect(partitioned.success, JSON.stringify(partitioned.errors)).toBe(true);
+      const partitionedCalls = partitioned.entries.map(e => e.result.result).join("\n").split("\n").filter(line => !line.startsWith("define function ")).join("\n");
+      expect(partitionedCalls).toContain(comparison === "at most" ? '"__CRL_PublicationProducer_v1_QuantityAtMostCandidate"(' : '"__CRL_PublicationProducer_v1_QuantityThresholdCandidate"(');
+      expect(partitionedCalls).not.toContain(comparison === "at most" ? '"__CRL_PublicationProducer_v1_QuantityThresholdCandidate"(' : '"__CRL_PublicationProducer_v1_QuantityAtMostCandidate"(');
+    }
+  });
+  // @kit text-answers:quantity-thresholds
+  it.each(["milliseconds", "seconds", "'1'", "'s'", "'mm[Hg]'"])("refuses unsupported threshold spelling %s with supported unit guidance", spelling => {
+    const parsed = buildCRL(quantityThresholdSource("ms", "at most", 120).replace("at most 120 'ms'", `at most 120 ${spelling}`));
+    expect(parsed.success, JSON.stringify(parsed.errors)).toBe(true);
+    const result = prepareSingleLibraryPublication(parsed.result!, options);
+    expect(result.diagnostics.some(d => d.kind === "publication-quantity-unit-unsupported" && d.message.includes(`unit '${spelling.replaceAll("'", "")}' is unsupported`))).toBe(true);
+  });
+  it("keeps wrong result/operand types and nested age producers outside threshold admission", () => {
+    const source = quantityThresholdSource("%", "at most", 55);
+    for (const invalid of [source.replace("value type is boolean", "value type is Quantity"), source.replace("value type is Quantity '%'", "value type is boolean"), source.replace('"Measurement" at most 55 \'%\'', 'age today at most 18 years')]) {
+      const parsed = buildCRL(invalid); expect(parsed.success, JSON.stringify(parsed.errors)).toBe(true);
+      expect(prepareSingleLibraryPublication(parsed.result!, options).diagnostics.length).toBeGreaterThan(0);
+    }
+  });
+  it.each(["below", "exceeds"])("names supported inclusive spellings when rejecting strict threshold %s", comparison => {
+    const parsed = buildCRL(quantityThresholdSource("%", "at most", 55).replace("at most", comparison));
+    expect(parsed.success, JSON.stringify(parsed.errors)).toBe(true);
+    const concept = parsed.result!.statements.find(s => s.type === "Concept" && s.name === "Threshold Met");
+    if (concept?.type !== "Concept" || concept.definition?.type !== "DefinitionIsDefinition") throw Error("Missing threshold definition");
+    expect(matchNarrative(concept.definition.body)).toMatchObject({ known: true, pattern: comparison === "below" ? "Below" : "Exceeds" });
+    expect(prepareSingleLibraryPublication(parsed.result!, options).diagnostics.some(d => d.message.includes("at least or at most"))).toBe(true);
+  });
   // REFACTOR:grounded: the source binding repair applies to non-age publications too.
   it("qualifies an uncoded Quantity source across layers", () => {
     const { ast } = prepare(source.replace(/^- code is `height`\.\r?\n/m, ""));

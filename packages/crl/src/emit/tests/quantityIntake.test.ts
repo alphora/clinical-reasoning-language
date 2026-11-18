@@ -106,7 +106,7 @@ describe("Quantity intake presence", () => {
     const f = fixture(source);
     const validation = validateCRLImports(f.path);
     expect(validation.success).toBe(false);
-    expect(validation.validationErrors.some(e => e.message.includes("Quantity threshold requires"))).toBe(true);
+    expect(validation.validationErrors.some(e => e.kind === "use-site-type-mismatch" && e.message.includes(`unit '${unit}' is unsupported`))).toBe(true);
     expect(emitCQLImports(f.path).success).toBe(false);
     expect(runCel(resolveCelImports(f.cases)).runs.every(r => r.status !== "pass")).toBe(true);
   });

@@ -167,15 +167,25 @@ for the request/clear contract and native FHIR parser boundary. Quantity presenc
 Quantity measurements can use explicit Record/Observation publication with `shape reduction is most recent`.
 An Observation source preserves its Quantity and effectiveDateTime while projecting the analytical identity.
 A local code adds an answer representation; an uncoded source calculation does not invent a question.
-The unary `definition is "Measurement" at least N 'unit'` producer publishes a Boolean Observation and
+The unary `definition is "Measurement" at least N 'unit'` or `at most N 'unit'` producer publishes a Boolean Observation and
 inherits the selected operand's actual optional validity. No operand produces no candidate; a selected
 operand with no numeric value produces an unknown-valued candidate. Final selection remains separate.
 Quantity code determines unit identity when present; display unit does not override it. The existing CEL
 unit-only representation is supported. Supplied systems must be UCUM with a code; comparator quantities
-are not exact measurements. This comparison currently supports m/cm, kg/g and kg/m2, magnitude at most
+are not exact measurements. Inclusive comparisons currently support m/cm, kg/g, kg/m2, same-unit % and same-unit ms, magnitude at most
 10^6 and at most eight decimal places, with exact decimal unit-factor comparison. This is a bounded
 implementation domain, not a clinical range. It does not recover unsupported lexical precision already
-lost in a caller's numeric parsing.
+lost in a caller's numeric parsing. Use quoted UCUM codes, for example `55 '%'` and `120 'ms'`.
+There is no ratio `1` to percent scaling or seconds to milliseconds conversion. Unsupported units,
+unitless numeric values, comparators and invalid systems error rather than silently becoming false or
+unknown. Malformed Quantities fail candidate validation before selection. A declared unit also
+normalizes every candidate carrying a numeric value before selection, so an older incompatible numeric candidate can fail
+despite a newer valid answer. Without a declared unit, an otherwise valid selected Quantity with an unsupported
+comparison unit fails when consumed by a threshold comparison; presence-only/display consumers do not
+impose the threshold unit list. Integer unit factors preserve the eight-place native decimal domain. Threshold comparisons accept zero and negative
+values as numbers; they add no clinical plausibility range. Selected-Quantity strict less-than/greater-than
+producers remain unsupported; do not substitute an inclusive bound for a strict policy cutoff.
+Unsupported authored threshold-unit spellings fail validation/preparation; invalid datum errors occur at runtime.
 
 BMI production uses `definition is body mass index of "Weight" and "Height" using validity of "Weight"`.
 Both operands must be selected Quantity publications; the validity operand must name one of them.

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { emitCrlBundle, produceResults } from '@smile-digital-health/crl';
 import { applySession } from '@smile-digital-health/crl/session';
 import { questionUnitSource } from '../../crl/src/authoring-kit/questionUnitExample';
+import { quantityThresholdSource } from '../../crl/src/authoring-kit/quantityThresholdExample';
 import { InteractiveSession, nativeInteractiveRunner, readInteractiveResult, interactiveRequest } from './interactiveQuestionnaire';
 
 const enabled = process.env.CRL_QUESTION_UNIT_NATIVE === '1';
@@ -51,6 +52,66 @@ async function answer(session, quantity, minute) {
  expect(item).toBeDefined(); if (quantity === null) delete item.answer; else item.answer = [{ valueQuantity: quantity }];
  return session.evaluate(qr);
 }
+
+// @kit text-answers:quantity-thresholds-native
+it.skipIf(!enabled).each([['%', 'at most', 55], ['ms', 'at least', 120]])('native threshold %s %s preserves exact boundaries, repeated answers and clear', async (code, comparison, threshold) => {
+ const f = fixture(quantityThresholdSource(code, comparison, threshold));
+ try {
+  const session = interview(f, code === '%' ? 'percent-upper' : 'milliseconds-lower');
+  const start = await session.evaluate(); outcome(start, null);
+  expect(observations(start)).toHaveLength(0);
+  expect(unit(quantities(start)[0])).toEqual([{ system: 'http://unitsofmeasure.org', code, display: code }]);
+  let minute = 1;
+  for (const value of [threshold - 0.00000001, threshold, threshold + 0.00000001, 0]) {
+   const result = await answer(session, { value, code, unit: code, system: 'http://unitsofmeasure.org' }, minute++);
+   outcome(result, (comparison === 'at most' ? value <= threshold : value >= threshold) ? 'Meets' : 'Does Not Meet');
+   expect(observations(result).at(-1).valueQuantity).toMatchObject({ value, code, system: 'http://unitsofmeasure.org' });
+  }
+  const saved = structuredClone(observations(session.result));
+  const repeated = await session.evaluate(structuredClone(session.result.response));
+  expect(observations(repeated)).toEqual(saved);
+  outcome(repeated, comparison === 'at most' ? 'Meets' : 'Does Not Meet');
+  const clear = await answer(session, null, minute++); outcome(clear, null);
+  expect(observations(clear).at(-1)).not.toHaveProperty('valueQuantity');
+  expect(unit(quantities(clear)[0])[0].code).toBe(code);
+  // The wrong dimension is an error, never false or an implicit conversion.
+  await expect(answer(session, { value: 0.55, code: code === '%' ? '1' : 's', system: 'http://unitsofmeasure.org' }, minute++)).rejects.toThrow('native-error');
+  expect(JSON.stringify(session.qualificationReceipts.at(-1).diagnostics)).toContain('publication-quantity-unit-unsupported');
+  expect(JSON.stringify(session.qualificationReceipts.at(-1).diagnostics)).toContain('Quantity is incompatible with its declared type unit');
+ } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 300000);
+
+// @kit text-answers:quantity-thresholds-native-unit-guard
+it.skipIf(!enabled).each([['%', 'at most', 55, '1'], ['ms', 'at least', 120, 's'], ['%', 'at most', 55, 'ms']])('native threshold %s %s %i rejects %s without declared-type normalization', async (code, comparison, threshold, wrongUnit) => {
+ const f = fixture(quantityThresholdSource(code, comparison, threshold).replace(`Quantity '${code}'`, 'Quantity'));
+ try {
+  const system = f.bundle.entry.map(e => e.resource).find(r => r.resourceType === 'CodeSystem' && r.concept?.some(c => c.code === 'measurement')).url;
+  const raw = { resourceType: 'Observation', id: 'wrong-unit', status: 'final', subject: { reference: 'Patient/p' }, code: { coding: [{ system, code: 'measurement' }] }, valueQuantity: { value: 0.55, system: 'http://unitsofmeasure.org', code: wrongUnit, unit: wrongUnit } };
+  const session = interview(f, `untyped-unit-error-${code === '%' ? 'percent' : code}-${wrongUnit}`, [raw]);
+  await expect(session.evaluate()).rejects.toThrow('native-error');
+  expect(JSON.stringify(session.qualificationReceipts.at(-1).diagnostics)).toContain('publication-quantity-unit-unsupported');
+  expect(JSON.stringify(session.qualificationReceipts.at(-1).diagnostics)).toContain('Quantity comparison requires compatible supported units');
+ } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 120000);
+
+// @kit text-answers:quantity-thresholds-native-candidate-order
+it.skipIf(!enabled).each([true, false])('native Quantity candidate-order declared=%s distinguishes older incompatible from newer valid data', async declared => {
+ const source = quantityThresholdSource('%', 'at most', 55);
+ const f = fixture(declared ? source : source.replace("Quantity '%'", 'Quantity'));
+ try {
+  const system = f.bundle.entry.map(e => e.resource).find(r => r.resourceType === 'CodeSystem' && r.concept?.some(c => c.code === 'measurement')).url;
+  const record = (id, date, code, value) => ({ resourceType: 'Observation', id, status: 'final', subject: { reference: 'Patient/p' }, code: { coding: [{ system, code: 'measurement' }] }, effectiveDateTime: date, valueQuantity: { value, code, unit: code, system: 'http://unitsofmeasure.org' } });
+  const raw = [record('old-incompatible', '2026-11-01T00:00:00Z', 'ms', 1), record('new-valid', '2026-11-02T00:00:00Z', '%', 55)];
+  const session = interview(f, `candidate-order-${declared}`, raw);
+  if (declared) {
+   await expect(session.evaluate()).rejects.toThrow('native-error');
+   expect(JSON.stringify(session.qualificationReceipts.at(-1).diagnostics)).toContain('Quantity is incompatible with its declared type unit');
+  } else {
+   const result = await session.evaluate(); outcome(result, 'Meets');
+   expect(observations(result)).toEqual(raw);
+  }
+ } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 120000);
 
 // @kit text-answers:question-unit-native-session
 it.skipIf(!enabled)('declared BMI default survives native Start, untouched, number entry, change, clear and repeated applies', async () => {

@@ -2520,7 +2520,7 @@ class Emitter {
         : producer.kind === "hasValue"
         ? `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.hasValue)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${cqlStringLiteral(producer.operandValueType)}, 'Patient/' + Patient.id.value)`
         : producer.kind === "quantityThreshold"
-        ? `${cqlIdent(QUANTITY_CQL.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${producer.threshold.value.toFixed(8)}, ${cqlStringLiteral(producer.threshold.unit)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`
+        ? `${cqlIdent(producer.comparison === "at-most" ? QUANTITY_CQL.candidateAtMost : QUANTITY_CQL.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${producer.threshold.value.toFixed(8)}, ${cqlStringLiteral(producer.threshold.unit)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`
         : `${cqlIdent(PUBLICATION_PRODUCER_FUNCTIONS.candidate)}(${operand}, ${cqlStringLiteral(producer.producerId)}, ${code}, ${profile}, ${renderPublicationCodeTable(producer.domain)}, ${renderPublicationCodeTable(producer.qualifying)}, ${cqlStringLiteral(descriptor.conceptId)}, 'Patient/' + Patient.id.value)`;
       // Flatten preserves duplicate inputs for the selector's diagnostic; union could silently erase them.
       candidates = `Flatten({ ${candidates}, (({ ${produced} }) C where C is not null) })`;

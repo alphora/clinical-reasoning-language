@@ -78,6 +78,7 @@ export interface PublicationThresholdProducer {
   readonly producerId: string;
   readonly operand: QualifiedConceptIdentity;
   readonly threshold: { readonly value: number; readonly unit: string };
+  readonly comparison: "at-least" | "at-most";
 }
 
 // REFACTOR:grounded (#320, plan589): ordered dependencies and validity are distinct.
@@ -103,14 +104,16 @@ export function publicationProducerOperands(p: PublicationProducer | undefined):
 }
 
 // REFACTOR:grounded (#320, plan587): unary comparison contributes its own Boolean record.
-export function readPublicationThreshold(concept: Readonly<Concept>): { operand: ReferenceName; threshold: { value: number; unit: string }; location: Location } | undefined {
+export function readPublicationThreshold(concept: Readonly<Concept>): { operand: ReferenceName; threshold: { value: number; unit: string }; comparison: "at-least" | "at-most"; location: Location } | undefined {
   if (concept.definition?.type !== "DefinitionIsDefinition") return undefined;
   const call = matchNarrative(concept.definition.body);
-  if (!call.known || call.pattern !== "AtLeast" || call.args.length !== 2) return undefined;
+  if (!call.known || call.args.length !== 2) return undefined;
+  const comparison = call.pattern === "AtLeast" ? "at-least" : call.pattern === "AtMost" ? "at-most" : undefined;
+  if (comparison === undefined) return undefined;
   const [operand, threshold] = call.args;
   if (operand.type !== "ConceptRefArg" || threshold.type !== "QuantityArg") return undefined;
   return { operand: operand.library === undefined ? operand.value : { type: "QualifiedReference", libraryName: operand.library, name: operand.value, location: operand.location },
-    threshold: { value: threshold.value, unit: threshold.unit }, location: call.location };
+    threshold: { value: threshold.value, unit: threshold.unit }, comparison, location: call.location };
 }
 
 // REFACTOR:grounded (#322): only the exact unary selected-value presence form is admitted.
@@ -211,10 +214,10 @@ export function publicationAdmissionReason(concept: Readonly<Concept>): string |
   const bmi = readPublicationBMI(concept);
   const anyMembership = readPublicationAnyMembership(concept);
   if (concept.code !== undefined && concept.code.trim().length === 0) return "A local `code is` must be nonempty.";
+  if (concept.definition !== undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && anyMembership === undefined)
+    return "Supported production is selected-value presence, selected-value membership, Quantity at least or at most thresholds, or body mass index with an explicit validity operand; other definitions cannot be ignored.";
   // REFACTOR:grounded (#320, plan585): an age calculation needs no invented answer identity.
   if (concept.code === undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && anyMembership === undefined && concept.representations.length === 0) return "A publication requires a local code or an admitted producer/source.";
-  if (concept.definition !== undefined && hasValue === undefined && membership === undefined && threshold === undefined && bmi === undefined && anyMembership === undefined)
-    return "Supported production is selected-value presence, selected-value membership, quantity threshold, or body mass index with an explicit validity operand; other definitions cannot be ignored.";
   const sourceReason = publicationSourceAdmissionReason(concept);
   if (sourceReason !== undefined) return sourceReason;
   if (hasValue !== undefined && concept.valueTypes[0] !== "boolean") return "Has-value produces an Observation with a boolean value.";
@@ -470,7 +473,7 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
           return fail(thresholdError, comparison.location, "publication-quantity-unit-unsupported");
         checkQuestionUnit(hit.library, hit.node, comparison.threshold.unit, `quantity threshold in "${library.libraryName}"."${concept.name}"`, comparison.location);
         producer = Object.freeze({ kind: "quantityThreshold", producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, ["quantityThreshold", 0]]))}`,
-          operand: operand.identity, threshold: Object.freeze(comparison.threshold) });
+          operand: operand.identity, threshold: Object.freeze(comparison.threshold), comparison: comparison.comparison });
       }
       // REFACTOR:grounded (#320, plan589): prepare both selected inputs and resolve anchor identity.
       const bmi = readPublicationBMI(concept);

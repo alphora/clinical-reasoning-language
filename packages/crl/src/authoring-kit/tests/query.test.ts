@@ -53,8 +53,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview).not.toHaveProperty("rules");
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
-    // Keep the complete index bounded; uncertainty guard display adds one entry. Quantity intake adds two paired artifacts and discovery terms.
-    expect(JSON.stringify(overview).length).toBeLessThan(39000);
+    // Two shared numeric-threshold examples and their unit aliases extend the complete index by <1KB.
+    expect(JSON.stringify(overview).length).toBeLessThan(40000);
     const fullSize = JSON.stringify(query({ view: "full" })).length;
     for (const id of ["rule:criterion", "rule:decision-composition"]) {
       expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);
@@ -83,6 +83,9 @@ describe("one authoring kit: discovery and complete guidance", () => {
 
   // @kit verify-loop:kit-discovery
   it.each([
+    ["LVEF", "rule:text-answers"],
+    ["milliseconds", "rule:text-answers"],
+    ["at most", "rule:text-answers"],
     ["--serve", "rule:native-apply-session"],
     ["reusable JVM", "rule:native-apply-session"],
     ["createNativeWorkerPool", "rule:native-apply-session"],

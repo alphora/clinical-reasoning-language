@@ -21,11 +21,15 @@ export function readPublicationQuantity(value: unknown): PublicationQuantityValu
   return { kind: "known", value: q.value, unit };
 }
 
-const units: Record<string, { group: string; factor: bigint }> = {
+// Integer factors preserve the eight-place decimal domain in emitted CQL as well as TS.
+export const PUBLICATION_QUANTITY_UNITS: Readonly<Record<string, { readonly group: string; readonly factor: bigint }>> = Object.freeze({
   m: { group: "length", factor: 100n }, cm: { group: "length", factor: 1n },
   kg: { group: "mass", factor: 1000n }, g: { group: "mass", factor: 1n },
   "kg/m2": { group: "bmi", factor: 1n },
-};
+  "%": { group: "percentage", factor: 1n },
+  ms: { group: "milliseconds", factor: 1n },
+});
+const units = PUBLICATION_QUANTITY_UNITS;
 /** REFACTOR:grounded (#328): reuse the actual comparison domain; metadata adds no conversions. */
 export function publicationQuantityUnitsCompatible(a: string, b: string): boolean {
   return a === b || Object.prototype.hasOwnProperty.call(units, a) && Object.prototype.hasOwnProperty.call(units, b) && units[a].group === units[b].group;
@@ -43,21 +47,34 @@ export function isPublicationComparisonDecimal(value: number): boolean {
 }
 /** The same authored threshold admission is used by validation and executable preparation. */
 export function publicationQuantityThresholdError(threshold: { value: number; unit: string }): string | undefined {
-  return !isPublicationComparisonDecimal(threshold.value) || !Object.prototype.hasOwnProperty.call(units, threshold.unit)
-    ? "Quantity threshold requires a finite value and a supported unit: m, cm, kg, g, kg/m2."
-    : undefined;
+  if (!isPublicationComparisonDecimal(threshold.value)) return "Quantity threshold requires a finite value with magnitude at most 10^6 and at most eight decimal places.";
+  return Object.prototype.hasOwnProperty.call(units, threshold.unit) ? undefined
+    : `Quantity threshold unit '${threshold.unit}' is unsupported. Use a supported quoted UCUM code: ${Object.keys(units).map(unit => `'${unit}'`).join(", ")}.`;
 }
 export function publicationQuantityAtLeast(value: unknown, threshold: { value: number; unit: string }):
+  { kind: "unknown" } | { kind: "known"; value: boolean } | PublicationValueError {
+  return comparePublicationQuantity(value, threshold, "at-least");
+}
+
+// REFACTOR:grounded (quantity thresholds): inclusive operators share exact unit-aware arithmetic.
+export function publicationQuantityAtMost(value: unknown, threshold: { value: number; unit: string }):
+  { kind: "unknown" } | { kind: "known"; value: boolean } | PublicationValueError {
+  return comparePublicationQuantity(value, threshold, "at-most");
+}
+
+function comparePublicationQuantity(value: unknown, threshold: { value: number; unit: string }, comparison: "at-least" | "at-most"):
   { kind: "unknown" } | { kind: "known"; value: boolean } | PublicationValueError {
   const q = readPublicationQuantity(value);
   if (q.kind !== "known") return q;
   if (!isPublicationComparisonDecimal(q.value) || !isPublicationComparisonDecimal(threshold.value))
     return { kind: "error", code: "publication-quantity-precision-unsupported", message: "Quantity comparison supports magnitude at most 10^6 and at most eight decimal places." };
-  const a = units[q.unit], b = units[threshold.unit];
+  const a = Object.prototype.hasOwnProperty.call(units, q.unit) ? units[q.unit] : undefined;
+  const b = Object.prototype.hasOwnProperty.call(units, threshold.unit) ? units[threshold.unit] : undefined;
   if (a === undefined || b === undefined || a.group !== b.group)
     return { kind: "error", code: "publication-quantity-unit-unsupported", message: "Quantity comparison requires compatible supported units." };
   const left = publicationDecimal(q.value), right = publicationDecimal(threshold.value);
-  return { kind: "known", value: left.coefficient * a.factor * right.scale >= right.coefficient * b.factor * left.scale };
+  const lhs = left.coefficient * a.factor * right.scale, rhs = right.coefficient * b.factor * left.scale;
+  return { kind: "known", value: comparison === "at-most" ? lhs <= rhs : lhs >= rhs };
 }
 
 /** REFACTOR:grounded (#328): explicit type normalization never changes caller-owned raw data.
