@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "04657bd7222763eff9c466a8853314a79d702f67",
-  "auditedSchemaVersion": "2.48",
-  "auditedContentHash": "66dc778106e7986e52b1a6f0a1d89c0993ffd2a51c982311441791695abea8db",
-  "scope": "Schema 2.48 bounded implementation maintenance: named owned native retention conditions preserve passive available-value semantics, imported answers, unchanged resubmission and explicit clear. Full interval and proof tiers in coverage.md. Engine, driver, session API and kit content unchanged; installed/Linux/publication remain separate release gates.",
+  "auditedRevision": "4ca314c2ddbdab6cd42b73ed760405d57e197a62",
+  "auditedSchemaVersion": "2.49",
+  "auditedContentHash": "10496ccfe465096fe31a3ec14dba93eac27828b9ae900958ee2460bbb676fed8",
+  "scope": "Schema 2.49 bounded Quantity threshold maintenance: inclusive at least/at most, isolated same-unit percentage and millisecond comparisons, shared evaluator/CQL unit table and tested synthetic examples. Exact decimal, unknown/error and declared-unit candidate ordering qualified with Windows native sessions. Complete baseline/target interval and proof limits in coverage.md; release, installed/Linux/client/customer qualification remain separate.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
