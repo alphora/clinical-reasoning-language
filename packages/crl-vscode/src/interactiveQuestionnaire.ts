@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
 import { singletonAnswerBindings, prepareSingletonAnswers, adoptSingletonAnswers } from './interactiveQuestionnaireAnswers';
-import { emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
+import { displayDetermination, emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
 import type { DefinitionPublicationOptions } from '@smile-digital-health/crl';
 import type { ApplySessionRequestV1, ApplySessionResult, ApplySessionOptions } from "@smile-digital-health/crl/session";
 
@@ -139,7 +139,7 @@ export function readInteractiveResult(native: Fhir): InteractiveResult {
   const [url, version] = (response?.questionnaire ?? "").split("|");
   if (response && (!questionnaire || url !== questionnaire.url || version && version !== questionnaire.version))
     throw new Error("The engine returned an unbound QuestionnaireResponse.");
-  const activities=outcomes.map(o=>o.label);
+  const activities=outcomes.map(o=>displayDetermination(o.label));
   return { questionnaire, response, activities };
 }
 

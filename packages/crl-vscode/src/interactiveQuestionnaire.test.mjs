@@ -300,7 +300,7 @@ describe("interactive native request lifecycle", () => {
     expect(JSON.stringify(state.bundle)).toBe(before);
   });
   it("extracts nested Q/QR and multiple activities and refuses ambiguous forms", () => {
-    const native = { resourceType: "Parameters", parameter: [{ resource: { resourceType: "Bundle", entry: [{ resource: q }, { resource: qr() }, { resource: { resourceType: "RequestGroup", action: [{ title: "Met", resource: { reference: "#one" } }, { title: "Unmet", resource: { reference: "#two" } }] } }] } }] };
+    const native = { resourceType: "Parameters", parameter: [{ resource: { resourceType: "Bundle", entry: [{ resource: q }, { resource: qr() }, { resource: { resourceType: "RequestGroup", action: [{ title: "certify.Met", resource: { reference: "#one" } }, { title: "not-certify.Unmet", resource: { reference: "#two" } }] } }] } }] };
     expect(readInteractiveResult(native).activities).toEqual(["Met", "Unmet"]);
     native.parameter.push({ resource: { ...q, url: "urn:other" } });
     expect(() => readInteractiveResult(native)).toThrow(/multiple/);
