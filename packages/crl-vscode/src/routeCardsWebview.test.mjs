@@ -52,3 +52,18 @@ test.skipIf(!browserExecutable)('shared questions stay deduplicated with wording
   assert.deepEqual(result.initial,{tree:9,panel:3,numbers:['1','2','3'],noSelector:true});assert.equal(result.target,'variant');for(const k of ['dedup','unknown','labels','failure','success','stale'])assert.equal(result[k],true,k);
  }finally{await b.close();}
 }, 90000);
+test.skipIf(!browserExecutable)('an invalidated editor retains its draft and disables save and request-status writes',async()=>{
+ const b=await fixture();try{
+  const result=await b.evaluate(`(()=>{const {pane,panel,payload,clone}=f;const next=clone(payload);next.cards=[{...next.cards[0],editing:true,draftText:'Retained draft',editBlockedReason:'Definitions changed',questionRequest:{id:'request',status:'pending-fix',authored:'Old',requested:'New'},requestOpen:'request'}];panel.show(next);
+   return{draft:pane.querySelector('textarea').value,save:[...pane.querySelectorAll('.route-card-editor button')].find(b=>b.textContent==='Save change').disabled,status:[...pane.querySelectorAll('.route-request-details button')].every(b=>b.disabled)};})()`);
+  assert.equal(result.draft,'Retained draft');assert.equal(result.save,true);assert.equal(result.status,true);
+ }finally{await b.close();}
+},90000);
+test.skipIf(!browserExecutable)('authoritative save and request revert cannot resurrect the saved browser draft',async()=>{
+ const b=await fixture();try{
+  const result=await b.evaluate(`(()=>{const {pane,panel,payload,clone}=f;const next=clone(payload);next.cards=[{...next.cards[0],editing:true}];panel.show(next);let field=pane.querySelector('textarea');field.value='Saved request';field.dispatchEvent(new Event('input',{bubbles:true}));[...pane.querySelectorAll('.route-card-editor button')].find(b=>b.textContent==='Save change').click();
+   const saved=clone(payload);saved.cards=[{...saved.cards[0],text:'Saved request',editing:false}];saved.authoritativeDrafts=true;panel.show(saved);panel.result({token:saved.token,key:saved.cards[0].id,ok:true,message:'Request saved'});
+   const reverted=clone(payload);reverted.cards=[{...reverted.cards[0],editing:false}];reverted.authoritativeDrafts=true;panel.show(reverted);pane.querySelector('.route-card-edit').click();return pane.querySelector('textarea').value;})()`);
+  assert.equal(result,'Question 0?');
+ }finally{await b.close();}
+},90000);

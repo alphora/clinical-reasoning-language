@@ -9,7 +9,7 @@ export function nextQuestionnaireColumn(): vscode.ViewColumn {
 }
 
 /** One pinned-branch pane. A replaced panel can neither send commands nor close its replacement. */
-export function createBranchQuestionnairePanel(onMessage: (message: any) => void, onClosed: () => void, getInitialColumn?: () => vscode.ViewColumn | undefined) {
+export function createBranchQuestionnairePanel(onMessage: (message: any) => void, onClosed: () => void, getInitialColumn?: () => vscode.ViewColumn | undefined, title = 'Medical Validation — Result Questionnaire') {
   let current: vscode.WebviewPanel | undefined, payload: any, ready = false, serial = 0;
   // REFACTOR:grounded: unanchored callers reuse their column; anchored creation follows the current tree.
   let preferredColumn: vscode.ViewColumn | undefined;
@@ -22,7 +22,7 @@ export function createBranchQuestionnairePanel(onMessage: (message: any) => void
     open(value: any) {
       if(current){payload=value;post({type:'routeCards',...value});return;}
       payload=value;ready=false;const generation=++serial;
-      const panel=vscode.window.createWebviewPanel(BRANCH_QUESTIONNAIRE_VIEW_TYPE,'Medical Validation — Result Questionnaire',
+      const panel=vscode.window.createWebviewPanel(BRANCH_QUESTIONNAIRE_VIEW_TYPE,title,
         {viewColumn:getInitialColumn?.()??preferredColumn??(preferredColumn=nextQuestionnaireColumn()),preserveFocus:true},{enableScripts:true,retainContextWhenHidden:true,localResourceRoots:[]});
       current=panel;
       const listener=panel.webview.onDidReceiveMessage(message=>{

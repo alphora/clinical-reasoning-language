@@ -98,20 +98,21 @@ export function prepareInteractivePolicy(celPath: string, definitionOptions: Def
   if (!selected.ok) throw new Error(selected.diagnostics.map(d => d.message).join("; "));
   if (!selected.suite.policyPath) throw new Error("The selected MV policy has no CRL root.");
   const initialStates = discoverInitialStates(selected.suite.projectRoot);
-  const emitted = emitCrlBundle(selected.suite.policyPath, definitionOptions);
+  const emitted = emitCrlBundle(selected.suite.policyPath, { ...definitionOptions, sourceOrigins: true });
   if (!emitted.success) throw new Error("Cannot prepare policy definitions: " + JSON.stringify(emitted.diagnostics));
   const roots = emitted.bundle.entry.map(e => e.resource).filter((r: Fhir) => r.resourceType === "PlanDefinition" &&
     r.type?.coding?.some((c: any) => c.code === "workflow-definition"));
   if (roots.length !== 1 || !roots[0].id) throw new Error("The policy must emit exactly one workflow-definition PlanDefinition.");
-  return { initialStates, definitions: emitted.bundle, planId: roots[0].id,
+  return { initialStates, definitions: emitted.bundle, definitionOrigins: emitted.definitionOrigins ?? [], planId: roots[0].id,
     warnings: emitted.diagnostics.filter(d => d.severity === "warning").map(d => {
       const detail = d.detail as { message?: unknown; line?: unknown };
       return typeof detail?.message === "string" ? detail.message + (typeof detail.line === "number" ? ` (line ${detail.line})` : "") : JSON.stringify(d.detail);
     }) };
 }
 
-export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; warnings?: string[]; nativeData?: Fhir }
-export function readInteractiveResult(native: Fhir): InteractiveResult {
+export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; warnings?: string[]; nativeData?: Fhir; nativeResult?: Fhir }
+/** Single ordered native traversal shared by displayed determinations and their review identity. */
+export function enumerateInteractiveNative(native:Fhir):{resources:Fhir[];outcomes:{ref:string;label:string}[]} {
   const resources: Fhir[] = [];
   const visit = (v: any) => {
     if (!v || typeof v !== "object") return;
@@ -119,6 +120,17 @@ export function readInteractiveResult(native: Fhir): InteractiveResult {
     for (const value of Object.values(v)) if (value && typeof value === "object") visit(value);
   };
   visit(native);
+  const outcomes:{ref:string;label:string}[]=[];
+  const groups=resources.filter(r=>['RequestGroup','RequestOrchestration'].includes(r.resourceType!)),ids=new Set(groups.map(r=>r.id));
+  const actions=(items:Fhir[])=>{for(const a of items??[]){const ref=a.resource?.reference;
+    if(ref&&!ids.has(ref.replace(/^#/,'').split('/').pop()))outcomes.push({ref,label:a.title||a.description||a.code?.[0]?.text||ref});
+    actions(a.action);
+  }};
+  for(const group of groups)actions(group.action);
+  return {resources,outcomes};
+}
+export function readInteractiveResult(native: Fhir): InteractiveResult {
+  const {resources,outcomes}=enumerateInteractiveNative(native);
   const unique = (type: string) => [...new Map(resources.filter(r => r.resourceType === type).map(r => [JSON.stringify(r), r])).values()];
   const qs = unique("Questionnaire"), qrs = unique("QuestionnaireResponse");
   if (qs.length > 1 || qrs.length > 1) throw new Error("The engine returned multiple distinct Questionnaires or responses; this session cannot select an unambiguous form.");
@@ -127,17 +139,7 @@ export function readInteractiveResult(native: Fhir): InteractiveResult {
   const [url, version] = (response?.questionnaire ?? "").split("|");
   if (response && (!questionnaire || url !== questionnaire.url || version && version !== questionnaire.version))
     throw new Error("The engine returned an unbound QuestionnaireResponse.");
-  const activities: string[] = [];
-  const orchestrationIds = new Set(resources.filter(r => ["RequestGroup", "RequestOrchestration"].includes(r.resourceType!)).map(r => r.id));
-  const actions = (items: any[]) => {
-    for (const a of items ?? []) {
-      const ref = a.resource?.reference;
-      if (ref && !orchestrationIds.has(ref.replace(/^#/, "").split("/").pop()))
-        activities.push(a.title || a.description || a.code?.[0]?.text || ref);
-      actions(a.action);
-    }
-  };
-  for (const r of resources.filter(r => ["RequestGroup", "RequestOrchestration"].includes(r.resourceType!))) actions(r.action);
+  const activities=outcomes.map(o=>o.label);
   return { questionnaire, response, activities };
 }
 
@@ -167,7 +169,8 @@ export function nativeInteractiveRunner(apply: NativeApply, scratchRoot = tmpdir
       if (!artifact || artifact.bytes > 32 * 1024 * 1024) throw new Error("Native result is missing or too large.");
       const data = result.artifacts['native-data.json'];
       if (!data || data.bytes > 32 * 1024 * 1024) throw new Error('Native extracted data is missing or too large.');
-      return { ...readInteractiveResult(JSON.parse(readFileSync(artifact.path, "utf8"))), nativeData: JSON.parse(readFileSync(data.path, 'utf8')),
+      const nativeResult = JSON.parse(readFileSync(artifact.path, 'utf8'));
+      return { ...readInteractiveResult(nativeResult), nativeResult, nativeData: JSON.parse(readFileSync(data.path, 'utf8')),
         warnings: result.diagnostics.filter(d => d.severity === "warning").map(d => d.message) };
     } finally {
       // dir is our absolute mkdtemp child of the chosen scratch root, never a supplied project path.

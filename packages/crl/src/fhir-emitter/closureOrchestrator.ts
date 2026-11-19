@@ -46,7 +46,7 @@ import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminolo
 import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
 import { buildCriterionTable } from "../ast/criterionExpansion";
 import { buildCriterionIndex, guardConceptClosure } from "../ast/criterionIndex";
-import { guardDefineNameCollisions } from "../ast/guardDefines";
+import { guardDefineNameCollisions, collectGuardDefines } from "../ast/guardDefines";
 import { hasLocalPublicationContribution, type PublicationDescriptor } from "../emit/publicationProgram";
 import { normalizeDispositionConfig } from "../dispositions";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -1236,6 +1236,7 @@ export function emitFhirDefClosure(
 
   // Per-library emit (1-4) + per-decision emit with closure-aware resolvers.
   for (const lib of libraries) {
+    const sourceResourceStart = resources.length;
     // Named answer vocabularies are owned by the authored CRL library and concept.
     for (const st of lib.ast.statements) {
       if (st.type !== "Concept") continue;
@@ -1999,7 +2000,10 @@ export function emitFhirDefClosure(
             presentationOwner: presentationCatalogs.get(descriptor.identity.sourceIdentity) } };
         }),
       );
-      if (decResult.resource) resources.push(decResult.resource);
+      if (decResult.resource) {
+        Object.defineProperties(decResult.resource, { sourceDecision: { value: decision, configurable: true }, sourceConditions: { value: collectGuardDefines(decision), configurable: true } });
+        resources.push(decResult.resource);
+      }
       errors.push(...decResult.errors);
       unmatched.push(...decResult.unmatched);
     }
@@ -2156,6 +2160,7 @@ export function emitFhirDefClosure(
         errors.push(...cfResult.errors);
       }
     }
+    for (let i = sourceResourceStart; i < resources.length; i++) Object.defineProperty(resources[i], 'sourceLibraryName', { value: lib.libraryName, configurable: true });
   }
 
   for (const catalog of presentationCatalogs.values()) {
@@ -2180,7 +2185,10 @@ export function emitFhirDefClosure(
       { valueElement: descriptor.valueElement, datumValueType: descriptor.valueType }, descriptor.answerOptions,
       undefined, true, { profileUrl: descriptor.profileUrl, localCode: descriptor.localCode, age: hasAgeSource(descriptor), quantityUnit: descriptor.quantityUnit },
     );
-    if (result.resource) resources.push(result.resource);
+    if (result.resource) {
+      Object.defineProperty(result.resource, 'sourceLibraryName', { value: descriptor.identity.libraryName, configurable: true });
+      resources.push(result.resource);
+    }
     errors.push(...result.errors);
   }
 

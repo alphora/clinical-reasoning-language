@@ -1,0 +1,5 @@
+library "Origin Root".
+activity "Met": - request CPGTaskRequest. - with `MET`.
+decision "Assessment":
+- when "Origin Shared"."Imported Answer" then recommend activity "Met".
+- when "Origin Shared"."Unworded Answer" then recommend activity "Met".

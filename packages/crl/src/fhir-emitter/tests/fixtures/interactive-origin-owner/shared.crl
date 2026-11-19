@@ -1,0 +1,19 @@
+library "Origin Shared".
+concept "Imported Answer":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `imported-answer`.
+- shape reduction is most recent.
+presentation for "Imported Answer":
+- question text is "Imported question?".
+- choice group is "Checks".
+presentation group "Checks":
+- question text is "Choose applicable findings".
+- control is checkbox.
+concept "Unworded Answer":
+- shape is Record.
+- type is Observation.
+- value type is boolean.
+- code is `unworded-answer`.
+- shape reduction is most recent.

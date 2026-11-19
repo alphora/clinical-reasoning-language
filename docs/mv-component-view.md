@@ -1,5 +1,16 @@
 # Criterion components in Medical Validation
 
+The Interactive FHIR Questionnaire has right-side Focus, pencil and flag controls
+for questions with an exact source identity. Focus reveals the chosen tree
+occurrence, including inputs inside collapsed groups and Decision Table rows.
+The pencil opens the existing question editor and saves an MV request for the KE;
+the flag opens the existing node flag workflow. These controls preserve answers.
+Each native determination has a route verdict control. It updates saved MV cases
+on that exact route, using existing review painting. Uncovered or ambiguous routes,
+and cases whose review would also affect another execution route, explain why a
+route-only verdict is unavailable. Answer changes invalidate the previous outcome
+until re-evaluation; policy and definition changes invalidate its action targets.
+
 The criterion boundary represents a reusable component, not another clinical
 question or condition to assess. Its authored name is technical identity and is
 hidden from the normal canvas, available through the component tooltip and

@@ -8,16 +8,32 @@ const fixture = path.resolve(__dirname, "fhir-emitter/tests/fixtures/code-is-dec
 afterEach(() => vi.restoreAllMocks());
 // @kit fhir-packaging:definition-bundle
 describe("definitions-only Bundle", () => {
+  it('retains the owning library for imported question profiles in host-only provenance',()=>{
+    const result=emitCrlBundle(path.resolve(__dirname,'fhir-emitter/tests/fixtures/interactive-origin-owner/root.crl'),{sourceOrigins:true});
+    expect(result.success).toBe(true);if(!result.success)throw Error(JSON.stringify(result.diagnostics));
+    const imported=result.definitionOrigins!.filter(o=>o.kind==='CaseFeature'&&o.name==='Imported Answer');
+    expect(imported).toHaveLength(1);expect(imported[0].library).toBe('Origin Shared');
+    expect(JSON.stringify(result.bundle)).not.toContain('sourceLibraryName');
+  });
   it("embeds the actual two-lane CQL without patient data or mutation", () => {
     const two = twoLane.emitCrlTwoLane(fixture);
     expect(two.success).toBe(true);
     const before = JSON.stringify(two);
     const expected = buildEngineRepoBundle({ definitions: two.fhir.resources.map(r => ({ ...r.resource, resourceType: String(r.resource.resourceType) })),
       cqlByLibraryFile: cqlIndex(two.cqlLibraries), caseInput: { caseName: "", resources: [] } });
-    const result = emitCrlBundle(fixture);
+    const result = emitCrlBundle(fixture, {sourceOrigins:true});
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("emit refused");
     expect(result.bundle).toEqual(expected.bundle);
+    expect(result.definitionOrigins!.length).toBeGreaterThan(0);
+    for (const origin of result.definitionOrigins!) {
+      expect(origin.library).toBeTruthy();
+      expect(result.bundle.entry.some(e => e.resource.url === origin.canonical)).toBe(true);
+    }
+    expect(JSON.stringify(result.bundle)).not.toContain('sourceLibraryName');
+    expect(JSON.stringify(result.bundle)).not.toContain('sourceDecision');
+    expect(JSON.stringify(two.fhir.resources)).not.toContain('sourceDecision');
+    expect(emitCrlBundle(fixture)).not.toHaveProperty('definitionOrigins');
     expect(result.resourceCount).toBe(two.fhir.resources.length);
     expect(result.bundle.entry.some(e => ["Patient", "Observation", "QuestionnaireResponse"].includes(e.resource.resourceType))).toBe(false);
     for (const entry of result.bundle.entry) {

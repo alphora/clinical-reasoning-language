@@ -6,14 +6,21 @@ export interface BundleDiagnostic {
   severity: "error" | "warning";
   detail: unknown;
 }
+/** Exact source owners for host UI joins; separate from executable FHIR definitions. */
+export interface DefinitionOrigin {
+  canonical: string; version?: string; library: string; name: string; kind: NonNullable<import('./fhir-emitter/types').EmittedResource['sourceKind']>;
+  decision?: import('./ast/types').Decision;
+  conditions?: readonly import('./ast/guardDefines').SyntheticGuardDefine[];
+}
 export type EmitCrlBundleResult =
-  | { success: true; bundle: RepoBundleResult["bundle"]; resourceCount: number; inlinedLibraries: string[]; diagnostics: BundleDiagnostic[] }
+  | { success: true; bundle: RepoBundleResult["bundle"]; resourceCount: number; inlinedLibraries: string[]; diagnostics: BundleDiagnostic[]; definitionOrigins?: DefinitionOrigin[] }
   | { success: false; diagnostics: BundleDiagnostic[]; missingCql?: string[] };
 
 /** REFACTOR:grounded (#111): definitions-only collection using the native repository
  * composition. No patient data, static Questionnaire generation, or filesystem writes. */
-export function emitCrlBundle(filePath: string, options: Parameters<typeof emitCrlTwoLane>[1] = {}): EmitCrlBundleResult {
-  const emitted = emitCrlTwoLane(filePath, options);
+export function emitCrlBundle(filePath: string, options: NonNullable<Parameters<typeof emitCrlTwoLane>[1]> & { sourceOrigins?: boolean } = {}): EmitCrlBundleResult {
+  const { sourceOrigins, ...emitOptions } = options;
+  const emitted = emitCrlTwoLane(filePath, emitOptions);
   const diagnostics: BundleDiagnostic[] = [
     ...emitted.hardErrors.map(detail => ({ source: "emit" as const, severity: "error" as const, detail })),
     ...emitted.warnings.map(detail => ({ source: "emit" as const, severity: "warning" as const, detail })),
@@ -44,6 +51,11 @@ export function emitCrlBundle(filePath: string, options: Parameters<typeof emitC
     diagnostics: [...diagnostics, { source: "bundle", severity: "error", detail: {
       kind: "missing-cql", libraries: result.missingCql,
     } }] };
-  return { success: true, bundle: result.bundle, resourceCount: result.bundle.entry.length,
+  const definitionOrigins = emitted.fhir.resources.flatMap(r =>
+    r.sourceLibraryName && r.sourceName && r.sourceKind && typeof r.resource.url === 'string'
+      ? [{ canonical: r.resource.url, ...(typeof r.resource.version === 'string' ? { version: r.resource.version } : {}),
+          library: r.sourceLibraryName, name: r.sourceName, kind: r.sourceKind,
+          ...(r.sourceDecision ? { decision: r.sourceDecision, conditions: r.sourceConditions } : {}) }] : []);
+  return { success: true, bundle: result.bundle, resourceCount: result.bundle.entry.length, ...(sourceOrigins ? {definitionOrigins} : {}),
     inlinedLibraries: result.inlined, diagnostics };
 }

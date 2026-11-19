@@ -330,16 +330,16 @@ export function expandTraversalCriteria(current: Set<string>, traversal: import(
 }
 
 /** Pinned questions reveal only the INPUT/criterion ancestors of their real source occurrences. */
-export function expandQuestionInputs(current: Set<string>, cards: import('./routeCards').RouteCard[], structure: CrlDecisionStructure[], opts: Parameters<typeof renderFlowPane>[1] = {}): Set<string> {
+export function expandQuestionInputs(current: Set<string>, cards: import('./routeCards').RouteCard[], structure: CrlDecisionStructure[], opts: Parameters<typeof renderFlowPane>[1] = {}, focusQuestion?: {library:string;concept:string;ownerKeys?:readonly string[]}): Set<string> {
   const next = new Set(current);
   const {roots} = buildLaid(projectFlowStructure(structure), new Map((opts.concepts ?? []).map(c=>[c.nodeKey,c])), {...opts,expandAllCriteria:true});
   const walk = (n: LaidNode, ancestors: string[], context: {lib:string;name:string}[]): void => {
     const criterion=n.criterionCollapse ?? n.critRow;
     const path=criterion?[...context,{lib:criterion.lib,name:criterion.name}]:context;
     const disclosures=criterion||n.inputRow?[...ancestors,n.nodeKey]:ancestors;
-    if(n.isSource && n.conceptLib!==undefined && n.conceptName!==undefined && cards.some(card=>
+    if(n.isSource && n.conceptLib!==undefined && n.conceptName!==undefined && ((focusQuestion?.library===n.conceptLib && focusQuestion.concept===n.conceptName && (!focusQuestion.ownerKeys||focusQuestion.ownerKeys.includes(n.topWhenKey??n.nodeKey))) || cards.some(card=>
       card.library===n.conceptLib && card.concept===n.conceptName && card.occurrences.some(o=>
-        o.ownerKey===(n.topWhenKey ?? n.nodeKey) && o.criterionPaths.some(p=>JSON.stringify(p)===JSON.stringify(path))))) {
+        o.ownerKey===(n.topWhenKey ?? n.nodeKey) && o.criterionPaths.some(p=>JSON.stringify(p)===JSON.stringify(path)))))) {
       disclosures.forEach(key=>next.add(key));
     }
     n.children.forEach(child=>walk(child,child.outline?disclosures:[],child.outline?path:[]));
@@ -1493,8 +1493,8 @@ export const FLOW_STYLE = VERDICT_ICON_STYLE + FLOW_LOGIC_STYLE +
   // signal. A glow is a separate visual axis — it leaves every node's border intact + coexists with the protected overlays.
   // THEME-ADAPTIVE: a WHITE halo pops on a dark canvas (default / HC-dark); on a LIGHT theme swap to a BLACK halo (VS Code
   // stamps `vscode-light` / `vscode-high-contrast-light` on the webview body) so it never disappears. Two shadows = crisp.
-  `.flow-row.node-focus>rect{filter:drop-shadow(0 0 5px #ffffff) drop-shadow(0 0 2px #ffffff)}` +
-  `body.vscode-light .flow-row.node-focus>rect,body.vscode-high-contrast-light .flow-row.node-focus>rect{filter:drop-shadow(0 0 5px #000000) drop-shadow(0 0 2px #000000)}` +
+  `.flow-row.node-focus>rect,.question-node-focus>rect{filter:drop-shadow(0 0 5px #ffffff) drop-shadow(0 0 2px #ffffff)}` +
+  `body.vscode-light .flow-row.node-focus>rect,body.vscode-high-contrast-light .flow-row.node-focus>rect,body.vscode-light .question-node-focus>rect,body.vscode-high-contrast-light .question-node-focus>rect{filter:drop-shadow(0 0 5px #000000) drop-shadow(0 0 2px #000000)}` +
   // #187 Todo 3: the per-case leaf verdict is now the on-path RING (above) — `markLeaves` toggles `.flow-leaf-yes` (TRUE
   // → ring) / `.flow-leaf-no` (false → NOTHING; `.flow-leaf-no` is a RESERVED no-op class, kept so a muted false marker is
   // a cheap re-add if the audit ever needs false≠unevaluated). The old green ✓ / grey ✗ tick glyphs are removed.

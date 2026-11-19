@@ -9,8 +9,8 @@ import {transformSync} from 'esbuild';
 
 const src=ts.createSourceFile('panel.ts',readFileSync(new URL('./interactiveQuestionnairePanel.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
 const body=src.statements.find(s=>ts.isFunctionDeclaration(s)&&s.name.text==='createInteractiveQuestionnairePanel').getText(src).replace(/^export /,'');
-function fixture(){
- const messages=[],sessions=[],panels=[],visibility=[];let receive,revision=1,finishCleanup,failPrepare=false,failAdapter=false,cleanupSafe=true;
+function fixture(hooks){
+ const messages=[],sessions=[],panels=[],visibility=[],status=[];let receive,revision=1,finishCleanup,failPrepare=false,failAdapter=false,cleanupSafe=true;
  const cleanup=new Promise(resolve=>finishCleanup=resolve);
  const makePanel=()=>{const listeners=[];let disposed=false;const panel={reveal:()=>{},dispose:()=>{if(disposed)return;disposed=true;for(const fn of listeners)fn();},onDidDispose:fn=>listeners.push(fn),webview:{postMessage:m=>messages.push(m),onDidReceiveMessage:f=>{receive=f;return {dispose:()=>{}};},asWebviewUri:()=>({toString:()=>''}),cspSource:'test'}};panels.push(panel);return panel;};
  class Session {
@@ -18,16 +18,16 @@ function fixture(){
   reset(state){this.selected=state.id;this.result=undefined;}
   cancel(){this.cancelled=true;}
   cancelAndWait(){this.cancel();return cleanup;}
-  async evaluate(){this.evaluated=true;return {questionnaire:{resourceType:'Questionnaire',id:String(this.definitions.revision)}};}
+  async evaluate(){this.evaluated=true;return this.result={questionnaire:{resourceType:'Questionnaire',id:String(this.definitions.revision),item:[{linkId:'one',type:'boolean'}]},activities:['Met'],nativeData:{private:'data'},nativeResult:{private:'result'}};}
  }
  const c=vm.createContext({join,randomUUID,InteractiveSession:Session,
   nativeInteractiveRunner:()=>({cleanupSafe:()=>cleanupSafe}),require:()=>{if(failAdapter)throw Error('Adapter unavailable');return {applySession:()=>{}};},
   prepareInteractivePolicy:()=>{if(failPrepare)throw Error('Invalid current definitions');return {definitions:{revision},planId:'plan',initialStates:[{id:'one',label:'One'},{id:'two',label:'Two'}],warnings:[]};},
   interactiveQuestionnaireDependencies:()=>({}),interactiveQuestionnaireHtml:()=>'<main>Actual HTML tested separately</main>',nextQuestionnaireColumn:()=>2,
-  vscode:{window:{createWebviewPanel:makePanel},Uri:{joinPath:()=>({})}}});
+  vscode:{window:{createWebviewPanel:makePanel,setStatusBarMessage:m=>status.push(m)},Uri:{joinPath:()=>({})}}});
  vm.runInContext(transformSync(body,{loader:'ts',target:'es2022'}).code,c);
- const api=c.createInteractiveQuestionnairePanel({subscriptions:[],extensionPath:'/synthetic',extensionUri:{}},undefined,undefined,()=>visibility.push(api.isOpen));
- return {api,messages,sessions,panels,visibility,receive:m=>receive(m),token:()=>messages.at(-1).token,finishCleanup,
+ const api=c.createInteractiveQuestionnairePanel({subscriptions:[],extensionPath:'/synthetic',extensionUri:{}},undefined,undefined,()=>visibility.push(api.isOpen),hooks);
+ return {api,messages,sessions,panels,visibility,status,receive:m=>receive(m),token:()=>messages.at(-1).token,finishCleanup,
   revision:v=>revision=v,failPrepare:v=>failPrepare=v,failAdapter:v=>failAdapter=v,cleanupSafe:v=>cleanupSafe=v};
 }
 
@@ -38,6 +38,45 @@ test('definition changes freeze evaluation and Restart uses current definitions 
  const restarted=f.receive({type:'restart',token:f.token()});f.finishCleanup();await restarted;
  assert.equal(f.messages.at(-1).type,'initial');assert.equal(f.messages.at(-1).selectedId,'two');assert.equal(f.sessions.at(-1).definitions.revision,2);
  await f.receive({type:'start',token:f.token()});assert.equal(f.messages.at(-1).questionnaire.id,'2');
+});
+
+test('review actions bind to the actual evaluation and keep native artifacts host-side',async()=>{
+ const calls=[];const f=fixture({describe:()=>({questions:[{linkId:'one'}],outcomes:[{label:'To do'}]}),question:(ctx,action,id)=>calls.push([ctx.current(),action,id]),verdict:(ctx,index)=>calls.push([ctx.outcomeCurrent(),'verdict',index])});
+ f.api.open('policy.cel');await f.receive({type:'ready'});await f.receive({type:'start',token:f.token()});
+ const result=f.messages.at(-1);assert.equal(result.type,'result');assert.ok(result.evaluationId);assert.ok(!('nativeData'in result));assert.ok(!('nativeResult'in result));
+ for(const action of ['focus','edit','flag'])await f.receive({type:'questionReviewAction',token:f.token(),evaluationId:result.evaluationId,linkId:'one',action});
+ await f.receive({type:'outcomeVerdict',token:f.token(),evaluationId:result.evaluationId,index:0});
+ assert.deepEqual(calls,[[true,'focus','one'],[true,'edit','one'],[true,'flag','one'],[true,'verdict',0]]);
+ await f.receive({type:'outcomeVerdict',token:f.token(),evaluationId:'old-result',index:0});assert.equal(calls.length,4);
+ await f.receive({type:'answersChanged',token:f.token(),evaluationId:result.evaluationId});
+ await f.receive({type:'outcomeVerdict',token:f.token(),evaluationId:result.evaluationId,index:0});assert.equal(calls.length,4);
+ await f.receive({type:'questionReviewAction',token:f.token(),evaluationId:result.evaluationId,linkId:'one',action:'focus'});assert.equal(calls.length,5,'navigation remains available after answer edits');
+});
+
+test('answer edits during a verdict menu invalidate its captured write predicate',async()=>{
+ let finish,context,writes=0;const pending=new Promise(resolve=>finish=resolve);
+ const f=fixture({describe:()=>({questions:[],outcomes:[{label:'To do'}]}),question:()=>{},verdict:async ctx=>{context=ctx;await pending;if(ctx.outcomeCurrent())writes++;}});
+ f.api.open('policy.cel');await f.receive({type:'ready'});await f.receive({type:'start',token:f.token()});const id=f.messages.at(-1).evaluationId;
+ const menu=f.receive({type:'outcomeVerdict',token:f.token(),evaluationId:id,index:0});assert.ok(context.outcomeCurrent());
+ await f.receive({type:'answersChanged',token:f.token(),evaluationId:id});finish();await menu;assert.equal(writes,0);
+ f.api.policyChanged('other.cel');assert.equal(context.current(),false);
+});
+test('form replacement and manual closure invalidate retained editor controls; ordinary answer edits do not',async()=>{
+ for(const transition of ['reset','select','continue','cancel','dispose']){
+  let invalidations=0;const f=fixture({describe:()=>({questions:[],outcomes:[]}),question:()=>{},verdict:()=>{},invalidated:()=>invalidations++});
+  f.api.open('policy.cel');await f.receive({type:'ready'});await f.receive({type:'start',token:f.token()});const baseline=invalidations,id=f.messages.at(-1).evaluationId;
+  await f.receive({type:'answersChanged',token:f.token(),evaluationId:id});assert.equal(invalidations,baseline);
+  if(transition==='dispose')f.panels.at(-1).dispose();else await f.receive({type:transition,token:f.token(),id:'two',questionnaire:{resourceType:'Questionnaire'},response:{resourceType:'QuestionnaireResponse'}});
+  assert.equal(invalidations,baseline+1,transition);
+ }
+});
+test('review refusal appears once in the current panel, or globally if its captured form was replaced',async()=>{
+ for(const invalidated of [false,true]){
+  let finish;const pending=new Promise(resolve=>finish=resolve);const f=fixture({describe:()=>({questions:[],outcomes:[{label:'To do'}]}),question:()=>{},verdict:async()=>{await pending;throw new Error('Not applied');}});
+  f.api.open('policy.cel');await f.receive({type:'ready'});await f.receive({type:'start',token:f.token()});const id=f.messages.at(-1).evaluationId;
+  const action=f.receive({type:'outcomeVerdict',token:f.token(),evaluationId:id,index:0});if(invalidated)f.api.policyChanged('other.cel');finish();await action;
+  assert.equal(f.messages.filter(m=>m.type==='reviewError'&&m.message.includes('Not applied')).length,invalidated?0:1);assert.equal(f.status.length,invalidated?1:0);
+ }
 });
 
 test('a definition revision arriving during native cleanup keeps the retained form stale until a fresh Restart',async()=>{

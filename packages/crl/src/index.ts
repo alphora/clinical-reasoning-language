@@ -381,7 +381,7 @@ export type {
 export { emitCrlTwoLane } from "./emit-two-lane";
 export { emitCrlBundle } from "./emit-bundle";
 export { emitResultDefinitionClosure, definitionClosureDigest, type DefinitionPublicationOptions } from './results/definitionClosure';
-export type { EmitCrlBundleResult, BundleDiagnostic } from "./emit-bundle";
+export type { EmitCrlBundleResult, BundleDiagnostic, DefinitionOrigin } from "./emit-bundle";
 export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary } from "./emit-two-lane";
 export { writeTwoLane, EmitWriteError } from "./emit-writers";
 export { resolveEmitOutput, laneOffset, LANE_PRODUCES, type EmitLane, type EmitOutput } from "./emit-layout";

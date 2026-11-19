@@ -135,6 +135,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
       for(const [title,value] of [['Authored',request.authored],['Requested',request.requested]]){const label=document.createElement('strong'),text=document.createElement('div');label.textContent=title;text.textContent=value;text.className='route-request-value';detail.append(label,text);}
       for(const [action,label] of request.status==='pending-fix'?[['fixed','Mark Fixed'],['revert','Revert request']]:[['approved','Approve'],['open','Reopen']]){
         const control=document.createElement('button');control.textContent=label;control.disabled=!!card.saving;
+        control.disabled=!!card.saving||!!card.editBlockedReason;
         control.onclick=()=>api.postMessage({type:'qaRequestAction',gen:generation(),token:snapshot.token,key:card.id,requestId:request.id,value:action});detail.append(control);
       }
       group.append(detail);
@@ -227,7 +228,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         const questionLabel=document.createElement("label"); questionLabel.textContent="Question"; questionLabel.append(input);
         const descriptionLabel=document.createElement("label"); descriptionLabel.textContent="Description"; descriptionLabel.append(desc); editor.append(questionLabel,descriptionLabel);
         const save = document.createElement("button"); save.textContent = "Save change";
-        save.disabled = !!card.saving;
+        save.disabled = !!card.saving || !!card.editBlockedReason;
         save.onclick = () => { card.saving = true; card.statusMessage = "Saving…"; save.disabled = true; status.textContent = card.statusMessage; api.postMessage({ type: "routeCardSave", gen: generation(), token: snapshot.token, key: card.id, fields: { questionText: card.draftText ?? card.text, questionDescription: card.draftDescription ?? card.description } }); };
         const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.onclick = () => { card.editing = false; delete card.draftText; delete card.draftDescription; sendDraft(card); render(); };
         editor.append(save, cancel); form.append(editor);

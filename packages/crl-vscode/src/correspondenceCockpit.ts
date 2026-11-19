@@ -12,6 +12,8 @@ import { paintFlagBadges } from './flagBadgesWebview';
 import { summarizeFlagBadges } from './flagPlacement';
 import { createBranchQuestionnairePanel, nextQuestionnaireColumn } from "./branchQuestionnairePanel";
 import { createInteractiveQuestionnairePanel } from "./interactiveQuestionnairePanel";
+import type { InteractiveReviewContext, InteractiveReviewPresentation } from './interactiveQuestionnairePanel';
+import { questionReviewOwners, nativeReviewRoutes, reviewCasesForRoute, interactiveQuestionWordingMatches, type QuestionOwner } from './interactiveReview';
 import { traversalRouteNeighbors, type BranchIdentity } from "./branchNavigation";
 import { allRouteVerdictsApproved, summarizeBranchVerdict } from "./branchVerdict";
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
@@ -476,7 +478,168 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Policy retargeting finishes synchronously before this refresh reads its review/flag state.
     queueMicrotask(() => { if (!cockpitDisposed) { renderTreeChrome(); mvPaneLayout.request(); } });
   }
-  const interactiveQuestionnaire = createInteractiveQuestionnairePanel(context, unrenderableQuestionnaireFeatures,interactivePublication,interactivePanelChanged);
+  const interactiveQuestionnaire = createInteractiveQuestionnairePanel(context, unrenderableQuestionnaireFeatures,interactivePublication,interactivePanelChanged,
+    {describe:describeInteractiveReview,question:interactiveQuestionAction,verdict:interactiveVerdict,invalidated:invalidateInteractiveEdit});
+  let interactiveEdit: {token:string;context:InteractiveReviewContext;target:WordingTarget;version:number;revision:number;card:any} | undefined;
+  const interactiveEditPanel=createBranchQuestionnairePanel(message=>{void saveInteractiveQuestion(message);},()=>{interactiveEdit=undefined;},()=>interactiveQuestionnaire.layoutPanel?.viewColumn??nextQuestionnaireColumn(),'Medical Validation — Edit Question');
+  context.subscriptions.push({dispose:()=>interactiveEditPanel.close()});
+  let interactiveRouteCache:{result:InteractiveReviewContext['result'];version:number;routes:ReturnType<typeof nativeReviewRoutes>}|undefined;
+  function interactiveRoutes(ctx:InteractiveReviewContext){
+    if(interactiveRouteCache?.result!==ctx.result||interactiveRouteCache.version!==indexVersion)interactiveRouteCache={result:ctx.result,version:indexVersion,routes:nativeReviewRoutes(ctx.result.nativeResult,ctx.prepared.planId,ctx.prepared.definitionOrigins,crlStructure)};
+    return interactiveRouteCache.routes;
+  }
+  function invalidateInteractiveEdit():void{
+    interactiveRouteCache=undefined;
+    const edit=interactiveEdit;if(!edit)return;
+    edit.card.editBlockedReason=`This draft belongs to ${basename(edit.context.cel)}. The questionnaire context is no longer current. Your draft is retained. Reopen this question from the current form to continue.`;
+    interactiveEditPanel.update({token:edit.token,label:edit.target.concept,cards:[edit.card],showQuestions:true,note:edit.card.editBlockedReason});
+  }
+  function describeInteractiveReview(ctx:InteractiveReviewContext):InteractiveReviewPresentation {
+    const owners=questionReviewOwners(ctx.result.questionnaire,ctx.prepared.definitionOrigins);
+    const questions:{linkId:string;reason?:string}[]=[];
+    const walk=(items:any[])=>{for(const q of items??[]){if(!['group','display'].includes(q.type))questions.push({linkId:q.linkId,...(!owners.has(q.linkId)?{reason:'This question has no unique source-node identity.'}:{})});walk(q.item);}};
+    walk(ctx.result.questionnaire?.item);
+    const routes=interactiveRoutes(ctx);
+    const entries=tableEntries();
+    return {questions,outcomes:ctx.result.activities.map((_,index)=>{
+      const route=routes.length===ctx.result.activities.length?routes[index]:undefined;
+      const match=reviewCasesForRoute(route?.keys,entries),reason=route?.reason??(!route?'Native route identity is unavailable.':match.reason);
+      return reason?{label:'Unavailable',reason}:{label:pinnedVerdict(match.caseIds).label};
+    })};
+  }
+  function interactiveContextCurrent(ctx:InteractiveReviewContext,version:number,revision?:number):boolean {
+    return !cockpitDisposed && ctx.current() && mode==='medical-validation' && currentCel===ctx.cel && indexVersion===version && (revision===undefined || mvRevision===revision);
+  }
+  async function interactiveVerdict(ctx:InteractiveReviewContext,index:number):Promise<void> {
+    const version=indexVersion,revision=mvRevision,sidecar=mvSidecarPath;
+    const resolve=()=>{const routes=interactiveRoutes(ctx);
+      const route=routes.length===ctx.result.activities.length?routes[index]:undefined;
+      if(!route?.keys)throw new Error(route?.reason??'Native route identity is unavailable.');
+      const match=reviewCasesForRoute(route.keys,tableEntries());if(match.reason)throw new Error(match.reason);return match;};
+    if(!interactiveContextCurrent(ctx,version,revision)||!ctx.outcomeCurrent()||!sidecar)throw new Error('The current form and an MV review sidecar are required to set a verdict. Reopen Medical Validation and re-evaluate.');
+    const match=resolve(),current=pinnedVerdict(match.caseIds);
+    const pick=await vscode.window.showQuickPick(REVIEW_ORDER.map(state=>({label:REVIEW_LABEL[state],state,description:state===current.state?'current route verdict':''})),{placeHolder:`Set verdict for all ${match.caseIds.length} cases on this route`});
+    if(!pick)return;
+    if(!interactiveContextCurrent(ctx,version,revision)||!ctx.outcomeCurrent()||mvSidecarPath!==sidecar)throw new Error('The form or review changed. Re-evaluate before setting this verdict.');
+    const latest=resolve();if(!isDeepStrictEqual(latest.caseIds,match.caseIds))throw new Error('Route coverage changed. Re-evaluate before setting this verdict.');
+    const {map,changed}=setAllReviewState(reviewByCaseId,latest.caseIds,pick.state);
+    if(changed && persistMv(map,notesByCaseId)){renderPane('worklist');renderTreeChrome();driveDoneOverlay();cockpitAgentBridge.notifyChanged();}
+  }
+  function interactiveWordingTarget(view:PaneView,key:string,owner:QuestionOwner):WordingTarget|undefined{
+    const source=wordingSources.get(owner.library);if(!source)return;
+    const ownerKey=view.focusNodes?.[key]?.owner??key;
+    const contains=(nodes:CrlStructureNode[]):boolean=>nodes.some(n=>n.nodeKey===ownerKey||contains(n.children));
+    const decision=crlStructure.find(d=>d.nodeKey===ownerKey||contains(d.children));
+    const criteria:string[]=[];let parent=key;const visited=new Set<string>();
+    while(parent&&!visited.has(parent)){visited.add(parent);const occurrence=view.criterionOccurrences.find(o=>o.occurrenceKey===parent);if(occurrence)criteria.unshift(occurrence.name);parent=view.focusNodes?.[parent]?.parent??'';}
+    return resolveSourceWordingTarget(source,owner.concept,decision?.lib===owner.library?{decision:decision.decision,criteria:new Set(criteria)}:undefined);
+  }
+  async function interactiveQuestionTarget(ctx:InteractiveReviewContext,owner:QuestionOwner) {
+    const version=indexVersion,revision=mvRevision;
+    if(!interactiveContextCurrent(ctx,version,revision))throw new Error('This question no longer belongs to the current Medical Validation form.');
+    const sessions=decisionTable&&!decisionTable.suspended?decisionTable.visible.map(id=>decisionTable!.sessions.get(id)!):[undefined];
+    const options:{view:PaneView;session:BranchSession|undefined;gid:string;key:string;label:string;description:string}[]=[];
+    const expansions:{session:BranchSession|undefined;before:Set<string>;next:Set<string>}[]=[];
+    const restore=(picked?:typeof options[number])=>{
+      if(currentCel!==ctx.cel)return;
+      for(const change of expansions){if(picked&&picked.session===change.session)continue;
+        if(change.session){if(change.session.expanded===change.next){change.session.expanded=change.before;if(branchSessionCurrent(change.session))renderBranchSession(change.session);}}
+        else if(expandedGuardWhens===change.next){expandedGuardWhens=change.before;renderPane('tree');}
+      }
+    };
+    for(const session of sessions){
+      const view=session?.view??views.get('tree');if(!view)continue;
+      const expanded=session?.expanded??expandedGuardWhens;
+      const next=expandQuestionInputs(expanded,[],crlStructure,treeRenderOptions(view.gen),{...owner,ownerKeys:session?.row.pathKeys});
+      if(next.size!==expanded.size){expansions.push({session,before:expanded,next});if(session){session.expanded=next;renderBranchSession(session);}else{expandedGuardWhens=next;renderPane('tree');}}
+      for(const occurrence of view.conceptOccurrences.filter(o=>o.lib===owner.library&&o.name===owner.concept)){
+        const key=Object.keys(view.anchors).find(key=>view.anchors[key].segmentIds.includes(occurrence.gid));
+        const routeOwner=key&&(view.focusNodes?.[key]?.owner??key);
+        if(key&&(!session||session.row.pathKeys.includes(routeOwner!))){
+          const wording=interactiveWordingTarget(view,key,owner);
+          options.push({view,session,gid:occurrence.flagGid??occurrence.gid,key,label:owner.concept,description:[session?`Row ${String(session.index+1n)} — ${session.row.label}`:key,wording?.scopeLabel,wording?.questionText].filter(Boolean).join(' — ')});
+        }
+      }
+    }
+    if(!options.length){restore();throw new Error('This question has no visible tree occurrence in the current view. Close or change the table to show its branch.');}
+    let picked:typeof options[number]|undefined;
+    try{picked=options.length===1?options[0]:await vscode.window.showQuickPick(options,{placeHolder:'Choose the question occurrence in the tree'});}finally{restore(picked);}
+    if(!picked)return;
+    if(!interactiveContextCurrent(ctx,version,revision)||(picked.session?!branchSessionCurrent(picked.session):views.get('tree')!==picked.view))throw new Error('The question view changed. Choose its occurrence again.');
+    return picked;
+  }
+  async function interactiveQuestionAction(ctx:InteractiveReviewContext,action:'focus'|'edit'|'flag',linkId:string):Promise<void> {
+    const owner=questionReviewOwners(ctx.result.questionnaire,ctx.prepared.definitionOrigins).get(linkId);if(!owner)throw new Error('This question has no unique current source owner.');
+    const version=indexVersion,revision=mvRevision,target=await interactiveQuestionTarget(ctx,owner);
+    if(!target)return;
+    if(!interactiveContextCurrent(ctx,version,revision))throw new Error('The form or review changed. Choose the question again.');
+    const {view,session,key,gid}=target;
+    if(action==='focus'){
+      if(session)focusBranchSession(session);else if(!pinnedCards)focusTreeNode(key);
+      const current=session?.view??views.get('tree');if(current)postBranch(session,{type:'focusQuestionNode',gen:current.gen,key});
+      views.get('tree')?.panel.reveal(undefined,false);return;
+    }
+    if(action==='flag'){
+      const reveal=Object.entries(view.reveals).find(([,hit])=>('nodeKey'in hit&&hit.nodeKey===key)||(isSubQuestionHit(hit)&&hit.subQuestionLeafKey===key));
+      if(!reveal)throw new Error('The tree question is no longer available for flags.');
+      await nodeFlagAction(reveal[0],gid,view.gen,'validation',session);return;
+    }
+    const source=wordingSources.get(owner.library);if(!source)throw new Error('The source question is unavailable.');
+    const wording=interactiveWordingTarget(view,key,owner);
+    if(!wording)throw new Error('The question wording owner could not be resolved.');
+    const question=(items:any[]):any=>{for(const item of items??[]){if(item.linkId===linkId)return item;const found=question(item.item);if(found)return found;}};
+    const displayed=question(ctx.result.questionnaire?.item);
+    if(!interactiveQuestionWordingMatches(displayed?.text,wording))throw new Error('The form wording does not match this source presentation. If several occurrences are offered, choose the matching scope; otherwise restart with current definitions.');
+    const src=findPolicySrc(ctx.cel),relativePath=src?relative(dirname(src),wording.filePath):'..';
+    if(wording.editable===false||source.packaged||isAbsolute(relativePath)||relativePath==='..'||relativePath.startsWith('..'+sep))throw new Error(wording.readOnlyReason??'Edit this imported question in its owning workspace.');
+    if(vscode.workspace.textDocuments.some(d=>d.uri.fsPath===wording.filePath&&d.isDirty))throw new Error('Save or revert unsaved source edits before editing this question.');
+    assertMvWriteAllowed();
+    if(interactiveEdit?.card.editing && (interactiveEdit.card.draftText!==undefined || interactiveEdit.card.draftDescription!==undefined)){
+      if(interactiveEdit.target.filePath===wording.filePath&&interactiveEdit.target.concept===wording.concept&&isDeepStrictEqual(interactiveEdit.target.context,wording.context)&&interactiveEdit.target.baseline===wording.baseline){interactiveEdit.context=ctx;interactiveEdit.target=wording;interactiveEdit.version=version;interactiveEdit.revision=revision;delete interactiveEdit.card.editBlockedReason;interactiveEditPanel.update({token:interactiveEdit.token,label:owner.concept,cards:[interactiveEdit.card],showQuestions:true});interactiveEditPanel.layoutPanel?.reveal(undefined,false);return;}
+      const discard=await vscode.window.showWarningMessage('Discard the unsaved question wording draft?',{modal:true},'Discard');
+      if(discard!=='Discard')return;
+      if(!interactiveContextCurrent(ctx,version,revision))throw new Error('The form or review changed while the draft confirmation was open. Reopen the question.');
+    }
+    const token=randomUUID(),card={id:token,ownerKey:key,library:owner.library,concept:owner.concept,questionNumber:1,text:wording.questionText,description:wording.questionDescription,value:'',determination:'',explanation:false,editable:true,scopeLabel:wording.scopeLabel,editing:true,occurrences:[],criteria:[],criterionPaths:[],answerChoices:[]};
+    interactiveEdit={token,context:ctx,target:wording,version,revision,card};
+    refreshInteractiveQuestionRequest();
+    interactiveEditPanel.open({token,label:owner.concept,cards:[card],showQuestions:true,note:!wording.owners.questionText?'No question wording is authored. The displayed text is a fallback; a wording request will add default wording.':''});
+    interactiveEditPanel.layoutPanel?.reveal(undefined,false);
+  }
+  function refreshInteractiveQuestionRequest():void{
+    const edit=interactiveEdit;if(!edit)return;
+    const selected=resolveCelSuite(edit.context.cel);if(!selected.ok)return;
+    edit.card.text=edit.target.questionText;edit.card.description=edit.target.questionDescription;delete edit.card.questionRequest;
+    overlayQaRequests(selected.suite.projectRoot,[edit.card],new Map([[edit.card.id,edit.target]]),new Map(),flagsList);
+  }
+  async function saveInteractiveQuestion(message:any):Promise<void>{
+    const edit=interactiveEdit;if(!edit||message.token!==edit.token||message.key!==edit.card.id)return;
+    if(message.type==='routeCardDraft'){
+      const fields=message.fields??{};
+      for(const key of ['editing','draftText','draftDescription'])if(fields[key]===null)delete edit.card[key];else if(fields[key]!==undefined)edit.card[key]=fields[key];return;
+    }
+    if(message.type!=='routeCardSave'&&message.type!=='qaRequestAction')return;
+    const post=(ok:boolean,text:string)=>interactiveEditPanel.post({type:'routeCardSaveResult',token:edit.token,key:edit.card.id,ok,message:text});
+    try{
+      if(cockpitDisposed||!edit.context.current()||mode!=='medical-validation'||currentCel!==edit.context.cel)throw new Error('The questionnaire context changed. Reopen the question editor.');
+      if(edit.card.editBlockedReason)throw new Error(edit.card.editBlockedReason);
+      if(vscode.workspace.textDocuments.some(d=>d.uri.fsPath===edit.target.filePath&&d.isDirty))throw new Error('Save or revert unsaved source edits before saving this question request.');
+      if(message.type==='qaRequestAction'){
+        if(message.requestId!==edit.card.questionRequest?.id||!['revert','fixed','approved','open'].includes(String(message.value)))return;
+        assertMvWriteAllowed();const dir=flagStoreDir(edit.context.cel);if(!dir)throw new Error('No MV flag store.');
+        changeQaRequest(dir,message.requestId,message.value);
+        reloadReviewFlags();refreshInteractiveQuestionRequest();interactiveEditPanel.open({token:edit.token,label:edit.target.concept,cards:[edit.card],showQuestions:true,authoritativeDrafts:true,note:edit.card.draftText!==undefined||edit.card.draftDescription!==undefined?'Request status changed. Your unsaved wording draft is retained.':''});renderTreeChrome();driveFlagBadges();return;
+      }
+      if(typeof message.fields?.questionText!=='string'||typeof message.fields?.questionDescription!=='string')throw new Error('Invalid question wording.');
+      assertMvWriteAllowed();const selected=resolveCelSuite(edit.context.cel),dir=flagStoreDir(edit.context.cel);
+      if(!selected.ok||!dir)throw new Error('The selected policy flag store is unavailable.');
+      const flag=saveQuestionRequest(selected.suite.projectRoot,dir,edit.target,message.fields.questionText,message.fields.questionDescription);
+      edit.card.editing=false;delete edit.card.draftText;delete edit.card.draftDescription;
+      reloadReviewFlags();refreshInteractiveQuestionRequest();
+      interactiveEditPanel.open({token:edit.token,label:edit.target.concept,cards:[edit.card],showQuestions:true,authoritativeDrafts:true});
+      post(true,flag?'Request saved for KE.':'Request cleared.');renderTreeChrome();driveFlagBadges();
+    }catch(error){post(false,error instanceof Error?error.message:String(error));}
+  }
   function interactivePublication(cel:string):ReturnType<typeof mvPublicationOptions>|{} {
     const selected=resolveCelSuite(cel);if(!selected.ok)throw new Error(selected.diagnostics.map(d=>d.message).join('; '));
     const pkg=JSON.parse(readFileSync(join(selected.suite.projectRoot,'package.json'),'utf8'));
@@ -1881,6 +2044,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   function driveDoneOverlay(): void {
+    interactiveQuestionnaire.refreshReview();
     const tree = views.get("tree");
     if (!tree) return; // tree pane is opt-in; nothing to paint
     if (mode !== "medical-validation" || !crlMaps) {
@@ -6977,6 +7141,7 @@ const COCKPIT_WEBVIEW_BODY =
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('this-node');}}` +
   // #210 (disc 239): the CRL Assist focus ring (.node-focus) on the agent's flag-anchor node. Gen-guarded clear-then-set,
   // its own channel; an empty segmentIds is a clean clear. NEVER touched by highlight/clearHighlight (independent overlay).
+  `else if(m.type==='focusQuestionNode'){if(m.gen!==gen)return;const node=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===m.key);if(node){for(const el of root.querySelectorAll('.question-node-focus'))el.classList.remove('question-node-focus');node.classList.add('question-node-focus');node.setAttribute('tabindex','-1');node.focus({preventScroll:true});node.scrollIntoView({block:'nearest',inline:'nearest'});}}` +
   `else if(m.type==='markNodeFocus'){if(m.gen!==gen)return;clrNF();` +
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('node-focus');}}` +
   // disc 164: the produced-path diverter channel (.diverter). Gen-guarded clear-then-set like the others; coexists with

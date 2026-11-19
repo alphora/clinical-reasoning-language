@@ -12,6 +12,7 @@ export interface RouteCard {
   text: string; description: string; value: string; determination: string;
   explanation: boolean; editable: boolean; scopeLabel?: string; readOnlyReason?: string;
   questionRequest?: QaFlagView;
+  editBlockedReason?: string;
   answerContributions?: AnswerContribution[];
   unclassifiedAnswerUses?: {ownerKey:string;checkId:string;checkLabel:string}[];
   criteria: { lib: string; name: string }[];
