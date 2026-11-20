@@ -13,7 +13,8 @@ flag status.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
 explanation, **Show Panel: Highlighted Source**, **Show Questionnaire:** with
-**CRL Questionnaire** and native **FHIR Questionnaire** controls, then source files under the
+**CRL Questionnaire** and native **FHIR Questionnaire** controls, optional edit history/recovery,
+**MV fix log**, then source files under the
 **Source documents** subgroup heading. A group with
 several documents has one named button per file. An empty group is disabled;
 incomplete discovery is disclosed rather than reported as empty.
@@ -61,6 +62,11 @@ Unsaved source edits, conflicting read-only exclusions, configuration failures,
 or a changed policy/document identity prevent the open and produce an explanation.
 File paths are resolved and checked again after asynchronous configuration.
 Toolbar messages contain host-owned indices and tokens rather than file paths.
+
+**MV fix log** applies the same exact-file editor read-only safeguards to the
+artifact's configured QA report, then opens a locked Markdown preview. Its file
+contract and producer responsibilities are described in [MV fix log](mv-fix-log.md).
+The action explains missing reports without changing review status.
 
 Read-only here is a VS Code editor default, not an operating-system permission
 or security boundary. It does not prevent another program, an explicit editor

@@ -44,6 +44,13 @@ test('history and recovery are independently conditional; history includes unrea
     assert.equal(hasReviewEditHistory(root),true);
   }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+test('MV fix log stays enabled before any report exists and carries only the escaped host token',()=>{
+  const x=input();assert.doesNotMatch(renderMvTreeChrome(x),/data-open-mv-fix-log/);
+  x.reprocessLog=true;x.documentToken='token<&"';const html=renderMvTreeChrome(x);
+  assert.match(html,/<button class="fc-toggle-btn" data-open-mv-fix-log data-log-token="token&lt;&amp;&quot;"[^>]*>MV fix log<\/button>/);
+  assert.doesNotMatch(html,/reprocess-log\.md|src\/qa|tests\//);
+});
 test('recovery availability uses backend operation eligibility, including retained locks but excluding pre-existing locks', () => {
   const phases=['planning','locked','acquiring','scope-outcome-unknown','publishing','local-applied','save-failed','save-in-flight','save-outcome-unknown','saved','no-live-change'];
   for(const phase of phases){

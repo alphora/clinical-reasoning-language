@@ -3,7 +3,8 @@ import { caseReviewReach, criterionReviewMembership, projectCriterionReview } fr
 import { createRouteReviewMatcher } from './routeReviewMatch';
 import { createMvPaneLayout } from './mvPaneLayout';
 import { listSourceDocuments, resolveSourceDocument, showSourceDocuments, type SourceDocument } from './sourceDocuments';
-import { openReadonlySourceDocument } from './sourceDocumentOpener';
+import { openReadonlySourceDocument, ReadonlyDocumentError } from './sourceDocumentOpener';
+import { resolveMvReprocessLog } from './mvReprocessLog';
 import { hasReviewEditHistory, renderMvTreeChrome, MV_TREE_CHROME_STYLE } from './mvTreeChrome';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
@@ -708,7 +709,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // webview for `#root`). Single-flight, settle-once; the pure state machine lives in snapshotCapture.ts.
   const snapshotCapture = new SnapshotCapture();
   let sourceDocumentsBusy = false;
-  let sourceDocumentsSnapshot: { cel: string; src: string; token: string; documents: SourceDocument[] } | undefined;
+  let sourceDocumentsSnapshot: { cel: string; src: string; sourceIdentity?: string; token: string; documents: SourceDocument[] } | undefined;
+  let mvFixLogBusy = false;
   let snapshotExporting = false; // command-level single-flight: guards the WHOLE export (capture → dialog → write), so a second toolbar click while the save dialog is open can't stack two dialogs
   // #224 ii.3 Slice 2: nodeKeys of single-criterion `when`s the user has EXPANDED (default: all collapsed). Ephemeral —
   // not persisted (reload → all-collapsed-with-verdict is the desired steady state). NodeKeys are case-independent, so
@@ -1385,13 +1387,44 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const src = currentCel && findPolicySrc(currentCel);
     const documents = src ? listSourceDocuments(src) : { documents: [], complete: true, warnings: [] };
     const token = randomUUID();
-    sourceDocumentsSnapshot = src && currentCel ? { cel: currentCel, src, token, documents: documents.documents } : undefined;
+    let sourceIdentity: string | undefined;
+    try { if (src) sourceIdentity = realpathSync(src); } catch { /* A missing policy must not break the toolbar. */ }
+    sourceDocumentsSnapshot = src && currentCel ? { cel: currentCel, src, sourceIdentity, token, documents: documents.documents } : undefined;
     const highlighting = `<div class="fc-toggle" title="Compare the selected test case with its expected result. A correctly expected Unmet result is a passing test."><span class="fc-toggle-label">Highlight:</span>`
       + `<button class="fc-toggle-btn${failedCriteriaMode === 'blocking' ? ' fc-active' : ''}" data-fc-mode="blocking" aria-pressed="${failedCriteriaMode === 'blocking'}" title="Highlight conditions or earlier matches that prevented the test's expected result">Expected-result blockers</button>`
       + `<button class="fc-toggle-btn${failedCriteriaMode === 'all' ? ' fc-active' : ''}" data-fc-mode="all" aria-pressed="${failedCriteriaMode === 'all'}" title="Highlight every evaluated false condition, including conditions on other branches">All unmet conditions</button></div>`;
     const explanation = diverterToggle.replace('Details:', 'Explain outcome:');
     const panels = `<div class="fc-toggle"><span class="fc-toggle-label">Show Panel:</span><button class="fc-toggle-btn${views.has('source') ? ' fc-active' : ''}" data-highlighted-source aria-pressed="${views.has('source')}">Highlighted Source</button></div>`;
-    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, panels, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
+    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, panels, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, reprocessLog: !!sourceIdentity, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
+  }
+
+  /** Keep this action available before the first report arrives; resolve its current mapping on click. */
+  async function openMvFixLog(token: unknown): Promise<void> {
+    const snapshot = sourceDocumentsSnapshot;
+    if (mvFixLogBusy || !snapshot?.sourceIdentity || mode !== 'medical-validation' || currentCel !== snapshot.cel || token !== snapshot.token) return;
+    mvFixLogBusy = true;
+    try {
+      const validatePolicy = () => {
+        if (mode !== 'medical-validation' || currentCel !== snapshot.cel ||
+          findPolicySrc(snapshot.cel) !== snapshot.src || realpathSync(snapshot.src) !== snapshot.sourceIdentity)
+          throw new ReadonlyDocumentError('The selected policy changed. Open the MV fix log from the current tree.');
+      };
+      validatePolicy();
+      const report = resolveMvReprocessLog(snapshot.src);
+      if (report.kind !== 'available') {
+        void (report.kind === 'missing' || report.reason === 'no-project' || report.reason === 'unmapped-qa' ? vscode.window.showInformationMessage(report.message) : vscode.window.showWarningMessage(report.message));
+        return;
+      }
+      await openReadonlySourceDocument(report.filePath, () => {
+        validatePolicy();
+        const current = resolveMvReprocessLog(snapshot.src);
+        if (current.kind !== 'available') throw new ReadonlyDocumentError(current.message);
+        if (current.artifactRoot !== report.artifactRoot || current.filePath !== report.filePath)
+          throw new ReadonlyDocumentError('The MV fix log location changed while opening. Open it again from the current tree.');
+      }, 'markdown-preview');
+    } catch (error) {
+      void vscode.window.showWarningMessage(error instanceof ReadonlyDocumentError ? error.message : 'Could not open the MV fix log. Check that the policy and report are still available and Markdown preview is enabled.');
+    } finally { mvFixLogBusy = false; }
   }
 
   async function openToolbarSourceDocument(token: unknown, index: unknown): Promise<void> {
@@ -3752,6 +3785,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       snapshotCapture.resolve(msg.token, typeof msg.html === "string" ? msg.html : undefined);
     } else if (msg.type === "openToolbarSourceDocument" && pane === "tree") {
       void openToolbarSourceDocument(msg.token, msg.idx);
+    } else if (msg.type === "openMvFixLog" && pane === "tree") {
+      void openMvFixLog(msg.token);
     } else if (msg.type === "openSourceDocuments" && pane === "tree") {
       void openPolicySourceDocuments();
     } else if (msg.type === "exportSnapshot" && pane === "tree") {
@@ -7144,7 +7179,7 @@ const COCKPIT_WEBVIEW_BODY =
   `window.addEventListener('pointerup',()=>{if(fpPan){fpPan=false;document.body.style.cursor='';}});` +
   `root.addEventListener('click',(e)=>{if(fpMoved){fpMoved=false;e.stopPropagation();e.preventDefault();}},true);` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
-  `fcc.addEventListener('click',(e)=>{const documentButton=e.target.closest&&e.target.closest('[data-source-document]');if(documentButton){e.preventDefault();if(!documentButton.disabled)v.postMessage({type:'openToolbarSourceDocument',token:documentButton.getAttribute('data-source-token'),idx:Number(documentButton.getAttribute('data-source-document'))});return;}const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const hs=e.target.closest&&e.target.closest('[data-highlighted-source]');if(hs){e.preventDefault();v.postMessage({type:'toggleHighlightedSource',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
+  `fcc.addEventListener('click',(e)=>{const documentButton=e.target.closest&&e.target.closest('[data-source-document]');if(documentButton){e.preventDefault();if(!documentButton.disabled)v.postMessage({type:'openToolbarSourceDocument',token:documentButton.getAttribute('data-source-token'),idx:Number(documentButton.getAttribute('data-source-document'))});return;}const sourceDocs=e.target.closest&&e.target.closest('[data-open-source-documents]');if(sourceDocs){e.preventDefault();v.postMessage({type:'openSourceDocuments'});return;}const log=e.target.closest&&e.target.closest('[data-open-mv-fix-log]');if(log){e.preventDefault();v.postMessage({type:'openMvFixLog',token:log.getAttribute('data-log-token')});return;}const iq=e.target.closest&&e.target.closest('[data-interactive-questionnaire]');if(iq){e.preventDefault();v.postMessage({type:'openInteractiveQuestionnaire',gen});return;}const hs=e.target.closest&&e.target.closest('[data-highlighted-source]');if(hs){e.preventDefault();v.postMessage({type:'toggleHighlightedSource',gen});return;}const qp=e.target.closest&&e.target.closest('[data-questionnaire-pane]');if(qp){e.preventDefault();v.postMessage({type:'toggleQuestionnairePane',gen,value:qp.getAttribute('data-questionnaire-pane')});return;}const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
   // disc 164: the produced-path diverter overlay on/off toggle (MV chrome).
   `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +

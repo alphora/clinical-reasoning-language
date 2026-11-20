@@ -29,6 +29,7 @@ export interface MvTreeChrome {
   legend: string;
   documents: SourceDocumentListing;
   documentToken: string;
+  reprocessLog?: boolean;
   history: boolean;
   recovery: boolean;
 }
@@ -43,9 +44,11 @@ export function renderMvTreeChrome(input: MvTreeChrome): string {
   }).join(' ');
   const history = input.history ? '<button class="fc-toggle-btn" data-mv-edit-action="history">Edit history</button>' : '';
   const recovery = input.recovery ? '<button class="fc-toggle-btn mv-attention" data-mv-edit-action="recovery">Recover interrupted edit</button>' : '';
+  const report = input.reprocessLog ? `<div class="fc-toggle"><button class="fc-toggle-btn" data-open-mv-fix-log data-log-token="${escape(input.documentToken)}" title="Open the artifact's agent MV fix log read-only">MV fix log</button></div>` : '';
   const warning = !input.documents.complete ? `<div class="mv-toolbar-notice" role="status">${escape(input.documents.warnings.join(' '))}</div>` : '';
   const actions = `${input.tools}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>${input.panels ?? ''}${input.questionnaires}`
     + (history || recovery ? `<div class="fc-toggle">${history}${recovery}</div>` : '')
+    + report
     + `<section aria-labelledby="mv-source-documents-heading"><h3 id="mv-source-documents-heading" class="mv-toolbar-heading mv-toolbar-subheading">Source documents</h3><div class="fc-toggle mv-document-buttons">${documents}</div></section>`;
   return `<div class="mv-toolbar"><div class="mv-toolbar-context">${group('Status', input.status + warning)}${group('Legend', input.legend)}</div>${group('Actions', actions)}</div>`;
 }
