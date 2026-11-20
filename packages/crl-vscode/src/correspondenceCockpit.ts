@@ -12,10 +12,14 @@ import { paintFlagBadges } from './flagBadgesWebview';
 import { summarizeFlagBadges } from './flagPlacement';
 import { createBranchQuestionnairePanel, nextQuestionnaireColumn } from "./branchQuestionnairePanel";
 import { createInteractiveQuestionnairePanel } from "./interactiveQuestionnairePanel";
-import type { InteractiveReviewContext, InteractiveReviewPresentation } from './interactiveQuestionnairePanel';
-import { questionReviewOwners, nativeReviewRoutes, reviewCasesForRoute, interactiveQuestionWordingMatches, type QuestionOwner } from './interactiveReview';
+import type { QuestionReviewContext, InteractiveReviewContext, InteractiveReviewPresentation } from './interactiveQuestionnairePanel';
+import { questionReviewPresentation, questionReviewOwners, nativeReviewRoutes, reviewCasesForRoute, interactiveQuestionWordingMatches, type QuestionOwner } from './interactiveReview';
 import { traversalRouteNeighbors, type BranchIdentity } from "./branchNavigation";
 import { allRouteVerdictsApproved, summarizeBranchVerdict } from "./branchVerdict";
+import {installQuestionNodeFocus} from './questionNodeFocus';
+import {installSavedQuestionnaireReview} from './savedQuestionnaireReview';
+import {installLformsReviewControls,LFORMS_REVIEW_STYLE} from './lformsReviewControls';
+import {emitCrlBundle} from '@smile-digital-health/crl';
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
 import {installBooleanAnswerClearControls} from "./lformsBooleanControls";
 import {installPresentationChoiceGroups} from "./lformsPresentationGroups";
@@ -302,6 +306,7 @@ interface PaneView {
   criterionOccurrences: { gid: string; occurrenceKey: string; lib: string; name: string; collapsed: boolean; bodyConcepts: { lib: string; name: string }[] }[];
   /** the start/primary-node gid — carries the chrome-mirror count badge (see driveFlagBadges). */
   startNodeGid?: string;
+  questionFocus?: {gen:number;key:string;token:string;armed?:boolean};
   disposables: vscode.Disposable[];
 }
 
@@ -480,7 +485,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
   const interactiveQuestionnaire = createInteractiveQuestionnairePanel(context, unrenderableQuestionnaireFeatures,interactivePublication,interactivePanelChanged,
     {describe:describeInteractiveReview,question:interactiveQuestionAction,verdict:interactiveVerdict,invalidated:invalidateInteractiveEdit});
-  let interactiveEdit: {token:string;context:InteractiveReviewContext;target:WordingTarget;version:number;revision:number;card:any} | undefined;
+  let interactiveEdit: {token:string;context:QuestionReviewContext;target:WordingTarget;version:number;revision:number;card:any} | undefined;
   const interactiveEditPanel=createBranchQuestionnairePanel(message=>{void saveInteractiveQuestion(message);},()=>{interactiveEdit=undefined;},()=>interactiveQuestionnaire.layoutPanel?.viewColumn??nextQuestionnaireColumn(),'Medical Validation — Edit Question');
   context.subscriptions.push({dispose:()=>interactiveEditPanel.close()});
   let interactiveRouteCache:{result:InteractiveReviewContext['result'];version:number;routes:ReturnType<typeof nativeReviewRoutes>}|undefined;
@@ -490,15 +495,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
   function invalidateInteractiveEdit():void{
     interactiveRouteCache=undefined;
-    const edit=interactiveEdit;if(!edit)return;
+    const edit=interactiveEdit;if(!edit||!('outcomeCurrent' in edit.context)&&edit.context.current())return;
     edit.card.editBlockedReason=`This draft belongs to ${basename(edit.context.cel)}. The questionnaire context is no longer current. Your draft is retained. Reopen this question from the current form to continue.`;
     interactiveEditPanel.update({token:edit.token,label:edit.target.concept,cards:[edit.card],showQuestions:true,note:edit.card.editBlockedReason});
   }
   function describeInteractiveReview(ctx:InteractiveReviewContext):InteractiveReviewPresentation {
-    const owners=questionReviewOwners(ctx.result.questionnaire,ctx.prepared.definitionOrigins);
-    const questions:{linkId:string;reason?:string}[]=[];
-    const walk=(items:any[])=>{for(const q of items??[]){if(!['group','display'].includes(q.type))questions.push({linkId:q.linkId,...(!owners.has(q.linkId)?{reason:'This question has no unique source-node identity.'}:{})});walk(q.item);}};
-    walk(ctx.result.questionnaire?.item);
+    const questions=questionReviewPresentation(ctx.result.questionnaire,ctx.prepared.definitionOrigins);
     const routes=interactiveRoutes(ctx);
     const entries=tableEntries();
     return {questions,outcomes:ctx.result.activities.map((_,index)=>{
@@ -507,7 +509,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return reason?{label:'Unavailable',reason}:{label:pinnedVerdict(match.caseIds).label};
     })};
   }
-  function interactiveContextCurrent(ctx:InteractiveReviewContext,version:number,revision?:number):boolean {
+  function interactiveContextCurrent(ctx:QuestionReviewContext,version:number,revision?:number):boolean {
     return !cockpitDisposed && ctx.current() && mode==='medical-validation' && currentCel===ctx.cel && indexVersion===version && (revision===undefined || mvRevision===revision);
   }
   async function interactiveVerdict(ctx:InteractiveReviewContext,index:number):Promise<void> {
@@ -534,7 +536,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     while(parent&&!visited.has(parent)){visited.add(parent);const occurrence=view.criterionOccurrences.find(o=>o.occurrenceKey===parent);if(occurrence)criteria.unshift(occurrence.name);parent=view.focusNodes?.[parent]?.parent??'';}
     return resolveSourceWordingTarget(source,owner.concept,decision?.lib===owner.library?{decision:decision.decision,criteria:new Set(criteria)}:undefined);
   }
-  async function interactiveQuestionTarget(ctx:InteractiveReviewContext,owner:QuestionOwner) {
+  async function interactiveQuestionTarget(ctx:QuestionReviewContext,owner:QuestionOwner) {
     const version=indexVersion,revision=mvRevision;
     if(!interactiveContextCurrent(ctx,version,revision))throw new Error('This question no longer belongs to the current Medical Validation form.');
     const sessions=decisionTable&&!decisionTable.suspended?decisionTable.visible.map(id=>decisionTable!.sessions.get(id)!):[undefined];
@@ -568,15 +570,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(!interactiveContextCurrent(ctx,version,revision)||(picked.session?!branchSessionCurrent(picked.session):views.get('tree')!==picked.view))throw new Error('The question view changed. Choose its occurrence again.');
     return picked;
   }
-  async function interactiveQuestionAction(ctx:InteractiveReviewContext,action:'focus'|'edit'|'flag',linkId:string):Promise<void> {
+  async function interactiveQuestionAction(ctx:QuestionReviewContext,action:'focus'|'edit'|'flag',linkId:string):Promise<void> {
     const owner=questionReviewOwners(ctx.result.questionnaire,ctx.prepared.definitionOrigins).get(linkId);if(!owner)throw new Error('This question has no unique current source owner.');
     const version=indexVersion,revision=mvRevision,target=await interactiveQuestionTarget(ctx,owner);
     if(!target)return;
     if(!interactiveContextCurrent(ctx,version,revision))throw new Error('The form or review changed. Choose the question again.');
     const {view,session,key,gid}=target;
     if(action==='focus'){
-      if(session)focusBranchSession(session);else if(!pinnedCards)focusTreeNode(key);
-      const current=session?.view??views.get('tree');if(current)postBranch(session,{type:'focusQuestionNode',gen:current.gen,key});
+      if(session)focusBranchSession(session);
+      else if(!pinnedCards){
+        let reading=key;const visited=new Set<string>();
+        while(reading&&!visited.has(reading)){visited.add(reading);const node=view.focusNodes?.[reading];
+          if(!node)throw new Error('The question reading target is no longer available.');
+          if(!node.outline&&!node.choice&&!node.logic)break;
+          reading=node.owner!==reading?node.owner:node.parent;
+        }
+        if(!reading||!view.focusNodes?.[reading]||view.focusNodes[reading].outline||view.focusNodes[reading].choice||view.focusNodes[reading].logic)throw new Error('This question has no structural reading target.');
+        focusTreeNode(reading);
+      }
+      const current=session?.view??views.get('tree');if(current){current.questionFocus={gen:current.gen,key,token:randomUUID()};postBranch(session,{type:'armQuestionFocus',...current.questionFocus});}
       views.get('tree')?.panel.reveal(undefined,false);return;
     }
     if(action==='flag'){
@@ -783,6 +795,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(dirty.length)throw new Error('Save or revert unsaved definition inputs before setting Pass.');
       const previous=currentDefinitions,next=definitionFreshness.check(selected.suite.policyPath,join(editStorage(root),'freshness'));
       currentDefinitions=next;
+      invalidateSavedQuestionEdit();
       if(previous.digest!==next.digest || previous.state==='current'&&next.state!=='current')interactiveQuestionnaire.definitionsChanged(currentCel);
       if(next.state==='current' && next.digest!==modelDefinitionDigest){currentDefinitions={state:'checking',digest:next.digest,message:'Definitions changed; refreshing the reviewed tree.'};scheduleRebuild();return false;}
       return next.state==='current';
@@ -1063,7 +1076,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // selection's `.current` highlight is posted FIRST and the `.failed-criterion` overlay (a separate channel) lands
     // after it — the next selection's `.current`/clearHighlight then wipes the overlay, but this same-click reveal does
     // not (disc 159, the ordering invariant). The overlay is its own channel, so it coexists with `.current`.
-    driveFailedCriteriaPeek();
+    const previousScrollOrigin=scrollSuppressPane;
+    if(replay)scrollSuppressPane='tree';
+    try{driveFailedCriteriaPeek();}finally{scrollSuppressPane=previousScrollOrigin;}
     // disc 164: the produced-path diverter overlay — same post-dispatch timing + ordering invariant as the failed-criterion
     // peek (lands AFTER the selection's `.current`/clrDV, so the SAME-click marks survive; the NEXT reveal's clrDV drops them).
     // Its own channel, MV-only, selection-coupled. Inert (clears) in cockpit / for a non-cel, errored, or no-diverter case.
@@ -1109,7 +1124,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function applyReveal(e: Effect, replay = false): void {
     const v = views.get(e.pane);
     if (!v) return;
-    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay }, indexVersion);
+    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay, preserveViewport:replay }, indexVersion);
     // Steady-state flush ONLY when the pane's CURRENT render is acked AND is for the current index. During a rebuild
     // the global indexVersion has advanced past the still-acked old render, so this is skipped and the reveal waits for
     // the new render's ack (avoiding a flush against the about-to-be-replaced DOM that would also drop the new reveal).
@@ -1178,7 +1193,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // anchors, so those simply no-op in highlightRows — the structure rows light up, which is the intent.)
     // #219: a reveal targeting the pane the click originated in must NOT scroll (respect the user's viewport). Cross-pane
     // targets (pane ≠ origin) still scroll to bring the corresponding row into view.
-    const noScroll = pane === scrollSuppressPane || (pane === 'tree' && !!disclosureFocus && disclosureFocus.gen === v.gen);
+    const noScroll = pane === 'tree'&&target.preserveViewport===true || pane === scrollSuppressPane || (pane === 'tree' && !!disclosureFocus && disclosureFocus.gen === v.gen);
     if (target.kind === "unit") {
       if (pane === "source") highlightRows(v, [target.id], noScroll);
       // #166 3b: unit → its driving decisions (direct + concept containment, scoped ONCE) THEN its applicable concept
@@ -2658,7 +2673,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.flaggableGids = r.flaggableGids;
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode, disclosureToken, treeFocusToken, pinFocusRequest, uncertaintyFocusKey,
-        uncertaintyDisclosures: r.uncertaintyDisclosures ?? {}, preserveViewport: v.preserveTreeViewport });
+        uncertaintyDisclosures: r.uncertaintyDisclosures ?? {}, preserveViewport: v.preserveTreeViewport,viewportKey:currentCel });
     } else if (pane === "fhirQuestionnaire") {
       v.anchors = {};
       v.reveals = {};
@@ -2735,8 +2750,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(fhirInspectionContext().identity!==inspection.identity){syncFhirInspection();return;}
       const definitionState=stale||currentDefinitions.state==='drift'?'changed':currentDefinitions.state;
       const effectiveStale=definitionState==='changed';
+      const formKey=key&&`${key}::${createHash('sha256').update(JSON.stringify({q,qr})).digest('hex')}`;
+      const review=q&&formKey?savedQuestionMetadata(view,gen,formKey,q,effectiveStale,definitionState):undefined;
+      if(!q){savedQuestionReview=undefined;invalidateSavedQuestionEdit();}
       void view.panel.webview.postMessage({type:'fhirQuestionnaire',gen,indexVersion,
-        key:key&&`${key}::${createHash('sha256').update(JSON.stringify({q,qr,stale:effectiveStale,definitionState,definitions:currentDefinitions.digest})).digest('hex')}`,
+        key:formKey,...review,
         label,q,qr,lookedFor,loading,loadError,emptyNote:inspection.emptyNote,
         unrenderable:q===undefined?[]:unrenderableQuestionnaireFeatures(q),stale:effectiveStale,definitionState});
     };
@@ -2820,7 +2838,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!tree.focusNodes?.[focus.key]) {
       clearTreeFocus();
       const selected = state.selection;
-      if (selected?.primary === 'cel') postReveal('tree',{kind:'celCase',id:selected.caseId});
+      if (selected?.primary === 'cel') postReveal('tree',{kind:'celCase',id:selected.caseId,preserveViewport:true});
       driveLeafMarks();
       return;
     }
@@ -2989,6 +3007,53 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let focusedBranchSession: BranchSession | undefined;
   // Render dedupe only; the freshly resolved inspection context is the read-freshness authority.
   let lastFhirInspectionIdentity: string | undefined;
+  let savedQuestionReview:{view:PaneView;gen:number;token:string;identity:string;reason?:string;stale:boolean;context:QuestionReviewContext}|undefined;
+  let savedQuestionOriginCache:{key:string;origins:QuestionReviewContext['prepared']['definitionOrigins']}|undefined;
+  function savedQuestionMetadata(view:PaneView,gen:number,formKey:string,q:any,stale:boolean,definitionState:string){
+    const cel=currentCel!,digest=currentDefinitions.digest,identity=JSON.stringify([formKey,digest]);
+    let origins:QuestionReviewContext['prepared']['definitionOrigins']=[],reason:string|undefined;
+    if(mode!=='medical-validation')reason='Question source controls are available in Medical Validation.';
+    else if(stale||definitionState==='changed')reason='Historical form: regenerate saved native results before using source controls.';
+    else if(definitionState!=='current')reason='Current policy definitions are not verified; source controls are unavailable.';
+    else try{
+      const selected=resolveCelSuite(cel);if(!selected.ok||!selected.suite.policyPath)throw new Error('The policy source is unavailable.');
+      const options=interactivePublication(cel),cacheKey=JSON.stringify([cel,selected.suite.policyPath,digest,options]);
+      if(savedQuestionOriginCache?.key!==cacheKey){
+        const emitted=emitCrlBundle(selected.suite.policyPath,{...options,sourceOrigins:true});
+        savedQuestionOriginCache=emitted.success?{key:cacheKey,origins:emitted.definitionOrigins??[]}:undefined;
+        if(!emitted.success)reason='Current source identity could not be emitted. Check CRL diagnostics.';
+      }
+      origins=savedQuestionOriginCache?.origins??[];
+    }catch(error){reason='Source controls unavailable: '+(error instanceof Error?error.message:String(error));}
+    const context:QuestionReviewContext={cel,prepared:{definitionOrigins:origins},result:{questionnaire:q},current:()=>!cockpitDisposed&&mode==='medical-validation'&&currentCel===cel&&currentDefinitions.digest===digest&&views.get('fhirQuestionnaire')===view&&savedQuestionReview?.identity===identity&&!savedQuestionReview.stale};
+    const token=randomUUID();savedQuestionReview={view,gen,token,identity,context,reason,stale};invalidateSavedQuestionEdit();
+    return {reviewToken:token,questions:questionReviewPresentation(q,origins,reason)};
+  }
+  async function savedQuestionAction(view:PaneView,message:any):Promise<void>{
+    const captured=savedQuestionReview;
+    const report=(text:string)=>{if(captured&&savedQuestionReview===captured&&views.get('fhirQuestionnaire')===view)void view.panel.webview.postMessage({type:'savedQuestionReviewError',token:captured.token,message:text});else vscode.window.setStatusBarMessage('Medical Validation: action not applied — '+text,5000);};
+    if(!captured||captured.view!==view||message.gen!==view.gen||captured.gen!==view.gen||message.token!==captured.token||!captured.context.current()){report('The saved form refreshed. Use its current question controls.');return;}
+    if(!['focus','edit','flag'].includes(message.action)||typeof message.linkId!=='string')return;
+    const question=questionReviewPresentation(captured.context.result.questionnaire,captured.context.prepared.definitionOrigins,captured.reason).find(q=>q.linkId===message.linkId);
+    if(!question||question.reason||currentDefinitions.state!=='current'){report(question?.reason??'Current source controls are unavailable.');return;}
+    try{await interactiveQuestionAction(captured.context,message.action,message.linkId);}catch(error){report(error instanceof Error?error.message:String(error));}
+  }
+  function flushQuestionFocus(view:PaneView,session?:BranchSession):void{
+    const request=view.questionFocus;if(!request)return;
+    if(request.gen!==view.gen){view.questionFocus=undefined;vscode.window.setStatusBarMessage('Medical Validation: the question view changed before Focus completed. Try Focus again.',5000);return;}
+    if(!view.acked||!request.armed)return;
+    postBranch(session,{type:'focusQuestionNode',...request});
+  }
+  function invalidateSavedQuestionEdit():void{
+    if(interactiveEdit&&!('outcomeCurrent' in interactiveEdit.context)&&!interactiveEdit.context.current())invalidateInteractiveEdit();
+  }
+  function acceptQuestionFocusResult(view:PaneView,message:any,session?:BranchSession):void{
+    if(!view.questionFocus||view.questionFocus.token!==message.token||view.questionFocus.gen!==message.gen)return;
+    if(message.status==='armed'){view.questionFocus.armed=true;flushQuestionFocus(view,session);return;}
+    view.questionFocus=undefined;
+    if(message.status==='cancelled'){if(message.reason==='render')vscode.window.setStatusBarMessage('Medical Validation: the question view changed before Focus completed. Try Focus again.',5000);return;}
+    if(message.ok===false)vscode.window.setStatusBarMessage('Medical Validation: the question control could not be revealed in this view. Reopen its branch and try Focus again.',5000);
+  }
   let branchQuestionnaireOwner: BranchSession | undefined;
   let legacyQuestionMode: QuestionDisplayMode = 'off';
   let flagDrawerSession: BranchSession | undefined;
@@ -3144,7 +3209,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const rendered=renderFlowPane(crlStructure,{...treeRenderOptions(gen),expandedGuardWhens:session.expanded,
       revealPrefix:`${session.prefix}g${gen}_`,uncertaintyDisplay:{expanded,collapsed:collapsedUncertaintyGuards,forced}});
     Object.assign(session.view,rendered);
-    postBranch(session,{type:'render',gen,indexVersion,mode,html:rendered.html,preserveViewport:true,disclosureToken,
+    postBranch(session,{type:'render',gen,indexVersion,mode,html:rendered.html,preserveViewport:true,viewportKey:currentCel,disclosureToken,
       uncertaintyDisclosures:rendered.uncertaintyDisclosures??{}});
     if(session.caseId && session.routeId) {
       const prior=session.pin ?? session.drafts.get(JSON.stringify([session.caseId,session.routeId]));
@@ -3342,13 +3407,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(message?.type==='decisionTableAction'){void decisionTableAction(message);return true;}
     if(message?.type!=='decisionTableRow')return false;
     const table=decisionTable,session=table?.sessions.get(message.rowId),msg=message.message;
-    if(!table||!session||!msg||typeof msg!=='object'||!branchMessageIsCurrent(session,table.epoch,indexVersion,{epoch:message.epoch,rowId:message.rowId,gen:msg.gen}))return true;
+    if(!table||!session||!msg||typeof msg!=='object')return true;
     const view=session.view;
+    // A pending Focus owns its original token/gen; cancellation may arrive after this row has rendered a newer gen.
+    if(msg.type==='questionFocusResult'&&msg.status==='cancelled'){if(message.epoch===table.epoch&&branchSessionCurrent(session)&&session.mounted)acceptQuestionFocusResult(view,msg,session);return true;}
+    if(!branchMessageIsCurrent(session,table.epoch,indexVersion,{epoch:message.epoch,rowId:message.rowId,gen:msg.gen}))return true;
+    if(msg.type==='questionFocusResult'){acceptQuestionFocusResult(view,msg,session);return true;}
     if(msg.type==='branchFocus'){focusBranchSession(session);return true;}
     if(msg.type==='ready')return true;
     if(msg.type==='branchReady'){
       if(msg.token!==session.renderToken)return true;
-      session.ready=true;view.acked=true;coord.ready(session.coordinatorKey,view.gen,indexVersion);paintBranchSession(session);
+      session.ready=true;view.acked=true;coord.ready(session.coordinatorKey,view.gen,indexVersion);paintBranchSession(session);flushQuestionFocus(view,session);
       postQuestionMode(session);return true;
     }
     if(msg.type==='pinFirstRoute'&&typeof msg.key==='string'){openDecisionTableAt(msg.key,session);return true;}
@@ -3656,6 +3725,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(pane==='tree'&&handleDecisionTableMessage(msg))return;
     const v = views.get(pane);
     if (!v) return;
+    if(pane==='fhirQuestionnaire'&&msg.type==='savedQuestionReviewAction'){void savedQuestionAction(v,msg);return;}
+    if(pane==='tree'&&msg.type==='questionFocusResult'){acceptQuestionFocusResult(v,msg);return;}
     if (pane === "tree" && msg.gen === v.gen) {
       if (msg.type === 'treeFocus' && typeof msg.key === 'string') { focusTreeNode(msg.key); return; }
       if (msg.type === 'cycleTreeFocus' && typeof msg.key === 'string' && typeof msg.dir === 'string') { cycleTreeFocus(msg.key, msg.dir, msg.token); return; }
@@ -3688,13 +3759,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (msg.type === "ready" && typeof msg.gen === "number") {
       if (msg.gen !== v.gen) return; // superseded render's ack
       v.acked = true;
+      flushQuestionFocus(v);
       // Use the render's authoritative indexVersion (stored shell-side), NOT a value echoed by the untrusted webview.
       const target = coord.ready(pane, v.gen, v.indexVersion);
       if (target) {
-        const previousOrigin=scrollSuppressPane;
-        // REFACTOR:grounded: deliberate navigation still scrolls after a disclosure render; replay preserves manual pan.
-        if(v.preserveTreeViewport && !target.expandUncertainty)scrollSuppressPane='tree';
-        try { postReveal(pane, target); } finally { scrollSuppressPane=previousOrigin; }
+        // REFACTOR:grounded: the queued target carries explicit passive intent through the ACK.
+        postReveal(pane, target);
       }
       // #173 T3: a fresh tree render starts with an empty #fcChrome — re-post the toggle + gap banner on ack so they
       // survive a re-render (rebuild / showKeys toggle). The failed-criterion OVERLAY itself re-applies via the normal
@@ -4104,6 +4174,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (views.get(pane) !== v) return;
       coord.disposePane(pane);
       views.delete(pane);
+      if(pane==='fhirQuestionnaire'){savedQuestionReview=undefined;invalidateSavedQuestionEdit();}
       if(pane==='source'||pane==='questionnaire'||pane==='fhirQuestionnaire') {
         dispatch({type:'setPaneVisible',pane,visible:false});
         if(pane==='questionnaire'){questionNodeIds=[];currentQuestionIndex=-1;clearAllThisNode();}
@@ -4152,6 +4223,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const previousDefinitions=currentDefinitions;
       currentDefinitions=selected.suite.policyPath?definitionFreshness.check(selected.suite.policyPath,join(editStorage(selected.suite.projectRoot),"freshness")):{state:"unknown",message:"Policy entry is unavailable."};
       modelDefinitionDigest=currentDefinitions.digest;
+      invalidateSavedQuestionEdit();
       if(previousDefinitions.digest && previousDefinitions.digest!==modelDefinitionDigest)mvRevision++;
       if(previousDefinitions.digest!==currentDefinitions.digest || previousDefinitions.state==='current'&&currentDefinitions.state!=='current')interactiveQuestionnaire.definitionsChanged(currentCel);
       setupDefinitionDependencyWatchers(selected.suite.projectRoot);
@@ -6979,7 +7051,7 @@ body[data-mode="medical-validation"] .flow-svg{box-sizing:content-box;padding-ri
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}${DECISION_TABLE_STYLE}`;
+${LFORMS_REVIEW_STYLE}${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}${DECISION_TABLE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
@@ -7014,7 +7086,7 @@ ${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${RO
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 const COCKPIT_WEBVIEW_BODY =
-  `const v={postMessage:m=>options.bridge.postMessage(options.tableRow?{gen,...m}:m)};const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;let gen=-1;` +
+  `const v={postMessage:m=>options.bridge.postMessage(options.tableRow?{gen,...m}:m)};const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;const addSavedHeader=m=>{let header=document.createElement('div');header.id='aqHeader';root.prepend(header);if(m.label){const h=document.createElement('p');h.className='aq-case';h.textContent='Case - '+m.label;header.append(h);}if(m.stale||m.definitionState==='checking'||m.definitionState==='unknown'){const p=document.createElement('p');p.className='aq-warning';p.setAttribute('role','status');p.textContent=m.stale?'Historical questionnaire: policy definitions changed. Regenerate native results to refresh this saved form.':m.definitionState==='checking'?'Checking policy definitions; this saved form has not been verified against them.':'Current policy definitions could not be verified. This saved form is retained for inspection.';header.append(p);}};let gen=-1,viewportKey;const questionFocusUi=(${installQuestionNodeFocus.toString()})(root,v,()=>gen);const savedQuestionUi=(${installSavedQuestionnaireReview.toString()})(root,v,(${installLformsReviewControls.toString()}));` +
   `root.addEventListener('focusin',()=>{if(options.tableRow)v.postMessage({type:'branchFocus'});});` +
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
@@ -7057,22 +7129,23 @@ const COCKPIT_WEBVIEW_BODY =
   `const disclosureUi=(${installFlowDisclosureFocus.toString()})(root);` +
   `const pinnedTraversalPaint=(${paintPinnedTraversal.toString()});` +
   `const applyFlowPin=(deferCriterionRefresh=false)=>{pinVisibility.update();root.classList.toggle('flow-has-pin',!!pinnedFlowKey);if(!pinnedFlowKey)fld.querySelector('.flag-target-note')?.remove();pinnedTraversalPaint(root,pinnedFlowKey?pinnedPathKeys:undefined);const nodes=[...root.querySelectorAll('[data-flow-key]')];for(const el of root.querySelectorAll('.flow-focus-hidden,.flow-pinned'))el.classList.remove('flow-focus-hidden','flow-pinned');for(const p of root.querySelectorAll('[data-flow-pin]'))p.setAttribute('aria-pressed',String(p.dataset.flowPin===(root.hasAttribute('data-flow-scope-key')?root.dataset.flowScopeKey:pinnedFlowKey)));let note=root.querySelector('[data-flow-pin-notice]');if(!note){note=document.createElement('div');note.setAttribute('data-flow-pin-notice','');root.prepend(note);}note.textContent=pinnedFlowKey&&pinnedRouteLabel!==currentRouteLabel?'Showing pinned case; selection changed.':'';note.title=pinnedRouteLabel;for(const link of root.querySelectorAll('[data-flow-open-decision]')){link.style.display='';link.removeAttribute('aria-hidden');link.setAttribute('tabindex','0');}if(pinnedFlowKey){const keep=new Set(pinnedRouteKeys);uncertaintyVisibility(keep,pinnedRouteKeys,uncertaintyDisclosures);let changed=true;while(changed){changed=false;for(const n of nodes)if(n.dataset.flowOutline&&keep.has(n.dataset.flowParent)&&!keep.has(n.dataset.flowKey)){keep.add(n.dataset.flowKey);changed=true;}}for(const n of nodes){if(!keep.has(n.dataset.flowKey))n.classList.add('flow-focus-hidden');if(n.dataset.flowKey===pinnedFlowKey)n.classList.add('flow-pinned');}for(const e of root.querySelectorAll('[data-flow-from]'))if(!keep.has(e.dataset.flowFrom)||!keep.has(e.dataset.flowTo))e.classList.add('flow-focus-hidden');for(const link of root.querySelectorAll('[data-flow-open-decision]'))if(!keep.has(link.dataset.flowOpenDecision)){link.style.display='none';link.setAttribute('aria-hidden','true');link.setAttribute('tabindex','-1');}}logicUi.pinnedRoute(pinnedFlowKey?pinnedGroupKeys:[],pinnedFlowKey?pinnedGroupOutcomes:[]);if(!deferCriterionRefresh)criterionDescriptionUi.refresh();};` +
-  `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=k=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});leaf.scrollIntoView({block:'center',inline:'center'});});};` +
+  `let pendingPinFocus='',pinFocusVersion=0;const focusPinLeaf=(k,reveal=true)=>{const version=pinFocusVersion,expectedGen=gen;requestAnimationFrame(()=>{if(version!==pinFocusVersion||expectedGen!==gen)return;const leaf=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===k);if(!leaf)return;leaf.setAttribute('tabindex','-1');leaf.focus({preventScroll:true});if(reveal)leaf.scrollIntoView({block:'center',inline:'center'});});};` +
   `for(const type of ['pointerdown','keydown','focusin'])window.addEventListener(type,()=>{pendingPinFocus='';pinFocusVersion++;},true);` +
-  `const toggleFlowPin=k=>{if(options.tableRow){v.postMessage({type:'pinFirstRoute',gen,key:k,token:String(++pinFocusVersion)});return;}pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
+  `const toggleFlowPin=k=>{if(options.tableRow){v.postMessage({type:'pinFirstRoute',gen,key:k,token:String(++pinFocusVersion)});return;}pinFocusVersion++;pendingPinFocus='';if(pinnedFlowKey===k){pinnedFlowKey='';pinnedRouteKeys=[];routeCardUi.reset();v.postMessage({type:'unpinRoute',gen});applyFlowPin();applyZoom();focusPinLeaf(k,false);}else{pendingPinFocus=String(pinFocusVersion);v.postMessage({type:'pinFirstRoute',gen,key:k,token:pendingPinFocus});}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
   // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
   // textarea by its key (+ the focused one's caret), swap, then restore matching textareas. A SENT note doesn't reappear
   // because the click handler cleared its textarea BEFORE this render arrived (snapshot already empty).
-  `if(m.type==='render'){var _d={},_a=null,_s=0,_e=0;` +
+  // Same-policy pan survives rebuilds; preserveViewport keeps chrome. Restore description geometry before raw pan, then explicit disclosure anchoring may adjust it.
+  `if(m.type==='render'){const scroller=document.scrollingElement||document.documentElement,keepViewport=m.viewportKey&&m.viewportKey===viewportKey?{left:scroller.scrollLeft,top:scroller.scrollTop}:undefined;viewportKey=m.viewportKey;questionFocusUi.cancel();savedQuestionUi.clear();var _d={},_a=null,_s=0,_e=0;` +
   `if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');_d[k]=ta.value;if(ta===document.activeElement){_a=k;_s=ta.selectionStart;_e=ta.selectionEnd;}}` +
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
   // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
-  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');uncertaintyDisclosures=m.uncertaintyDisclosures||{};root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);if(m.uncertaintyFocusKey){const u=[...root.querySelectorAll('[data-flow-uncertainty-toggle]')].find(n=>n.dataset.flowUncertaintyToggle===m.uncertaintyFocusKey);u?.focus({preventScroll:true});}` +
-  `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
+  `if(!pendingPinFocus||m.pinFocusRequest!==pendingPinFocus||m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){pendingPinFocus='';pinFocusVersion++;}gen=m.gen;treeFocusUi.beforeRender(m.treeFocusToken);disclosureUi.beforeRender();criterionDescriptionUi.beforeRender();root.classList.add('flow-route-review-loading');root.classList.remove('flow-policy-routes-approved');uncertaintyDisclosures=m.uncertaintyDisclosures||{};root.innerHTML=m.html;if(!m.preserveViewport)fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;if(m.mode!=='medical-validation'||pinEpoch!==m.indexVersion){disclosureUi.cancel();criterionDescriptionUi.reset();logicUi.reset();treeFocusUi.reset();pinnedFlowKey='';pinnedRouteKeys=[];currentRouteKeys=[];routeCardUi.reset();}pinEpoch=m.indexVersion;applyFlowPin(true);routeCardUi.rebind();applyZoom();criterionDescriptionUi.restore();if(keepViewport){scroller.scrollLeft=keepViewport.left;scroller.scrollTop=keepViewport.top;}if(m.disclosureToken)disclosureUi.restore(m.disclosureToken);if(m.uncertaintyFocusKey){const u=[...root.querySelectorAll('[data-flow-uncertainty-toggle]')].find(n=>n.dataset.flowUncertaintyToggle===m.uncertaintyFocusKey);u?.focus({preventScroll:true});}` +
+  `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus({preventScroll:true});try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion,routeToken:routeCardUi.token(),questionnaireOpen:routeCardUi.isExternal()});}` +
   // #(tree-snapshot) Todo 2: reply to the host's snapshot request with the CURRENT `#root` markup (WYSIWYG — the painted
   // overlay classes are on the rows). Strip the EPHEMERAL rings (selection `.current`/`.this-node`, agent `.node-focus`) off a
@@ -7141,7 +7214,8 @@ const COCKPIT_WEBVIEW_BODY =
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('this-node');}}` +
   // #210 (disc 239): the CRL Assist focus ring (.node-focus) on the agent's flag-anchor node. Gen-guarded clear-then-set,
   // its own channel; an empty segmentIds is a clean clear. NEVER touched by highlight/clearHighlight (independent overlay).
-  `else if(m.type==='focusQuestionNode'){if(m.gen!==gen)return;const node=[...root.querySelectorAll('[data-flow-key]')].find(n=>n.dataset.flowKey===m.key);if(node){for(const el of root.querySelectorAll('.question-node-focus'))el.classList.remove('question-node-focus');node.classList.add('question-node-focus');node.setAttribute('tabindex','-1');node.focus({preventScroll:true});node.scrollIntoView({block:'nearest',inline:'nearest'});}}` +
+  `else if(m.type==='armQuestionFocus'){questionFocusUi.arm(m);}` +
+  `else if(m.type==='focusQuestionNode'){if(m.gen===gen)questionFocusUi.show(m);}` +
   `else if(m.type==='markNodeFocus'){if(m.gen!==gen)return;clrNF();` +
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('node-focus');}}` +
   // disc 164: the produced-path diverter channel (.diverter). Gen-guarded clear-then-set like the others; coexists with
@@ -7155,7 +7229,7 @@ const COCKPIT_WEBVIEW_BODY =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'||(pendingPinFocus&&m.focusRequest===pendingPinFocus)){focusPinLeaf(m.pinKey);pendingPinFocus='';}if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'){focusPinLeaf(m.pinKey);}else if(pendingPinFocus&&m.focusRequest===pendingPinFocus){focusPinLeaf(m.pinKey,false);}pendingPinFocus='';if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
   `else if(m.type==='modeledBranch'){if(m.gen!==gen)return;routeCardUi.reset();treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=[];pinnedGroupKeys=[];pinnedGroupOutcomes=[];pinnedRouteLabel=m.label;currentRouteLabel=m.label;applyFlowPin();applyZoom();if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
   `else if(m.type==='unpinnedTreeFocus'){treeFocusUi.show(m);}` +
   `else if(m.type==='clearTreeFocus'){if(m.gen===gen)treeFocusUi.reset();}` +
@@ -7178,20 +7252,21 @@ const COCKPIT_WEBVIEW_BODY =
   // `key` is the render identity: remount ONLY when the case's CONTENT changes. Every cockpit re-render
   // (rebuild/applyShowKeys/renderEmpty) reaches every pane, and remounting a 1.85 MB Angular app on an
   // unrelated render would churn and discard in-progress answers.
+  `else if(m.type==='savedQuestionReviewError'){savedQuestionUi.error(m);}` +
   `else if(m.type==='fhirQuestionnaire'){` +
   // The skip-remount latch is set ONLY after a successful mount (bottom of the try). Latching it up-front
   // latched FAILURES too: select a case with no artifacts -> "could not find" paints and the key sticks -> the
   // producer (or the seed script) writes the files -> every later render posts the same key and returns early,
   // so the pane shows "could not find" until you select a different case and come back. That is precisely the
   // workflow this pane exists for.
-  `if(m.key&&m.key===window.__aqKey)return;` +
+  `if(m.key&&m.key===window.__aqKey){const header=document.getElementById('aqHeader');if(header)header.remove();addSavedHeader(m);savedQuestionUi.update(m);return;}savedQuestionUi.clear();` +
   `if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
   `window.__aqKey=undefined;` +
   `const host=document.getElementById('root');` +
   // The case header mirrors the CRL Questionnaire pane's, so the two panes read as the same case side by side.
   `const head=(t)=>{const h=document.createElement('p');h.className='aq-case';h.textContent=t;return h;};` +
-  `const addHeader=()=>{if(m.label)host.appendChild(head('Case - '+m.label));if(m.stale||m.definitionState==='checking'||m.definitionState==='unknown'){const p=document.createElement('p');p.className='aq-warning';p.setAttribute('role','status');p.textContent=m.stale?'Historical questionnaire: policy definitions changed. Regenerate native results to refresh this saved form.':m.definitionState==='checking'?'Checking policy definitions; this saved form has not been verified against them.':'Current policy definitions could not be verified. This saved form is retained for inspection.';host.appendChild(p);}};` +
-  `const fail=(t)=>{if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}host.replaceChildren();addHeader();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
+  `const addHeader=()=>addSavedHeader(m);` +
+  `const fail=(t)=>{savedQuestionUi.clear();if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}host.replaceChildren();addHeader();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
   `if(!m.label){fail(m.emptyNote||'Select a case to see its FHIR questionnaire.');return;}` +
   `if(m.loading){fail('Loading FHIR questionnaire…');return;}` +
   `if(m.loadError){fail('Could not read the saved FHIR questionnaire. '+m.loadError+(m.lookedFor?(' Path: '+m.lookedFor):''));return;}` +
@@ -7217,7 +7292,7 @@ const COCKPIT_WEBVIEW_BODY =
   `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
   `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +
   `LForms.Util.addFormToPage(form,'aqMount',{prepopulate:false});` +
-  `window.__aqKey=m.key;` + // latch ONLY on success — see the note at the top of this branch
+  `window.__aqKey=m.key;savedQuestionUi.update(m);` + // latch ONLY on success — see the note at the top of this branch
 
   // addFormToPage can resolve without painting (an unrecognised item tree yields an empty form). Angular
   // Elements upgrades asynchronously, so poll briefly rather than measuring on the next frame.
@@ -7414,7 +7489,7 @@ export const COCKPIT_WEBVIEW_INSTALLER =
     .split('root.addEventListener(').join('listen(root,')
     .split('fcc.addEventListener(').join('listen(fcc,')
     .split('fld.addEventListener(').join('listen(fld,') +
-  `return {setZoom:z=>setZoom(z,true),dispose(){if(disposed)return;disposed=true;if(fpPan){fpPan=false;document.body.style.cursor='';}for(const remove of removers)remove();for(const id of timers)window.clearTimeout(id);for(const id of frames)window.cancelAnimationFrame(id);keyboardUi.dispose();disclosureUi.cancel();routeCardUi.reset();treeFocusUi.dispose();criterionDescriptionUi.dispose();logicUi.dispose();pinVisibility.dispose();}};};`;
+  `return {setZoom:z=>setZoom(z,true),dispose(){if(disposed)return;disposed=true;if(fpPan){fpPan=false;document.body.style.cursor='';}for(const remove of removers)remove();for(const id of timers)window.clearTimeout(id);for(const id of frames)window.cancelAnimationFrame(id);keyboardUi.dispose();disclosureUi.cancel();routeCardUi.reset();treeFocusUi.dispose();criterionDescriptionUi.dispose();logicUi.dispose();pinVisibility.dispose();questionFocusUi.dispose();savedQuestionUi.dispose();}};};`;
 
 export const COCKPIT_WEBVIEW_SCRIPT = COCKPIT_WEBVIEW_INSTALLER +
   `const crlCockpitBridge=acquireVsCodeApi();const crlCockpitRuntime=globalThis.installCrlCockpitRuntime({root:document.getElementById('root'),chrome:document.getElementById('fcChrome'),drawer:document.getElementById('flagDrawer'),bridge:crlCockpitBridge});`;

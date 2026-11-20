@@ -34,7 +34,7 @@ describe("fhirQuestionnaire webview branch", () => {
   it("guards remount on the render identity", () => {
     // Every cockpit re-render (rebuild/applyShowKeys/renderEmpty) reaches every pane. Without this guard an
     // unrelated render would remount a 1.85 MB Angular app and discard in-progress answers.
-    assert.match(branch, /m\.key===window\.__aqKey\)return/);
+    assert.match(branch, /m\.key===window\.__aqKey\)\{[^}]*savedQuestionUi\.update\(m\);return;/);
   });
 
   it("fails LOUDLY when the runtime is missing, rather than painting nothing", () => {
@@ -87,7 +87,8 @@ describe("fhirQuestionnaire webview branch", () => {
 
   it("shows the case header on both the success and failure paths", () => {
     // Mirrors the CRL Questionnaire pane's header so the two panes read as the same case side by side.
-    assert.match(branch,/const addHeader=\(\)=>\{if\(m\.label\)host\.appendChild\(head\('Case - '\+m\.label\)\)/);
+    assert.match(branch,/const addHeader=\(\)=>addSavedHeader\(m\)/);
+    assert.ok(COCKPIT_WEBVIEW_SCRIPT.includes("h.textContent='Case - '+m.label"));
     const heads = branch.match(/addHeader\(\)/g) ?? [];
     assert.ok(heads.length >= 2, `case header should appear on failure AND success paths, found ${heads.length}`);
   });

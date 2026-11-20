@@ -8,6 +8,8 @@ export interface SemanticTarget {
   id: string;
   /** REFACTOR:grounded: explicit navigation may disclose a folded guard; paint replay may not. */
   expandUncertainty?: boolean;
+  /** Passive selection replay paints without moving the user's tree viewport. */
+  preserveViewport?: boolean;
 }
 export type PaneCapability = "renderable" | "placeholder";
 

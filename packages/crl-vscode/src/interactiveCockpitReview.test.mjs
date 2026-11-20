@@ -5,21 +5,22 @@ import {isDeepStrictEqual} from 'node:util';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
-import {reviewCasesForRoute,interactiveQuestionWordingMatches,questionReviewOwners} from './interactiveReview.ts';
+import {reviewCasesForRoute,interactiveQuestionWordingMatches,questionReviewOwners,questionReviewPresentation} from './interactiveReview.ts';
 import {resolveSourceWordingTarget} from './presentationProposal.ts';
 import {setAllReviewState} from './medicalValidationStore.ts';
 import {overlayQaRequests,questionFlagTarget} from './qaFlagEditing.ts';
+import {branchMessageIsCurrent} from './decisionTableSessions.ts';
 import {buildQaEditFlag,emitCrlBundle} from '@smile-digital-health/crl';
 import {fileURLToPath} from 'node:url';
 const file=readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ast=ts.createSourceFile('host.ts',file,ts.ScriptTarget.Latest,true);
 const root=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='registerCorrespondenceCockpit');
-const names=['interactiveContextCurrent','interactiveRoutes','interactiveVerdict','interactiveWordingTarget','interactiveQuestionAction','refreshInteractiveQuestionRequest','saveInteractiveQuestion','invalidateInteractiveEdit'];
+const names=['interactiveContextCurrent','interactiveRoutes','interactiveVerdict','interactiveWordingTarget','interactiveQuestionAction','refreshInteractiveQuestionRequest','saveInteractiveQuestion','invalidateInteractiveEdit','invalidateSavedQuestionEdit','savedQuestionMetadata','savedQuestionAction','flushQuestionFocus','acceptQuestionFocusResult','handleDecisionTableMessage'];
 const code=names.map(name=>root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(ast)).join('\n');
 function fixture(){
  const writes=[],paints=[],actions=[],payloads=[];let pick={state:'pass'},failPersist=false,allow=true;
  const route={nodeKeys:['root','terminal'],terminalKind:'produced'};
  const context={cel:'E:/fixture/src/cel/mv/policy.cel',prepared:{planId:'root',definitionOrigins:[]},result:{activities:['Met'],questionnaire:{item:[{linkId:'q',type:'boolean',text:'Question'}]},nativeResult:{}},current:()=>allow,outcomeCurrent:()=>allow};
- const target={view:{gen:2,focusNodes:{key:{owner:'owner'}},criterionOccurrences:[],reveals:{reveal:{nodeKey:'key'}}},session:undefined,key:'key',gid:'gid'};
+ const target={view:{gen:2,acked:true,panel:{reveal:()=>actions.push(['reveal'])},focusNodes:{key:{owner:'owner',outline:true},owner:{owner:'owner',parent:''}},criterionOccurrences:[],reveals:{reveal:{nodeKey:'key'}}},session:undefined,key:'key',gid:'gid'};
  const wording={filePath:'E:/fixture/src/crl/policy.crl',library:'L',concept:'A',baseline:'source',questionText:'Question',questionDescription:'Description',owners:{questionText:{contexts:[]}},scopeLabel:'Default'};
  const c=vm.createContext({basename,dirname,relative,isAbsolute,sep,isDeepStrictEqual,randomUUID:()=>String(payloads.length+1),
   cockpitDisposed:false,indexVersion:1,mvRevision:1,mvSidecarPath:'sidecar',mode:'medical-validation',currentCel:context.cel,
@@ -27,8 +28,8 @@ function fixture(){
   interactiveRouteCache:undefined,nativeReviewRoutes:()=>[{keys:route.nodeKeys}],reviewCasesForRoute,tableEntries:()=>c.entries,entries:[{caseId:'one',route},{caseId:'other',route:{nodeKeys:['different'],terminalKind:'produced'}}],
   pinnedVerdict:()=>({state:'unreviewed',label:'To do'}),REVIEW_ORDER:['unreviewed','pass','fail','pending'],REVIEW_LABEL:{unreviewed:'To do',pass:'Pass',fail:'Fail',pending:'Pending'},
   setAllReviewState,persistMv:map=>{if(failPersist)return false;writes.push(map);return true;},renderPane:p=>paints.push(p),renderTreeChrome:()=>paints.push('chrome'),driveDoneOverlay:()=>paints.push('tree'),cockpitAgentBridge:{notifyChanged:()=>{}},
-  interactiveQuestionWordingMatches,questionReviewOwners:()=>new Map([['q',{library:'L',concept:'A'}]]),interactiveQuestionTarget:async()=>target,
-  focusBranchSession:s=>actions.push(['row',s]),pinnedCards:undefined,focusTreeNode:key=>actions.push(['focus',key]),postBranch:(s,m)=>actions.push(['post',m]),views:new Map([['tree',{panel:{reveal:()=>actions.push(['reveal'])},gen:2}]]),
+  questionReviewPresentation,interactiveQuestionWordingMatches,questionReviewOwners:()=>new Map([['q',{library:'L',concept:'A'}]]),interactiveQuestionTarget:async()=>target,
+  focusBranchSession:s=>actions.push(['row',s]),pinnedCards:undefined,focusTreeNode:key=>actions.push(['focus',key]),postBranch:(s,m)=>actions.push(['post',m]),views:new Map([['tree',target.view]]),
   isSubQuestionHit:()=>false,nodeFlagAction:async(...args)=>actions.push(['flag',...args]),wordingSources:new Map([['L',{filePath:wording.filePath,source:'source',packaged:false}]]),
   resolveSourceWordingTarget:()=>wording,findPolicySrc:()=> 'E:/fixture/src',vscode:{window:{showQuickPick:()=>pick,showWarningMessage:()=> 'Discard',setStatusBarMessage:message=>actions.push(['statusBar',message])},workspace:{textDocuments:[]}},assertMvWriteAllowed:()=>{if(!allow)throw Error('Not allowed');},
   interactiveEdit:undefined,interactiveEditPanel:{open:p=>payloads.push(p),update:p=>payloads.push(p),post:p=>payloads.push(p),layoutPanel:{reveal:()=>{}}},resolveCelSuite:()=>({ok:true,suite:{projectRoot:'E:/fixture'}}),flagStoreDir:()=> 'flags',saveQuestionRequest:(...args)=>{actions.push(['save',...args]);return {};},reloadReviewFlags:()=>{},driveFlagBadges:()=>{},overlayQaRequests,flagsList:[],changeQaRequest:(...args)=>actions.push(['status',...args]),
@@ -47,8 +48,87 @@ it('actual cockpit verdict handler refuses changed coverage/review/form after th
 });
 it('actual question handler routes focus to the chosen table row and flags to its exact reveal/gid',async()=>{
  const f=fixture();f.target.session={id:'row'};
- await f.c.interactiveQuestionAction(f.context,'focus','q');expect(f.actions[0]).toEqual(['row',f.target.session]);expect(f.actions.some(a=>a[0]==='post'&&a[1].type==='focusQuestionNode'&&a[1].key==='key')).toBe(true);
+ await f.c.interactiveQuestionAction(f.context,'focus','q');expect(f.actions[0]).toEqual(['row',f.target.session]);expect(f.actions.some(a=>a[0]==='post'&&a[1].type==='armQuestionFocus'&&a[1].key==='key')).toBe(true);
+ f.c.acceptQuestionFocusResult(f.target.view,{...f.target.view.questionFocus,status:'armed'},f.target.session);expect(f.actions.some(a=>a[0]==='post'&&a[1].type==='focusQuestionNode')).toBe(true);
  await f.c.interactiveQuestionAction(f.context,'flag','q');expect(f.actions.at(-1)).toEqual(['flag','reveal','gid',2,'validation',f.target.session]);
+});
+it('question Focus selects the structural owner then waits for the exact question render ACK',async()=>{
+ const f=fixture();f.target.view.acked=false;
+ await f.c.interactiveQuestionAction(f.context,'focus','q');expect(f.actions).toContainEqual(['focus','owner']);expect(f.actions.some(a=>a[0]==='post'&&a[1].type==='focusQuestionNode')).toBe(false);
+ f.c.acceptQuestionFocusResult(f.target.view,{...f.target.view.questionFocus,status:'armed'});
+ f.target.view.acked=true;f.c.flushQuestionFocus(f.target.view);expect(f.actions.find(a=>a[0]==='post'&&a[1].type==='focusQuestionNode')[1]).toMatchObject({key:'key',gen:2});
+});
+it('manual interaction while Focus awaits render ACK cancels the host request and repeated ACK cannot reveal it',async()=>{
+ const f=fixture();f.target.view.acked=false;await f.c.interactiveQuestionAction(f.context,'focus','q');
+ const pending={...f.target.view.questionFocus};f.c.acceptQuestionFocusResult(f.target.view,{...pending,status:'armed'});
+ f.c.acceptQuestionFocusResult(f.target.view,{...pending,status:'cancelled'});expect(f.target.view.questionFocus).toBeUndefined();
+ f.target.view.acked=true;f.c.flushQuestionFocus(f.target.view);f.c.flushQuestionFocus(f.target.view);
+ f.c.acceptQuestionFocusResult(f.target.view,{...pending,status:'armed'});expect(f.actions.some(a=>a[0]==='post'&&a[1].type==='focusQuestionNode')).toBe(false);
+ await f.c.interactiveQuestionAction(f.context,'focus','q');f.target.view.gen++;f.c.flushQuestionFocus(f.target.view);expect(f.target.view.questionFocus).toBeUndefined();expect(f.actions.at(-1)).toEqual(['statusBar',expect.stringMatching(/view changed before Focus completed/)]);
+ await f.c.interactiveQuestionAction(f.context,'focus','q');const cancelled={...f.target.view.questionFocus,status:'cancelled',reason:'render'};f.target.view.gen++;f.c.acceptQuestionFocusResult(f.target.view,cancelled);expect(f.target.view.questionFocus).toBeUndefined();expect(f.actions.at(-1)).toEqual(['statusBar',expect.stringMatching(/view changed before Focus completed/)]);f.c.flushQuestionFocus(f.target.view);
+});
+it('row cancellation keeps manual intent silent across a newer row gen and refuses another epoch',async()=>{
+ const f=fixture(),view=f.target.view,session={id:'row',view,mounted:true,epoch:'epoch',sourceVersion:1,generation:view.gen};f.target.session=session;
+ f.c.decisionTable={epoch:'epoch',sessions:new Map([['row',session]])};f.c.branchMessageIsCurrent=branchMessageIsCurrent;
+ vm.runInContext(transformSync(root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='branchSessionCurrent').getText(ast),{loader:'ts',target:'es2022'}).code,f.c);expect(f.c.branchSessionCurrent({...session})).toBe(false);
+ await f.c.interactiveQuestionAction(f.context,'focus','q');const message={type:'questionFocusResult',...view.questionFocus,status:'cancelled',reason:'intent'};view.gen++;
+ session.generation=view.gen;
+ f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'old',rowId:'row',message});expect(view.questionFocus).toBeDefined();
+ session.sourceVersion=0;f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'epoch',rowId:'row',message});expect(view.questionFocus).toBeDefined();session.sourceVersion=1;
+ session.mounted=false;f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'epoch',rowId:'row',message});expect(view.questionFocus).toBeDefined();session.mounted=true;
+ for(const status of ['armed','done'])f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'epoch',rowId:'row',message:{...message,status,ok:false}});expect(view.questionFocus).toBeDefined();expect(view.questionFocus.armed).toBeUndefined();
+ f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'epoch',rowId:'row',message});expect(view.questionFocus).toBeUndefined();f.c.flushQuestionFocus(view,session);expect(f.actions.some(a=>a[0]==='statusBar')).toBe(false);
+});
+it('saved origins reuse the definition digest across view rebuilds and do not emit in cockpit mode',()=>{
+ const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);let emits=0;
+ Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl'}}),emitCrlBundle:()=>{emits++;return {success:true,definitionOrigins:[]};}});
+ const q={item:[{linkId:'q',type:'boolean',text:'Question'}]};f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(1);
+ f.c.indexVersion++;f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(1);
+ f.c.mode='cockpit';f.c.currentDefinitions.digest='new';const meta=f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(1);expect(meta.questions[0].reason).toMatch(/available in Medical Validation/);
+ f.c.mode='medical-validation';f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(2);
+ f.c.currentDefinitions.digest='retry';f.c.emitCrlBundle=()=>({success:++emits!==3,definitionOrigins:[]});
+ expect(f.c.savedQuestionMetadata(view,1,'case1',q,false,'current').questions[0].reason).toMatch(/could not be emitted/);
+ expect(f.c.savedQuestionMetadata(view,1,'case1',q,false,'current').questions[0].reason).not.toMatch(/could not be emitted/);expect(emits).toBe(4);
+});
+it('an awaited saved-form action refusal cannot paint onto another case',async()=>{
+ const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);
+ const origins=[{kind:'CaseFeature',canonical:'urn:answer',version:'1',library:'L',name:'A'}],q={item:[{linkId:'q',type:'boolean',text:'Question',definition:'urn:answer|1#Observation.value[x]'}]};
+ Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl'}}),emitCrlBundle:()=>({success:true,definitionOrigins:origins})});
+ const first=f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');let reject;f.c.interactiveQuestionAction=()=>new Promise((_,r)=>reject=r);
+ const action=f.c.savedQuestionAction(view,{gen:1,token:first.reviewToken,action:'edit',linkId:'q'});view.gen=2;f.c.savedQuestionMetadata(view,2,'case2',q,false,'current');reject(Error('First case failed'));await action;
+ expect(f.payloads.some(p=>p.type==='savedQuestionReviewError')).toBe(false);expect(f.actions.at(-1)).toEqual(['statusBar',expect.stringMatching(/First case failed/)]);
+});
+it('real owner disclosure renders synchronously before Focus arms the new generation',async()=>{
+ const f=fixture(),view=f.target.view;view.anchors={key:{segmentIds:['gid']}};view.conceptOccurrences=[{lib:'L',name:'A',gid:'gid'}];
+ Object.assign(f.c,{decisionTable:undefined,expandedGuardWhens:new Set(),expandQuestionInputs:()=>new Set(['opened']),treeRenderOptions:()=>({}),treeTraversalEntries:()=>[],postTreeFocus:()=>{},routeSelectionRequest:0,
+  renderPane:()=>{view.gen++;view.acked=false;f.actions.push(['render',view.gen]);}});
+ const actual=['interactiveQuestionTarget','focusTreeNode','selectTreeTraversal'].map(name=>root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(ast)).join('\n');
+ vm.runInContext(transformSync(actual,{loader:'ts',target:'es2022'}).code,f.c);
+ await f.c.interactiveQuestionAction(f.context,'focus','q');expect(f.actions[0]).toEqual(['render',3]);expect(view.questionFocus.gen).toBe(3);expect(view.acked).toBe(false);
+ expect(f.actions.find(a=>a[0]==='post')[1]).toMatchObject({type:'armQuestionFocus',gen:3,key:'key'});
+ const render=root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='renderPane');expect(render.modifiers?.some(m=>m.kind===ts.SyntaxKind.AsyncKeyword)??false).toBe(false);
+ expect(render.getText(ast).indexOf('v.acked = false')).toBeLessThan(render.getText(ast).indexOf('if (pane === "source")'));
+});
+it('saved form metadata/token refresh and dynamic close preserve its source draft; another form blocks it',async()=>{
+ const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);
+ const origins=[{kind:'CaseFeature',canonical:'urn:answer',version:'1',library:'L',name:'A'}],q={item:[{linkId:'q',type:'boolean',text:'Question',definition:'urn:answer|1#Observation.value[x]'}]};
+ Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl',projectRoot:'E:/fixture'}}),emitCrlBundle:()=>({success:true,definitionOrigins:origins})});
+ const first=f.c.savedQuestionMetadata(view,1,'case1::q',q,false,'current');const context=f.c.savedQuestionReview.context;
+ await f.c.interactiveQuestionAction(context,'edit','q');const edit=f.c.interactiveEdit;edit.card.draftText='Retained';
+ view.gen=2;const next=f.c.savedQuestionMetadata(view,2,'case1::q',q,false,'checking');expect(next.reviewToken).not.toBe(first.reviewToken);expect(context.current()).toBe(true);
+ f.c.invalidateInteractiveEdit();expect(edit.card.editBlockedReason).toBeUndefined();
+ f.c.currentDefinitions.digest='changed-dependency-before-metadata';expect(context.current()).toBe(false);
+ await f.c.saveInteractiveQuestion({type:'routeCardSave',token:edit.token,key:edit.card.id,fields:{questionText:'Retained',questionDescription:'Description'}});expect(f.payloads.at(-1).ok).toBe(false);expect(f.actions.some(a=>a[0]==='save')).toBe(false);
+ f.c.currentDefinitions.digest='digest';
+ f.c.savedQuestionMetadata(view,2,'case1::q',q,false,'current');await f.c.saveInteractiveQuestion({type:'routeCardSave',token:edit.token,key:edit.card.id,fields:{questionText:'Retained',questionDescription:'Description'}});expect(f.payloads.at(-1).ok).toBe(true);
+ f.c.savedQuestionMetadata(view,3,'case2::q',q,false,'current');expect(context.current()).toBe(false);expect(edit.card.editBlockedReason).toMatch(/draft is retained/);
+});
+it('saved action refuses an old transport token and historical or unmatched source metadata without writing',async()=>{
+ const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);
+ Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl'}}),emitCrlBundle:()=>({success:false})});
+ const q={item:[{linkId:'q',type:'boolean',text:'Question'}]},meta=f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(meta.questions[0].reason).toMatch(/could not be emitted/);
+ await f.c.savedQuestionAction(view,{gen:1,token:'old',action:'edit',linkId:'q'});expect(f.payloads.at(-1).message).toMatch(/refreshed/);
+ await f.c.savedQuestionAction(view,{gen:1,token:meta.reviewToken,action:'edit',linkId:'q'});expect(f.payloads.at(-1).message).toMatch(/could not be emitted/);expect(f.c.interactiveEdit).toBeUndefined();
 });
 it('actual pencil handler opens the existing editor expanded and saves an MV question request',async()=>{
  const f=fixture();await f.c.interactiveQuestionAction(f.context,'edit','q');const payload=f.payloads[0];expect(payload.cards[0].editing).toBe(true);expect(payload.cards[0].text).toBe('Question');

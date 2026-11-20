@@ -9,7 +9,11 @@ import { interactiveQuestionnaireDependencies } from "./interactiveQuestionnaire
 import type { InteractiveResult } from './interactiveQuestionnaire';
 import type { InteractiveQuestionControl } from './lformsReviewControls';
 
-export interface InteractiveReviewContext {
+export interface QuestionReviewContext {
+  cel:string; prepared:Pick<ReturnType<typeof prepareInteractivePolicy>,'definitionOrigins'>;
+  result:Pick<InteractiveResult,'questionnaire'>; current():boolean;
+}
+export interface InteractiveReviewContext extends QuestionReviewContext {
   cel: string; prepared: ReturnType<typeof prepareInteractivePolicy>; result: InteractiveResult;
   current(): boolean; outcomeCurrent(): boolean;
 }

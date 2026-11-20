@@ -6,6 +6,7 @@ export function installLformsReviewControls(mount: HTMLElement, questions: Inter
   action: (kind: 'focus' | 'edit' | 'flag', linkId: string) => void, enabled: () => boolean): () => void {
   const doc = mount.ownerDocument, win = doc.defaultView!;
   const owned = new Map<HTMLElement, HTMLElement>();
+  const identities = new WeakMap<HTMLElement, string>();
   let stopped = false, pending = false;
   const paths = {
     focus: 'M3 9 V3 H9 M15 3 H21 V9 M21 15 V21 H15 M9 21 H3 V15 M8 12 H16 M12 8 V16',
@@ -16,11 +17,18 @@ export function installLformsReviewControls(mount: HTMLElement, questions: Inter
   const refresh = () => {
     pending = false;
     if (stopped) return;
-    for (const [node, toolbar] of owned) if (!mount.contains(node)) { toolbar.remove(); owned.delete(node); }
-    for (const q of questions) {
+    const items = Array.from(mount.querySelectorAll<HTMLElement>('lhc-item'));
+    const matches = new Map(questions.map(q => {
       const prefix = 'item-' + q.linkId + '/';
-      const nodes = Array.from(mount.querySelectorAll<HTMLElement>('lhc-item')).filter(n =>
-        n.id.startsWith(prefix) && /^\d+(\/\d+)*$/.test(n.id.slice(prefix.length)));
+      return [q.linkId, items.filter(n => n.id.startsWith(prefix) && /^\d+(\/\d+)*$/.test(n.id.slice(prefix.length)))] as const;
+    }));
+    for (const [node, toolbar] of owned) if (!mount.contains(node)) { toolbar.remove(); owned.delete(node); }
+    for (const [node, toolbar] of owned) {
+      const linkId = identities.get(toolbar), nodes = linkId === undefined ? undefined : matches.get(linkId);
+      if (!nodes || nodes.length !== 1 || nodes[0] !== node) { toolbar.remove(); owned.delete(node); }
+    }
+    for (const q of questions) {
+      const nodes = matches.get(q.linkId)!;
       // Repeated DOM occurrences cannot be addressed by linkId alone.
       if (nodes.length !== 1) continue;
       const node = nodes[0];
@@ -44,7 +52,8 @@ export function installLformsReviewControls(mount: HTMLElement, questions: Inter
           icon.append(path); button.append(icon);
           button.addEventListener('click', event => {
             event.preventDefault(); event.stopPropagation();
-            if (enabled() && !q.reason && !button.disabled) action(kind, q.linkId);
+            const current = questions.find(item => item.linkId === identities.get(toolbar!));
+            if (enabled() && current && !current.reason && !button.disabled) action(kind, current.linkId);
           });
           button.addEventListener('keydown', event => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -55,6 +64,7 @@ export function installLformsReviewControls(mount: HTMLElement, questions: Inter
         }
         heading.append(toolbar); owned.set(node, toolbar);
       }
+      identities.set(toolbar, q.linkId);
       for (const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))) {
         const disabled = !enabled() || !!q.reason;
         if (button.disabled !== disabled) button.disabled = disabled;
@@ -64,7 +74,7 @@ export function installLformsReviewControls(mount: HTMLElement, questions: Inter
   };
   const schedule = () => { if (!pending && !stopped) { pending = true; win.queueMicrotask(refresh); } };
   const observer = new win.MutationObserver(schedule);
-  observer.observe(mount, { subtree: true, childList: true, attributes: true, attributeFilter: ['inert', 'aria-busy'] });
+  observer.observe(mount, { subtree: true, childList: true, attributes: true, attributeFilter: ['id', 'inert', 'aria-busy'] });
   mount.addEventListener('crl-review-state', refresh);
   refresh();
   return () => { stopped = true; observer.disconnect(); mount.removeEventListener('crl-review-state', refresh); for (const toolbar of owned.values()) toolbar.remove(); owned.clear(); };

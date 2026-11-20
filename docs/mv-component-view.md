@@ -1,10 +1,14 @@
 # Criterion components in Medical Validation
 
-The Interactive FHIR Questionnaire has right-side Focus, pencil and flag controls
+The FHIR Questionnaire and Interactive FHIR Questionnaire have right-side Focus, pencil and flag controls
 for questions with an exact source identity. Focus reveals the chosen tree
 occurrence, including inputs inside collapsed groups and Decision Table rows.
 The pencil opens the existing question editor and saves an MV request for the KE;
 the flag opens the existing node flag workflow. These controls preserve answers.
+Focus discloses the owning tree path and navigates to the exact question control.
+Editing, pinning and passive selection replay retain the tree viewport. Saved-form
+source controls and freshness warnings update without remounting unchanged case
+data; another case has its own form even if the saved bytes are identical.
 Each native determination has a route verdict control. It updates saved MV cases
 on that exact route, using existing review painting. Uncovered or ambiguous routes,
 and cases whose review would also affect another execution route, explain why a

@@ -6,6 +6,15 @@ import type {WordingTarget} from './presentationProposal';
 
 export type QuestionOwner = { library: string; concept: string };
 export type NativeReviewRoute = { keys?: string[]; reason?: string };
+export function questionReviewPresentation(questionnaire:Fhir|undefined,origins:DefinitionOrigin[],disabledReason?:string){
+  const owners=questionReviewOwners(questionnaire,origins),questions:{linkId:string;reason?:string}[]=[];
+  const walk=(items:Fhir[])=>{for(const q of items??[]){if(!['group','display'].includes(q.type)){
+    const url=typeof q.definition==='string'?q.definition.split('#')[0].split('|')[0]:undefined;
+    const mismatch=url&&origins.some(o=>o.kind==='CaseFeature'&&o.canonical===url);
+    const reason=disabledReason??(!owners.has(q.linkId)?mismatch?'This question profile version or occurrence does not match one current source owner.':'This question has no unique source-node identity.':undefined);
+    questions.push({linkId:q.linkId,...reason?{reason}:{}});
+  }walk(q.item);}};walk(questionnaire?.item);return questions;
+}
 /** A grouped input can retain the ordinary CPG prefix or use the capable engine's member text. */
 export function interactiveQuestionWordingMatches(text:unknown,target:WordingTarget):boolean{
   if(typeof text!=='string')return false;

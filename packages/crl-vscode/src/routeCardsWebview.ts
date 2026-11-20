@@ -232,7 +232,7 @@ export function installRouteCards(root: HTMLElement, api: { postMessage(m: unkno
         save.onclick = () => { card.saving = true; card.statusMessage = "Saving…"; save.disabled = true; status.textContent = card.statusMessage; api.postMessage({ type: "routeCardSave", gen: generation(), token: snapshot.token, key: card.id, fields: { questionText: card.draftText ?? card.text, questionDescription: card.draftDescription ?? card.description } }); };
         const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.onclick = () => { card.editing = false; delete card.draftText; delete card.draftDescription; sendDraft(card); render(); };
         editor.append(save, cancel); form.append(editor);
-        edit.onclick = () => { delete card.answerDraft; card.editing = true; card.editingOwner=standalone?undefined:ownerKey; sendDraft(card); render(); root.querySelector<HTMLTextAreaElement>('[data-card-id="'+card.id+'"] .route-card-editor:not([hidden]) textarea')?.focus(); };
+        edit.onclick = () => { delete card.answerDraft; card.editing = true; card.editingOwner=standalone?undefined:ownerKey; sendDraft(card); render(); root.querySelector<HTMLTextAreaElement>('[data-card-id="'+card.id+'"] .route-card-editor:not([hidden]) textarea')?.focus({preventScroll:true}); };
         editor.hidden = !card.editing || (!standalone && card.editingOwner!==ownerKey);
       }
       form.addEventListener("click", e => e.stopPropagation()); form.addEventListener("keydown", e => e.stopPropagation());
