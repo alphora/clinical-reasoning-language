@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "4ca314c2ddbdab6cd42b73ed760405d57e197a62",
-  "auditedSchemaVersion": "2.49",
-  "auditedContentHash": "10496ccfe465096fe31a3ec14dba93eac27828b9ae900958ee2460bbb676fed8",
-  "scope": "Schema 2.49 bounded Quantity threshold maintenance: inclusive at least/at most, isolated same-unit percentage and millisecond comparisons, shared evaluator/CQL unit table and tested synthetic examples. Exact decimal, unknown/error and declared-unit candidate ordering qualified with Windows native sessions. Complete baseline/target interval and proof limits in coverage.md; release, installed/Linux/client/customer qualification remain separate.",
+  "auditedRevision": "22ae27ac64d55aa0024e5c92ad8e32abb7bcebeb",
+  "auditedSchemaVersion": "2.50",
+  "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
+  "scope": "Schema 2.50 bounded release-availability maintenance: percentage/millisecond thresholds require CRL6.4.55; declared Quantity units require CRL6.4.46 and its qualified runtime. Six canonical paths changed; numeric examples and semantics unchanged. Full implementation interval, native proof tiers, shipped46 archive verification and three identity owners recorded in coverage.md. Installed/Linux/publication qualification remains separate.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
