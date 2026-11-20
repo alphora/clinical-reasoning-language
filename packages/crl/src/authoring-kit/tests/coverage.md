@@ -2377,7 +2377,7 @@ Release qualification test corrections: six language-service test imports combin
 - `packages/crl-vscode/src/crl-patterns-coverage.test.mjs`
 - `packages/crl-vscode/src/embedded-catalog.test.mjs`
 - `packages/crl-vscode/src/highlight.test.mjs`
-- `packages/crl-vscode/src/fhirQuestionnaireBranch.test.mjs`
+- Saved-pane `fhirQuestionnaireBranch.test.mjs` is historical and retired. Current explicit Default/browser coverage is `packages/crl-vscode/src/manualQuestionnaireDefault.test.mjs`; this does not reassert the earlier native qualification below.
 
 Final maintained Bleph regeneration: all16 native MV cases generated Questionnaire/QuestionnaireResponse with actual6.4.36 provenance; all32 artifact hashes/resources checked. Source/config binding repinned only after this run; prior CQL/clinical conditions remain unchanged. Producer generation does not adjudicate native outcomes against CEL expectations, so no clinical-approval claim. Fresh native5 synthetic Task controls separately assert Task semantics. Source/installed qualification is separate. Operator active MV sidecar and ke-ui-demo edit excluded from candidate commit.
 

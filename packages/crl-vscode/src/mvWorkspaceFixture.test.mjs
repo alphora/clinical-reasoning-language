@@ -1,3 +1,4 @@
+// REFACTOR:grounded: manual FHIR Default replaces the retired saved pane; retained navigation contracts stay covered.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -101,7 +102,7 @@ test('the L34194 native delivery stays bound to its source snapshot and emitted 
  assert.deepEqual(data.cases.map(c=>c.caseId).sort(),results.cases.map(c=>c.caseId).sort());
  for(const c of data.cases)for(const a of c.artifacts)assert.equal(createHash('sha256').update(readFileSync(join(example,'tests/data/fhir',a.path))).digest('hex'),a.sha256,a.path);
  const workspace=JSON.parse(readFileSync(join(example,'medical-validation.code-workspace'),'utf8'));
- assert.deepEqual(workspace.settings['crl.medical-validation.paneOrder'],['source','tree','fhirQuestionnaire']);
+ assert.deepEqual(workspace.settings['crl.medical-validation.paneOrder'],['source','tree']);
 });
 
 test('the Bleph example includes the complete matching FHIR definition set',()=>{

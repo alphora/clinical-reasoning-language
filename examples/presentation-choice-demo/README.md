@@ -3,8 +3,8 @@
 In this repository's Run and Debug menu, select **Run Multi-select Demo (isolated)** and press **F5**.
 The extension builds and opens Medical Validation on this demo automatically.
 
-- Select **Two activities selected** to see the saved native `$apply` questionnaire with two checked choices.
-- Open **Interactive FHIR Questionnaire** from the MV tool and click **Start** for a blank form.
+- Select **Two activities selected**, open **FHIR Questionnaire** from the MV tool and click **Default** to load that case's answers into the native form.
+- Choose the request initial state and click **Start** for a blank form. **Reset** clears editable answers; **Default** explicitly loads the currently selected row again.
 - Check several activities, then click **Continue / Re-evaluate**. Each activity keeps its own Boolean answer.
 - A mixed checkbox is unanswered; checked is Yes; unchecked is an explicit No. Use **Clear** to return a choice to unanswered.
 - The group requests three columns and adapts to the pane width. Widen the questionnaire pane to see the columns.

@@ -430,18 +430,16 @@
               "source",
               "tree",
               "questionnaire",
-              "fhirQuestionnaire",
               "crl",
               "cel"
             ]
           },
           "default": [
             "source",
-            "tree",
-            "fhirQuestionnaire"
+            "tree"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the Medical Validation panel's panes. The list is honored exactly as written; an empty list shows no panes. Available panes: 'source', 'tree' (result selection, review, and question cards), 'worklist' (optional tabular case review with verdicts and notes), 'questionnaire' (the CRL path questionnaire), 'fhirQuestionnaire' (the native FHIR Questionnaire produced by $apply), 'cel' (the read-only case list), and 'crl'. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
+          "description": "Left-to-right column order of the Medical Validation panel's panes. The list is honored exactly as written; an empty list shows no panes. Available panes: 'source', 'tree' (result selection, review, and question cards), 'worklist' (optional tabular case review with verdicts and notes), 'questionnaire' (the CRL path questionnaire), 'cel' (the read-only case list), and 'crl'. The native FHIR Questionnaire opens from its tree toggle. Set it in User settings to persist across projects, or in Workspace settings for one project. Unknown entries are dropped. Changes apply live to open panes."
         },
         "crl.medical-validation.showKeys": {
           "type": "boolean",

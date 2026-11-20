@@ -1,3 +1,4 @@
+// REFACTOR:grounded: manual FHIR Default replaces the retired saved pane; retained navigation contracts stay covered.
 import {it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -5,7 +6,7 @@ import {pathToFileURL} from 'node:url';
 import vm from 'node:vm';
 import ts from 'typescript';
 import {transformSync} from 'esbuild';
-import {COCKPIT_WEBVIEW_SCRIPT,paneShellFragments} from './correspondenceCockpit.ts';
+import {COCKPIT_WEBVIEW_SCRIPT} from './correspondenceCockpit.ts';
 import {PaneRevealCoordinator} from './paneRevealCoordinator.ts';
 import {installLformsReviewControls} from './lformsReviewControls.ts';
 import {browserExecutable,browserFixture} from '../test/browserHarness.mjs';
@@ -22,7 +23,7 @@ it('actual replay preserves the viewport through immediate and queued coordinato
  c.postReveal('tree',{kind:'crlNode',id:'question'});expect(calls.at(-1)).toBe(false);
 });
 it('actual dispatch also suppresses failed-criteria scrolling on passive replay and restores its caller origin',()=>{
- const seen=[],state={},c=vm.createContext({state,selectingTreeFocus:false,scrollSuppressPane:'source',mode:'medical-validation',views:new Map(),clearTreeFocus(){},focusedCaseId:()=>undefined,reduce:()=>({state,effects:[]}),onNav:{fire(){}},reflectSelectionToTree(){},driveFailedCriteriaPeek:()=>seen.push(c.scrollSuppressPane),driveDiverters(){},driveLeafMarks(){},shouldRerenderQuestionnaire:()=>false});
+ const seen=[],state={},c=vm.createContext({state,selectingTreeFocus:false,scrollSuppressPane:'source',mode:'medical-validation',views:new Map(),clearTreeFocus(){},focusedCaseId:()=>undefined,reduce:()=>({state,effects:[]}),onNav:{fire(){}},reflectSelectionToTree(){},driveFailedCriteriaPeek:()=>seen.push(c.scrollSuppressPane),driveDiverters(){},driveLeafMarks(){},syncQuestionnaireDefaults(){},shouldRerenderQuestionnaire:()=>false});
  vm.runInContext(transformSync(body('dispatch'),{loader:'ts',target:'es2022'}).code,c);
  c.dispatch({type:'select'},true);expect(seen).toEqual(['tree']);expect(c.scrollSuppressPane).toBe('source');
  c.dispatch({type:'select'},false);expect(seen).toEqual(['tree','source']);expect(c.scrollSuppressPane).toBe('source');
@@ -64,32 +65,7 @@ it.skipIf(!browserExecutable)('tree pan is restored after retained criterion des
   expect(await browser.evaluate(`[scrollX,scrollY]`)).toEqual(await browser.evaluate('beforeDescriptionPan'));
  }finally{await browser.close();}
 },30000);
-it.skipIf(!browserExecutable)('real saved LForms keeps its mounted instance, local answers and focused toolbar on metadata changes, remounts another case',async()=>{
- const vendor=paneShellFragments('fhirQuestionnaire',{nonce:'test',asset:name=>pathToFileURL(resolve('packages/crl-vscode/media/lforms',name)).href});
- const browser=await browserFixture(html(vendor.head,vendor.bodyScripts));
- try{
-  const send=m=>browser.evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(m)}}))`);
-  const q={resourceType:'Questionnaire',url:'urn:saved-navigation',status:'active',item:[{linkId:'a',type:'boolean',text:'A question',definition:'urn:a#Observation.value[x]'}]};
-  const m={type:'fhirQuestionnaire',gen:1,key:'policy/case1::data',label:'One',q,reviewToken:'one',definitionState:'current',questions:[{linkId:'a'}]};
-  await send(m);await browser.until(()=>browser.evaluate(`document.querySelectorAll('[data-question-review]').length===3`),'saved controls');
-  await browser.evaluate(`window.originalForm=document.querySelector('wc-lhc-form');document.querySelector('label[id$="|true"]').click();document.querySelector('[data-question-review="flag"]').focus();window.originalButton=document.activeElement;window.originalAnswers=JSON.stringify(LForms.Util.getFormFHIRData('QuestionnaireResponse','R4',document.getElementById('aqMount')).item);`);
-  await send({...m,gen:2,reviewToken:'two'});
-  expect(await browser.evaluate(`originalForm===document.querySelector('wc-lhc-form')&&originalButton===document.activeElement`)).toBe(true);
-  expect(await browser.evaluate(`JSON.stringify(LForms.Util.getFormFHIRData('QuestionnaireResponse','R4',document.getElementById('aqMount')).item)===originalAnswers`)).toBe(true);
-  await browser.evaluate(`document.querySelector('[data-question-review="flag"]').click()`);expect(await browser.evaluate(`sent.filter(m=>m.type==='savedQuestionReviewAction').at(-1)`)).toMatchObject({gen:2,token:'two',action:'flag',linkId:'a'});
-  await send({...m,gen:3,reviewToken:'three',definitionState:'checking',questions:[{linkId:'a',reason:'Checking'}]});expect(await browser.evaluate(`document.querySelector('[data-question-review]').disabled&&originalForm===document.querySelector('wc-lhc-form')&&document.getElementById('aqHeader').textContent.includes('Checking')`)).toBe(true);
-  await send({...m,gen:4,reviewToken:'four'});expect(await browser.evaluate(`!document.querySelector('[data-question-review]').disabled&&originalForm===document.querySelector('wc-lhc-form')`)).toBe(true);
-  await send({...m,gen:5,reviewToken:'five',key:'policy/case2::data',label:'Two',definitionState:'checking',questions:[{linkId:'a',reason:'Checking'}]});await browser.until(()=>browser.evaluate(`document.querySelectorAll('[data-question-review]').length===3&&originalForm!==document.querySelector('wc-lhc-form')`),'other saved case');
-  expect(await browser.evaluate(`JSON.stringify(LForms.Util.getFormFHIRData('QuestionnaireResponse','R4',document.getElementById('aqMount')).item)!==originalAnswers`)).toBe(true);
-  expect(await browser.evaluate(`document.querySelector('[data-question-review]').disabled`)).toBe(true);
-  await send({...m,gen:6,reviewToken:'six',key:'policy/case2::data',label:'Two'});
-  await browser.evaluate(`document.querySelector('[data-question-review="edit"]').click();document.querySelector('[data-question-review="focus"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));`);
-  expect(await browser.evaluate(`sent.filter(m=>m.type==='savedQuestionReviewAction').slice(-2).map(m=>[m.action,m.gen,m.token])`)).toEqual([['edit',6,'six'],['focus',6,'six']]);
-  await send({type:'savedQuestionReviewError',token:'six',message:'Old refusal'});expect(await browser.evaluate(`!!document.querySelector('[data-question-review-error]')`)).toBe(true);
-  await send({...m,gen:7,reviewToken:'seven',key:'policy/case2::data'});expect(await browser.evaluate(`document.querySelector('[data-question-review-error]').textContent`)).toBe('Old refusal');
-  await browser.evaluate(`document.querySelector('[data-question-review="flag"]').click()`);expect(await browser.evaluate(`!!document.querySelector('[data-question-review-error]')`)).toBe(false);
- }finally{await browser.close();}
-},30000);
+
 it.skipIf(!browserExecutable)('actual tree runtime retains pan across index/redraw and deliberate Focus cancels on manual interaction or a newer Focus',async()=>{
  const browser=await browserFixture(html());
  try{

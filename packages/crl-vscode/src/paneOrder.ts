@@ -41,7 +41,7 @@ export const COCKPIT_PANE_SPEC: PaneSpec = {
 };
 
 /** The medical-validation spec — `worklist` is now a FIRST-CLASS internal pane (the review surface), DISTINCT from `cel`
- *  (the read-only case-list). Default = [worklist, source, tree, questionnaire]. `cel` (read-only) + `crl` are valid-but-
+ *  (the read-only case-list). Default = [source, tree]. `cel` (read-only) + `crl` are valid-but-
  *  not-canonical, so a MV user can open the read-only CEL alongside the worklist. No alias (dropped when worklist split
  *  from cel — pane split, disc 179): listing both `worklist` and `cel` now opens BOTH (they're different internal panes). */
 export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
@@ -54,16 +54,12 @@ export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
   // including the 1.85 MB LForms shell — side by side on a browser-only clinician's screen, for panes most of
   // them never open. Discoverability comes from the settings enum, which is where someone editing paneOrder
   // already is.
-  valid: ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"],
-  canonical: ["source", "tree", "fhirQuestionnaire"],
+  valid: ["worklist", "source", "tree", "questionnaire", "crl", "cel"],
+  canonical: ["source", "tree"],
 };
 
-/** Every internal pane, in a stable order — the ONE authoritative list. Anything that needs to enumerate panes
- *  (the valid set below, the webview view types, the serializer registration) derives from this rather than
- *  repeating it, because the repeated copies have already drifted once: `fhirQuestionnaire` was added to the
- *  cockpit's list and to this file but missed in `correspondenceEngine.PANES`, silently costing that pane its
- *  reveal effects. None of those lists is compiler-checked against the `Pane` union. */
-export const ALL_PANES: readonly Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"];
+/** REFACTOR:grounded: enumerate retained reducer panes; native FHIR has its own session panel. */
+export const ALL_PANES: readonly Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"];
 
 /** The webview view type for a pane's panel. Shared so the panel that is CREATED and the serializer that
  *  RECLAIMS it after a window reload can never disagree — a mismatch there is invisible until a restored tab

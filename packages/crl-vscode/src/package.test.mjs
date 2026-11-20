@@ -1,3 +1,4 @@
+// REFACTOR:grounded: manual FHIR Default replaces the retired saved pane; retained navigation contracts stay covered.
 // Static-assertion tests for the v2.3.0 package.json contributes restructure.
 // Asserts:
 //   - contributes.languages has entries for `crl` and `crl-cel` (per 054 Δ4
@@ -168,11 +169,11 @@ check("contributes the crl.medical-validation.paneOrder setting (enum + ALL-pane
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
   assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "fhirQuestionnaire", "crl", "cel"]);
+  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "crl", "cel"]);
   // Operator's default (2026-08-16). Deliberately a SUBSET of the enum: the setting is the source of truth, so
   // the rest are opt-in via the enum a user editing this setting is already looking at. Defaulting to all seven
   // was tried and reverted — seven webviews side by side on a browser-only clinician's screen.
-  assert.deepEqual(prop.default, ["source", "tree", "fhirQuestionnaire"]);
+  assert.deepEqual(prop.default, ["source", "tree"]);
   assert.equal(prop.scope, "window");
 });
 

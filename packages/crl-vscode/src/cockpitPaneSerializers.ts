@@ -9,7 +9,7 @@
 //
 // A restored tab is invisible to that loop, so it can never be disposed however the setting changes. The
 // symptom is a pane the user did not ask for, sitting in a column the panel wants for something else — e.g.
-// paneOrder `[source, fhirQuestionnaire, tree]` presenting a stale "Medical Validation - CRL Questionnaire".
+// paneOrder `[source, tree]` presenting a stale "Medical Validation - CRL Questionnaire".
 // It survives every settings edit and looks exactly like the setting being ignored, which is the one thing the
 // settings-are-the-source-of-truth contract promises cannot happen.
 //
@@ -50,6 +50,10 @@ export function registerCockpitPaneSerializers(
       }),
     );
   }
+  // REFACTOR:grounded: retire persisted saved-FHIR tabs without restoring their UI or session.
+  context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('crlCockpit.fhirQuestionnaire', {
+    async deserializeWebviewPanel(panel:vscode.WebviewPanel):Promise<void>{panel.dispose();},
+  }));
   // A pin is session-local; its optional Branch Questionnaire cannot survive a window reload.
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer(BRANCH_QUESTIONNAIRE_VIEW_TYPE, {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel): Promise<void> {

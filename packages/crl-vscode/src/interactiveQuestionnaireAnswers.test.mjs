@@ -16,6 +16,41 @@ const pair=(a=true,b)=>({questionnaire:q(),response:qr(a,b),activities:[],native
 const initial={id:'one',label:'one',subject:'Patient/p',bundle:data([{resourceType:'Patient',id:'p'}])};
 const defs=data([{resourceType:'PlanDefinition',id:'plan'}]);
 
+// REFACTOR:grounded: manual Default retains exact existing facts and makes subsequent edits replace them.
+it('Default seeds additive profiles once; edit/clear preserve background and replace answer identity',async()=>{
+ const original=resource('a',true);original.meta.profile.unshift('urn:qicore:base');
+ const background={resourceType:'Practitioner',id:'author',name:[{text:'Unchanged'}]};
+ const seeded={...initial,bundle:data([...initial.bundle.entry.map(e=>e.resource),background,original,resource('b',false)])};
+ const before=structuredClone(seeded),requests=[];let first=true;
+ const session=new InteractiveSession(defs,'plan',async request=>{
+  const payload=JSON.parse(request.requestDataJson);requests.push(payload);
+  if(first){first=false;return {...pair(true,false),nativeData:seeded.bundle};}
+  const response=payload.entry.map(e=>e.resource).find(r=>r.resourceType==='QuestionnaireResponse');
+  const changed=response.item[0],value=changed.answer?.[0]?.valueBoolean;
+  return {...pair(value,false),nativeData:data([resource('a',value,'replacement')])};
+ });
+ session.resetWithDefaults(seeded,new Set([profile('a'),profile('b')]));
+ expect(session.initial.bundle).toEqual(data([...initial.bundle.entry.map(e=>e.resource),background]));
+ await session.evaluate();expect(requests[0].entry.filter(e=>e.resource.resourceType==='Observation')).toHaveLength(2);
+ await session.evaluate(qr(false,false));
+ expect(requests[1].entry.filter(e=>e.resource.resourceType==='Observation').map(e=>e.resource)).toEqual([resource('b',false)]);
+ const clear=qr(false,false);delete clear.item[0].answer;await session.evaluate(clear);
+ expect(requests[2].entry.find(e=>e.resource.resourceType==='QuestionnaireResponse').resource.item[0]).not.toHaveProperty('answer');
+ for(const request of requests)expect(request.entry.find(e=>e.resource.resourceType==='Practitioner').resource).toEqual(background);
+ expect(seeded).toEqual(before);
+});
+it('Default refuses duplicate/ambiguous/foreign inputs before replacing the current session',()=>{
+ const session=new InteractiveSession(defs,'plan',async()=>pair());session.reset(initial);
+ const observation=resource('a',true);
+ const bads=[[observation,observation],[{...observation,subject:{reference:'Patient/other'}}],[{...observation,meta:{profile:[profile('a'),profile('b')]}}]];
+ for(const resources of bads){expect(()=>session.resetWithDefaults({...initial,bundle:data([...initial.bundle.entry.map(e=>e.resource),...resources])},new Set([profile('a'),profile('b')]))).toThrow();expect(session.initial).toBe(initial);}
+});
+it('Default refuses unsupported seeded extraction before adopting a result, without dropping authored facts',async()=>{
+ const session=new InteractiveSession(defs,'plan',async()=>({questionnaire:{...q(),extension:[{url:'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract',valueCanonical:'urn:aggregate'}]},activities:[]}));
+ session.resetWithDefaults({...initial,bundle:data([...initial.bundle.entry.map(e=>e.resource),resource('a',true)])},new Set([profile('a')]));
+ await expect(session.evaluate()).rejects.toThrow(/without independent singleton answer bindings/);expect(session.result).toBeUndefined();
+});
+
 describe('singleton answer intent',()=>{
  it('leaves extraction-owning root/group containers to legacy handling',()=>{
   const extension={url:'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtract',valueCanonical:'urn:aggregate'};

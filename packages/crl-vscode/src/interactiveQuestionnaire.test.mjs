@@ -1,10 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { discoverInitialStates, validateInitialBundle, interactiveRequest, readInteractiveResult, InteractiveSession, prepareInteractivePolicy } from "./interactiveQuestionnaire.ts";
 import { pruneInteractiveResponse, questionnaireWithoutDefaults } from "./interactiveQuestionnaireResponse.ts";
 import { vi } from 'vitest';
+
+// REFACTOR:grounded: optional request-folder errors are reported independently of row Default definitions.
+it('Default prepares definitions with missing or malformed standalone initial states; strict discovery still refuses malformed input',()=>{
+ const root=mkdtempSync(join(tmpdir(),'crl-default-initial-'));
+ try{
+  cpSync(resolve(import.meta.dirname,'testdata/interactive-questionnaire'),root,{recursive:true});
+  const cel=join(root,'src/cel/mv/cases.cel'),folder=join(root,'tests/interactive-questionnaire');
+  writeFileSync(join(folder,'request-1/request-bundle.json'),'{}');
+  expect(()=>prepareInteractivePolicy(cel)).toThrow(/request-1/);
+  const prepared=prepareInteractivePolicy(cel,{},true);expect(prepared.planId).toBeTruthy();expect(prepared.initialStates).toEqual([]);expect(prepared.initialStateError).toMatch(/request-1/);
+  rmSync(folder,{recursive:true,force:true});const empty=prepareInteractivePolicy(cel,{},true);expect(empty.initialStates).toEqual([]);expect(empty.planId).toBeTruthy();expect(empty.initialStateError).toBeUndefined();
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
 
 it('interactive Restart prepares definitions with the same explicit MV date despite inherited environment',()=>{
  vi.stubEnv('SOURCE_DATE_EPOCH','946684800');

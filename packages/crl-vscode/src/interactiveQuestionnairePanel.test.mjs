@@ -9,27 +9,71 @@ import {transformSync} from 'esbuild';
 
 const src=ts.createSourceFile('panel.ts',readFileSync(new URL('./interactiveQuestionnairePanel.ts',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true);
 const body=src.statements.find(s=>ts.isFunctionDeclaration(s)&&s.name.text==='createInteractiveQuestionnairePanel').getText(src).replace(/^export /,'');
-function fixture(hooks){
- const messages=[],sessions=[],panels=[],visibility=[],status=[];let receive,revision=1,finishCleanup,failPrepare=false,failAdapter=false,cleanupSafe=true;
+function fixture(hooks,options,initialStates=[{id:'one',label:'One'},{id:'two',label:'Two'}]){
+ const messages=[],sessions=[],panels=[],visibility=[],status=[];let receive,revision=1,finishCleanup,failPrepare=false,failAdapter=false,cleanupSafe=true,finishEvaluation,failEvaluation=false,deferEvaluation=false;
  const cleanup=new Promise(resolve=>finishCleanup=resolve);
  const makePanel=()=>{const listeners=[];let disposed=false;const panel={reveal:()=>{},dispose:()=>{if(disposed)return;disposed=true;for(const fn of listeners)fn();},onDidDispose:fn=>listeners.push(fn),webview:{postMessage:m=>messages.push(m),onDidReceiveMessage:f=>{receive=f;return {dispose:()=>{}};},asWebviewUri:()=>({toString:()=>''}),cspSource:'test'}};panels.push(panel);return panel;};
  class Session {
   constructor(definitions){this.definitions=definitions;sessions.push(this);}
-  reset(state){this.selected=state.id;this.result=undefined;}
+  reset(state){this.initial=state;this.selected=state.id;this.result=undefined;}
+  resetWithDefaults(state,profiles){this.reset(state);this.profiles=profiles;}
   cancel(){this.cancelled=true;}
   cancelAndWait(){this.cancel();return cleanup;}
-  async evaluate(){this.evaluated=true;return this.result={questionnaire:{resourceType:'Questionnaire',id:String(this.definitions.revision),item:[{linkId:'one',type:'boolean'}]},activities:['Met'],nativeData:{private:'data'},nativeResult:{private:'result'}};}
+  async evaluate(){this.evaluated=true;if(deferEvaluation)await new Promise(resolve=>finishEvaluation=resolve);if(failEvaluation)throw Error('Native failure');return this.result={questionnaire:{resourceType:'Questionnaire',id:String(this.definitions.revision),item:[{linkId:'one',type:'boolean'}]},activities:['Met'],nativeData:{private:'data'},nativeResult:{private:'result'}};}
  }
  const c=vm.createContext({join,randomUUID,InteractiveSession:Session,
   nativeInteractiveRunner:()=>({cleanupSafe:()=>cleanupSafe}),require:()=>{if(failAdapter)throw Error('Adapter unavailable');return {applySession:()=>{}};},
-  prepareInteractivePolicy:()=>{if(failPrepare)throw Error('Invalid current definitions');return {definitions:{revision},planId:'plan',initialStates:[{id:'one',label:'One'},{id:'two',label:'Two'}],warnings:[]};},
+  prepareInteractivePolicy:()=>{if(failPrepare)throw Error('Invalid current definitions');return {definitions:{revision},definitionOrigins:[{kind:'CaseFeature',canonical:'urn:answer'}],planId:'plan',initialStates,warnings:[]};},
   interactiveQuestionnaireDependencies:()=>({}),interactiveQuestionnaireHtml:()=>'<main>Actual HTML tested separately</main>',nextQuestionnaireColumn:()=>2,
   vscode:{window:{createWebviewPanel:makePanel,setStatusBarMessage:m=>status.push(m)},Uri:{joinPath:()=>({})}}});
  vm.runInContext(transformSync(body,{loader:'ts',target:'es2022'}).code,c);
- const api=c.createInteractiveQuestionnairePanel({subscriptions:[],extensionPath:'/synthetic',extensionUri:{}},undefined,undefined,()=>visibility.push(api.isOpen),hooks);
+ const api=c.createInteractiveQuestionnairePanel({subscriptions:[],extensionPath:'/synthetic',extensionUri:{}},undefined,undefined,()=>visibility.push(api.isOpen),hooks,options);
  return {api,messages,sessions,panels,visibility,status,receive:m=>receive(m),token:()=>messages.at(-1).token,finishCleanup,
-  revision:v=>revision=v,failPrepare:v=>failPrepare=v,failAdapter:v=>failAdapter=v,cleanupSafe:v=>cleanupSafe=v};
+  revision:v=>revision=v,failPrepare:v=>failPrepare=v,failAdapter:v=>failAdapter=v,cleanupSafe:v=>cleanupSafe=v,
+  failEvaluation:v=>failEvaluation=v,deferEvaluation:v=>deferEvaluation=v,finishEvaluation:()=>finishEvaluation?.()};
 }
+
+const defaultState={id:'row-default:case',label:'Selected row',subject:'Patient/p',bundle:{resourceType:'Bundle'}};
+test('Default works with no request folders; definition restart requires a fresh explicit Default',async()=>{
+ const f=fixture(undefined,{defaults:{describe:()=>({label:'Row'}),load:()=>({initial:defaultState,current:()=>true})}},[]);
+ f.api.open('policy.cel');await f.receive({type:'ready'});assert.equal(f.messages.at(-1).states.length,0);f.finishCleanup();
+ await f.receive({type:'default',token:f.token()});assert.equal(f.messages.at(-1).type,'result');
+ f.api.definitionsChanged('policy.cel');await f.receive({type:'restart',token:f.token()});assert.equal(f.messages.at(-1).states.length,0);
+ await f.receive({type:'default',token:f.token()});assert.equal(f.messages.at(-1).type,'result');
+});
+test('Default is manual, adopts current row only on success, and publishes native review controls',async()=>{
+ let calls=0;const f=fixture(undefined,{defaults:{describe:()=>({label:'Row'}),load:()=>{calls++;return {initial:defaultState,current:()=>true};}}});
+ f.api.open('policy.cel');await f.receive({type:'ready'});f.api.defaultsChanged();assert.equal(calls,0);assert.equal(f.messages.at(-1).type,'defaults');
+ f.finishCleanup();await f.receive({type:'default',token:f.token()});assert.equal(calls,1);assert.equal(f.messages.at(-1).type,'result');assert.equal(f.messages.at(-1).selectedId,defaultState.id);assert.equal(f.sessions.at(-1).selected,defaultState.id);
+ assert.equal(f.messages.at(-1).states.at(-1).label,'Empty assessment — Selected row');assert.equal(f.messages.at(-1).defaulted,true);
+ await f.receive({type:'reset',token:f.token()});assert.equal(f.messages.at(-1).emptyAssessment,true);assert.equal(f.messages.at(-1).label,'Empty assessment — Selected row');
+ f.api.defaultsChanged();assert.equal(calls,1);assert.equal(f.messages.at(-1).type,'defaults');
+});
+test('failed or cancelled Default preserves the old evaluation controls, including invalidated verdict state',async()=>{
+ for(const cancellation of [false,true]){
+  const calls=[];const f=fixture({describe:()=>({questions:[],outcomes:[]}),question:(ctx)=>calls.push(ctx.current()),verdict:()=>calls.push('verdict')},{defaults:{describe:()=>({label:'Row'}),load:()=>({initial:defaultState,current:()=>true})}});
+  f.api.open('policy.cel');await f.receive({type:'ready'});await f.receive({type:'start',token:f.token()});const prior=f.messages.at(-1);
+  await f.receive({type:'answersChanged',token:f.token(),evaluationId:prior.evaluationId});f.finishCleanup();f.failEvaluation(!cancellation);f.deferEvaluation(cancellation);
+  const work=f.receive({type:'default',token:f.token()});await new Promise(resolve=>setImmediate(resolve));
+  if(cancellation){await f.receive({type:'cancel',token:f.token()});f.finishEvaluation();}await work;
+  await f.receive({type:'questionReviewAction',token:f.token(),evaluationId:prior.evaluationId,linkId:'one',action:'focus'});
+  await f.receive({type:'outcomeVerdict',token:f.token(),evaluationId:prior.evaluationId,index:0});assert.deepEqual(calls,[true]);
+ }
+});
+test('row changes during Default discard candidate; a closed panel cannot adopt late results',async()=>{
+ for(const close of [false,true]){
+  let current=true;const f=fixture(undefined,{defaults:{describe:()=>({label:'Row'}),load:()=>({initial:defaultState,current:()=>current})}});
+  f.api.open('policy.cel');await f.receive({type:'ready'});f.finishCleanup();f.deferEvaluation(true);
+  const work=f.receive({type:'default',token:f.token()});await new Promise(resolve=>setImmediate(resolve));current=false;if(close)f.api.close();f.finishEvaluation();await work;
+  assert.equal(f.messages.filter(m=>m.type==='result').length,0);if(!close)assert.match(f.messages.at(-1).message,/selected row changed/);
+ }
+});
+test('reopened panel waits for controller cleanup, and unsafe cleanup refuses another native run',async()=>{
+ const f=fixture(undefined,{defaults:{describe:()=>({label:'Row'}),load:()=>({initial:defaultState,current:()=>true})}});
+ f.api.open('one');await f.receive({type:'ready'});f.api.close();f.api.open('two');await f.receive({type:'ready'});
+ const work=f.receive({type:'default',token:f.token()});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.sessions.some(s=>s.evaluated),false);
+ f.cleanupSafe(false);f.finishCleanup();await work;assert.match(f.messages.at(-1).message,/cleanup was not confirmed/);assert.equal(f.sessions.some(s=>s.evaluated),false);
+});
 
 test('definition changes freeze evaluation and Restart uses current definitions while retaining the selected initial case',async()=>{
  const f=fixture();f.api.open('policy.cel');await f.receive({type:'ready'});
@@ -119,7 +163,7 @@ test('the cockpit uses the live panel state for blue/pressed styling and dispatc
  const chrome=root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='buildTreeChromeHtml');
  const declaration=chrome.body.statements.find(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(ast)==='questionnaires'));
  const code=transformSync(declaration.getText(ast),{loader:'ts',target:'es2022'}).code;
- const f=fixture();const render=cel=>vm.runInNewContext(code+'\nquestionnaires;',{mode:'medical-validation',views:new Map(),PANE_TITLE:{questionnaire:'Result Questionnaire',fhirQuestionnaire:'FHIR Questionnaire'},interactiveQuestionnaire:f.api,currentCel:cel});
+ const f=fixture();const render=cel=>vm.runInNewContext(code+'\nquestionnaires;',{mode:'medical-validation',views:new Map(),PANE_TITLE:{questionnaire:'Result Questionnaire'},interactiveQuestionnaire:f.api,currentCel:cel});
  const button=cel=>render(cel).match(/<button[^>]*data-interactive-questionnaire[^>]*>/)[0];
  assert.match(button('policy.cel'),/aria-pressed="false"/);assert.doesNotMatch(button('policy.cel'),/fc-active/);
  f.api.toggle('policy.cel');assert.match(button('policy.cel'),/fc-active/);assert.match(button('policy.cel'),/aria-pressed="true"/);

@@ -35,7 +35,7 @@ The guard is a Criterion combining two membership checks with `or`, displayed as
 
 ## Interactive questionnaire
 
-In the Medical Validation tree toolbar, choose **Interactive FHIR Questionnaire**, then **Start**. The included synthetic Patient and request have no clinical answers: the first unanswered question is Cosmetic Surgical Purpose. Answer the form and use **Continue / Re-evaluate** to see the next questions or determination. **Reset** starts again without your answers.
+In the Medical Validation tree toolbar, choose **FHIR Questionnaire**. Select **Default** to evaluate the focused Decision Table row or case with all of its authored answers. Switching rows does not replace the form until you select Default again. To start an empty interview instead, choose the included request state and select **Start**. The synthetic Patient and request have no clinical answers: the first unanswered question is Cosmetic Surgical Purpose. Answer the form and use **Continue / Re-evaluate** to see the next questions or determination. **Reset** clears editable answers; the row's **Empty assessment** entry starts from its background context, and Default refills the selected row.
 
 The request supplies demo context only. Its CPT code does not answer Procedure Under Review; choose that procedure in the questionnaire when asked. Either procedure branch can be exercised from this starter.
 

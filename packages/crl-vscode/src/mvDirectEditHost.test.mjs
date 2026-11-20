@@ -64,19 +64,7 @@ test('approval rechecks definitions and refuses a new revision until the reviewe
  c.modelDefinitionDigest='new';assert.equal(c.verifyDefinitionsAtApproval(),true);assert.equal(calls,2);
  c.vscode.workspace.textDocuments=[{isDirty:true,uri:{fsPath:path.join(root,'src/crl/policy.crl')}}];assert.equal(c.verifyDefinitionsAtApproval(),false);assert.equal(calls,2);
 });
-test('FHIR remount identity changes with effective stale status while native bytes stay unchanged',()=>{
- let body;function find(n){if(ts.isVariableDeclaration(n)&&n.name.getText(source)==='post'&&n.initializer?.getText(source).includes('effectiveStale'))body=n.getText(source);ts.forEachChild(n,find);}find(source);assert.ok(body);
- const messages=[],view={gen:1,panel:{webview:{postMessage:m=>messages.push(m)}}},inspection={identity:'inspection'};
- let currentInspection=inspection,resyncs=0;
- const c=vm.createContext({createHash,view,views:new Map([['fhirQuestionnaire',view]]),inspection,fhirInspectionContext:()=>currentInspection,syncFhirInspection:()=>resyncs++,gen:1,indexVersion:1,key:'case',label:'Case',currentDefinitions:{state:'current',digest:'same'},unrenderableQuestionnaireFeatures:()=>[]});
- vm.runInContext(transformSync("var "+body.replace("const definitionState=","var definitionState=")+";",{loader:'ts'}).code,c);const q={resourceType:'Questionnaire'};c.post(q,undefined,undefined,false);c.currentDefinitions.state='drift';c.post(q,undefined,undefined,false);
- assert.notEqual(messages[0].key,messages[1].key);assert.equal(messages[0].stale,false);assert.equal(messages[1].stale,true);
- c.currentDefinitions.state='checking';c.post(q,undefined,undefined,false);assert.equal(messages[2].stale,false);assert.equal(messages[2].definitionState,'checking');
- c.currentDefinitions.state='unknown';c.post(q,undefined,undefined,false);assert.equal(messages[3].stale,false);assert.equal(messages[3].definitionState,'unknown');
- currentInspection={identity:'different-row'};c.post(q,undefined,undefined,false);assert.equal(messages.length,4);assert.equal(resyncs,1,'obsolete row reads trigger a fresh inspection');
- currentInspection=inspection;view.gen=2;c.post(q,undefined,undefined,false);assert.equal(messages.length,4,'obsolete pane generations are dropped');
- view.gen=1;c.views.delete('fhirQuestionnaire');c.post(q,undefined,undefined,false);assert.equal(messages.length,4,'closed panes receive no stale read');
-});
+
 
 test('a note save cannot restore approvals from before a direct edit when sidecar refresh failed',()=>{
  const errors=[],writes=[];let scheduled=0;
@@ -127,18 +115,12 @@ test('changed wording or scope does not transplant an old draft into a different
  g.c.pinCards('case','route',undefined,true,'traversal',g.preserved);assert.equal(g.c.pinnedCards.payload.cards[0].draftText,undefined);
 });
 
-
-
 test('a preserving viewport request is consumed and does not suppress a later model change',()=>{
  const text=bodies.get('renderPane'),start=text.indexOf('v.preserveTreeViewport ='),end=text.indexOf('v.preserveNextTreeViewport = false;',start)+'v.preserveNextTreeViewport = false;'.length;
  assert.ok(start>=0);const c=vm.createContext({pane:'tree',indexVersion:2,v:{gen:1,indexVersion:1,preserveNextTreeViewport:true}});
  const code=transformSync(text.slice(start,end),{loader:'ts'}).code;vm.runInContext(code,c);assert.equal(c.v.preserveTreeViewport,true);assert.equal(c.v.preserveNextTreeViewport,false);
  c.indexVersion=3;vm.runInContext(code,c);assert.equal(c.v.preserveTreeViewport,false);
 });
-
-
-
-
 
 test('definition banner preserves legacy review and explains a changed reviewed-model digest',()=>{
  const c=vm.createContext({mvDefinitionRevision:undefined,mvEditBusy:false,mvRecoveryBlock:undefined,mvSaveNotice:undefined,currentDefinitions:{state:'unknown',message:'Direct editing metadata unavailable'},modelDefinitionDigest:'old'});
@@ -147,19 +129,11 @@ test('definition banner preserves legacy review and explains a changed reviewed-
  c.currentDefinitions={state:'current',digest:'new'};assert.match(c.definitionStatusMessage(),/refresh the reviewed tree/);
 });
 
-
-
-
-
-
-
 test('legacy interactive publication preserves defaults on malformed configured dates and warns; edited policies require repair',()=>{
  const warnings=[],c=vm.createContext({join:path.join,mvDefinitionRevision:undefined,resolveCelSuite:()=>({ok:true,suite:{projectRoot:'/artifact'}}),readFileSync:()=>JSON.stringify({crl:{date:'2026-13-45'}}),mvPublicationOptions:()=>{throw Error('Invalid date');},vscode:{window:{showWarningMessage:m=>warnings.push(m)}}});
  install(c,['interactivePublication']);assert.equal(Object.keys(c.interactivePublication('policy.cel')).length,0);assert.match(warnings[0],/legacy publication defaults/);
  c.mvDefinitionRevision={id:'edit'};assert.throws(()=>c.interactivePublication('policy.cel'),/Invalid date/);
 });
-
-
 
 test('completed local Save does not offer already released scopes as retained locks',async()=>{
  const h=harness();let picked=false;h.c.inspectScopeOperations=()=>({errors:[],operations:[{file:'/synthetic/completed.json',operation:{id:randomUUID(),phase:'saved',localComplete:true,acquired:['fhir'],released:['fhir'],preExisting:['mv']}}]});h.c.loadEditRecovery=()=>{};

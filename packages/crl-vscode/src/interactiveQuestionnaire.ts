@@ -93,17 +93,20 @@ export function discoverInitialStates(projectRoot: string): InitialState[] {
     });
 }
 
-export function prepareInteractivePolicy(celPath: string, definitionOptions: DefinitionPublicationOptions = {}) {
+// REFACTOR:grounded: row defaults do not depend on optional standalone request folders.
+export function prepareInteractivePolicy(celPath: string, definitionOptions: DefinitionPublicationOptions = {}, tolerateInitialStateError = false) {
   const selected = resolveCelSuite(celPath);
   if (!selected.ok) throw new Error(selected.diagnostics.map(d => d.message).join("; "));
   if (!selected.suite.policyPath) throw new Error("The selected MV policy has no CRL root.");
-  const initialStates = discoverInitialStates(selected.suite.projectRoot);
+  let initialStates: InitialState[] = [], initialStateError: string | undefined;
+  try { initialStates = discoverInitialStates(selected.suite.projectRoot); }
+  catch(error) { if(!tolerateInitialStateError)throw error;initialStateError=error instanceof Error?error.message:String(error); }
   const emitted = emitCrlBundle(selected.suite.policyPath, { ...definitionOptions, sourceOrigins: true });
   if (!emitted.success) throw new Error("Cannot prepare policy definitions: " + JSON.stringify(emitted.diagnostics));
   const roots = emitted.bundle.entry.map(e => e.resource).filter((r: Fhir) => r.resourceType === "PlanDefinition" &&
     r.type?.coding?.some((c: any) => c.code === "workflow-definition"));
   if (roots.length !== 1 || !roots[0].id) throw new Error("The policy must emit exactly one workflow-definition PlanDefinition.");
-  return { initialStates, definitions: emitted.bundle, definitionOrigins: emitted.definitionOrigins ?? [], planId: roots[0].id,
+  return { initialStates, initialStateError, definitions: emitted.bundle, definitionOrigins: emitted.definitionOrigins ?? [], planId: roots[0].id,
     warnings: emitted.diagnostics.filter(d => d.severity === "warning").map(d => {
       const detail = d.detail as { message?: unknown; line?: unknown };
       return typeof detail?.message === "string" ? detail.message + (typeof detail.line === "number" ? ` (line ${detail.line})` : "") : JSON.stringify(d.detail);
@@ -194,6 +197,27 @@ export class InteractiveSession {
   cancel() { ++this.epoch; this.abort?.abort(); }
   async cancelAndWait(): Promise<void> { this.cancel(); await this.work.catch(() => {}); }
   reset(initial: InitialState) { this.cancel(); this.initial = initial; this.result = undefined; this.answers.clear(); this.trackSingletons = false; }
+  // REFACTOR:grounded: case facts seed replaceable answer slots; background resources remain exact.
+  resetWithDefaults(initial: InitialState, answerProfiles: ReadonlySet<string>) {
+    const entries=initial.bundle.entry;
+    if(initial.bundle.resourceType!=='Bundle'||initial.bundle.type!=='collection'||!Array.isArray(entries))throw new Error('Default requires a case collection Bundle.');
+    const resources=entries.map((e:Fhir)=>e.resource),patients=resources.filter((r:Fhir)=>r?.resourceType==='Patient');
+    if(patients.length!==1||!patients[0].id||initial.subject!==`Patient/${patients[0].id}`)throw new Error('Default requires exactly one matching Patient.');
+    const answers=new Map<string,Fhir>(),identities=new Set<string>(),base:Fhir[]=[];
+    for(const entry of entries){
+      const r=entry.resource;
+      if(!r?.resourceType||!r.id)throw new Error('Default case resources require an identity.');
+      const identity=`${r.resourceType}/${r.id}`;
+      if(identities.has(identity))throw new Error('Default case contains duplicate resource identities.');identities.add(identity);
+      const profiles=[...new Set<string>((r.meta?.profile??[]).map((p:string)=>p.split('|')[0]))].filter(p=>answerProfiles.has(p));
+      if(profiles.length>1||profiles.some(p=>answers.has(p)))throw new Error('Default case has ambiguous answer slots.');
+      if(profiles.length){
+        if(r.subject?.reference!==initial.subject)throw new Error('Default answer belongs to a different Patient.');
+        answers.set(profiles[0],JSON.parse(JSON.stringify(r)));
+      }else base.push(entry);
+    }
+    this.reset({...initial,bundle:JSON.parse(JSON.stringify({...initial.bundle,entry:base}))});this.answers=answers;
+  }
   async evaluate(response?: Fhir, retainedQuestionnaire?: Fhir): Promise<InteractiveResult | undefined> {
     if (!this.initial) throw new Error("Select an initial state.");
     let questionnaire = this.result?.questionnaire;
@@ -222,7 +246,7 @@ export class InteractiveSession {
       ? prepareSingletonAnswers(questionnaire, this.result.questionnaire, this.result.response, response, this.answers) : undefined;
     if (response && !prepared && this.answers.size) throw new Error('This form no longer has independent singleton answer bindings. Previous answers are retained. Reset to start a new assessment.');
     const request = interactiveRequest(this.definitions, this.planId, this.initial, questionnaire,
-      prepared ? prepared.response : response, prepared ? [...prepared.retained.values()] : []);
+      prepared ? prepared.response : response, prepared ? [...prepared.retained.values()] : !response ? [...this.answers.values()] : []);
     const previous = this.work;
     const work = (async () => {
       await previous.catch(() => {});
@@ -230,6 +254,8 @@ export class InteractiveSession {
       try {
         const native = await this.run(request, abort.signal);
         if (epoch !== this.epoch) return;
+        if(!this.result&&this.answers.size&&(!native.questionnaire||!singletonAnswerBindings(native.questionnaire)))
+          throw new Error('Default cannot load an editable assessment without independent singleton answer bindings. The previous form was retained. Reset to start an empty assessment instead.');
         if (prepared) {
           if (!native.nativeData) throw new Error('Native extracted data is required to preserve edited answers. Previous answers were retained.');
           this.answers = adoptSingletonAnswers(prepared, native.nativeData, this.initial!.subject);

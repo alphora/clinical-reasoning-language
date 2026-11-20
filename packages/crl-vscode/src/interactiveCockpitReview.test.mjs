@@ -1,3 +1,4 @@
+// REFACTOR:grounded: manual FHIR Default replaces the retired saved pane; retained navigation contracts stay covered.
 import {it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {basename,dirname,relative,isAbsolute,sep} from 'node:path';
@@ -14,7 +15,7 @@ import {buildQaEditFlag,emitCrlBundle} from '@smile-digital-health/crl';
 import {fileURLToPath} from 'node:url';
 const file=readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ast=ts.createSourceFile('host.ts',file,ts.ScriptTarget.Latest,true);
 const root=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='registerCorrespondenceCockpit');
-const names=['interactiveContextCurrent','interactiveRoutes','interactiveVerdict','interactiveWordingTarget','interactiveQuestionAction','refreshInteractiveQuestionRequest','saveInteractiveQuestion','invalidateInteractiveEdit','invalidateSavedQuestionEdit','savedQuestionMetadata','savedQuestionAction','flushQuestionFocus','acceptQuestionFocusResult','handleDecisionTableMessage'];
+const names=['interactiveContextCurrent','interactiveRoutes','interactiveVerdict','interactiveWordingTarget','interactiveQuestionAction','refreshInteractiveQuestionRequest','saveInteractiveQuestion','invalidateInteractiveEdit','flushQuestionFocus','acceptQuestionFocusResult','handleDecisionTableMessage'];
 const code=names.map(name=>root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(ast)).join('\n');
 function fixture(){
  const writes=[],paints=[],actions=[],payloads=[];let pick={state:'pass'},failPersist=false,allow=true;
@@ -79,25 +80,8 @@ it('row cancellation keeps manual intent silent across a newer row gen and refus
  for(const status of ['armed','done'])f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'epoch',rowId:'row',message:{...message,status,ok:false}});expect(view.questionFocus).toBeDefined();expect(view.questionFocus.armed).toBeUndefined();
  f.c.handleDecisionTableMessage({type:'decisionTableRow',epoch:'epoch',rowId:'row',message});expect(view.questionFocus).toBeUndefined();f.c.flushQuestionFocus(view,session);expect(f.actions.some(a=>a[0]==='statusBar')).toBe(false);
 });
-it('saved origins reuse the definition digest across view rebuilds and do not emit in cockpit mode',()=>{
- const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);let emits=0;
- Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl'}}),emitCrlBundle:()=>{emits++;return {success:true,definitionOrigins:[]};}});
- const q={item:[{linkId:'q',type:'boolean',text:'Question'}]};f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(1);
- f.c.indexVersion++;f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(1);
- f.c.mode='cockpit';f.c.currentDefinitions.digest='new';const meta=f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(1);expect(meta.questions[0].reason).toMatch(/available in Medical Validation/);
- f.c.mode='medical-validation';f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(emits).toBe(2);
- f.c.currentDefinitions.digest='retry';f.c.emitCrlBundle=()=>({success:++emits!==3,definitionOrigins:[]});
- expect(f.c.savedQuestionMetadata(view,1,'case1',q,false,'current').questions[0].reason).toMatch(/could not be emitted/);
- expect(f.c.savedQuestionMetadata(view,1,'case1',q,false,'current').questions[0].reason).not.toMatch(/could not be emitted/);expect(emits).toBe(4);
-});
-it('an awaited saved-form action refusal cannot paint onto another case',async()=>{
- const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);
- const origins=[{kind:'CaseFeature',canonical:'urn:answer',version:'1',library:'L',name:'A'}],q={item:[{linkId:'q',type:'boolean',text:'Question',definition:'urn:answer|1#Observation.value[x]'}]};
- Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl'}}),emitCrlBundle:()=>({success:true,definitionOrigins:origins})});
- const first=f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');let reject;f.c.interactiveQuestionAction=()=>new Promise((_,r)=>reject=r);
- const action=f.c.savedQuestionAction(view,{gen:1,token:first.reviewToken,action:'edit',linkId:'q'});view.gen=2;f.c.savedQuestionMetadata(view,2,'case2',q,false,'current');reject(Error('First case failed'));await action;
- expect(f.payloads.some(p=>p.type==='savedQuestionReviewError')).toBe(false);expect(f.actions.at(-1)).toEqual(['statusBar',expect.stringMatching(/First case failed/)]);
-});
+
+
 it('real owner disclosure renders synchronously before Focus arms the new generation',async()=>{
  const f=fixture(),view=f.target.view;view.anchors={key:{segmentIds:['gid']}};view.conceptOccurrences=[{lib:'L',name:'A',gid:'gid'}];
  Object.assign(f.c,{decisionTable:undefined,expandedGuardWhens:new Set(),expandQuestionInputs:()=>new Set(['opened']),treeRenderOptions:()=>({}),treeTraversalEntries:()=>[],postTreeFocus:()=>{},routeSelectionRequest:0,
@@ -109,27 +93,8 @@ it('real owner disclosure renders synchronously before Focus arms the new genera
  const render=root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='renderPane');expect(render.modifiers?.some(m=>m.kind===ts.SyntaxKind.AsyncKeyword)??false).toBe(false);
  expect(render.getText(ast).indexOf('v.acked = false')).toBeLessThan(render.getText(ast).indexOf('if (pane === "source")'));
 });
-it('saved form metadata/token refresh and dynamic close preserve its source draft; another form blocks it',async()=>{
- const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);
- const origins=[{kind:'CaseFeature',canonical:'urn:answer',version:'1',library:'L',name:'A'}],q={item:[{linkId:'q',type:'boolean',text:'Question',definition:'urn:answer|1#Observation.value[x]'}]};
- Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl',projectRoot:'E:/fixture'}}),emitCrlBundle:()=>({success:true,definitionOrigins:origins})});
- const first=f.c.savedQuestionMetadata(view,1,'case1::q',q,false,'current');const context=f.c.savedQuestionReview.context;
- await f.c.interactiveQuestionAction(context,'edit','q');const edit=f.c.interactiveEdit;edit.card.draftText='Retained';
- view.gen=2;const next=f.c.savedQuestionMetadata(view,2,'case1::q',q,false,'checking');expect(next.reviewToken).not.toBe(first.reviewToken);expect(context.current()).toBe(true);
- f.c.invalidateInteractiveEdit();expect(edit.card.editBlockedReason).toBeUndefined();
- f.c.currentDefinitions.digest='changed-dependency-before-metadata';expect(context.current()).toBe(false);
- await f.c.saveInteractiveQuestion({type:'routeCardSave',token:edit.token,key:edit.card.id,fields:{questionText:'Retained',questionDescription:'Description'}});expect(f.payloads.at(-1).ok).toBe(false);expect(f.actions.some(a=>a[0]==='save')).toBe(false);
- f.c.currentDefinitions.digest='digest';
- f.c.savedQuestionMetadata(view,2,'case1::q',q,false,'current');await f.c.saveInteractiveQuestion({type:'routeCardSave',token:edit.token,key:edit.card.id,fields:{questionText:'Retained',questionDescription:'Description'}});expect(f.payloads.at(-1).ok).toBe(true);
- f.c.savedQuestionMetadata(view,3,'case2::q',q,false,'current');expect(context.current()).toBe(false);expect(edit.card.editBlockedReason).toMatch(/draft is retained/);
-});
-it('saved action refuses an old transport token and historical or unmatched source metadata without writing',async()=>{
- const f=fixture(),view={gen:1,panel:{webview:{postMessage:m=>f.payloads.push(m)}}};f.c.views.set('fhirQuestionnaire',view);
- Object.assign(f.c,{currentDefinitions:{state:'current',digest:'digest'},savedQuestionReview:undefined,savedQuestionOriginCache:undefined,interactivePublication:()=>({}),resolveCelSuite:()=>({ok:true,suite:{policyPath:'policy.crl'}}),emitCrlBundle:()=>({success:false})});
- const q={item:[{linkId:'q',type:'boolean',text:'Question'}]},meta=f.c.savedQuestionMetadata(view,1,'case1',q,false,'current');expect(meta.questions[0].reason).toMatch(/could not be emitted/);
- await f.c.savedQuestionAction(view,{gen:1,token:'old',action:'edit',linkId:'q'});expect(f.payloads.at(-1).message).toMatch(/refreshed/);
- await f.c.savedQuestionAction(view,{gen:1,token:meta.reviewToken,action:'edit',linkId:'q'});expect(f.payloads.at(-1).message).toMatch(/could not be emitted/);expect(f.c.interactiveEdit).toBeUndefined();
-});
+
+
 it('actual pencil handler opens the existing editor expanded and saves an MV question request',async()=>{
  const f=fixture();await f.c.interactiveQuestionAction(f.context,'edit','q');const payload=f.payloads[0];expect(payload.cards[0].editing).toBe(true);expect(payload.cards[0].text).toBe('Question');
  await f.c.saveInteractiveQuestion({type:'routeCardSave',token:payload.token,key:payload.cards[0].id,fields:{questionText:'Updated',questionDescription:'More'}});

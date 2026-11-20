@@ -8,8 +8,7 @@
     "crl.medical-validation.primary": "cel",
     "crl.medical-validation.paneOrder": [
       "source",
-      "tree",
-      "fhirQuestionnaire"
+      "tree"
     ]
   }
 }

@@ -2,7 +2,7 @@
 
 The tree header has two columns: **Status** above **Legend** on the left, with
 **Actions** on the right. Actions has room for the Highlight buttons together
-and the three questionnaire buttons together. Narrow panes scroll the header horizontally.
+and the two questionnaire buttons together. Narrow panes scroll the header horizontally.
 Group headings use the gold text glow. The legend retains the tree's existing
 colors and meanings.
 
@@ -13,7 +13,7 @@ flag status.
 
 Actions are ordered: review verdicts, snapshot export, highlighting, outcome
 explanation, **Show Panel: Highlighted Source**, **Show Questionnaire:** with
-the three questionnaire controls, then source files under the
+**CRL Questionnaire** and native **FHIR Questionnaire** controls, then source files under the
 **Source documents** subgroup heading. A group with
 several documents has one named button per file. An empty group is disabled;
 incomplete discovery is disclosed rather than reported as empty.
@@ -31,7 +31,7 @@ not change clinical evaluation, conditions, or answers.
 ## Editor panel defaults
 
 The tree and Decision Table use the remaining editor width. Result Questionnaire,
-FHIR Questionnaire, CRL Questionnaire, Interactive FHIR Questionnaire, and
+FHIR Questionnaire, CRL Questionnaire, and
 Highlighted Source each default to about 380 pixels when open in separate columns.
 Smaller windows reduce the support columns equally. Highlighted Source opens the
 existing highlighted source viewer immediately left of the tree. Result and FHIR

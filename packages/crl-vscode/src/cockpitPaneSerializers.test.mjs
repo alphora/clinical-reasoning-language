@@ -1,3 +1,4 @@
+// REFACTOR:grounded: manual FHIR Default replaces the retired saved pane; retained navigation contracts stay covered.
 // A restored webview tab the extension does not own can never be disposed by reconcilePaneOrder (which iterates
 // only `views`), so it outlives every settings edit and reads as paneOrder being ignored. The guarantee that
 // prevents it is coverage: EVERY pane view type must have a serializer, registered during activate.
@@ -33,7 +34,7 @@ describe("registerCockpitPaneSerializers", () => {
     for (const pane of ALL_PANES) {
       assert.ok(vscode.__registered.has(cockpitViewType(pane)), `no serializer for pane '${pane}'`);
     }
-    assert.equal(c.subscriptions.length, ALL_PANES.length + 1, "every registration, including the pinned Branch Questionnaire, must be disposable with the extension");
+    assert.equal(c.subscriptions.length, ALL_PANES.length + 2, "retained panes, retired-tab cleanup and Branch Questionnaire registrations are disposable");
   });
 
   it("DISPOSES the restored panel rather than adopting it", () => {
@@ -44,17 +45,19 @@ describe("registerCockpitPaneSerializers", () => {
     registerCockpitPaneSerializers(c, (p) => seen.push(p));
     let disposed = false;
     const panel = { dispose: () => (disposed = true) };
-    const s = vscode.__registered.get(cockpitViewType("fhirQuestionnaire"));
+    const s = vscode.__registered.get(cockpitViewType("questionnaire"));
     return s.deserializeWebviewPanel(panel, undefined).then(() => {
       assert.equal(disposed, true, "the restored panel must be disposed");
-      assert.deepEqual(seen, ["fhirQuestionnaire"]);
+      assert.deepEqual(seen, ["questionnaire"]);
     });
   });
 
-  it("covers the questionnaire panes specifically — the pair that produced the ghost", () => {
+  it("covers static questionnaire and discards an old saved FHIR tab without adopting it", async () => {
     registerCockpitPaneSerializers(ctx());
     assert.ok(vscode.__registered.has("crlCockpit.questionnaire"));
-    assert.ok(vscode.__registered.has("crlCockpit.fhirQuestionnaire"));
+    let disposed=false;
+    await vscode.__registered.get('crlCockpit.fhirQuestionnaire').deserializeWebviewPanel({dispose:()=>disposed=true});
+    assert.equal(disposed,true);assert.ok(!ALL_PANES.includes('fhirQuestionnaire'));
   });
 
   it("closes a restored Branch Questionnaire because its pin is session-local", async () => {

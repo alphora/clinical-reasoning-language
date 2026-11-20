@@ -1,14 +1,14 @@
 # Criterion components in Medical Validation
 
-The FHIR Questionnaire and Interactive FHIR Questionnaire have right-side Focus, pencil and flag controls
+The FHIR Questionnaire has right-side Focus, pencil and flag controls
 for questions with an exact source identity. Focus reveals the chosen tree
 occurrence, including inputs inside collapsed groups and Decision Table rows.
 The pencil opens the existing question editor and saves an MV request for the KE;
 the flag opens the existing node flag workflow. These controls preserve answers.
 Focus discloses the owning tree path and navigates to the exact question control.
-Editing, pinning and passive selection replay retain the tree viewport. Saved-form
-source controls and freshness warnings update without remounting unchanged case
-data; another case has its own form even if the saved bytes are identical.
+Editing, pinning and passive selection replay retain the tree viewport. Row changes
+update the Default button's target without changing the native form or its answers.
+Click Default to evaluate the selected row and replace the form on success.
 Each native determination has a route verdict control. It updates saved MV cases
 on that exact route, using existing review painting. Uncovered or ambiguous routes,
 and cases whose review would also affect another execution route, explain why a
@@ -70,7 +70,7 @@ With Questions off, answer choices use the dotted tree disclosure and mark the
 selected answer. Tree and card disclosures retain their own independent expansion
 state. Authored ALL OF/ANY OF groups have independent connector emphasis: ANY OF uses teal, ALL OF uses orange, independent of depth. Enabled connectors use a white line with their manual group-colored glow; inactive groups stay neutral. Turning a group off also clears
 its descendants; turning it on leaves them unchanged. This emphasis is a reading
-aid, not an evaluation result. Clicking a group changes manual connector emphasis. On a selected terminal route, known Yes/left owners override that toggle color with the native green branch glow; No/right owners use the native red glow. Clearing the route restores the manual toggle's original state and color. Unknown owners get no automatic polarity color. Hidden off-route connectors have no visible halos. Synthetic wrappers do not create Boolean groups in the MV tree. The existing CRL Questionnaire and FHIR Questionnaire each have their own open/close toggle inside the tree pane. They remain separate views with their existing data and rendering behavior.
+aid, not an evaluation result. Clicking a group changes manual connector emphasis. On a selected terminal route, known Yes/left owners override that toggle color with the native green branch glow; No/right owners use the native red glow. Clearing the route restores the manual toggle's original state and color. Unknown owners get no automatic polarity color. Hidden off-route connectors have no visible halos. Synthetic wrappers do not create Boolean groups in the MV tree. The CRL Questionnaire and FHIR Questionnaire have separate open/close toggles inside the tree pane. FHIR Questionnaire is the native interactive form. Default explicitly evaluates the selected Decision Table row or focused case using its full authored case inputs; changing rows only updates the button target and preserves current answers. Failed or cancelled Default retains the current form. Reset clears the assessment to its background inputs; Default refills answers. Restart after definition changes discards the transient row state: use Default again to load current case inputs. Optional invalid standalone request files appear as warnings and do not block Default. The saved read-only FHIR pane is retired. The default layout opens Source and Tree; native FHIR opens immediately after Tree/Result Questionnaire.
 
 Authority: operator-approved refinement, UX discussions 704, 710, 714/715, 718/719, and 720/721. Machine
 identifiers retain component terminology. CRL/CEL evaluation remains unchanged.

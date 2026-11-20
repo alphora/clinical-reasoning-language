@@ -1,3 +1,4 @@
+// REFACTOR:grounded: manual FHIR Default replaces the retired saved pane; retained navigation contracts stay covered.
 // Unit tests for normalizePaneOrder (#156 C2b-4 + medical-validation slice 3). vscode-free.
 //
 // ⚠ CONTRACT CHANGED 2026-08-16 — THE SETTING IS THE SOURCE OF TRUTH.
@@ -20,13 +21,13 @@ const check = test;
 check("an explicit order is honored EXACTLY — nothing is appended", () => {
   assert.deepEqual(cockpit(["crl", "source", "cel"]), ["crl", "source", "cel"]);
   assert.deepEqual(cockpit(["cel"]), ["cel"], "a single-pane order stays a single pane");
-  assert.deepEqual(mv(["source", "fhirQuestionnaire", "tree"]), ["source", "fhirQuestionnaire", "tree"]);
+  assert.deepEqual(mv(["source", "tree"]), ["source", "tree"]);
 });
 
 check("EVERY pane is opt-out-able, including the MV worklist and the CRL questionnaire", () => {
   // The specific report that drove this change: choosing fhirQuestionnaire also got you the CRL questionnaire.
-  assert.ok(!mv(["source", "fhirQuestionnaire"]).includes("questionnaire"));
-  assert.ok(!mv(["source", "fhirQuestionnaire"]).includes("worklist"));
+  assert.ok(!mv(["source"]).includes("questionnaire"));
+  assert.ok(!mv(["source"]).includes("worklist"));
   assert.ok(!cockpit(["crl"]).includes("source"));
 });
 
@@ -42,10 +43,10 @@ check("a NON-array (unset / malformed type) falls back to the spec's canonical s
   }
 });
 
-check("MV's fallback is the operator's three-pane set, NOT every pane", () => {
+check("MV fallback opens source/tree; questionnaires are explicit toggles", () => {
   // Defaulting to all seven was tried and reverted: seven retainContextWhenHidden webviews side by side on a
   // browser-only clinician's screen, including the 1.85 MB LForms shell, for panes most never open.
-  assert.deepEqual(mv(undefined), ["source", "tree", "fhirQuestionnaire"]);
+  assert.deepEqual(mv(undefined), ["source", "tree"]);
 });
 
 // ── repair rules that survive unchanged ──
@@ -78,7 +79,7 @@ check("case/whitespace variants are NOT recognized (ids are exact)", () => {
 
 check("each spec only accepts its own pane ids", () => {
   // questionnaire panes are MV-only; they never appear in a cockpit order.
-  assert.deepEqual(cockpit(["questionnaire", "fhirQuestionnaire", "crl"]), ["crl"]);
+  assert.deepEqual(cockpit(["questionnaire", "crl"]), ["crl"]);
   // `tree` is valid in both.
   assert.deepEqual(cockpit(["tree"]), ["tree"]);
   assert.deepEqual(mv(["tree"]), ["tree"]);
@@ -92,17 +93,17 @@ check("MV: worklist and cel are DISTINCT panes — listing both opens both (disc
 check("retained CRL Questionnaire survives saved pane orders on upgrade", () => {
   assert.deepEqual(mv(["questionnaire"]), ["questionnaire"]);
   assert.deepEqual(mv(["worklist", "questionnaire"]), ["worklist", "questionnaire"]);
-  assert.deepEqual(mv(["questionnaire", "fhirQuestionnaire"]), ["questionnaire", "fhirQuestionnaire"]);
-  assert.deepEqual(mv(["fhirQuestionnaire", "questionnaire"]), ["fhirQuestionnaire", "questionnaire"]);
+  assert.deepEqual(mv(["questionnaire", "fhirQuestionnaire"]), ["questionnaire"]);
+  assert.deepEqual(mv(["fhirQuestionnaire", "tree"]), ["tree"]);
 });
 
 check("INVARIANT: output is always a dupe-free subset of the spec's valid set, in the user's order", () => {
   const inputs = [
     ["worklist", "source"],
-    ["fhirQuestionnaire"],
+    [],
     [],
     ["zzz", "tree", "tree"],
-    ["cel", "crl", "questionnaire", "worklist", "source", "tree", "fhirQuestionnaire"],
+    ["cel", "crl", "questionnaire", "worklist", "source", "tree"],
   ];
   for (const raw of inputs) {
     const out = mv(raw);

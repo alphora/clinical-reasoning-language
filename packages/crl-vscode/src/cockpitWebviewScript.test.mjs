@@ -65,9 +65,9 @@ check('pin focus follows the matching response and unpin retains the leaf; stale
   assert.deepEqual(cancellations.map(c=>[c.type,c.capture]),[['pointerdown',true],['keydown',true],['focusin',true]],'cancellation is on the window capture path before document activation');
   ui.toggle('leaf');const request=messages.at(-1);
   ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:'old'});assert.equal(frames.length,0);
-  ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:request.token});frames.shift()();assert.deepEqual(events,['focus','scroll']);
-  ui.toggle('leaf');assert.equal(messages.at(-1).type,'unpinRoute');frames.shift()();assert.equal(events.length,4);
-  ui.toggle('leaf');ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:messages.at(-1).token});ui.invalidate();frames.shift()();assert.equal(events.length,4);
+  ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:request.token});frames.shift()();assert.deepEqual(events,['focus'],'pin keeps keyboard focus without scrolling');
+  ui.toggle('leaf');assert.equal(messages.at(-1).type,'unpinRoute');frames.shift()();assert.equal(events.length,2);
+  ui.toggle('leaf');ui.receive({gen:1,pinKey:'leaf',routeKeys:['leaf'],focusRequest:messages.at(-1).token});ui.invalidate();frames.shift()();assert.equal(events.length,2);
 });
 
 check('internal disclosure and label refresh replays preserve tree focus; user navigation clears it',()=>{
@@ -84,7 +84,7 @@ check('internal disclosure and label refresh replays preserve tree focus; user n
     const mode='medical-validation',PANES=['tree'],views=new Map([['tree',{gen:1}]]),crlStructure=[],conceptLayer=[],guardOutlines=new Map();
     const focusedCaseId=s=>s.selection?.primary==='cel'?s.selection.caseId:undefined;
     const clearTreeFocus=()=>{focus=false;clears++;},cockpitAgentBridge={notifyChanged(){}},onNav={fire(){}};
-    const applyReveal=()=>{},reflectSelectionToTree=()=>{},driveFailedCriteriaPeek=()=>{},driveDiverters=()=>{},driveLeafMarks=()=>{},driveThisNode=()=>{},shouldRerenderQuestionnaire=()=>false;
+    const applyReveal=()=>{},reflectSelectionToTree=()=>{},driveFailedCriteriaPeek=()=>{},driveDiverters=()=>{},driveLeafMarks=()=>{},driveThisNode=()=>{},syncQuestionnaireDefaults=()=>{},shouldRerenderQuestionnaire=()=>false;
     const buildDefExprResolver=()=>{},answerOptionsForDisplay=()=>{},answersFromTerminologyForDisplay=()=>{};
     const toggleCriterionExpansion=(set,key)=>{const next=new Set(set);next.has(key)?next.delete(key):next.add(key);return next;};
     const renderPane=()=>{renders++;views.get('tree').gen++;};
@@ -746,7 +746,7 @@ check("#219 host: a click sets scrollSuppressPane to the origin pane around the 
   assert.ok(/\} finally \{\s*scrollSuppressPane = undefined;\s*\}/.test(COCKPIT_SRC), "and clears it in finally (the flag is live only for the synchronous dispatch)");
 });
 check("#219 host: postReveal suppresses scroll for the origin pane; highlightRows omits scrollTo when suppressed", () => {
-  assert.ok(/const noScroll = pane === scrollSuppressPane \|\|/.test(COCKPIT_SRC), "postReveal computes noScroll = pane is the click origin");
+  assert.ok(/const noScroll = [^;]*pane === scrollSuppressPane \|\|/.test(COCKPIT_SRC), "postReveal suppresses origin clicks as well as passive replay");
   // every highlightRows call in postReveal threads noScroll (cross-pane targets still scroll; the origin pane does not).
   assert.ok(!/highlightRows\(v, crlAnchorsForUnits\(unitsForCase\(target\.id, m\), m\)\);/.test(COCKPIT_SRC), "the case→tree highlight passes noScroll (no bare call left)");
   assert.ok(/highlightRows\(v, \[\.\.\.new Set\(keys\)\], noScroll\)/.test(COCKPIT_SRC), "case→tree/crl highlight threads noScroll");

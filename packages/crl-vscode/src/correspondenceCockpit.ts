@@ -17,12 +17,12 @@ import { questionReviewPresentation, questionReviewOwners, nativeReviewRoutes, r
 import { traversalRouteNeighbors, type BranchIdentity } from "./branchNavigation";
 import { allRouteVerdictsApproved, summarizeBranchVerdict } from "./branchVerdict";
 import {installQuestionNodeFocus} from './questionNodeFocus';
-import {installSavedQuestionnaireReview} from './savedQuestionnaireReview';
-import {installLformsReviewControls,LFORMS_REVIEW_STYLE} from './lformsReviewControls';
-import {emitCrlBundle} from '@smile-digital-health/crl';
+import {rowQuestionnaireDefaults} from './rowQuestionnaireDefaults';
+
+
 import {installFlowLogicHighlight} from "./flowLogicHighlight";
-import {installBooleanAnswerClearControls} from "./lformsBooleanControls";
-import {installPresentationChoiceGroups} from "./lformsPresentationGroups";
+
+
 // REFACTOR:grounded: pinned route cards and coordinated direct edits (docs/medical-validation-plan.md).
 // Correspondence cockpit SHELL (thin vscode) — three-pane viewer C2a (#156).
 // Wires the pure cores to VS Code: a CRL activity-bar navigator (TreeView) + three webview panes (Source rendered;
@@ -63,7 +63,7 @@ import {
   type FlagStatus,
   type RenderScenarioResult,
   type ScenarioViewModel,
-  readSuiteResult,
+
 } from "@smile-digital-health/crl";
 import type { LsLocation, ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import {
@@ -251,7 +251,7 @@ import { caseDisplayName } from "./caseDisplayName";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "fhirQuestionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/fhirQuestionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
 // The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
 // so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
 const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
@@ -267,7 +267,7 @@ const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.Vi
 // The two questionnaire panes are named by their SOURCE, which is the whole point of showing both: "CRL
 // Questionnaire" is the projection of what the CRL says, "FHIR Questionnaire" is what the emitted artifact
 // actually produced via $apply. Naming one of them "$apply" would name the mechanism rather than the thing.
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", fhirQuestionnaire: "FHIR Questionnaire", worklist: "Worklist" };
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "CRL Questionnaire", worklist: "Worklist" };
 // Bound full source rendering; annotation-dense policies can exceed 2000 marks even with short source text.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 5000;
@@ -281,7 +281,7 @@ interface PaneView {
   /** the indexVersion the current render was posted at — the authoritative freshness key (NOT trusted from the webview). */
   indexVersion: number;
   acked: boolean;
-  fhirCaseIdentity?: string;
+
   preserveTreeViewport?: boolean;
   preserveNextTreeViewport?: boolean;
   focusNodes?: Record<string, FocusNode>;
@@ -484,7 +484,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     queueMicrotask(() => { if (!cockpitDisposed) { renderTreeChrome(); mvPaneLayout.request(); } });
   }
   const interactiveQuestionnaire = createInteractiveQuestionnairePanel(context, unrenderableQuestionnaireFeatures,interactivePublication,interactivePanelChanged,
-    {describe:describeInteractiveReview,question:interactiveQuestionAction,verdict:interactiveVerdict,invalidated:invalidateInteractiveEdit});
+    {describe:describeInteractiveReview,question:interactiveQuestionAction,verdict:interactiveVerdict,invalidated:invalidateInteractiveEdit},
+    {defaults:{describe:()=>{const value=questionnaireDefaultContext();return {label:value.scenario?caseDisplayName(value.scenario.case.name):undefined,reason:value.reason};},
+      load:loadQuestionnaireDefault},
+      column:()=>{const column=views.get('tree')?.panel.viewColumn;return column===undefined?nextQuestionnaireColumn():column+(branchQuestionnaire.isOpen?2:1);}});
   let interactiveEdit: {token:string;context:QuestionReviewContext;target:WordingTarget;version:number;revision:number;card:any} | undefined;
   const interactiveEditPanel=createBranchQuestionnairePanel(message=>{void saveInteractiveQuestion(message);},()=>{interactiveEdit=undefined;},()=>interactiveQuestionnaire.layoutPanel?.viewColumn??nextQuestionnaireColumn(),'Medical Validation — Edit Question');
   context.subscriptions.push({dispose:()=>interactiveEditPanel.close()});
@@ -795,7 +798,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(dirty.length)throw new Error('Save or revert unsaved definition inputs before setting Pass.');
       const previous=currentDefinitions,next=definitionFreshness.check(selected.suite.policyPath,join(editStorage(root),'freshness'));
       currentDefinitions=next;
-      invalidateSavedQuestionEdit();
+
       if(previous.digest!==next.digest || previous.state==='current'&&next.state!=='current')interactiveQuestionnaire.definitionsChanged(currentCel);
       if(next.state==='current' && next.digest!==modelDefinitionDigest){currentDefinitions={state:'checking',digest:next.digest,message:'Definitions changed; refreshing the reviewed tree.'};scheduleRebuild();return false;}
       return next.state==='current';
@@ -1097,19 +1100,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         prevCaseId,
         nextCaseId: previousRoute !== (next.selection?.primary === "cel" ? next.selection.routeId : undefined)
           ? `${focusedCaseId(next)}:route:${next.selection?.primary === "cel" ? next.selection.routeId : ""}` : focusedCaseId(next),
-        // Either questionnaire pane being open is reason enough to run this hook — they render the same case
-        // from different sources (CRL projection vs the emitted artifact) and both must follow the selection.
-        paneOpen: views.has("questionnaire") || views.has("fhirQuestionnaire"),
+        // The static CRL projection follows selection; native Default availability updates separately below.
+        paneOpen: views.has("questionnaire"),
         mode,
       })
     ) {
       currentQuestionIndex = -1; // a new case starts with NO question focused
       renderPane("questionnaire");
-      // The $apply pane follows the SAME case selection. Without this it is rendered only by rebuild() — which
-      // runs before any case is focused — so it would sit permanently on its "select a case" placeholder while
-      // the static questionnaire beside it updated. Its own render-identity guard makes a no-change render a
-      // cheap no-op, so re-rendering here cannot churn the mounted form.
-      renderPane("fhirQuestionnaire");
       // #177 slice 4: the questionnaire just re-rendered for the new case (no focused question) — re-drive the "this node" marker
       // across all panes. CORRECTNESS MODEL (mirrors driveDoneOverlay): the PANE-ACK re-drive (onWebviewMessage's `ready` →
       // driveThisNode, fires on every marker-bearing pane render) is the guarantee — a freshly rendered pane always re-paints
@@ -1119,6 +1116,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // emptied on the placeholder render) → driveThisNode clears all panes.
       driveThisNode();
     }
+    syncQuestionnaireDefaults();
   }
 
   function applyReveal(e: Effect, replay = false): void {
@@ -1379,7 +1377,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         : "";
     // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
     // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
-    const questionnaires=mode==='medical-validation'?`<div class="fc-toggle mv-questionnaires"><span class="fc-toggle-label">Show Questionnaire:</span> <span class="mv-questionnaire-buttons">${(['questionnaire','fhirQuestionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn${interactiveQuestionnaire.isOpen?" fc-active":""}" data-interactive-questionnaire aria-pressed="${interactiveQuestionnaire.isOpen}">Interactive FHIR Questionnaire</button></span></div>`:'';
+    const questionnaires=mode==='medical-validation'?`<div class="fc-toggle mv-questionnaires"><span class="fc-toggle-label">Show Questionnaire:</span> <span class="mv-questionnaire-buttons">${(['questionnaire'] as const).map(p=>`<button class="fc-toggle-btn${views.has(p)?" fc-active":""}" data-questionnaire-pane="${p}" aria-pressed="${views.has(p)}">${PANE_TITLE[p]}</button>`).join(' ')} <button class="fc-toggle-btn${interactiveQuestionnaire.isOpen?" fc-active":""}" data-interactive-questionnaire aria-pressed="${interactiveQuestionnaire.isOpen}">FHIR Questionnaire</button></span></div>`:'';
     const sourceDocumentsBtn = mode === "medical-validation" ? `<div class="fc-toggle"><button class="fc-toggle-btn" data-open-source-documents title="Open a Source or Refined source document">Source documents…</button></div>` : "";
     const definitionMessage=definitionStatusMessage();
     const definitionStatus=mode==='medical-validation' && definitionMessage?`<div role="status" class="fc-gaps">${escapeHtml(definitionMessage)}</div>`:'';
@@ -2674,10 +2672,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.startNodeGid = r.startNodeGid; // the chrome-mirror count badge's node
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode, disclosureToken, treeFocusToken, pinFocusRequest, uncertaintyFocusKey,
         uncertaintyDisclosures: r.uncertaintyDisclosures ?? {}, preserveViewport: v.preserveTreeViewport,viewportKey:currentCel });
-    } else if (pane === "fhirQuestionnaire") {
-      v.anchors = {};
-      v.reveals = {};
-      renderFhirQuestionnaire(v,gen);
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
       // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware
@@ -2705,24 +2699,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** REFACTOR:grounded: FHIR inspection follows the focused row's entire native case, independently of source and detached RQ ownership. */
-  function fhirInspectionContext(): { scenario?: ScenarioViewModel; caseId?: string; routeId?: string; identity: string; emptyNote?: string } {
-    const table=decisionTable;
-    if(table&&!table.suspended){
+  // REFACTOR:grounded: Default follows the selected full case; passive selection updates availability only.
+  function questionnaireDefaultContext():{scenario?:ScenarioViewModel;identity:string;reason?:string}{
+    let scenario:ScenarioViewModel|undefined,key:unknown;
+    if(decisionTable&&!decisionTable.suspended){
       const row=focusedBranchSession;
-      const current=row&&branchSessionCurrent(row)&&row.mounted?row:undefined;
-      return {scenario:current?.caseId?scenarioByCaseId.get(current.caseId):undefined,caseId:current?.caseId,routeId:current?.routeId,
-        identity:JSON.stringify([currentCel,currentDefinitions.digest,indexVersion,table.epoch,current?.id,current?.caseId,current?.routeId]),
-        emptyNote:!current?'Select a Decision Table row to see its FHIR questionnaire.':current.caseId?'The selected branch case is unavailable for saved FHIR questionnaire inspection.':'This modeled branch has no covering test case, so no saved FHIR questionnaire is available.'};
-    }
-    const cid=focusedCaseId(state),routeId=state.selection?.primary==='cel'?state.selection.routeId:undefined;
-    return {scenario:focusedScenario(),caseId:cid,routeId,identity:JSON.stringify([currentCel,currentDefinitions.digest,indexVersion,'selection',cid,routeId])};
+      if(row&&branchSessionCurrent(row)&&row.mounted&&row.caseId)scenario=scenarioByCaseId.get(row.caseId);
+      key=[decisionTable.epoch,row?.id,row?.caseId,row?.routeId];
+    }else{scenario=focusedScenario();key=focusedCaseId(state);}
+    return {scenario,identity:JSON.stringify([currentCel,currentDefinitions.digest,indexVersion,key,!!scenario]),
+      reason:!scenario?'Select a covered Decision Table row or case to load Default.':!scenario.compartmentDir?'The selected row has no emitted patient compartment.':undefined};
   }
-  function syncFhirInspection(): void {
-    const identity=fhirInspectionContext().identity;
-    if(identity===lastFhirInspectionIdentity)return;
-    lastFhirInspectionIdentity=identity;
-    renderPane('fhirQuestionnaire');
+  let questionnaireDefaultClock=new Date();
+  let questionnaireDefaultRevision=0,questionnaireDefaultIdentity:string|undefined;
+  function syncQuestionnaireDefaults():void{
+    const identity=questionnaireDefaultContext().identity;
+    if(identity!==questionnaireDefaultIdentity){questionnaireDefaultIdentity=identity;++questionnaireDefaultRevision;}
+    interactiveQuestionnaire.defaultsChanged();
+  }
+  function loadQuestionnaireDefault(cel:string){
+    syncQuestionnaireDefaults();
+    const captured=questionnaireDefaultContext(),revision=questionnaireDefaultRevision;
+    if(cel!==currentCel||!captured.scenario||captured.reason)throw new Error(captured.reason??'Select a covered row.');
+    const initial=rowQuestionnaireDefaults(cel,captured.scenario,questionnaireDefaultClock);initial.label=caseDisplayName(captured.scenario.case.name);
+    return {initial,current:()=>{const now=questionnaireDefaultContext();return !cockpitDisposed&&currentCel===cel&&questionnaireDefaultRevision===revision&&!now.reason&&now.identity===captured.identity;}};
   }
   function focusBranchSession(session: BranchSession, fromPanel=focusedBranchSession?.questionMode==='panel'): void {
     if(!branchSessionCurrent(session)||!session.mounted)return;
@@ -2732,69 +2732,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if(hasBranchQuestionCase(session))setQuestionDisplayMode(session,'panel');
       else{previous.questionMode='off';if(branchQuestionnaireOwner)closeQuestionPanel();postQuestionMode(previous,true);}
     }
-    syncFhirInspection();
+    syncQuestionnaireDefaults();
   }
-  /** Load the full saved native Q/QR; a clicked node never truncates the form to a path prefix. */
-  function renderFhirQuestionnaire(view: PaneView, gen: number): void {
-    // Rebuild renders panes before reconciling table sessions. Defer only that source-version gap; epoch/map updates are synchronous.
-    // Reconciliation supersedes this render generation, so its missing ACK creates no reveal or permanent pending work.
-    if(decisionTable&&!decisionTable.suspended&&focusedBranchSession&&focusedBranchSession.sourceVersion!==indexVersion)return;
-    const inspection=fhirInspectionContext(),focused=inspection.scenario;
-    // Freshness may rotate on rebuild/route changes; an unchanged native case must keep its mounted form.
-    const key=focused?JSON.stringify([currentCel,focused.decision?.libraryName??'',inspection.caseId]):undefined;
-    const changed=view.fhirCaseIdentity!==key;
-    view.fhirCaseIdentity=key;lastFhirInspectionIdentity=inspection.identity;
-    const label=focused?caseDisplayName(focused.case?.name??''):undefined;
-    const post=(q?:unknown,qr?:unknown,lookedFor?:string,stale?:boolean,loading=false,loadError?:string):void=>{
-      if(views.get('fhirQuestionnaire')!==view||view.gen!==gen)return;
-      if(fhirInspectionContext().identity!==inspection.identity){syncFhirInspection();return;}
-      const definitionState=stale||currentDefinitions.state==='drift'?'changed':currentDefinitions.state;
-      const effectiveStale=definitionState==='changed';
-      const formKey=key&&`${key}::${createHash('sha256').update(JSON.stringify({q,qr})).digest('hex')}`;
-      const review=q&&formKey?savedQuestionMetadata(view,gen,formKey,q,effectiveStale,definitionState):undefined;
-      if(!q){savedQuestionReview=undefined;invalidateSavedQuestionEdit();}
-      void view.panel.webview.postMessage({type:'fhirQuestionnaire',gen,indexVersion,
-        key:formKey,...review,
-        label,q,qr,lookedFor,loading,loadError,emptyNote:inspection.emptyNote,
-        unrenderable:q===undefined?[]:unrenderableQuestionnaireFeatures(q),stale:effectiveStale,definitionState});
-    };
-    if(!focused||!inspection.caseId||!focused.case?.name){post();return;}
-    // Clear an obsolete case immediately while the generation-bound disk read runs.
-    if(changed)post(undefined,undefined,undefined,undefined,true);
-    void loadFhirQuestionnaireCase(focused.compartmentDir).then(result=>post(result.q,result.qr,result.lookedFor,result.stale),error=>post(undefined,undefined,focused.compartmentDir,undefined,false,String(error)));
-  }
-
-  /** The FOCUSED cel case's `ScenarioViewModel` — the questionnaire's input. Resolved via the SAME frozen
-   *  `scenarioByCaseId` join the failed-criterion peek uses (caseId → sv; ambiguous/unfrozen cases excluded in
-   *  rebuild). undefined when the selection is not a cel case (or no case is selected) → the pane shows a placeholder. */
-  /**
-   * Read the FHIR Questionnaire + QuestionnaireResponse for a case FROM DISK, at the directory the
-   * EMITTER reports — `ScenarioViewModel.compartmentDir`, never a path composed here:
-   *
-   *   <artifact>/tests/results/fhir/patient/<compartmentId>/questionnaire/*.json
-   *   <artifact>/tests/results/fhir/patient/<compartmentId>/questionnaireresponse/*.json
-   *
-   * ⚠ RESULTS, NOT CASE DATA. `tests/data/fhir/patient/<compartmentId>/` is what the CEL emitter
-   * writes — the FACTS a case states. A Questionnaire is not a fact about a patient; it is what an
-   * ENGINE produced when `$apply` ran, so it lives in its own tree with its own producer and lifecycle.
-   * Reading the data tree for a Questionnaire found nothing, and would have found a CEL-authored
-   * QuestionnaireResponse if one existed — `QuestionnaireResponse` is a legal CEL emit target.
-   *
-   * This is deliberately a real filesystem read and not a compiled-in fixture: it exercises the exact path the
-   * producer (issue #277) will write to, so when the producer lands nothing here changes. To test it today,
-   * copy a Questionnaire/QuestionnaireResponse pair into a case directory.
-   *
-   * The case directory carries an outcome suffix (`…-met` / `…-unmet`) that the case id does not, hence the
-   * trailing `*` on the slug.
-   */
-  // REFACTOR:grounded: bind native Q/QR to the selected policy's verified suite manifest.
-  async function loadFhirQuestionnaireCase(
-    compartmentDir: string | undefined,
-  ): Promise<{ q?: unknown; qr?: unknown; lookedFor: string; stale?: boolean }> {
-    if (!currentCel || !compartmentDir) return { lookedFor: "This case has no emitted compartment." };
-    return readSuiteResult(currentCel, compartmentDir, currentDefinitions.digest);
-  }
-
   function focusedScenario(): ScenarioViewModel | undefined {
     const sel = state.selection;
     return sel && sel.primary === "cel" ? scenarioByCaseId.get(sel.caseId) : undefined;
@@ -2987,14 +2926,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.criterionOccurrences = []; // #224 ii.3 Slice 2b: reset the criterion-verdict substrate too (symmetry)
       v.flaggableGids = [];
       v.startNodeGid = undefined;
-      if (pane === "fhirQuestionnaire") {
-        // This pane owns its own DOM and holds a render-identity key in the webview. The generic `render`
-        // message would replace #root (destroying the LForms mount) WITHOUT clearing that key, so re-selecting
-        // the same case afterwards would hit the skip-remount check and never rebuild the form. Its own
-        // data-only message clears the key and paints the placeholder.
-        void v.panel.webview.postMessage({ type: "fhirQuestionnaire", gen, indexVersion, key: undefined, label: undefined });
-        continue;
-      }
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
     }
   }
@@ -3006,46 +2937,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let decisionTable: { epoch: string; model: DecisionTableModel; scope: DecisionTableScope; offset: bigint; sessions: Map<string, BranchSession>; visible: string[]; suspended?: boolean } | undefined;
   let focusedBranchSession: BranchSession | undefined;
   // Render dedupe only; the freshly resolved inspection context is the read-freshness authority.
-  let lastFhirInspectionIdentity: string | undefined;
-  let savedQuestionReview:{view:PaneView;gen:number;token:string;identity:string;reason?:string;stale:boolean;context:QuestionReviewContext}|undefined;
-  let savedQuestionOriginCache:{key:string;origins:QuestionReviewContext['prepared']['definitionOrigins']}|undefined;
-  function savedQuestionMetadata(view:PaneView,gen:number,formKey:string,q:any,stale:boolean,definitionState:string){
-    const cel=currentCel!,digest=currentDefinitions.digest,identity=JSON.stringify([formKey,digest]);
-    let origins:QuestionReviewContext['prepared']['definitionOrigins']=[],reason:string|undefined;
-    if(mode!=='medical-validation')reason='Question source controls are available in Medical Validation.';
-    else if(stale||definitionState==='changed')reason='Historical form: regenerate saved native results before using source controls.';
-    else if(definitionState!=='current')reason='Current policy definitions are not verified; source controls are unavailable.';
-    else try{
-      const selected=resolveCelSuite(cel);if(!selected.ok||!selected.suite.policyPath)throw new Error('The policy source is unavailable.');
-      const options=interactivePublication(cel),cacheKey=JSON.stringify([cel,selected.suite.policyPath,digest,options]);
-      if(savedQuestionOriginCache?.key!==cacheKey){
-        const emitted=emitCrlBundle(selected.suite.policyPath,{...options,sourceOrigins:true});
-        savedQuestionOriginCache=emitted.success?{key:cacheKey,origins:emitted.definitionOrigins??[]}:undefined;
-        if(!emitted.success)reason='Current source identity could not be emitted. Check CRL diagnostics.';
-      }
-      origins=savedQuestionOriginCache?.origins??[];
-    }catch(error){reason='Source controls unavailable: '+(error instanceof Error?error.message:String(error));}
-    const context:QuestionReviewContext={cel,prepared:{definitionOrigins:origins},result:{questionnaire:q},current:()=>!cockpitDisposed&&mode==='medical-validation'&&currentCel===cel&&currentDefinitions.digest===digest&&views.get('fhirQuestionnaire')===view&&savedQuestionReview?.identity===identity&&!savedQuestionReview.stale};
-    const token=randomUUID();savedQuestionReview={view,gen,token,identity,context,reason,stale};invalidateSavedQuestionEdit();
-    return {reviewToken:token,questions:questionReviewPresentation(q,origins,reason)};
-  }
-  async function savedQuestionAction(view:PaneView,message:any):Promise<void>{
-    const captured=savedQuestionReview;
-    const report=(text:string)=>{if(captured&&savedQuestionReview===captured&&views.get('fhirQuestionnaire')===view)void view.panel.webview.postMessage({type:'savedQuestionReviewError',token:captured.token,message:text});else vscode.window.setStatusBarMessage('Medical Validation: action not applied — '+text,5000);};
-    if(!captured||captured.view!==view||message.gen!==view.gen||captured.gen!==view.gen||message.token!==captured.token||!captured.context.current()){report('The saved form refreshed. Use its current question controls.');return;}
-    if(!['focus','edit','flag'].includes(message.action)||typeof message.linkId!=='string')return;
-    const question=questionReviewPresentation(captured.context.result.questionnaire,captured.context.prepared.definitionOrigins,captured.reason).find(q=>q.linkId===message.linkId);
-    if(!question||question.reason||currentDefinitions.state!=='current'){report(question?.reason??'Current source controls are unavailable.');return;}
-    try{await interactiveQuestionAction(captured.context,message.action,message.linkId);}catch(error){report(error instanceof Error?error.message:String(error));}
-  }
   function flushQuestionFocus(view:PaneView,session?:BranchSession):void{
     const request=view.questionFocus;if(!request)return;
     if(request.gen!==view.gen){view.questionFocus=undefined;vscode.window.setStatusBarMessage('Medical Validation: the question view changed before Focus completed. Try Focus again.',5000);return;}
     if(!view.acked||!request.armed)return;
     postBranch(session,{type:'focusQuestionNode',...request});
-  }
-  function invalidateSavedQuestionEdit():void{
-    if(interactiveEdit&&!('outcomeCurrent' in interactiveEdit.context)&&!interactiveEdit.context.current())invalidateInteractiveEdit();
   }
   function acceptQuestionFocusResult(view:PaneView,message:any,session?:BranchSession):void{
     if(!view.questionFocus||view.questionFocus.token!==message.token||view.questionFocus.gen!==message.gen)return;
@@ -3085,7 +2981,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const tree = views.get('tree')?.panel;
     if (cockpitDisposed || mode !== 'medical-validation' || !tree) return;
     const support = [views.get('source')?.panel, views.get('questionnaire')?.panel,
-      views.get('fhirQuestionnaire')?.panel, branchQuestionnaire.layoutPanel, interactiveQuestionnaire.layoutPanel]
+      branchQuestionnaire.layoutPanel, interactiveQuestionnaire.layoutPanel]
       .filter((panel): panel is vscode.WebviewPanel => !!panel);
     return { epoch: `${currentCel}:${indexVersion}`, tree: {identity: tree, column: tree.viewColumn},
       support: support.map(panel => ({identity: panel, column: panel.viewColumn})),
@@ -3135,7 +3031,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       pin.payload.questionMode='panel';pin.payload.showQuestions=false;branchQuestionnaire.open(pin.payload);
       if (opening) {
         const treeColumn = views.get('tree')?.panel.viewColumn;
-        const fhir = views.get('fhirQuestionnaire')?.panel;
+        const fhir = interactiveQuestionnaire.layoutPanel;
         if (fhir && treeColumn !== undefined) fhir.reveal(treeColumn + 2, true);
         mvPaneLayout.request();
       }
@@ -3301,7 +3197,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const retained=focusedBranchSession&&table.visible.includes(focusedBranchSession.id)&&table.sessions.get(focusedBranchSession.id)===focusedBranchSession?focusedBranchSession:undefined;
     const selected=table.visible.map(id=>table!.sessions.get(id)!).find(row=>row.caseId===focusedCaseId(state));
     const focused=created?table.sessions.get(table.visible[0]):retained??selected??table.sessions.get(table.visible[0]);
-    if(focused)focusBranchSession(focused,fromPanel);else{focusedBranchSession=undefined;syncFhirInspection();}
+    if(focused)focusBranchSession(focused,fromPanel);else{focusedBranchSession=undefined;syncQuestionnaireDefaults();}
     if(branchQuestionnaireOwner&&!branchQuestionnaireOwner.mounted)closeQuestionPanel();
     if(created&&focused&&hasBranchQuestionCase(focused))setQuestionDisplayMode(focused,'panel');
     postDecisionTableLayout();
@@ -3311,13 +3207,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** Explicit off-scope flag navigation preserves current and dormant per-case drafts and RQ ownership. */
   function suspendDecisionTable(): void {
     const table=decisionTable;if(!table)return;
-    snapshotCapture.settleEmpty();table.suspended=true;syncFhirInspection();
+    snapshotCapture.settleEmpty();table.suspended=true;syncQuestionnaireDefaults();
     for(const session of table.sessions.values())session.mounted=false;
     void views.get('tree')?.panel.webview.postMessage({type:'decisionTable',active:false,preserve:true,epoch:table.epoch});
   }
   function closeDecisionTable(): void {
     const table=decisionTable;if(!table)return;
-    decisionTable=undefined;focusedBranchSession=undefined;syncFhirInspection();branchQuestionnaire.close();branchQuestionnaireOwner=undefined;snapshotCapture.settleEmpty();
+    decisionTable=undefined;focusedBranchSession=undefined;syncQuestionnaireDefaults();branchQuestionnaire.close();branchQuestionnaireOwner=undefined;snapshotCapture.settleEmpty();
     for(const session of table.sessions.values())coord.disposePane(session.coordinatorKey);
     void views.get('tree')?.panel.webview.postMessage({type:'decisionTable',active:false});
     mvPaneLayout.request();
@@ -3363,7 +3259,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(!session.row.cases.some(entry=>entry.caseId===picked.entry.caseId&&entry.route.terminalId===picked.entry.route.terminalId))return;
     if(oldPin)session.drafts.set(JSON.stringify([oldPin.caseId,oldPin.routeId]),oldPin);
     session.caseId=picked.entry.caseId;session.routeId=picked.entry.route.terminalId;session.pin=undefined;
-    postDecisionTableLayout();renderBranchSession(session);syncFhirInspection();
+    postDecisionTableLayout();renderBranchSession(session);syncQuestionnaireDefaults();
   }
   function postDecisionTableLayout(): void {
     const table=decisionTable,outer=views.get('tree');if(!table||!outer)return;
@@ -3725,7 +3621,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if(pane==='tree'&&handleDecisionTableMessage(msg))return;
     const v = views.get(pane);
     if (!v) return;
-    if(pane==='fhirQuestionnaire'&&msg.type==='savedQuestionReviewAction'){void savedQuestionAction(v,msg);return;}
+
     if(pane==='tree'&&msg.type==='questionFocusResult'){acceptQuestionFocusResult(v,msg);return;}
     if (pane === "tree" && msg.gen === v.gen) {
       if (msg.type === 'treeFocus' && typeof msg.key === 'string') { focusTreeNode(msg.key); return; }
@@ -3743,7 +3639,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         setQuestionDisplayMode(undefined,msg.questionMode);
         postQuestionMode(undefined,false,pinnedCards.token,typeof msg.requestId==='string'?msg.requestId:undefined);return;
       }
-      if(msg.type==='toggleQuestionnairePane' && (msg.value==='questionnaire'||msg.value==='fhirQuestionnaire')){toggleQuestionnairePane(msg.value);return;}
+      if(msg.type==='toggleQuestionnairePane' && msg.value==='questionnaire'){toggleQuestionnairePane(msg.value);return;}
       if(msg.type==='toggleHighlightedSource'){toggleQuestionnairePane('source');return;}
       if(msg.type==='openInteractiveQuestionnaire' && mode==='medical-validation' && currentCel){interactiveQuestionnaire.toggle(currentCel);return;}
       if (msg.type === "routeCardSave" || msg.type === "routeCardAnswerSave") { void saveCard(msg); return; }
@@ -4126,16 +4022,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (!cockpitDisposed) { renderTreeChrome(); mvPaneLayout.request(); }
     }
   }
-  function toggleQuestionnairePane(pane: 'source'|'questionnaire'|'fhirQuestionnaire'): void {
+  function toggleQuestionnairePane(pane: 'source'|'questionnaire'): void {
     if(mode!=='medical-validation')return;
     const existing=views.get(pane);
     if(existing) { dispatch({type:'setPaneVisible',pane,visible:false});existing.panel.dispose(); }
     else if (pane === 'source') { void openHighlightedSourceLeft(); return; }
     else {
-      const treeColumn = views.get('tree')?.panel.viewColumn;
-      const column = pane === 'fhirQuestionnaire' && branchQuestionnaire.isOpen && treeColumn !== undefined
-        ? treeColumn + 2 : nextQuestionnaireColumn();
-      ensurePane(pane,column);dispatch({type:'setPaneVisible',pane,visible:true});renderPane(pane);
+      ensurePane(pane,nextQuestionnaireColumn());dispatch({type:'setPaneVisible',pane,visible:true});renderPane(pane);
     }
     renderTreeChrome();
     mvPaneLayout.request();
@@ -4143,11 +4036,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function ensurePane(pane: Pane, column?: vscode.ViewColumn): PaneView {
     let v = views.get(pane);
     if (v) return v;
-    // The $apply pane loads the vendored LForms runtime from media/lforms/. Setting localResourceRoots NARROWS
-    // the webview to that one directory. (Omitting it does NOT mean "no local resources" — VS Code's default is
-    // the workspace folders plus the extension directory; the other panes are protected by their
-    // `default-src 'none'` CSP, not by an empty root list.)
-    const lformsRoot = vscode.Uri.joinPath(context.extensionUri, "media", "lforms");
     const panel = vscode.window.createWebviewPanel(
       cockpitViewType(pane), // shared with the reload serializer — see registerCockpitPaneSerializers
       paneTitle(pane),
@@ -4155,12 +4043,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        ...(pane === "fhirQuestionnaire" ? { localResourceRoots: [lformsRoot] } : {}),
+
       },
     );
-    panel.webview.html = shellHtml(pane, panel.webview.cspSource, (f: string) =>
-      panel.webview.asWebviewUri(vscode.Uri.joinPath(lformsRoot, f)).toString(),
-    );
+    panel.webview.html = shellHtml(pane, panel.webview.cspSource);
     coord.setPaneCapability(pane, "renderable"); // all panes render + receive reveals (the tree flowchart lit up in T3)
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
@@ -4174,8 +4060,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (views.get(pane) !== v) return;
       coord.disposePane(pane);
       views.delete(pane);
-      if(pane==='fhirQuestionnaire'){savedQuestionReview=undefined;invalidateSavedQuestionEdit();}
-      if(pane==='source'||pane==='questionnaire'||pane==='fhirQuestionnaire') {
+
+      if(pane==='source'||pane==='questionnaire') {
         dispatch({type:'setPaneVisible',pane,visible:false});
         if(pane==='questionnaire'){questionNodeIds=[];currentQuestionIndex=-1;clearAllThisNode();}
         renderTreeChrome();
@@ -4207,6 +4093,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     try {
       const selected = resolveCelSuite(currentCel);
       if (!selected.ok) { resetToEmpty(selected.diagnostics.map(d => d.message).join("\n")); return; }
+      questionnaireDefaultClock=new Date();
       const cm = buildSuiteExecutionModel(selected.suite);
       if (!cm) { resetToEmpty("0 MV cases — nothing to review"); return; }
       const graph = selected.suite.files[0].graph;
@@ -4223,7 +4110,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const previousDefinitions=currentDefinitions;
       currentDefinitions=selected.suite.policyPath?definitionFreshness.check(selected.suite.policyPath,join(editStorage(selected.suite.projectRoot),"freshness")):{state:"unknown",message:"Policy entry is unavailable."};
       modelDefinitionDigest=currentDefinitions.digest;
-      invalidateSavedQuestionEdit();
+
       if(previousDefinitions.digest && previousDefinitions.digest!==modelDefinitionDigest)mvRevision++;
       if(previousDefinitions.digest!==currentDefinitions.digest || previousDefinitions.state==='current'&&currentDefinitions.state!=='current')interactiveQuestionnaire.definitionsChanged(currentCel);
       setupDefinitionDependencyWatchers(selected.suite.projectRoot);
@@ -6684,44 +6571,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
 /** Hermetic webview shell (strict CSP + nonce). Swaps #root on `render` + acks `ready`; `highlight` (gen-checked) toggles
  *  `.current` + scrolls; clicks on `[data-reveal]` post the opaque key back. No external resources. */
-/**
- * The per-pane Content-Security-Policy. Pure + exported so the policy is string-testable, like
- * COCKPIT_WEBVIEW_SCRIPT below.
- *
- * Every pane is nonce-only TODAY and this returns one string for all of them. It exists as a seam because the
- * `$apply` questionnaire pane will need `style-src 'unsafe-inline' <cspSource>` — LForms is an Angular Elements
- * build that injects ~7 unnonced <style> elements at runtime, and a nonce present alongside `'unsafe-inline'`
- * makes browsers ignore the latter, so the nonce must be DROPPED rather than supplemented. That is the ONLY
- * directive that needs to change: `script-src` stays nonce-only (the vendored bundles carry no eval/new
- * Function) and `default-src` stays `'none'`. Measured on Desktop AND the web workbench — see
- * media/lforms/README.md.
- *
- * Because each pane is its own WebviewPanel with its own document, that relaxation lands in ONE pane and leaves
- * every other pane nonce-only.
- */
+/** REFACTOR:grounded: retained cockpit panes use nonce-only shells; native FHIR owns its vendor runtime. */
 export function cockpitPaneCsp(
   pane: Pane,
   a: { nonce: string; styleNonce: string; cspSource: string },
 ): string {
-  if (pane === "fhirQuestionnaire") {
-    // The style nonce is DROPPED, not supplemented: a nonce present makes browsers ignore 'unsafe-inline',
-    // so keeping both would silently remain nonce-only and LForms would render unstyled. `cspSource` is needed
-    // for the vendored styles.css <link>, which style-src also governs. Measured clean on Desktop AND the web
-    // workbench.
-    //
-    // `img-src ${cspSource}` (added when the producer contract was pinned to ALL R4 item types): `styles.css`
-    // pulls two LOCAL images — down_arrow_gray_10_10.png and magnifying_glass.png, the autocompleter's dropdown
-    // arrow and search icon — which appear for `choice`/`open-choice` items. The earlier group/boolean fixture
-    // never requested one, which is why this stayed shut and looked clean. The image set is CLOSED: the vendored
-    // files contain no other image reference, no @font-face, and no remote asset host, so this needs no `data:`
-    // and no widening later. (The one `data:` image route is markdown-it's link validator, reachable only via
-    // `rendering-markdown`/`rendering-xhtml` item text — contracted OUT on the producer side, not allowed here.)
-    //
-    // `connect-src` stays SHUT via default-src. The bundles carry live fetch/XHR call sites (ValueSet expansion,
-    // external autocomplete); this pane does no computation, so it must do no fetching. See
-    // `unrenderableQuestionnaireFeatures` for the host-side detector that makes that constraint LOUD.
-    return `default-src 'none'; img-src ${a.cspSource}; style-src 'unsafe-inline' ${a.cspSource}; script-src 'nonce-${a.nonce}';`;
-  }
   return `default-src 'none'; style-src 'nonce-${a.styleNonce}'; script-src 'nonce-${a.nonce}';`;
 }
 
@@ -6829,57 +6683,8 @@ export function unrenderableQuestionnaireFeatures(q: unknown): string[] {
   return [...found].sort();
 }
 
-/**
- * The pane-specific pieces of the shell document, split by WHERE they must go. Pure + exported because every
- * silent failure this pane has had lived here, and none of them was catchable by typecheck or by the message
- * tests — each presented identically, as "LForms is undefined" over a blank pane:
- *
- *   - vendor scripts in <head> → they run before <body> exists, LForms throws on `document.body.appendChild`
- *     and never defines its global;
- *   - `zone.min.js` after `lhc-forms.js` → Angular never bootstraps (the bundle deliberately excludes Zone.js);
- *   - the error hooks after the scripts they exist to observe → the cause is unreported;
- *   - a nonce on the <link> → under this pane's `style-src 'unsafe-inline' <cspSource>` (nonce DROPPED) a
- *     nonced link would be blocked, and the form renders unstyled rather than failing loudly.
- *
- * Every one of those is a change a reasonable refactor would make, so they are pinned by tests rather than by
- * comments alone.
- */
-export function paneShellFragments(
-  pane: Pane,
-  a: { nonce: string; asset: (f: string) => string },
-): { head: string; bodyScripts: string } {
-  if (pane !== "fhirQuestionnaire") return { head: "", bodyScripts: "" };
-  const head =
-    // Capture-phase error listener FIRST, before anything it needs to observe. THREE distinct failure channels
-    // that do not overlap: a 404 gives an `error` whose target has a src; a script that loads then THROWS gives
-    // an `error` with no target src; a CSP-blocked script raises `securitypolicyviolation` and neither of the
-    // others. Listening to one makes the other two indistinguishable from "loaded fine and defined nothing".
-    `<script nonce="${a.nonce}">window.__aqErrs=[];` +
-    `window.addEventListener('error',function(e){var t=e&&e.target;` +
-    `if(t&&(t.src||t.href)){window.__aqErrs.push('404 '+String(t.src||t.href).split('/').pop());}` +
-    `else{window.__aqErrs.push('threw '+((e&&e.message)?e.message:'(no message)'));}},true);` +
-    `document.addEventListener('securitypolicyviolation',function(e){window.__aqErrs.push('CSP '+e.violatedDirective+' blocked '+String(e.blockedURI||'').split('/').pop());});` +
-    // FOURTH channel, added with the all-item-types contract. The three above are all SYNCHRONOUS; LForms fails
-    // asynchronously in the paths the wider contract reaches. `loadAnswerValueSets` rejects outright when no
-    // terminology server and no FHIR context are configured (neither is, deliberately) — verified in the
-    // vendored bundle as `Promise.reject(new Error("Unable to load ValueSet ... A terminology server or a FHIR
-    // server is needed."))`, raised WITHOUT any network attempt. Nothing listened for that, so it read as a
-    // clean load with an empty dropdown.
-    `window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;` +
-    `window.__aqErrs.push('rejected '+((r&&r.message)?r.message:String(r)));});` +
-    `</script>` +
-    // NO nonce on the link — this pane's style-src is 'unsafe-inline' + cspSource, with the nonce dropped.
-    `<link rel="stylesheet" href="${a.asset("styles.css")}">` +
-    `<style>#root{white-space:normal}</style>`; // the shell's body{white-space:pre-wrap} would mangle the form
-  // BODY, after the divs — see the throw described above. Zone.js first.
-  const bodyScripts =
-    `<script nonce="${a.nonce}" src="${a.asset("zone.min.js")}"></script>` +
-    `<script nonce="${a.nonce}" src="${a.asset("lhc-forms.js")}"></script>` +
-    `<script nonce="${a.nonce}" src="${a.asset("lformsFHIR.min.js")}"></script>`;
-  return { head, bodyScripts };
-}
-
-export function shellHtml(pane: Pane, cspSource: string, asset: (f: string) => string): string {
+// REFACTOR:grounded: cockpit shells have no saved FHIR form or vendor runtime.
+export function shellHtml(pane: Pane, cspSource: string): string {
   const nonce = randomBytes(16).toString("base64");
   const styleNonce = randomBytes(16).toString("base64");
   const csp = cockpitPaneCsp(pane, { nonce, styleNonce, cspSource });
@@ -7051,27 +6856,12 @@ body[data-mode="medical-validation"] .flow-svg{box-sizing:content-box;padding-ri
    three halves stack consistently; the all-clean variant gets the same green done treatment as .mv-progress-done. */
 .mv-criteria{padding:2px 2px 4px;font-size:.85em;opacity:.85}
 .mv-criteria-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${LFORMS_REVIEW_STYLE}${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}${DECISION_TABLE_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QUESTIONNAIRE_STYLE}${ROUTE_CARD_STYLE}${ROUTE_POINTER_STYLE}${REVIEW_GRID_DRAWER_STYLE}${DECISION_TABLE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
     `<style nonce="${styleNonce}">${style}</style>` +
-    // The $apply pane's vendored runtime loads HERE, in the shell document — a real document load, so the
-    // scripts execute. They must NOT be delivered in a render fragment: the cockpit installs those with
-    // `root.innerHTML`, and <script> inserted that way never runs. Zone.js first (the concatenated bundle
-    // deliberately excludes it, and without it Angular never bootstraps and the form silently paints nothing).
-    // The stylesheet <link> needs no nonce here because this pane's style-src is 'unsafe-inline' + cspSource.
-    paneShellFragments(pane, { nonce, asset }).head +
     `</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>` +
-    // ⚠ The vendor runtime loads in the BODY, after the divs — NOT in <head>. LForms bootstraps against
-    // `document.body`, so loading it from <head> throws
-    // "Cannot read properties of null (reading 'appendChild')" before it can define the `LForms` global, and
-    // lformsFHIR then dies looking for `UcumLhcUtils`. Neither is a 404 or a CSP violation, so the only visible
-    // symptom is "LForms is undefined".
-    // Zone.js still first: the concatenated bundle deliberately excludes it and Angular will not bootstrap
-    // without it. These are classic (non-module) scripts, so parse order is execution order, and the message
-    // listener below registers in the same synchronous pass — message dispatch is async, so it cannot be missed.
-    paneShellFragments(pane, { nonce, asset }).bodyScripts +
     `<script nonce="${nonce}">` +
     COCKPIT_WEBVIEW_SCRIPT +
     (pane === 'tree' ? `const crlDecisionTable=(${installDecisionTableWebview.toString()})(document.getElementById('root'),crlCockpitBridge,globalThis.installCrlCockpitRuntime,(${captureDecisionTable.toString()}),[(${sanitizeUncertaintySnapshot.toString()}),(${sanitizeCriterionDescriptionSnapshot.toString()}),(${sanitizeUnpinnedTreeFocusSnapshot.toString()})]);` : '') +
@@ -7086,7 +6876,7 @@ ${LFORMS_REVIEW_STYLE}${CORR_STYLE}${FLOW_STYLE}${UNPINNED_TREE_FOCUS_STYLE}${QU
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
  *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 const COCKPIT_WEBVIEW_BODY =
-  `const v={postMessage:m=>options.bridge.postMessage(options.tableRow?{gen,...m}:m)};const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;const addSavedHeader=m=>{let header=document.createElement('div');header.id='aqHeader';root.prepend(header);if(m.label){const h=document.createElement('p');h.className='aq-case';h.textContent='Case - '+m.label;header.append(h);}if(m.stale||m.definitionState==='checking'||m.definitionState==='unknown'){const p=document.createElement('p');p.className='aq-warning';p.setAttribute('role','status');p.textContent=m.stale?'Historical questionnaire: policy definitions changed. Regenerate native results to refresh this saved form.':m.definitionState==='checking'?'Checking policy definitions; this saved form has not been verified against them.':'Current policy definitions could not be verified. This saved form is retained for inspection.';header.append(p);}};let gen=-1,viewportKey;const questionFocusUi=(${installQuestionNodeFocus.toString()})(root,v,()=>gen);const savedQuestionUi=(${installSavedQuestionnaireReview.toString()})(root,v,(${installLformsReviewControls.toString()}));` +
+  `const v={postMessage:m=>options.bridge.postMessage(options.tableRow?{gen,...m}:m)};const root=options.root;const fcc=options.chrome;const fld=options.drawer;const channel=options.channel||window;let gen=-1,viewportKey;const questionFocusUi=(${installQuestionNodeFocus.toString()})(root,v,()=>gen);` +
   `root.addEventListener('focusin',()=>{if(options.tableRow)v.postMessage({type:'branchFocus'});});` +
   // #211: show ONLY the selected flag tag's field group (client-side; no host round-trip). Called after the drawer is
   // injected and on a tag-select change. Safe no-op when the drawer is empty.
@@ -7138,8 +6928,7 @@ const COCKPIT_WEBVIEW_BODY =
   // textarea by its key (+ the focused one's caret), swap, then restore matching textareas. A SENT note doesn't reappear
   // because the click handler cleared its textarea BEFORE this render arrived (snapshot already empty).
   // Same-policy pan survives rebuilds; preserveViewport keeps chrome. Restore description geometry before raw pan, then explicit disclosure anchoring may adjust it.
-  `if(m.type==='render'){const scroller=document.scrollingElement||document.documentElement,keepViewport=m.viewportKey&&m.viewportKey===viewportKey?{left:scroller.scrollLeft,top:scroller.scrollTop}:undefined;viewportKey=m.viewportKey;questionFocusUi.cancel();savedQuestionUi.clear();var _d={},_a=null,_s=0,_e=0;` +
-  `if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
+  `if(m.type==='render'){const scroller=document.scrollingElement||document.documentElement,keepViewport=m.viewportKey&&m.viewportKey===viewportKey?{left:scroller.scrollLeft,top:scroller.scrollTop}:undefined;viewportKey=m.viewportKey;questionFocusUi.cancel();var _d={},_a=null,_s=0,_e=0;` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');_d[k]=ta.value;if(ta===document.activeElement){_a=k;_s=ta.selectionStart;_e=ta.selectionEnd;}}` +
   // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
   // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
@@ -7229,7 +7018,7 @@ const COCKPIT_WEBVIEW_BODY =
   // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
   // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
-  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'){focusPinLeaf(m.pinKey);}else if(pendingPinFocus&&m.focusRequest===pendingPinFocus){focusPinLeaf(m.pinKey,false);}pendingPinFocus='';if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
+  `else if(m.type==='routeCards'){if(m.gen!==gen)return;treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=m.pathNodeKeys||[];pinnedGroupKeys=m.pathGroupKeys||[];pinnedGroupOutcomes=m.pathGroupOutcomes||[];pinnedRouteLabel=m.label;applyFlowPin();routeCardUi.show(m);applyZoom();if(m.focusRequest==='branch-navigation'){pendingPinFocus='';focusPinLeaf(m.pinKey);}else if(pendingPinFocus&&m.focusRequest===pendingPinFocus){pendingPinFocus='';focusPinLeaf(m.pinKey,false);}if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
   `else if(m.type==='modeledBranch'){if(m.gen!==gen)return;routeCardUi.reset();treeFocusUi.reset();pinnedFlowKey=m.pinKey;pinnedRouteKeys=m.routeKeys;pinnedPathKeys=[];pinnedGroupKeys=[];pinnedGroupOutcomes=[];pinnedRouteLabel=m.label;currentRouteLabel=m.label;applyFlowPin();applyZoom();if(options.tableRow)v.postMessage({type:'branchReady',gen,token:m.token});}` +
   `else if(m.type==='unpinnedTreeFocus'){treeFocusUi.show(m);}` +
   `else if(m.type==='clearTreeFocus'){if(m.gen===gen)treeFocusUi.reset();}` +
@@ -7252,68 +7041,6 @@ const COCKPIT_WEBVIEW_BODY =
   // `key` is the render identity: remount ONLY when the case's CONTENT changes. Every cockpit re-render
   // (rebuild/applyShowKeys/renderEmpty) reaches every pane, and remounting a 1.85 MB Angular app on an
   // unrelated render would churn and discard in-progress answers.
-  `else if(m.type==='savedQuestionReviewError'){savedQuestionUi.error(m);}` +
-  `else if(m.type==='fhirQuestionnaire'){` +
-  // The skip-remount latch is set ONLY after a successful mount (bottom of the try). Latching it up-front
-  // latched FAILURES too: select a case with no artifacts -> "could not find" paints and the key sticks -> the
-  // producer (or the seed script) writes the files -> every later render posts the same key and returns early,
-  // so the pane shows "could not find" until you select a different case and come back. That is precisely the
-  // workflow this pane exists for.
-  `if(m.key&&m.key===window.__aqKey){const header=document.getElementById('aqHeader');if(header)header.remove();addSavedHeader(m);savedQuestionUi.update(m);return;}savedQuestionUi.clear();` +
-  `if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}` +
-  `window.__aqKey=undefined;` +
-  `const host=document.getElementById('root');` +
-  // The case header mirrors the CRL Questionnaire pane's, so the two panes read as the same case side by side.
-  `const head=(t)=>{const h=document.createElement('p');h.className='aq-case';h.textContent=t;return h;};` +
-  `const addHeader=()=>addSavedHeader(m);` +
-  `const fail=(t)=>{savedQuestionUi.clear();if(window.__aqGroupDispose){window.__aqGroupDispose();window.__aqGroupDispose=undefined;}if(window.__aqClearDispose){window.__aqClearDispose();window.__aqClearDispose=undefined;}host.replaceChildren();addHeader();const p=document.createElement('p');p.className='placeholder';p.textContent=t;host.appendChild(p);};` +
-  `if(!m.label){fail(m.emptyNote||'Select a case to see its FHIR questionnaire.');return;}` +
-  `if(m.loading){fail('Loading FHIR questionnaire…');return;}` +
-  `if(m.loadError){fail('Could not read the saved FHIR questionnaire. '+m.loadError+(m.lookedFor?(' Path: '+m.lookedFor):''));return;}` +
-  // Distinguish "nothing selected" from "selected, but the producer has written nothing for it" — the second is
-  // the normal state until #277 lands, and saying WHERE we looked is what makes it actionable.
-  `if(!m.q){fail('Could not find FHIR Questionnaire data for this case.'+(m.lookedFor?(' Looked for: '+m.lookedFor):''));return;}` +
-  `if(typeof LForms==='undefined'||!LForms.Util){` +
-  `const errs=(window.__aqErrs||[]);` +
-  `fail('The LForms runtime did not load. '+(errs.length?('Failures: '+errs.join(' | ')):'No 404, no throw, no CSP violation — the scripts ran and defined no LForms global. Check load ORDER (zone.js must precede lhc-forms.js).'));` +
-  `return;}` +
-  `try{` +
-  `host.replaceChildren();addHeader();` +
-  // Producer-contract breaches, detected host-side. Shown ABOVE the form and NOT fatal: the rest of the
-  // questionnaire still renders, and the operator sees exactly which items will not.
-  `const un=(m.unrenderable||[]);` +
-  `if(un.length){const c=document.createElement('p');c.className='aq-warning';` +
-  `c.textContent='This questionnaire uses features the pane cannot render ('+un.length+'): '+un.join(' | ');` +
-  `host.appendChild(c);}` +
-  `const mount=document.createElement('div');host.appendChild(mount);mount.id='aqMount';` +
-  `window.__aqClearDispose=(${installBooleanAnswerClearControls.toString()})(mount);` +
-  `window.__aqGroupDispose=(${installPresentationChoiceGroups.toString()})(mount,m.q);` +
-  `let form=LForms.Util.convertFHIRQuestionnaireToLForms(m.q,'R4');` +
-  `if(!form){fail('convertFHIRQuestionnaireToLForms returned nothing.');return;}` +
-  `if(m.qr)form=LForms.Util.mergeFHIRDataIntoLForms('QuestionnaireResponse',m.qr,form,'R4');` +
-  `LForms.Util.addFormToPage(form,'aqMount',{prepopulate:false});` +
-  `window.__aqKey=m.key;savedQuestionUi.update(m);` + // latch ONLY on success — see the note at the top of this branch
-
-  // addFormToPage can resolve without painting (an unrecognised item tree yields an empty form). Angular
-  // Elements upgrades asynchronously, so poll briefly rather than measuring on the next frame.
-  // The no-paint poll must not outlive its own render. It closes over `mount`, and on timeout it used to call
-  // fail(), which clears #root — so a slow case A could wipe the LIVE form of case B selected moments later,
-  // and label the wreckage with A. It now bails if the latch moved on, and reports WITHOUT tearing down a form
-  // that may still be upgrading (Angular Elements can be slow on a cold codespace).
-  `const mine=m.key;let n=0;const chk=()=>{if(window.__aqKey!==mine)return;` +
-  `if(mount.getBoundingClientRect().height>0)return;` +
-  `if(++n>40){const w=document.createElement('p');w.className='aq-warning';` +
-  // Report WHAT failed, not just THAT nothing painted. Errors raised after addFormToPage resolves (Angular
-  // Elements upgrades asynchronously, so they escape the try/catch below) land in __aqErrs and were previously
-  // read only in the LForms-undefined branch — i.e. never, once the runtime loaded. A blank pane with a
-  // generic warning is the exact shape of the two false-negative CSP readings this pane has already produced.
-  `const errs=(window.__aqErrs||[]);` +
-  `w.textContent='The questionnaire has not rendered yet. If it stays blank, the form did not paint.'` +
-  `+(errs.length?(' Failures: '+errs.join(' | ')):'');` +
-  `if(!mount.previousElementSibling||!mount.previousElementSibling.classList.contains('aq-warning'))host.insertBefore(w,mount);return;}` +
-  `setTimeout(chk,50);};setTimeout(chk,50);` +
-  `}catch(e){fail('Could not render the questionnaire: '+((e&&e.message)?e.message:String(e)));}` +
-  `}` +
   // #211: the create-flag drawer's OWN region — set (or clear with '') its html. The render handler never touches it, so a
   // same-policy tree rebuild leaves the drawer + the user's typed text intact. aff() shows the selected tag's fields.
   // Todo 5 (impl-review [important]): the drawer is last in DOM + revealed preserveFocus, so a keyboard user would tab through
@@ -7489,7 +7216,7 @@ export const COCKPIT_WEBVIEW_INSTALLER =
     .split('root.addEventListener(').join('listen(root,')
     .split('fcc.addEventListener(').join('listen(fcc,')
     .split('fld.addEventListener(').join('listen(fld,') +
-  `return {setZoom:z=>setZoom(z,true),dispose(){if(disposed)return;disposed=true;if(fpPan){fpPan=false;document.body.style.cursor='';}for(const remove of removers)remove();for(const id of timers)window.clearTimeout(id);for(const id of frames)window.cancelAnimationFrame(id);keyboardUi.dispose();disclosureUi.cancel();routeCardUi.reset();treeFocusUi.dispose();criterionDescriptionUi.dispose();logicUi.dispose();pinVisibility.dispose();questionFocusUi.dispose();savedQuestionUi.dispose();}};};`;
+  `return {setZoom:z=>setZoom(z,true),dispose(){if(disposed)return;disposed=true;if(fpPan){fpPan=false;document.body.style.cursor='';}for(const remove of removers)remove();for(const id of timers)window.clearTimeout(id);for(const id of frames)window.cancelAnimationFrame(id);keyboardUi.dispose();disclosureUi.cancel();routeCardUi.reset();treeFocusUi.dispose();criterionDescriptionUi.dispose();logicUi.dispose();pinVisibility.dispose();questionFocusUi.dispose();}};};`;
 
 export const COCKPIT_WEBVIEW_SCRIPT = COCKPIT_WEBVIEW_INSTALLER +
   `const crlCockpitBridge=acquireVsCodeApi();const crlCockpitRuntime=globalThis.installCrlCockpitRuntime({root:document.getElementById('root'),chrome:document.getElementById('fcChrome'),drawer:document.getElementById('flagDrawer'),bridge:crlCockpitBridge});`;

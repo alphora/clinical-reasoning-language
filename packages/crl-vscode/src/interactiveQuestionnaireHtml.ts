@@ -9,10 +9,14 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   presentationGroups?: typeof installPresentationChoiceGroups, reviewControls?: typeof installLformsReviewControls) {
   const w = globalThis as any, doc = w.document, api = w.acquireVsCodeApi();
   const select = doc.getElementById("codeset"), start = doc.getElementById("start"), next = doc.getElementById("continue");
-  const restart = doc.getElementById("restart");
+  // REFACTOR:grounded: Default is explicit; availability updates never replace the mounted form.
+  const restart = doc.getElementById("restart"), defaults=doc.getElementById('default');
+  let defaultReason='Select a covered Decision Table row to use Default.', defaultLabel='', defaultBusy=false;
   let stale=false;
   const reset = doc.getElementById("reset"), cancel = doc.getElementById("cancel"), status = doc.getElementById("status");
   const mount = doc.getElementById("form"), outcomes = doc.getElementById("outcomes");
+  const assessment=doc.getElementById('assessment');
+  const showAssessment=(label?:string)=>{assessment.textContent=label??'';assessment.hidden=!label;};
   const results = doc.getElementById("results"), warnings = doc.getElementById("warnings"), warningList = doc.getElementById("warning-list");
   let definitionWarnings: string[] = [], evaluationWarnings: string[] = [];
   const showWarnings = () => {
@@ -35,6 +39,7 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
     for(const button of outcomes.querySelectorAll('button'))button.disabled=busy || stale || !outcomeValid || button.dataset.unavailable==='true';
     start.disabled = busy || !select.value || hasResult; next.disabled = busy || !ready || !q || blocked || editError;
     select.disabled = transitioning;
+    defaults.disabled=busy||stale||!!defaultReason;defaults.title=defaultReason||`Load selected row: ${defaultLabel}`;
     if(stale){start.disabled=true;next.disabled=true;reset.disabled=true;select.disabled=true;cancel.disabled=true;return;}
     reset.disabled = !select.value || transitioning; cancel.disabled = !busy || transitioning;
     mount.inert = busy || !ready;
@@ -126,7 +131,8 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
     } catch (e) { editError = true; error(e); controls(); }
   });
   start.addEventListener("click", () => { if (busy || hasResult) return; busy = true; status.textContent = "Evaluating…"; controls(); send("start"); });
-  const clear = () => { ++render;reviewDispose?.();reviewDispose=undefined;outcomeValid=false;evaluationId='';review=undefined;activityLabels=[]; ready = false; blocked = false; editError = false; hasResult = false; q = response = snapshot = undefined; mount.replaceChildren(); outcomes.replaceChildren(); results.hidden = true; evaluationWarnings = []; showWarnings(); controls(); };
+  defaults.addEventListener('click',()=>{if(defaults.disabled)return;observe();defaultBusy=true;busy=true;status.textContent=`Loading ${defaultLabel || 'selected row'}…`;controls();send('default');});
+  const clear = () => { ++render;showAssessment();reviewDispose?.();reviewDispose=undefined;outcomeValid=false;evaluationId='';review=undefined;activityLabels=[]; ready = false; blocked = false; editError = false; hasResult = false; q = response = snapshot = undefined; mount.replaceChildren(); outcomes.replaceChildren(); results.hidden = true; evaluationWarnings = []; showWarnings(); controls(); };
   const showOutcomes=(activities:string[])=>{
     activityLabels=activities;
     outcomes.replaceChildren();
@@ -146,11 +152,13 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
   cancel.addEventListener("click", () => { if (transitioning || !busy) return; transitioning = true; controls(); send("cancel"); });
   w.addEventListener("message", (event: any) => {
     const m = event.data;
+    if(m.type==='defaults'&&m.token===token){defaultReason=m.reason??'';defaultLabel=m.label??'';controls();return;}
     if(m.type === "definitionStale"){if(typeof m.token!=="number" || m.token<=token)return;token=m.token;stale=true;busy=false;transitioning=false;mount.inert=true;restart.hidden=false;status.textContent=m.message;controls();return;}
     if(m.type === "restartError"){if(m.token!==token)return;status.textContent=m.message;return;}
     if (m.type === "initial") {
       stale=false;mount.inert=false;restart.hidden=true;
       dependencies = m.dependencies ?? {};
+      defaultReason=m.defaults?(m.defaults.reason??''):'Default is unavailable.';defaultLabel=m.defaults?.label??'';defaultBusy=false;
       definitionWarnings = m.warnings ?? []; warnings.open = false;
       token = m.token; busy = false; transitioning = false; clear(); select.replaceChildren();
       for (const state of m.states) { const o = doc.createElement("option"); o.value = state.id; o.textContent = state.label; select.appendChild(o); }
@@ -158,14 +166,15 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
       select.hidden = m.states.length < 2;
       doc.getElementById("codeset-label").hidden = m.states.length < 2;
       subject = m.subject;
-      status.textContent = m.error || (m.states.length ? "Select Start to begin." : "No initial states found. Add tests/interactive-questionnaire/request-1/request-bundle.json to this policy.");
+      status.textContent = m.error || (m.initialStateError ? `Initial requests could not be loaded: ${m.initialStateError} Select Default to load the selected row.` : m.states.length ? "Select Start, or Default to load the selected row." : "Select Default to load the selected row, or add an initial request to start an empty assessment.");
       controls();
     } else if (m.type === "cancelled") {
-      token = m.token;outcomeValid=false; busy = false; transitioning = false; if (m.id) select.value = m.id; status.textContent = m.message; controls();
+      token = m.token;if(!defaultBusy)outcomeValid=false;defaultBusy=false; busy = false; transitioning = false; if (m.id) select.value = m.id; status.textContent = m.message; controls();
     } else if (m.type === "reset") {
-      token = m.token; busy = false; transitioning = false; subject = m.subject; clear();
+      token = m.token;defaultBusy=false; busy = false; transitioning = false; subject = m.subject; clear();
       if (m.id) select.value = m.id;
-      status.textContent = "Select Start to begin."; controls();
+      showAssessment(m.label ? (m.emptyAssessment ? m.label : 'Initial state: '+m.label) : undefined);
+      status.textContent = m.emptyAssessment ? "Ready for an empty assessment. Select Start, or Default to load the selected row." : "Select Start to begin."; controls();
     } else if(m.token===token && m.type==='reviewError'){status.textContent=m.message;
     } else if(m.token===token && m.type==='review' && m.evaluationId===evaluationId){
       review=m.review;
@@ -173,18 +182,20 @@ export function installInteractiveQuestionnaire(prune: typeof pruneInteractiveRe
       if(ready){reviewDispose?.();reviewDispose=reviewControls?.(mount,review?.questions??[],(action,linkId)=>send('questionReviewAction',{action,linkId,evaluationId}),()=>!busy&&!stale&&ready);}
       controls();
     } else if (m.token === token && m.type === "result") {
-      busy = false; editError = false; hasResult = true; q = m.questionnaire; response = m.response; subject = m.subject;
+      if(m.states){select.replaceChildren();for(const state of m.states){const option=doc.createElement('option');option.value=state.id;option.textContent=state.label;select.append(option);}select.value=m.selectedId;select.hidden=m.states.length<2;doc.getElementById('codeset-label').hidden=m.states.length<2;}
+      defaultBusy=false;busy = false; editError = false; hasResult = true; q = m.questionnaire; response = m.response; subject = m.subject;
       review=m.review;evaluationId=m.evaluationId;outcomeValid=true;showOutcomes(m.activities);
       results.hidden = m.activities.length === 0;
       status.textContent = m.activities.length
         ? q ? "Evaluation complete. You can change answers and re-evaluate." : "Evaluation complete. Select Reset to start again."
         : q ? "Answer the questions, then Continue." : "The engine returned no questionnaire or activities.";
+      if(m.defaulted){showAssessment('Loaded row: '+(m.defaultLabel??'Selected row'));status.textContent='Selected row defaults loaded. '+status.textContent;}
       evaluationWarnings = m.warnings ?? []; showWarnings();
       blocked = !!m.unsupported?.length;
       if (blocked) status.textContent = "This form cannot be submitted because the renderer does not support: " + m.unsupported.join("; ");
       void mountForm(false);
     } else if (m.token === token && m.type === "error") {
-      busy = false; status.textContent = m.message; controls();
+      defaultBusy=false;busy = false; status.textContent = m.message; controls();
     }
   });
   controls(); send("ready");
@@ -198,10 +209,10 @@ export function interactiveQuestionnaireHtml(nonce: string, cspSource: string, a
 body{padding:16px;color:var(--vscode-editor-foreground,#222);background:var(--vscode-editor-background,#fff);font:14px var(--vscode-font-family,Arial)}
 nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}button,select{padding:6px 10px;font:inherit}button{cursor:pointer}button:disabled{cursor:default}#status{line-height:1.5}#form[aria-busy=true]{opacity:.6}h1{font-size:18px}#results{margin-top:20px;padding:12px 16px;border:1px solid var(--vscode-panel-border,#777);border-radius:4px}#results h2{font-size:16px;margin:0 0 8px}#outcomes p{margin:6px 0;overflow-wrap:anywhere}#warnings{margin:12px 0}#warnings summary{cursor:pointer;color:var(--vscode-editorWarning-foreground,#c79420)}#warning-list{line-height:1.5;overflow-wrap:anywhere}
 ${LFORMS_REVIEW_STYLE}
-</style></head><body><h1>Interactive FHIR Questionnaire</h1><nav>
+</style></head><body><h1>FHIR Questionnaire</h1><nav>
 <label id="codeset-label" for="codeset">Initial state</label><select id="codeset"></select>
-<button id="restart" hidden>Restart with current definitions</button><button id="start">Start</button><button id="continue" disabled>Continue / Re-evaluate</button><button id="reset">Reset</button><button id="cancel" disabled>Cancel</button>
-</nav><p id="status" role="status">Loading initial states…</p><details id="warnings" hidden><summary id="warning-summary">Warnings</summary><ul id="warning-list"></ul></details><div id="form"></div><section id="results" aria-labelledby="result-heading" aria-live="polite" hidden><h2 id="result-heading">Result</h2><div id="outcomes"></div></section>
+<button id="restart" hidden>Restart with current definitions</button><button id="default" disabled>Default</button><button id="start">Start</button><button id="continue" disabled>Continue / Re-evaluate</button><button id="reset">Reset</button><button id="cancel" disabled>Cancel</button>
+</nav><p id="assessment" hidden></p><p id="status" role="status">Loading initial states…</p><details id="warnings" hidden><summary id="warning-summary">Warnings</summary><ul id="warning-list"></ul></details><div id="form"></div><section id="results" aria-labelledby="result-heading" aria-live="polite" hidden><h2 id="result-heading">Result</h2><div id="outcomes"></div></section>
 <script nonce="${nonce}" src="${asset("zone.min.js")}"></script><script nonce="${nonce}" src="${asset("lhc-forms.js")}"></script><script nonce="${nonce}" src="${asset("lformsFHIR.min.js")}"></script>
 <script nonce="${nonce}">(${installInteractiveQuestionnaire.toString()})(${pruneInteractiveResponse.toString()},${questionnaireWithoutDefaults.toString()},${retainInteractiveQuestionnaire.toString()},${inspect.toString()},${installBooleanAnswerClearControls.toString()},${installPresentationChoiceGroups.toString()},${installLformsReviewControls.toString()});</script></body></html>`;
 }
