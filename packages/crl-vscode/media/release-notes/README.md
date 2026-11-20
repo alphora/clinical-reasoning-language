@@ -1,8 +1,26 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.54.
+Updates since CRL 6.4.41 through 6.4.55.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.55 — Review policy paths from the questionnaire
+
+### Load a decision row when you choose
+
+FHIR Questionnaire is now one editable form\. Select a Decision Table row, then choose Default to load its answers\. Changing rows keeps your current form until you choose Default again\. Change or clear answers, then re\-evaluate to see the result\.
+
+![Synthetic six\-question form with Default, a Loaded row label, question review icons and a Met result\.](questionnaire-default.png)
+
+A demonstration policy shows the selected row’s answers in the editable FHIR Questionnaire\.
+
+### Review questions without losing your place
+
+Use the controls to the right of each question to focus it in the tree, edit its wording with the pencil, or manage its flags\. Focus navigates to the question; editing and pinning preserve your place\. The result uses the terminal name, such as Met or Unmet, and offers Verdict for the corresponding route when available\.
+
+### Review percentage and timing thresholds
+
+Measurement questions can use percentages, such as LVEF, and milliseconds, such as QRS or PR duration\. Policies can compare those values with an inclusive at\-least or at\-most threshold while keeping the measurement unit explicit\.
 
 ## 6.4.54 — More reliable uncertainty checks
 

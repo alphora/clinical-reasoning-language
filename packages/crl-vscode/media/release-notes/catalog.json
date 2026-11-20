@@ -1,6 +1,6 @@
 {
   "baselineVersion": "6.4.41",
-  "deployedBaselineVersion": "6.4.53",
+  "deployedBaselineVersion": "6.4.48",
   "releases": [
     {
       "version": "6.4.46",
@@ -158,6 +158,27 @@
         {
           "title": "Continue reviewing retained uncertain answers",
           "description": "Fixed an error that prevented questionnaires from opening for some policies that check uncertainty in earlier answers. Retained uncertain answers remain available to review and correct."
+        }
+      ]
+    },
+    {
+      "version": "6.4.55",
+      "title": "Review policy paths from the questionnaire",
+      "features": [
+        {
+          "title": "Load a decision row when you choose",
+          "description": "FHIR Questionnaire is now one editable form. Select a Decision Table row, then choose Default to load its answers. Changing rows keeps your current form until you choose Default again. Change or clear answers, then re-evaluate to see the result.",
+          "image": "questionnaire-default.png",
+          "alt": "Synthetic six-question form with Default, a Loaded row label, question review icons and a Met result.",
+          "caption": "A demonstration policy shows the selected row’s answers in the editable FHIR Questionnaire."
+        },
+        {
+          "title": "Review questions without losing your place",
+          "description": "Use the controls to the right of each question to focus it in the tree, edit its wording with the pencil, or manage its flags. Focus navigates to the question; editing and pinning preserve your place. The result uses the terminal name, such as Met or Unmet, and offers Verdict for the corresponding route when available."
+        },
+        {
+          "title": "Review percentage and timing thresholds",
+          "description": "Measurement questions can use percentages, such as LVEF, and milliseconds, such as QRS or PR duration. Policies can compare those values with an inclusive at-least or at-most threshold while keeping the measurement unit explicit."
         }
       ]
     }
