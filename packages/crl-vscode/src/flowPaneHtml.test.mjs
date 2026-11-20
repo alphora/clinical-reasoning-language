@@ -137,9 +137,9 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(!/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke COLOUR (a stroke-WIDTH thicken is fine)");
   // #210 (disc 239): the flag-anchor focus is a THEME-ADAPTIVE neutral GLOW (drop-shadow — a SEPARATE axis from the rect
   // stroke; every semantic colour is taken), so it does NOT recolor the base border / override the protected strokes (gpt55).
-  assert.ok(/\.flow-row\.node-focus>rect\{filter:drop-shadow\([^}]*#ffffff/.test(FLOW_STYLE), "white .node-focus GLOW (dark theme default)");
+  assert.ok(/\.flow-row\.node-focus>rect(?:,[^{]+)?\{filter:drop-shadow\([^}]*#ffffff/.test(FLOW_STYLE), "white .node-focus GLOW (dark theme default; may share its rule with question focus)");
   assert.ok(/body\.vscode-light \.flow-row\.node-focus>rect[^{]*\{filter:drop-shadow\([^}]*#000000/.test(FLOW_STYLE), "black .node-focus GLOW on light themes (adaptive)");
-  assert.ok(!/\.flow-row\.node-focus>rect\{[^}]*stroke:/.test(FLOW_STYLE), ".node-focus never recolors the base rect stroke (independent axis)");
+  assert.ok(!/\.flow-row\.node-focus>rect[^{]*\{[^}]*stroke:/.test(FLOW_STYLE), ".node-focus never recolors the base rect stroke (independent axis)");
 });
 
 check("grab-drag pan affordance: .flow-svg is cursor:grab + user-select:none; rows keep cursor:pointer (clickable)", () => {

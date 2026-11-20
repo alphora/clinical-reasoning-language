@@ -2,7 +2,6 @@ import {describe,it,expect} from 'vitest';
 import {buildCRL,decisionSpine,emitCrlBundle,resolveCelImports,assembleConceptProjections,buildCrlStructure,buildGuardOutlines,nodeKey,conceptDeclRef} from '@smile-digital-health/crl';
 import {collectGuardDefines} from '../../crl/src/ast/guardDefines.ts';
 import {questionReviewOwners,nativeReviewRoutes,reviewCasesForRoute} from './interactiveReview.ts';
-import {resolve} from 'node:path';
 import {expandQuestionInputs,renderFlowPane} from './flowPaneHtml.ts';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -41,14 +40,14 @@ describe('interactive review source joins',()=>{
   expect(questionReviewOwners({item:[{...q,linkId:'1'},{...q,linkId:'1/1'}]},origins).size).toBe(0);
  });
  it('the real Bleph emission supplies direct identities independently of display text',()=>{
-  const emitted=emitCrlBundle(resolve('examples/bleph-medical-validation/src/crl/blepharoplasty-blepharoptosis-repair.crl'),{date:'2026-10-08',sourceOrigins:true});
+  const emitted=emitCrlBundle(fileURLToPath(new URL('../../../examples/bleph-medical-validation/src/crl/blepharoplasty-blepharoptosis-repair.crl',import.meta.url)),{date:'2026-10-08',sourceOrigins:true});
   expect(emitted.success).toBe(true);
   const feature=emitted.definitionOrigins.find(o=>o.kind==='CaseFeature');expect(feature).toBeDefined();
   expect(questionReviewOwners({item:[{linkId:'q',type:'boolean',definition:feature.canonical+'#Observation.value[x]',text:'Different wording'}]},emitted.definitionOrigins).get('q')).toEqual({library:feature.library,concept:feature.name});
   expect(emitted.definitionOrigins.filter(o=>o.kind==='Decision').every(o=>o.decision&&o.conditions)).toBe(true);
  });
  it('focus expansion exposes the real Bleph question inside its collapsed INPUT group',()=>{
-  const graph=resolveCelImports(resolve('examples/bleph-medical-validation/src/cel/mv/medical-validation.cel'));
+  const graph=resolveCelImports(fileURLToPath(new URL('../../../examples/bleph-medical-validation/src/cel/mv/medical-validation.cel',import.meta.url)));
   const {conceptLayer,defExpr}=assembleConceptProjections(graph),structure=buildCrlStructure(graph);
   const opts={concepts:conceptLayer,defExpr:(lib,name)=>defExpr.get(nodeKey(conceptDeclRef(lib,name))),guardOutlines:buildGuardOutlines(graph,defExpr)};
   const owner={library:'Blepharoplasty And Blepharoptosis Repair',concept:'Procedure Under Review'};

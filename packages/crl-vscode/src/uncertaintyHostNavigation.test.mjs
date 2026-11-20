@@ -20,10 +20,10 @@ test('explicit source navigation unfolds once; replay after Hide stays hidden ac
    crlAnchorsForUnits:()=>['u'],conceptNodesForRow:()=>[],scrollSuppressPane:undefined,disclosureFocus:undefined,
    renderPane(){view.gen=coord.startRender('tree');view.acked=false;view.preserveTreeViewport=true;},
    branchQuestionnaire:{isOpen:false},legacyQuestionMode:'off',branchQuestionnaireOwner:undefined,pinnedCards:undefined,renderTreeChrome(){},driveDoneOverlay(){},driveFlagBadges(){},driveNodeFocus(){},postTreeFocus(){},driveThisNode(){},
-   selectingTreeFocus:false,clearTreeFocus(){},state:{selection:{primary:'source',unitId:'source-unit'}},focusedCaseId:()=>undefined,
+   selectingTreeFocus:false,clearTreeFocus(){},syncQuestionnaireDefaults(){},state:{selection:{primary:'source',unitId:'source-unit'}},focusedCaseId:()=>undefined,
    reduce:(state)=>({state,effects:[{pane:'tree',target:{kind:'unit',id:'source-unit'}}]}),onNav:{fire(){}},reflectSelectionToTree(){},driveFailedCriteriaPeek(){},driveDiverters(){},driveLeafMarks(){},shouldRerenderQuestionnaire:()=>false};
  view.anchors={u:{scrollTo:'guard-anchor',segmentIds:['guard-anchor']}};view.panel={webview:{postMessage:m=>messages.push(m)}};context.highlightRows=host('highlightRows',context);
- context.postReveal=host('postReveal',context);context.applyReveal=host('applyReveal',context);const dispatch=host('dispatch',context);
+ context.postReveal=host('postReveal',context);context.applyReveal=host('applyReveal',context);context.flushQuestionFocus=host('flushQuestionFocus',context);const dispatch=host('dispatch',context);
  dispatch({type:'select',selection:context.state.selection});assert(expanded.has('u'));assert.equal(view.gen,2);
  assert.equal(coord.ready('tree',1,1),undefined,'superseded acknowledgement cannot flush the navigation');
  const ready=readyHandler(context);ready('tree',{gen:2,questionnaireOpen:false},view);assert.equal(messages.findLast(m=>m.type==='highlight').scrollTo,'guard-anchor','explicit offscreen navigation keeps its scroll after ACK');assert.equal(view.gen,2,'ACK never re-renders an already disclosed guard');

@@ -1,11 +1,9 @@
 // REFACTOR:grounded: the shipped native form preserves local edits until an explicit successful Default.
 import {it,expect} from 'vitest';
-import {resolve} from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {interactiveQuestionnaireHtml} from './interactiveQuestionnaireHtml';
 import {browserExecutable,browserFixture} from '../test/browserHarness.mjs';
 it.skipIf(!browserExecutable)('real LForms Default is manual; availability and failures retain form/answers; success replaces it',async()=>{
- const nonce='test',html=interactiveQuestionnaireHtml(nonce,'file:',name=>pathToFileURL(resolve('packages/crl-vscode/media/lforms',name)).href)
+ const nonce='test',html=interactiveQuestionnaireHtml(nonce,'file:',name=>new URL('../media/lforms/'+name,import.meta.url).href)
   .replace('<script nonce="test" src=',`<script nonce="test">window.sent=[];window.acquireVsCodeApi=()=>({postMessage:m=>sent.push(m)});</script><script nonce="test" src=`);
  const browser=await browserFixture(html);
  try{

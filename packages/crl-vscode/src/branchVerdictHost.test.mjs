@@ -10,7 +10,7 @@ const source=ts.createSourceFile('cockpit.ts',readFileSync(new URL('./correspond
 let body,postBranch;function visit(n){if(ts.isFunctionDeclaration(n)&&n.name?.text==='pinnedVerdictMenu')body=n.getText(source);if(ts.isFunctionDeclaration(n)&&n.name?.text==='postBranch')postBranch=n.getText(source);ts.forEachChild(n,visit);}visit(source);
 test('policy completion includes every frozen case, not only the pinned group or painted cases',()=>{
  let overlay;function find(n){if(ts.isFunctionDeclaration(n)&&n.name?.text==='driveDoneOverlay')overlay=n.getText(source);ts.forEachChild(n,find);}find(source);
- const messages=[],context=vm.createContext({views:new Map([['tree',{gen:9,leafConcepts:{},panel:{webview:{postMessage:m=>messages.push(m)}}}]]),
+ const messages=[],context=vm.createContext({interactiveQuestionnaire:{refreshReview(){}},views:new Map([['tree',{gen:9,leafConcepts:{},panel:{webview:{postMessage:m=>messages.push(m)}}}]]),
   mode:'medical-validation',crlMaps:{},crlStructure:[],scenarios:{scenarios:[{case:{name:'A'}},{case:{name:'B'},status:'error'}]},
   duplicateScenarioNames:new Set(),caseIdByName:{A:'a',B:'b'},reviewByCaseId:{a:'pass',b:'fail',stale:'pending'},scenarioByCaseId:new Map(),
   collectDispositionLeafKeys:()=>new Set(),producedDispositionLeafKeys:()=>[],caseViewKey:c=>c.name,deriveAllPassLeaves:()=>new Set(),
@@ -48,7 +48,7 @@ test('actual verdict-save host paths immediately refresh complete criterion pain
  const tree={gen:9,focusNodes:nodes,criterionOccurrences:[{gid:'criterion',occurrenceKey:'owner',lib:'L',name:'C'}],leafConcepts:{},panel:{webview:{postMessage:m=>messages.push(m)}}};
  const live=new Map([[criterionVerdictKey('L','C'),{bodyHash:'hash',elided:false}]]);
  const cases=[{case:{name:'Left'},status:'complete'},{case:{name:'Right'},status:'complete'}];
- const context=vm.createContext({views:new Map([['tree',tree]]),mode:'medical-validation',crlMaps:{},crlStructure:[],scenarios:{scenarios:cases},
+ const context=vm.createContext({interactiveQuestionnaire:{refreshReview(){}},views:new Map([['tree',tree]]),mode:'medical-validation',crlMaps:{},crlStructure:[],scenarios:{scenarios:cases},
   duplicateScenarioNames:new Set(),caseIdByName:{Left:'left',Right:'right'},reviewByCaseId:{},scenarioByCaseId:new Map([['left',cases[0]],['right',cases[1]]]),
   notesByCaseId:{},criterionVerdicts:{},mvSidecarPath:'review.json',state:{},criterionIdentities:live,mvRecoveryBlock:false,mvEditBusy:false,
   guardOutlines:new Map([['owner',{expr:{kind:'criterion',lib:'L',name:'C',bodyHash:'hash',operand:{kind:'leaf',lib:'L',name:'False operand',nodeKey:'concept',isSource:true,isInferred:false}}}]]),

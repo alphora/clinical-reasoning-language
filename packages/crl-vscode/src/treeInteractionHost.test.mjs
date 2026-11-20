@@ -86,7 +86,7 @@ test('RQ host round-trips each click identity and ignores stale route requests',
  const messages=[],layoutRequests=[],pane={isOpen:false,open(){this.isOpen=true;},close(){this.isOpen=false;}};
  const tree={gen:2,panel:{webview:{postMessage:m=>messages.push(m)}}};
  const c=vm.createContext({views:new Map([['tree',tree]]),pinnedCards:{token:'route',epoch:1,payload:{}},indexVersion:1,mode:'medical-validation',branchQuestionnaire:pane,
-  branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',decisionTable:undefined,mvPaneLayout:{request:()=>layoutRequests.push(true)}});
+  branchQuestionnaireOwner:undefined,legacyQuestionMode:'off',decisionTable:undefined,interactiveQuestionnaire:{layoutPanel:undefined},mvPaneLayout:{request:()=>layoutRequests.push(true)}});
  for(const name of ['handleDecisionTableMessage','postBranch','questionModeFor','postQuestionMode','publishQuestionModes','closeQuestionPanel','syncQuestionPanel','setQuestionDisplayMode','onWebviewMessage'])vm.runInContext(transformSync(bodies.get(name),{loader:'ts'}).code,c);
  for(const [id,questionMode] of [['click1','panel'],['click2','inline'],['click3','off']]){
   c.onWebviewMessage('tree',{type:'toggleBranchQuestionnaire',gen:2,token:'route',requestId:id,questionMode});
