@@ -1124,7 +1124,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function applyReveal(e: Effect, replay = false): void {
     const v = views.get(e.pane);
     if (!v) return;
-    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay, preserveViewport:replay }, indexVersion);
+    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay, preserveViewport:replay || e.pane === scrollSuppressPane }, indexVersion);
     // Steady-state flush ONLY when the pane's CURRENT render is acked AND is for the current index. During a rebuild
     // the global indexVersion has advanced past the still-acked old render, so this is skipped and the reveal waits for
     // the new render's ack (avoiding a flush against the about-to-be-replaced DOM that would also drop the new reveal).
@@ -4226,7 +4226,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // review). Independent of the correspondence model (reads the `.crl` directly); inert in cockpit mode (MV-only).
     reloadReviewFlags();
     for (const pane of PANES) coord.clearPending(pane);
-    dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
+    dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) }, preservePin);
     updateNavMessage();
     // Iterating GLOBAL PANES is robust (FIX 3 verified): renderPane early-returns on `!views.get(pane)`, so a pane not
     // currently open — the MV-only questionnaire in cockpit mode, or a pane dropped on a mode switch whose onDidDispose

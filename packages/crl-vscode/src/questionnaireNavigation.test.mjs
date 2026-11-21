@@ -8,12 +8,46 @@ import ts from 'typescript';
 import {transformSync} from 'esbuild';
 import {COCKPIT_WEBVIEW_SCRIPT} from './correspondenceCockpit.ts';
 import {PaneRevealCoordinator} from './paneRevealCoordinator.ts';
+import {initialState,reduce} from './correspondenceEngine.ts';
 import {installLformsReviewControls} from './lformsReviewControls.ts';
 import {browserExecutable,browserFixture} from '../test/browserHarness.mjs';
 
 const raw=readFileSync(new URL('./correspondenceCockpit.ts',import.meta.url),'utf8'),ast=ts.createSourceFile('host.ts',raw,ts.ScriptTarget.Latest,true);
 const root=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='registerCorrespondenceCockpit');
 const body=name=>root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(ast);
+
+// Run actual host transitions and the real reducer/coordinator; only external UI/model services are stubs.
+function delayedNavigationHost(){
+ const messages=[],failedOrigins=[],coord=new PaneRevealCoordinator(),index={version:1,anchorFilePath:'',steps:[],sourceCycleIds:[],crlNav:[],celNav:[{caseId:'case',label:'Case'}]};
+ const view={gen:coord.startRender('tree'),indexVersion:1,acked:true,anchors:{root:{scrollTo:'render-root',segmentIds:['render-root']},terminal:{scrollTo:'render-terminal',segmentIds:['render-terminal']}},panel:{webview:{postMessage:m=>messages.push(m)}}};
+ coord.ready('tree',view.gen,1);
+ const c=vm.createContext({coord,indexVersion:1,views:new Map([['tree',view]]),crlMaps:{},mode:'medical-validation',scrollSuppressPane:undefined,disclosureFocus:undefined,
+  state:{...initialState(),primary:'cel',paneVisibility:{tree:true},index,selection:{primary:'cel',caseId:'case',routeId:'route'}},reduce,
+  selectingTreeFocus:false,clearTreeFocus(){},focusedCaseId:s=>s.selection?.primary==='cel'?s.selection.caseId:undefined,onNav:{fire(){}},reflectSelectionToTree(){},
+  driveFailedCriteriaPeek:()=>failedOrigins.push(c.scrollSuppressPane),driveDiverters(){},driveLeafMarks(){},syncQuestionnaireDefaults(){},shouldRerenderQuestionnaire:()=>false,cockpitAgentBridge:{notifyChanged(){}},
+  inspectedRoutes:()=>[{nodeKeys:['root','terminal']}],uncertaintyGuardCandidates:()=>new Map(),projectFlowStructure:()=>[],expandedUncertaintyGuards:new Set(),collapsedUncertaintyGuards:new Set(),forcedUncertaintyGuards:new Map(),
+  unpinnedFocus:{token:'focus',options:[{caseId:'case',route:{terminalId:'route'}}],index:0},expandedGuardWhens:new Set(),expandTraversalCriteria:()=>new Set(['criterion']),crlStructure:[],conceptLayer:[],guardOutlines:new Map(),
+  buildDefExprResolver(){},answerOptionsForDisplay(){},answersFromTerminologyForDisplay(){},postTreeFocus(){},
+  renderPane:()=>{view.gen=coord.startRender('tree');view.indexVersion=c.indexVersion;view.acked=false;},
+  toIndex:()=>({...index,version:c.indexVersion}),toCelNav:()=>[],model:{},scenarios:{},caseIdByName:{},duplicateScenarioNames:new Set()});
+ vm.runInContext(transformSync(['highlightRows','postReveal','applyReveal','dispatch','selectTreeTraversal'].map(body).join('\n'),{loader:'ts',target:'es2022'}).code,c);
+ const rebuild=root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='rebuild');
+ const selection=rebuild.body.statements.find(n=>ts.isExpressionStatement(n)&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(ast)==='dispatch'&&n.expression.arguments[0]?.getText(ast).includes('"setInputs"'));
+ assertSelection(selection);
+ return {c,view,messages,failedOrigins,refresh(preserve=true){c.preservePin=preserve;c.indexVersion++;coord.clearPending('tree');vm.runInContext(transformSync(selection.getText(ast),{loader:'ts'}).code,c);c.renderPane('tree');},flush(){view.acked=true;const target=coord.ready('tree',view.gen,c.indexVersion);if(target)c.postReveal('tree',target);return target;}};
+}
+function assertSelection(node){if(!node)throw Error('Missing actual rebuild selection dispatch');}
+
+it('terminal expansion retains its tree-local no-scroll intent after delayed render acknowledgement',()=>{
+ const h=delayedNavigationHost();h.c.selectTreeTraversal();expect(h.view.acked).toBe(false);expect(h.c.scrollSuppressPane).toBeUndefined();
+ const target=h.flush();expect(target.preserveViewport).toBe(true);expect(h.messages.at(-1).scrollTo).toBeUndefined();expect(h.failedOrigins).toEqual(['tree']);
+});
+it('same-policy sidecar refresh replays selection without root navigation while fresh navigation can still scroll',()=>{
+ const h=delayedNavigationHost();h.refresh();const target=h.flush();expect(target.preserveViewport).toBe(true);expect(h.messages.at(-1).scrollTo).toBeUndefined();expect(h.failedOrigins).toEqual(['tree']);
+ expect(h.c.state.selection.routeId).toBeUndefined();
+ h.c.dispatch({type:'select',selection:{primary:'cel',caseId:'case'}});expect(h.messages.at(-1).scrollTo).toBe('render-root');
+ const fresh=delayedNavigationHost();fresh.refresh(false);fresh.flush();expect(fresh.messages.at(-1).scrollTo).toBe('render-root');
+});
 it('actual replay preserves the viewport through immediate and queued coordinator delivery; direct reveals still navigate',()=>{
  const calls=[],view={gen:1,indexVersion:1,acked:true},coord=new PaneRevealCoordinator();coord.setPaneCapability('tree','renderable');coord.startRender('tree');coord.ready('tree',1,1);
  const c=vm.createContext({coord,indexVersion:1,views:new Map([['tree',view]]),crlMaps:{},mode:'medical-validation',scrollSuppressPane:undefined,disclosureFocus:undefined,conceptNodesForRow:()=>[],highlightRows:(v,keys,preserve)=>calls.push(preserve)});
@@ -34,6 +68,22 @@ it('actual pin toggle keeps keyboard focus but does not request automatic center
  vm.runInContext(code+';toggleFlowPin("root");',c);expect(calls).toContainEqual({key:'root',reveal:false});
 });
 const html=(head='',scripts='')=>`<!doctype html><html><head>${head}</head><body><div id="fcChrome"></div><div id="root"></div><div id="flagDrawer"></div>${scripts}<script>window.sent=[];window.acquireVsCodeApi=()=>({postMessage:m=>sent.push(m)});${COCKPIT_WEBVIEW_SCRIPT.replace(/<\/script/gi,'<\\/script')}</script></body></html>`;
+for(const action of ['terminal expansion','same-policy refresh'])it.skipIf(!browserExecutable)(`${action} preserves real browser pan through render, ACK and queued host highlight`,async()=>{
+ const browser=await browserFixture(html()),h=delayedNavigationHost();
+ try{
+  const send=m=>browser.evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(m)}}))`);
+  const flow='<svg class="flow-svg" width="4000" height="3000" viewBox="0 0 4000 3000"><g id="render-root" class="flow-row" data-flow-key="root"><rect x="0" y="0" width="100" height="40"/></g><g id="render-terminal" class="flow-row" data-flow-key="terminal"><rect x="3000" y="2000" width="100" height="40"/></g></svg>';
+  await send({type:'render',gen:1,indexVersion:1,mode:'medical-validation',viewportKey:'policy',html:flow});
+  await browser.evaluate('window.scrollTo(350,400);window.savedPan=[scrollX,scrollY]');expect(await browser.evaluate('savedPan[0]>0&&savedPan[1]>0')).toBe(true);
+  if(action==='terminal expansion')h.c.selectTreeTraversal();else h.refresh();
+  await send({type:'render',gen:h.view.gen,indexVersion:h.c.indexVersion,mode:'medical-validation',viewportKey:'policy',html:flow});
+  h.flush();for(const message of h.messages)await send(message);
+  await browser.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+  expect(await browser.evaluate('[scrollX,scrollY]')).toEqual(await browser.evaluate('savedPan'));
+  await send({type:'highlight',gen:h.view.gen,segmentIds:['render-root'],scrollTo:'render-root'});
+  expect(await browser.evaluate('[scrollX,scrollY]')).not.toEqual(await browser.evaluate('savedPan'));
+ }finally{await browser.close();}
+},30000);
 it.skipIf(!browserExecutable)('toolbar removal matches complete slash-containing linkIds',async()=>{
  const browser=await browserFixture(`<!doctype html><div id="mount"><lhc-item id="item-a/1"><lhc-item-question><label id="label-a/1">A</label></lhc-item-question></lhc-item><lhc-item id="item-a/b/1"><lhc-item-question><label id="label-a/b/1">B</label></lhc-item-question></lhc-item></div><script>window.questions=[{linkId:'a'},{linkId:'a/b'}];window.actions=[];(${installLformsReviewControls.toString()})(document.getElementById('mount'),questions,(action,linkId)=>actions.push({action,linkId}),()=>true);</script>`);
  try{
