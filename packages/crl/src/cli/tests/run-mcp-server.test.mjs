@@ -417,8 +417,8 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-    assert.equal(kit.schemaVersion, "2.50");
-    assert.equal(kit.contentHash, "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7");
+    assert.equal(kit.schemaVersion, "2.51");
+    assert.equal(kit.contentHash, "e96469532e1a4bc9922c78ab6f9fa1a9a7978172913d2a427bae3931208e9d31");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);
