@@ -34,6 +34,11 @@ import type {
   UsageContext,
 } from "./types";
 
+/** Convert normalized npm contact points to FHIR R4 ContactDetail metadata. */
+export function fhirContactDetails(points: readonly ContactPoint[]): Array<{ telecom: ContactPoint[] }> {
+  return points.length ? [{ telecom: points.map(point => ({ ...point })) }] : [];
+}
+
 export type MetadataResult =
   | { metadata: CpgMetadata; errors: CRLError[] }
   | { metadata: null; errors: CRLError[] };

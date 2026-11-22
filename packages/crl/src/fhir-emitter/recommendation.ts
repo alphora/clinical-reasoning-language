@@ -1,3 +1,4 @@
+import { fhirContactDetails } from "./metadata";
 /**
  * CRL Activity → cpg-recommendationdefinition PlanDefinition emit
  * (Todo 3, Recommendation lane).
@@ -189,7 +190,7 @@ export function emitRecommendationDefinition(
     ],
   };
 
-  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.contact.length > 0) resource.contact = fhirContactDetails(metadata.contact);
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 

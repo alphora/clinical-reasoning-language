@@ -1,3 +1,4 @@
+import { fhirContactDetails } from "./metadata";
 /**
  * CRL concept-level `code is` local codes → FHIR `CodeSystem` resource emit
  * (slice 4 of the CRL→FHIR-def deliverable).
@@ -181,7 +182,7 @@ export function emitLocalCodeSystem(
   };
 
   // Empty-array omission carries forward from the other lanes.
-  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.contact.length > 0) resource.contact = fhirContactDetails(metadata.contact);
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 
@@ -283,7 +284,7 @@ export function emitReferenceStubCodeSystem(
     concept: [...stubCodes].sort().map((code) => ({ code })),
   };
 
-  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.contact.length > 0) resource.contact = fhirContactDetails(metadata.contact);
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 

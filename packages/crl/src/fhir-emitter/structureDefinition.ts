@@ -1,3 +1,4 @@
+import { fhirContactDetails } from "./metadata";
 import { quantityUnitExtension } from "../emit/questionUnit";
 /**
  * CRL decision case-feature concept → FHIR `StructureDefinition` (case-feature
@@ -539,7 +540,7 @@ export function emitCaseFeatureStructureDefinition(
   };
 
   // Empty-array omission carries forward from the other lanes.
-  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.contact.length > 0) resource.contact = fhirContactDetails(metadata.contact);
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 

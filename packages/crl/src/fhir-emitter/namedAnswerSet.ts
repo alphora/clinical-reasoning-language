@@ -1,3 +1,4 @@
+import { fhirContactDetails } from "./metadata";
 import type { CRL, Concept, ReferenceName, Terminology } from "../ast/types";
 import { localAnswerTerminology, resolveAnswerDomain, type AnswerDomainError, type AnswerMember } from "../emit/answerDomain";
 import { emittedValueSetUrl } from "./valueSet";
@@ -63,7 +64,7 @@ function emitOwnedCodeSystem(system: { id: string; url: string; members: readonl
     name: pascalCaseName(system.id), title, description: title,
     status: metadata.status, experimental: metadata.experimental, publisher: metadata.publisher,
     ...(isPublishablePlus(level) ? { date: (opts.clock ?? (() => new Date()))().toISOString() } : {}),
-    ...(metadata.contact.length ? { contact: metadata.contact } : {}),
+    ...(metadata.contact.length ? { contact: fhirContactDetails(metadata.contact) } : {}),
     ...(metadata.jurisdiction.length ? { jurisdiction: metadata.jurisdiction } : {}),
     ...(metadata.useContext.length ? { useContext: metadata.useContext } : {}),
     caseSensitive: true, content: "complete",

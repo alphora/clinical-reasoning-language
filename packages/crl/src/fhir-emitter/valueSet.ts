@@ -1,3 +1,4 @@
+import { fhirContactDetails } from "./metadata";
 /**
  * CRL Terminology → FHIR `cpg-shareableValueSet` resource emit.
  *
@@ -303,7 +304,7 @@ export function emitValueSet(
   }
 
   // Δ13 — omit empty arrays from JSON.
-  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.contact.length > 0) resource.contact = fhirContactDetails(metadata.contact);
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 

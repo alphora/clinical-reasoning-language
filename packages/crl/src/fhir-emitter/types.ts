@@ -106,6 +106,7 @@ export interface CpgMetadata {
   title: string;
   description: string;
   publisher: string;
+  /** Normalized npm contact points; wrap as ContactDetail.telecom when emitting FHIR. */
   contact: ContactPoint[];
   // CRL-specific (package.json `crl` block):
   canonicalBase: string;
