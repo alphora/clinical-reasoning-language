@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { emitCrlTwoLane, captureExternalSupport, captureExternalDecision, createExternalBindings } from "../../index";
-import { assertCapturedClosure, checkedArtifactUnion } from "../../emit/externalBindings";
+import { activeDecisionSupport, assertCapturedClosure, checkedArtifactUnion, type SupportSubset } from "../../emit/externalBindings";
 import { computeFhirEmitClosure } from "../computeEmitClosure";
 import { resolveImports } from "../index";
 
@@ -60,6 +60,58 @@ decision "Parent decision":
 afterEach(() => { for (const dir of dirs.splice(0)) { if (!dir.startsWith(join(tmpdir(), "crl-external-"))) throw Error("Unexpected fixture"); rmSync(dir, { recursive: true, force: true }); } });
 
 describe("independent source-informed external bindings", () => {
+  it("retains component inventory without demanding a policy entry", () => {
+    const support: SupportSubset = { resources: [], cql: [] };
+    expect(activeDecisionSupport(support, "https://example.org/absent")).toBe(support);
+  });
+
+  it.each(["direct-activity", "nested-recommendation", "other-typed-reference", "unused"])("preserves required generated support (%s)", mode => {
+    const base = "https://example.org/support";
+    const entry = base + "/PlanDefinition/entry", recommendation = base + "/PlanDefinition/recommendation", activity = base + "/ActivityDefinition/activity";
+    const support: SupportSubset = { resources: [
+      { value: { resourceType: "PlanDefinition", sourceKind: "Decision", relativePath: "PlanDefinition/entry.json", resource: { resourceType: "PlanDefinition", url: entry, action: mode === "direct-activity" ? [{ definitionCanonical: activity }] : mode === "nested-recommendation" ? [{ action: [{ definitionCanonical: recommendation + "|1" }] }] : [] } }, origins: [] },
+      { value: { resourceType: "PlanDefinition", sourceKind: "Recommendation", relativePath: "PlanDefinition/recommendation.json", resource: { resourceType: "PlanDefinition", url: recommendation, version: "1", meta: { profile: ["http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition"] }, action: [{ definitionCanonical: activity }] } }, origins: [] },
+      { value: { resourceType: "ActivityDefinition", sourceKind: "Activity", relativePath: "ActivityDefinition/activity.json", resource: { resourceType: "ActivityDefinition", url: activity } }, origins: [] },
+      { value: { resourceType: "Library", relativePath: "Library/support.json", resource: { resourceType: "Library", url: base + "/Library/support", ...(mode === "other-typed-reference" ? { relatedArtifact: [{ resource: recommendation }] } : {}) } }, origins: [] },
+    ], cql: [] };
+    const before = JSON.stringify(support), result = activeDecisionSupport(support, entry);
+    expect(result.resources.some(r => r.value.resource.url === recommendation)).toBe(["nested-recommendation", "other-typed-reference"].includes(mode));
+    expect(result.resources.some(r => r.value.resource.url === activity)).toBe(mode !== "unused");
+    expect(result.resources.some(r => r.value.resourceType === "Library")).toBe(true);
+    expect(() => activeDecisionSupport(support, base + "/missing")).toThrow(/actual policy entry/);
+    expect(JSON.stringify(support)).toBe(before);
+  });
+
+  it("omits unused generated recommendations only from complete external decision assembly", () => {
+    const f = fixtures();
+    writeFileSync(f.s, readFileSync(f.s, "utf8") + '\nactivity "Unused": - request CPGTaskRequest.');
+    const ordinary = emitCrlTwoLane(f.s, { date });
+    expect(ordinary.success, JSON.stringify(ordinary.hardErrors)).toBe(true);
+    expect(ordinary.fhir.resources.filter(r => r.sourceName === "Unused")).toHaveLength(2);
+    const provider = captureExternalSupport(f.s, { library: "Supplemental Inputs", concept: "Calculate Supplemental Uncertainty" }, { date });
+    const parent = captureExternalDecision(f.p, { library: "Parent", decision: "Parent decision" }, {
+      date, externalBindings: createExternalBindings({ publications: [{ consumerSource: f.p, reference: { library: "Supplemental Inputs", concept: "Calculate Supplemental Uncertainty" }, provider }] }),
+    });
+    const result = emitCrlTwoLane(f.s, { date, externalBindings: createExternalBindings({ decisions: [{ consumerSource: f.s, reference: { library: "Parent", decision: "Parent decision" }, provider: parent }] }) });
+    expect(result.success, JSON.stringify(result.hardErrors)).toBe(true);
+    expect(result.fhir.resources.filter(r => r.sourceName === "Unused")).toHaveLength(0);
+    expect(result.fhir.resources.filter(r => r.sourceName === "Met")).toHaveLength(2);
+    expect(result.externalAssembly!.inventory.resources.map(r => r.value)).toEqual(result.fhir.resources);
+    expect(() => assertCapturedClosure(result.externalAssembly!.inventory, result.externalAssembly!.canonicalBases)).not.toThrow();
+    expect(() => captureExternalSupport(f.s, { library: "Supplemental Inputs", concept: "Calculate Supplemental Uncertainty" }, { externalBindings: createExternalBindings({}) })).toThrow(/original compilation context/);
+  });
+
+  it("does not hide conflicting unused resources before closure validation", () => {
+    const f = fixtures();
+    writeFileSync(f.s, readFileSync(f.s, "utf8") + '\nactivity "Unused": - request CPGTaskRequest.\nactivity "Unused!": - request CPGTaskRequest.');
+    const provider = captureExternalSupport(f.s, { library: "Supplemental Inputs", concept: "Calculate Supplemental Uncertainty" }, { date });
+    const parent = captureExternalDecision(f.p, { library: "Parent", decision: "Parent decision" }, {
+      date, externalBindings: createExternalBindings({ publications: [{ consumerSource: f.p, reference: { library: "Supplemental Inputs", concept: "Calculate Supplemental Uncertainty" }, provider }] }),
+    });
+    const result = emitCrlTwoLane(f.s, { date, externalBindings: createExternalBindings({ decisions: [{ consumerSource: f.s, reference: { library: "Parent", decision: "Parent decision" }, provider: parent }] }) });
+    expect(result.success).toBe(false);
+    expect(result.hardErrors.some(error => /collision|conflict/.test(error.kind ?? ""))).toBe(true);
+  });
   it.each([false, true])("preserves ordinary original-context identities and complete content (explicit helper include=%s)", explicit => {
     const f = fixtures();
     if (explicit) writeFileSync(f.s, readFileSync(f.s, "utf8").replace('library "Supplement".', 'library "Supplement".\ninclude "Supplemental Inputs".'));

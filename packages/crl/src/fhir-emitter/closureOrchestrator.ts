@@ -1,4 +1,4 @@
-import { checkedArtifactUnion, assertCapturedClosure, ExternalBindingError, type ExternalBindingsV1, type SupportSubset, type SnapshotProvenance } from "../emit/externalBindings";
+import { checkedArtifactUnion, assertCapturedClosure, activeDecisionSupport, ExternalBindingError, type ExternalBindingsV1, type SupportSubset, type SnapshotProvenance } from "../emit/externalBindings";
 import { publicationCaseFeatures } from "../emit/publicationInputs";
 import { publicationRetentionPlan } from "../emit/retentionPredicates";
 import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
@@ -2328,13 +2328,17 @@ export function emitFhirDefClosure(
   // success to false; warning-kind errors do not.
   errors.push(...checkPresentationReachability(inv1.surviving, inv1.droppedPaths));
   const success = errors.filter(isFhirDefError).length === 0 && unmatched.length === 0;
+  const activeInventory = success && checkedInventory
+    ? activeDecisionSupport(checkedInventory, `${metadata.canonicalBase}/PlanDefinition/${metadata.name}`)
+    : checkedInventory;
+  if (success && activeInventory) assertCapturedClosure(activeInventory, canonicalBases);
 
   return {
     success,
-    resources: errors.some((e) => e.kind === "presentation-overlap" && isFhirDefError(e)) ? [] : inv1.surviving,
+    resources: errors.some((e) => e.kind === "presentation-overlap" && isFhirDefError(e)) ? [] : success && activeInventory ? activeInventory.resources.map(r => r.value) : inv1.surviving,
     errors,
     unmatched,
-    ...(external && checkedInventory ? { externalAssembly: { inventory: checkedInventory,
+    ...(external && activeInventory ? { externalAssembly: { inventory: activeInventory,
       provenance: external.provenance, canonicalBases } } : {}),
   };
 }

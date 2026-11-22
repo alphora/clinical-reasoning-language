@@ -330,6 +330,57 @@ export function assertCapturedClosure(support: SupportSubset, bases: readonly st
   }
 }
 export function underBase(url: string, base: string): boolean { return url.startsWith(base.replace(/\/$/, "") + "/"); }
+/** Finalize a validated external policy assembly without publishing unused activity wrappers. */
+// REFACTOR:grounded — only generated recommendation/activity resources are optional here.
+// Source/component captures without a Decision retain their original support inventory.
+export function activeDecisionSupport(support: SupportSubset, entryCanonical: string): SupportSubset {
+  if (!support.resources.some(r => r.value.sourceKind === "Decision")) return support;
+  const entries = support.resources.filter(r => r.value.sourceKind === "Decision" && r.value.resource.url === entryCanonical);
+  if (entries.length !== 1) fail("external-binding-entry-missing", "Exactly one actual policy entry is required for external decision assembly.");
+  const byUrl = new Map(support.resources.map(r => [r.value.resource.url, r.value]));
+  const actionTargets = (resource: Record<string, unknown>): string[] => {
+    const targets: string[] = [];
+    const visit = (actions: unknown): void => {
+      if (!Array.isArray(actions)) return;
+      for (const action of actions) {
+        if (!action || typeof action !== "object") continue;
+        const node = action as Record<string, unknown>;
+        if (typeof node.definitionCanonical === "string") targets.push(node.definitionCanonical);
+        visit(node.action);
+      }
+    };
+    visit(resource.action); return targets;
+  };
+  const reached = new Set<EmittedResource>();
+  const visit = (resource: EmittedResource): void => {
+    if (reached.has(resource)) return;
+    reached.add(resource);
+    if (resource.resourceType !== "PlanDefinition") return;
+    for (const canonical of actionTargets(resource.resource)) {
+      const [url, version] = canonical.split("|");
+      const target = byUrl.get(url);
+      if (target && (version === undefined || target.resource.version === version)) visit(target);
+    }
+  };
+  visit(entries[0].value);
+  const dropped = new Set(support.resources.filter(({ value }) => {
+    const meta = value.resource.meta as { profile?: unknown } | undefined;
+    return value.resourceType === "PlanDefinition" && value.sourceKind === "Recommendation" && !reached.has(value)
+      && Array.isArray(meta?.profile) && meta.profile.includes("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition");
+  }).map(r => r.value));
+  // A generated wrapper can also be an explicit dependency outside action traversal.
+  // Preserve that dependency and any wrappers it references before considering its AD.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const needed = new Set(support.resources.filter(r => !dropped.has(r.value)).flatMap(r => ownedReferences(r.value.resource).map(c => c.split("|")[0])));
+    for (const resource of dropped) if (needed.has(String(resource.resource.url))) { dropped.delete(resource); changed = true; }
+  }
+  const activityTargets = new Set([...dropped].flatMap(r => actionTargets(r.resource).map(c => c.split("|")[0])));
+  const referenced = new Set(support.resources.filter(r => !dropped.has(r.value)).flatMap(r => ownedReferences(r.value.resource).map(c => c.split("|")[0])));
+  return { ...support, resources: support.resources.filter(({ value }) => !dropped.has(value) && !(value.resourceType === "ActivityDefinition"
+    && value.sourceKind === "Activity" && activityTargets.has(String(value.resource.url)) && !referenced.has(String(value.resource.url)))) };
+}
 /** Only typed reference slots; narrative strings/extension URLs are not artifact dependencies. */
 export function ownedReferences(resource: Record<string, unknown>): string[] {
   const result = new Set<string>();
