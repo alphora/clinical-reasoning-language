@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "613aa3959e68075d48ad92022ba738765e22fd94",
+  "auditedRevision": "f963a7b3b1d228fdd72da3d532130e8d69cfd1db",
   "auditedSchemaVersion": "2.50",
   "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
-  "scope": "Schema 2.50 unchanged-content maintenance through schema-6 Nautilus log discovery. Complete delta from1884b58c classified in coverage.md; no authoring-kit, language, emitter, native runtime or engine changes. Shape-limited project discovery remains separate from installed KELP full-schema/edit validation. Source, installed-artifact, staged acceptance and publication remain separate proof tiers.",
+  "scope": "Schema2.50 unchanged-content maintenance through Codify-owned Nautilus log reader. Complete delta from613aa395 classified in coverage.md, including prior audit metadata. Primary configured qa output and bounded standalone package/watch repairs are read-only UI behavior; no authoring-kit content, language, emitter, native runtime or engine change. Historical release evidence remains tied to its actual source. Source, installed-artifact, producer adoption and staging acceptance are separate proof tiers.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
