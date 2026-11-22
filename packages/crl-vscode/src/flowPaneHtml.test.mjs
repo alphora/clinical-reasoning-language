@@ -20,6 +20,14 @@ const flowLegendChrome = (...args) => {
 
 const check = test;
 
+check('a canonical terminal displays its local guard without a foreign declaration ref',()=>{
+  const action=node('handoff','action','https://example.org/PlanDefinition/parent',['c:G'],[],{actionKind:'use-canonical-decision'});
+  const r=renderFlowPane([{decision:'D',lib:'Pol',nodeKey:'root',location:{},children:[action]}],{concepts:[concept('c:G','G')]});
+  assert.match(r.html,/class="flow-guard-tab/);
+  assert.ok(Object.values(r.reveals).some(v=>v.conceptNodeKey==='c:G'));
+  assert.ok(!r.html.includes('data-flow-open-decision='));
+});
+
 // ── fixtures (the renderer ignores `location`, so {} suffices) ──
 const node = (nodeKey, kind, label, refKeys, children = [], extra = {}) => ({
   nodeKey, nodeId: nodeKey, decision: "D", lib: "Pol", kind, label, refKeys, location: {}, children, ...extra,

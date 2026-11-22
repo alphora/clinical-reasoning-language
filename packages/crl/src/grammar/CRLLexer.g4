@@ -15,6 +15,8 @@ UNCERTAINTY_GUARD_PASSES_WHEN : 'uncertainty guard passes when';
 // REFACTOR:grounded: criterion-owned explanatory metadata, separate from questions.
 DESCRIPTION_IS : 'description is';
 RECOMMEND_ACTIVITY  : 'recommend activity';
+// REFACTOR:grounded: distinct external leaf, leaving named delegation unchanged.
+USE_CANONICAL_DECISION : 'use decision canonical';
 USE_DECISION        : 'use decision';
 TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
 VALUE_TYPE_IS       : 'value type is' -> mode(VALUE_TYPE_MODE);

@@ -22,6 +22,7 @@ import { SOURCE_ORDER_EXAMPLE } from "./sourceOrderExample";
  * reference artifacts are validated by the unit test (no unverified CRL ships);
  * `contentHash` is derived so the kit's identity can't lie.
  */
+import { CANONICAL_TERMINAL_CRL, CANONICAL_TERMINAL_CEL } from "./canonicalTerminalExample";
 import audit from "./audit.json";
 import { aggregateDomainSource } from "./aggregateDomainExample";
 import { PATIENT_GENDER_CRL } from "./genderExample";
@@ -407,7 +408,8 @@ export type {
 // CONTENT schemaVersion → "2.49": inclusive Quantity thresholds, percentage/millisecond units and shared tested examples.
 // CONTENT schemaVersion → "2.50": release availability of qualified percent/ms thresholds.
 // CONTENT schemaVersion → "2.51": aggregate target unions retain each selected input's own domain and error behavior.
-const SCHEMA_VERSION = "2.51";
+// schemaVersion → "2.52": explicit canonical decision terminals, local MV evidence and runnable examples.
+const SCHEMA_VERSION = "2.52";
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
 
@@ -806,6 +808,29 @@ const RULES: KitRule[] = [
     ],
   },
   {
+  "id": "canonical-decision-terminal",
+  "applicability": "Source- or workflow-required delegation to a separately packaged decision",
+  "category": "decision-shape",
+  "rule": "Since CRL 6.4.60, use decision canonical `https://example.org/PlanDefinition/parent` explicitly ends the local route at that canonical. Supply an absolute URI, optionally followed by |resource-version; relative references, fragments, whitespace and empty versions are rejected. Ordinary use decision \"Local\" still resolves and follows a local declaration. MV treats the canonical as a local handoff terminal, without finding, loading, navigating to or executing its parent. A handoff is not the parent's Met/Unmet determination. Each source occurrence and each local caller route remains distinct, including repeated calls to the same canonical. Production FHIR retains the literal definitionCanonical; linking and supplying its target are packaging responsibilities. Direct production $apply without that target can fail. MV uses a private execution copy that omits only explicitly bound terminal targets, retaining their local applicability. Both original delivery and actual MV execution hashes plus exact source/action bindings identify its evidence; do not substitute raw delivery hashes for executed bytes or accept merely present actions as reached. Selected Record per-action guards remain unsupported; use supported branch guards without changing source intent. The complete canonical-terminal-source and canonical-terminal-cases examples share the exact native fixture. Required package.json: name canonical-local, version 1.0.0, crl.canonicalBase https://example.org/local-mv. Set emit_results suite purpose to mv for local review; regression/default emission remains ordinary production output.",
+  "ref": "docs/decision-shapes.md; canonical-terminal-source; canonical-terminal-cases",
+  "clauses": [
+    {
+      "text": "Use an explicit absolute canonical literal for a separate-artifact handoff. Keep ordinary named local delegation and malformed/unresolved-reference diagnostics intact.",
+      "force": "validator-enforced"
+    },
+    {
+      "text": "Treat only a verified reached local handoff as a terminal. Never infer parent Met/Unmet or manufacture a parent result, and keep separate local caller occurrences separate.",
+      "force": "invariant",
+      "test": "verifyLoop:native-outcome-verification"
+    },
+    {
+      "text": "Keep the unchanged production definitionCanonical separate from MV execution projection. Retain both closure identities and exact occurrence bindings; generated output alone does not establish reached routes or native outcome correctness.",
+      "force": "invariant",
+      "test": "verifyLoop:native-outcome-verification"
+    }
+  ]
+},
+  {
     id: "decision-composition",
     applicability: "All CRL authoring",
     category: "decision-shape",
@@ -837,7 +862,7 @@ const RULES: KitRule[] = [
     id: "chaining-necessity",
     applicability: "All CRL authoring",
     category: "decision-shape",
-    rule: "Use decision invokes action-bearing branch structure. Use it for a source-delegated determination, a genuinely shared determination, or a behavior-preserving internal continuation reached from several paths. A repeated remaining interview can be defined once in the same library and invoked from both callers; it need not have a separate clinical outcome or a name in the source. Preserve when it is reached, precedence, unknown/error behavior, action identity and multiplicity, and relevant question scope. Ordinary local nesting does not require a helper, and a meaningful Boolean condition can be named in a criterion, while reuse of action-bearing flow belongs in decision structure. Never couple independently owned policies merely because their criteria look alike. CRE publication preparation supports same-library and cross-library delegation inside the prepared emitted closure, evaluating each decision in its own source scope. Missing targets, mismatched include/runtime owners and outside-closure decisions are explicit errors; foreign legacy expression support remains a separate limitation. Factoring existing CRL changes structural addresses and can change review attribution display: regenerate/check provenance and renew affected MV review; semantic equivalence does not mean identical node IDs. The worked inline-versus-shared comparison proves CRE activities and condition order only. Re-verify native action IDs, RequestGroup nesting and Questionnaire grouping for the actual policy; preservation is an obligation, not a guarantee supplied by factoring. Every helper emits an independently applicable PlanDefinition; no internal-only marker prevents direct invocation. Verify deployment and invocation paths expose the intended policy root, not the helper alone. For PA, also check the delegated closure under pa-disposition-set and verifyLoop:mutual-exclusivity-spans-closure, including callers that both delegate and recommend. Decisions contain branches, not bare top-level actions. Use a guarded action block for several roots only when the source has a real common applicability condition. Otherwise place independently invoked roots in separate policy packages (one unreferenced root per package); no verified unconditional action-only coordinator is supplied, and an always-true question must not be invented. See shared-continuation-reference for the small ordered example and source-delegated-decision-reference for a separate determination.",
+    rule: "Named use decision invokes action-bearing branch structure inside the emitted closure. For an explicit separate-artifact handoff, see canonical-decision-terminal. Use it for a source-delegated determination, a genuinely shared determination, or a behavior-preserving internal continuation reached from several paths. A repeated remaining interview can be defined once in the same library and invoked from both callers; it need not have a separate clinical outcome or a name in the source. Preserve when it is reached, precedence, unknown/error behavior, action identity and multiplicity, and relevant question scope. Ordinary local nesting does not require a helper, and a meaningful Boolean condition can be named in a criterion, while reuse of action-bearing flow belongs in decision structure. Never couple independently owned policies merely because their criteria look alike. CRE publication preparation supports same-library and cross-library delegation inside the prepared emitted closure, evaluating each decision in its own source scope. Missing targets, mismatched include/runtime owners and outside-closure decisions are explicit errors; foreign legacy expression support remains a separate limitation. Factoring existing CRL changes structural addresses and can change review attribution display: regenerate/check provenance and renew affected MV review; semantic equivalence does not mean identical node IDs. The worked inline-versus-shared comparison proves CRE activities and condition order only. Re-verify native action IDs, RequestGroup nesting and Questionnaire grouping for the actual policy; preservation is an obligation, not a guarantee supplied by factoring. Every helper emits an independently applicable PlanDefinition; no internal-only marker prevents direct invocation. Verify deployment and invocation paths expose the intended policy root, not the helper alone. For PA, also check the delegated closure under pa-disposition-set and verifyLoop:mutual-exclusivity-spans-closure, including callers that both delegate and recommend. Decisions contain branches, not bare top-level actions. Use a guarded action block for several roots only when the source has a real common applicability condition. Otherwise place independently invoked roots in separate policy packages (one unreferenced root per package); no verified unconditional action-only coordinator is supplied, and an always-true question must not be invented. See shared-continuation-reference for the small ordered example and source-delegated-decision-reference for a separate determination.",
     why: "Reuse should preserve source meaning and ownership. Factoring the same remaining actions differs from inventing an independent determination or coupling lookalike policies.",
     ref: "decision-composition; criterion; shared-continuation-reference; source-delegated-decision-reference; docs/decision-shapes.md",
     clauses: [
@@ -1045,7 +1070,7 @@ const RULES: KitRule[] = [
     id: "disposition-mode",
     applicability: "Authoring authorization or coverage determinations, including before project configuration exists",
     category: "dispositions",
-    rule: "`crl.dispositions.mode` is first-class and gates FINALITY only. `standalone` — our decision IS the whole coverage adjudication; every determination leaf must be FINAL (certify / not-certify). `embedded` — our decision is a SUB-determination feeding a larger cross-company adjudication; a non-final `pended` (PAS A4) leaf is legitimate (a refer-up / need-info contribution). In BOTH modes our decision still issues EXACTLY ONE determination on completion; a needed-unknown pause emits none (mutual-exclusivity is not relaxed by mode — do NOT read `embedded` as permission to emit two determinations across a parent + sub).",
+    rule: "A local canonical handoff is not a completed coverage determination and does not assert the parent outcome; see canonical-decision-terminal. `crl.dispositions.mode` is first-class and gates FINALITY only. `standalone` — our decision IS the whole coverage adjudication; every determination leaf must be FINAL (certify / not-certify). `embedded` — our decision is a SUB-determination feeding a larger cross-company adjudication; a non-final `pended` (PAS A4) leaf is legitimate (a refer-up / need-info contribution). In BOTH modes our decision still issues EXACTLY ONE determination on completion; a needed-unknown pause emits none (mutual-exclusivity is not relaxed by mode — do NOT read `embedded` as permission to emit two determinations across a parent + sub).",
     why: "The customer described two operating modes: Smile as the whole PA (Approve/Deny final) vs Smile as part of a larger system (Met/Unmet contributions that the larger tree finalizes). Only finality differs — a contribution may be non-final; it is still one contribution per run. Making mode explicit lets the same policy CRL run either way per deployment, and lets the validator enforce standalone-finality without guessing.",
     ref: "crl.dispositions.mode",
     clauses: [
@@ -1467,6 +1492,8 @@ const TYPE_ALLOWLIST: TypeAllowlist = {
 };
 
 const EXAMPLES: KitExample[] = [
+  { id: "canonical-terminal-source", title: "Local canonical handoff source", language: "crl", valid: true, snippet: CANONICAL_TERMINAL_CRL, note: "Complete synthetic native fixture. Save as policy.crl with cases.cel from canonical-terminal-cases. package.json requires name canonical-local, version 1.0.0 and crl.canonicalBase https://example.org/local-mv. Local calls to Shared reach two distinct routes; the canonical never asserts the parent outcome." },
+  { id: "canonical-terminal-cases", title: "Local handoff and paused cases", language: "cel", valid: true, snippet: CANONICAL_TERMINAL_CEL, note: "Complete companion to canonical-terminal-source. Qualified Boolean Observation facts produce one or two local handoffs; missing answers pause. Maintained CRE/native evidence checks caller occurrence identity, not parent execution. Native error refusal is separately tested." },
   { id: "datetime-answer", title: "Date/time answer", language: "crl", valid: true, snippet: DATETIME_ANSWER, note: "Selected Observation dateTime answer. Add to a CRL library with crl.canonicalBase for emission; pair with a has-value predicate when a Boolean guard is needed. Native intake acceptance verifies the actual generated dateTime question, calendar precision, timestamps and clear. Client picker behavior is a separate boundary." },
   { id: "source-field-order", title: "source-field-order", language: "crl", valid: true, snippet: SOURCE_ORDER_EXAMPLE, note: "Exact declaration shared with concept-body-order-independence.test.ts: all concept fields precede the trailing source block. The owning test checks AST ownership and publication preparation, not native execution." },
   { id: "coded-observation-source", title: "Selected coded Observation source", language: "crl", valid: true, snippet: CODED_SOURCE_POLICY, note: "Complete synthetic source-only policy shared with the coded-source emitter and CRE tests. Declare the tested source and result terminology; do not replace it with clinical codes without source justification. Supply package.json name coded-source and crl.canonicalBase https://example.org/coded-source. No local code means no editable question. Interpretation follows final selection; no extra indeterminate modifier is introduced. These source tests do not certify a customer policy or native execution." },

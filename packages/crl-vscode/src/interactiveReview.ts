@@ -1,4 +1,4 @@
-import { decisionSpine,buildCRL,createPresentationCatalog,
+import { decisionSpine,buildCRL,createPresentationCatalog,localCanonicalHandoffs, type LocalCanonicalReviewProjection,
   type DefinitionOrigin, type CrlDecisionStructure, type CrlStructureNode, type ScenarioViewModel } from '@smile-digital-health/crl';
 import { executionRoutes, type ExecutionRoute } from './executionRoutes';
 import { enumerateInteractiveNative, type Fhir } from './interactiveQuestionnaire';
@@ -52,14 +52,41 @@ export function questionReviewOwners(questionnaire: Fhir | undefined, origins: D
 }
 
 /** Reconstruct source paths from this call's recorded condition carriers, never patient-data guesses. */
-export function nativeReviewRoutes(native: Fhir | undefined, planId: string, origins: DefinitionOrigin[], structure: CrlDecisionStructure[]): NativeReviewRoute[] {
+export function nativeReviewRoutes(native: Fhir | undefined, planId: string, origins: DefinitionOrigin[], structure: CrlDecisionStructure[], projection?: LocalCanonicalReviewProjection): NativeReviewRoute[] {
+  const ordinary = nativeActivityReviewRoutes(native,planId,origins,structure);
+  if (!native || !projection) return ordinary;
+  // REFACTOR:grounded: exact native caller ancestry selects local source occurrences, never canonical equality alone.
+  const handoffs = localCanonicalHandoffs(native,planId,projection).map(handoff => {
+    const keys: string[] = []; let complete = true;
+    for (const binding of handoff.actions) {
+      const owners = origins.filter(o => o.kind === 'Decision' && o.canonical === binding.definitionCanonical && o.version === binding.version && o.library === binding.library && o.name === binding.decision);
+      const declarations = structure.filter(d => d.lib === binding.library && d.decision === binding.decision);
+      const matches = owners[0]?.actions?.filter(a => a.actionId === binding.actionId && a.nodeId === binding.nodeId && a.target === binding.target && a.kind === binding.kind && JSON.stringify(a.conditions) === JSON.stringify(binding.conditions));
+      if (owners.length !== 1 || declarations.length !== 1 || matches?.length !== 1) { complete = false; break; }
+      const declaration = declarations[0]; keys.push(declaration.nodeKey);
+      const descend = (nodes:CrlStructureNode[],qualifier?:string):boolean => {
+        for (const node of nodes) {
+          if (node.nodeId === binding.nodeId) { keys.push(node.nodeKey); return true; }
+          if (binding.nodeId.startsWith(node.nodeId+'/')) { keys.push(node.nodeKey);return descend(node.children,node.childrenQualifier); }
+          if (qualifier === 'first' && node.kind === 'when') keys.push(node.nodeKey);
+        }
+        return false;
+      };
+      if (!descend(declaration.children,declaration.childrenQualifier)) { complete = false; break; }
+    }
+    return complete ? {keys:[...new Set(keys)]} : {reason:'The local canonical handoff cannot be joined to its exact source route.'};
+  });
+  return [...ordinary,...handoffs];
+}
+function nativeActivityReviewRoutes(native: Fhir | undefined, planId: string, origins: DefinitionOrigin[], structure: CrlDecisionStructure[]): NativeReviewRoute[] {
   if (!native) return [];
   const {resources,outcomes:orderedOutcomes}=enumerateInteractiveNative(native);
   const isGroup = (r: Fhir) => ['RequestGroup', 'RequestOrchestration'].includes(r.resourceType??'');
   const groups = resources.filter(isGroup);
   const resolve = (ref: string) => {
     const id = ref.replace(/^#/, '').split('/').pop();
-    const matches = resources.filter(r => r.id === id && (ref.startsWith('#') || ref.split('/').slice(-2)[0] === r.resourceType));
+    // REFACTOR:grounded: the native engine also returns bare local IDs; require a unique local resource.
+    const matches = resources.filter(r => r.id === id && (ref.startsWith('#') || !ref.includes('/') || ref.split('/').slice(-2)[0] === r.resourceType));
     return matches.length === 1 ? matches[0] : undefined;
   };
   const originFor = (ref: string, kind?: string) => {
@@ -139,7 +166,8 @@ export function nativeReviewRoutes(native: Fhir | undefined, planId: string, ori
       if (!source?.decision || stack.has(id)) return true;
       const reaches=decisionSpine(source.decision).some(n => {
         if (n.node.type !== 'ActionStatement') return false;
-        const a = n.node.action, ref = a.type === 'UseDecision' ? a.decisionName : a.activityName;
+        const a = n.node.action; if (a.type === 'UseDecisionCanonical') return false;
+        const ref = a.type === 'UseDecision' ? a.decisionName : a.activityName;
         return a.type === 'UseDecision' ? couldReach(refLib(ref,lib),refName(ref),new Set([...stack,id])) : refLib(ref,lib) === activity.library && refName(ref) === activity.name;
       });
       reachCache.set(id,reaches);return reaches;
@@ -152,7 +180,8 @@ export function nativeReviewRoutes(native: Fhir | undefined, planId: string, ori
         if(++steps>10000){incomplete=true;return true;}
         if(node.kind!=='action')return relevant(node.children);
         const raw:any=ast.get(node.nodeId);if(!raw)return true;
-        const a=raw.action,ref=a.type==='UseDecision'?a.decisionName:a.activityName;
+        const a=raw.action;if(a.type==='UseDecisionCanonical')return false;
+        const ref=a.type==='UseDecision'?a.decisionName:a.activityName;
         return node.actionKind==='use-decision'?couldReach(refLib(ref,lib),refName(ref)):refLib(ref,lib)===activity.library&&refName(ref)===activity.name;
       });
       const walk = (nodes: CrlStructureNode[], qualifier: string | undefined): any[] => {
@@ -174,7 +203,8 @@ export function nativeReviewRoutes(native: Fhir | undefined, planId: string, ori
             result.push(vm); if (value && qualifier === 'first') return result;
           } else if (node.kind === 'otherwise') { vm.children=walk(node.children,node.childrenQualifier);result.push(vm); }
           else {
-            const a=raw.action,ref=a.type==='UseDecision'?a.decisionName:a.activityName;
+            const a=raw.action;if(a.type==='UseDecisionCanonical')continue;
+            const ref=a.type==='UseDecision'?a.decisionName:a.activityName;
             const targetLib=refLib(ref,lib),targetName=refName(ref);
             const targetRelevant=node.actionKind==='use-decision'?couldReach(targetLib,targetName):targetLib===activity.library&&targetName===activity.name;
             if(raw.guard){

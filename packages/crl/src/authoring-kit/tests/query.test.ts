@@ -10,6 +10,17 @@ const kit = getAuthoringKit();
 const query = (input?: unknown): any => queryAuthoringKit(input);
 
 describe("one authoring kit: discovery and complete guidance", () => {
+  // @kit canonical-decision-terminal:retrieval
+  it('discovers canonical handoffs and supplies their complete prerequisite guidance',()=>{
+    for(const term of ['definitionCanonical','external handoff','use decision canonical']){
+      expect(JSON.stringify(query({view:'search',query:term}))).toContain('rule:canonical-decision-terminal');
+    }
+    const entry=query({view:'entry',id:'rule:canonical-decision-terminal'});
+    const bytes=JSON.stringify(entry);
+    for(const id of ['branch-guards','cel-cases','verify-loop','produce-results'])expect(bytes).toContain('rule:'+id);
+    expect(bytes).toContain('not the parent');
+    expect(query({view:'full'}).fullContentHash).toBe(kit.contentHash);
+  });
   // @kit verify-loop:kit-markdown
   it("advertises and returns the same complete Markdown as the audited file export", () => {
     const args = query().exports.markdown;
@@ -54,8 +65,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
     // Two shared numeric-threshold examples and their unit aliases extend the complete index by <1KB.
-    // The additional distinct-domain example and aliases keep the complete index under 41 KB.
-    expect(JSON.stringify(overview).length).toBeLessThan(41000);
+    // Canonical handoff guidance and two complete examples retain the untruncated index below 42 KB.
+    expect(JSON.stringify(overview).length).toBeLessThan(42000);
     const fullSize = JSON.stringify(query({ view: "full" })).length;
     for (const id of ["rule:criterion", "rule:decision-composition"]) {
       expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);

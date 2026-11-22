@@ -383,6 +383,7 @@ export { captureExternalSupport, captureExternalDecision, createExternalBindings
 export type { ExternalBindingsV1, ExternalPublicationBinding, ExternalDecisionBinding, ProviderSupportSnapshot, ProviderDecisionSnapshot, SupportSubset, SnapshotProvenance, SelectedBooleanExport } from "./emit/externalBindings";
 export { emitCrlBundle } from "./emit-bundle";
 export { emitResultDefinitionClosure, definitionClosureDigest, type DefinitionPublicationOptions } from './results/definitionClosure';
+export { localCanonicalReview, localCanonicalHandoffs, type LocalCanonicalReviewProjection, type LocalCanonicalHandoff } from './results/localCanonicalReview';
 export type { EmitCrlBundleResult, BundleDiagnostic, DefinitionOrigin } from "./emit-bundle";
 export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary, EmitCrlTwoLaneOptions } from "./emit-two-lane";
 export { writeTwoLane, EmitWriteError } from "./emit-writers";

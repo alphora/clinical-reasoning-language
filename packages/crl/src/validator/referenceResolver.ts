@@ -18,6 +18,7 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { canonicalDecisionParts } from "../ast/canonicalDecision";
 import { branchConditionRefs, branchConditionConceptRefsStrict } from "../ast/branchCondition";
 import { narrativeReferenceRoles, spanKey } from "../template-match/referenceRoles";
 import type { LibraryScope, SourceContext } from "../imports/scopes";
@@ -441,6 +442,9 @@ export class ReferenceResolver {
       this.checkRef(action.activityName, ACTIVITY_REF_KINDS, action.location, ctx, errors, null);
     } else if (action.type === "UseDecision") {
       this.checkRef(action.decisionName, DECISION_REF_KINDS, action.location, ctx, errors, null);
+    } else if (!canonicalDecisionParts(action.canonical)) {
+      // REFACTOR:grounded: local handoff admission does not require loading a foreign definition.
+      errors.push({ kind: "canonical-decision-reference", message: "Canonical decision requires an absolute URI, optionally followed by |version.", location: action.location, severity: "error", ...(ctx.filePath ? { filePath: ctx.filePath } : {}), ...(ctx.libraryName ? { libraryName: ctx.libraryName } : {}) });
     }
     // A per-action guard references a concept (same ref kinds as a `when`
     // condition); resolve it so an unknown guard concept is a reference error.

@@ -1,0 +1,19 @@
+library "Canonical Cases".
+covers "Canonical Local".
+fact "Patient": - defined by "Patient".
+fact "Ready true": - defined by "Canonical Local"."Ready". - value is true. - date is "2026-11-22".
+fact "Other false": - defined by "Canonical Local"."Other". - value is false. - date is "2026-11-22".
+fact "Other true": - defined by "Canonical Local"."Other". - value is true. - date is "2026-11-22".
+case "one":
+- subject is "Patient".
+- fact is "Ready true".
+- fact is "Other false".
+- result is "Root" is "https://example.org/rx-smoke/PlanDefinition/rx-smoke".
+case "both":
+- subject is "Patient".
+- fact is "Ready true".
+- fact is "Other true".
+- result is "Root" is "https://example.org/rx-smoke/PlanDefinition/rx-smoke".
+case "missing":
+- subject is "Patient".
+- result is "Root" is pause.

@@ -1,0 +1,194 @@
+{
+  "scope": "Four new synthetic generated-source native results. Stored raw bytes unchanged; source/execution bundles unchanged by later internal condition metadata addition. No old policy rerun.",
+  "engineSha256": "2ee7aa8ea7e76b0cf10cac558fc123d4326491087ae905f65b74f9354947b8fa",
+  "sourceDefinitionClosureSha256": "9ffd41982bf7b9f174f2cdb6b5497fe78f835782d36a48a310e89d0690e538f0",
+  "executionDefinitionClosureSha256": "70ac577ed02d1a613190fccf7532bcde514f9a493864743efa5a9c35e2cd916a",
+  "files": [
+    {
+      "file": "one.json",
+      "sha256": "953afb262dd2fb6c18cd4af723db95c5c73a7bebfa05f315b9c8b4a55a1c10d3"
+    },
+    {
+      "file": "both.json",
+      "sha256": "9415d1b1a9beddf6b351247a6e7ffbe0013377e26672e097c9416423543de7ed"
+    },
+    {
+      "file": "missing.json",
+      "sha256": "e80711c13cbaafa88dec2d9616b0f37fa60060aa86c7bd4e4539cadc89d1fce1"
+    },
+    {
+      "file": "bad-value.json",
+      "sha256": "db6eccbde1eaeef92190f71767b98b7d10827bef444422b4aef2ed10d5c8faa4"
+    }
+  ],
+  "rows": [
+    {
+      "mode": "one",
+      "handoffs": [
+        {
+          "ref": "local-handoff:[\"canonical-local\",\"crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0\",\"crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0-canonical-local-shared\",\"crl-ref-9d38194bbfbb7faf1262e3de024cf019-0\"]",
+          "label": "https://example.org/rx-smoke/PlanDefinition/rx-smoke",
+          "path": [
+            "canonical-local",
+            "crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0",
+            "crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0-canonical-local-shared",
+            "crl-ref-9d38194bbfbb7faf1262e3de024cf019-0"
+          ],
+          "actions": [
+            {
+              "nodeId": "when[0]/action[0]",
+              "kind": "local-decision",
+              "actionId": "crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0",
+              "target": "https://example.org/local-mv/PlanDefinition/canonical-local-shared",
+              "conditions": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L5C7"
+                  }
+                }
+              ],
+              "definitionCanonical": "https://example.org/local-mv/PlanDefinition/canonical-local",
+              "version": "1.0.0",
+              "library": "Canonical Local",
+              "decision": "Root"
+            },
+            {
+              "nodeId": "when[0]/action[0]",
+              "kind": "canonical-terminal",
+              "actionId": "crl-ref-9d38194bbfbb7faf1262e3de024cf019-0",
+              "target": "https://example.org/rx-smoke/PlanDefinition/rx-smoke",
+              "conditions": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L8C7"
+                  }
+                }
+              ],
+              "definitionCanonical": "https://example.org/local-mv/PlanDefinition/canonical-local-shared",
+              "version": "1.0.0",
+              "library": "Canonical Local",
+              "decision": "Shared"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "both",
+      "handoffs": [
+        {
+          "ref": "local-handoff:[\"canonical-local\",\"crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0\",\"crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0-canonical-local-shared\",\"crl-ref-9d38194bbfbb7faf1262e3de024cf019-0\"]",
+          "label": "https://example.org/rx-smoke/PlanDefinition/rx-smoke",
+          "path": [
+            "canonical-local",
+            "crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0",
+            "crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0-canonical-local-shared",
+            "crl-ref-9d38194bbfbb7faf1262e3de024cf019-0"
+          ],
+          "actions": [
+            {
+              "nodeId": "when[0]/action[0]",
+              "kind": "local-decision",
+              "actionId": "crl-ref-47cd26e0c48670dc93dc3c2d6ce779d6-0",
+              "target": "https://example.org/local-mv/PlanDefinition/canonical-local-shared",
+              "conditions": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L5C7"
+                  }
+                }
+              ],
+              "definitionCanonical": "https://example.org/local-mv/PlanDefinition/canonical-local",
+              "version": "1.0.0",
+              "library": "Canonical Local",
+              "decision": "Root"
+            },
+            {
+              "nodeId": "when[0]/action[0]",
+              "kind": "canonical-terminal",
+              "actionId": "crl-ref-9d38194bbfbb7faf1262e3de024cf019-0",
+              "target": "https://example.org/rx-smoke/PlanDefinition/rx-smoke",
+              "conditions": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L8C7"
+                  }
+                }
+              ],
+              "definitionCanonical": "https://example.org/local-mv/PlanDefinition/canonical-local-shared",
+              "version": "1.0.0",
+              "library": "Canonical Local",
+              "decision": "Shared"
+            }
+          ]
+        },
+        {
+          "ref": "local-handoff:[\"canonical-local\",\"crl-ref-b494e43a96473923829d2d5a9c8f2afa-0\",\"crl-ref-b494e43a96473923829d2d5a9c8f2afa-0-canonical-local-shared\",\"crl-ref-9d38194bbfbb7faf1262e3de024cf019-0\"]",
+          "label": "https://example.org/rx-smoke/PlanDefinition/rx-smoke",
+          "path": [
+            "canonical-local",
+            "crl-ref-b494e43a96473923829d2d5a9c8f2afa-0",
+            "crl-ref-b494e43a96473923829d2d5a9c8f2afa-0-canonical-local-shared",
+            "crl-ref-9d38194bbfbb7faf1262e3de024cf019-0"
+          ],
+          "actions": [
+            {
+              "nodeId": "when[1]/action[0]",
+              "kind": "local-decision",
+              "actionId": "crl-ref-b494e43a96473923829d2d5a9c8f2afa-0",
+              "target": "https://example.org/local-mv/PlanDefinition/canonical-local-shared",
+              "conditions": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L6C7"
+                  }
+                }
+              ],
+              "definitionCanonical": "https://example.org/local-mv/PlanDefinition/canonical-local",
+              "version": "1.0.0",
+              "library": "Canonical Local",
+              "decision": "Root"
+            },
+            {
+              "nodeId": "when[0]/action[0]",
+              "kind": "canonical-terminal",
+              "actionId": "crl-ref-9d38194bbfbb7faf1262e3de024cf019-0",
+              "target": "https://example.org/rx-smoke/PlanDefinition/rx-smoke",
+              "conditions": [
+                {
+                  "kind": "applicability",
+                  "expression": {
+                    "language": "text/cql-identifier",
+                    "expression": "CRL branch Ref L8C7"
+                  }
+                }
+              ],
+              "definitionCanonical": "https://example.org/local-mv/PlanDefinition/canonical-local-shared",
+              "version": "1.0.0",
+              "library": "Canonical Local",
+              "decision": "Shared"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "missing",
+      "handoffs": []
+    },
+    {
+      "mode": "bad-value",
+      "handoffs": []
+    }
+  ]
+}

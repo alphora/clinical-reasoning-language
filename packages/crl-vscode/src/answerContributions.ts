@@ -17,7 +17,8 @@ export function buildAnswerContributions(structure:CrlDecisionStructure[], conce
     if(!nodes.length)return {label:'No next step',kind:'unavailable',explanation:'No next step is defined for this branch.'};
     if(nodes.length!==1)return {label:'Multiple next steps',kind:'continue',explanation:'This branch has several next steps.'};
     const node=nodes[0];
-    return node.kind==='action' && node.actionKind==='recommend-activity' && node.refKeys.length<2
+    // REFACTOR:grounded: a canonical handoff ends this local branch without naming the parent's outcome.
+    return node.kind==='action' && ((node.actionKind==='recommend-activity'&&node.refKeys.length<2)||(node.actionKind==='use-canonical-decision'&&node.refKeys.length===0))
       ?{label:displayDetermination(node.label),kind:'terminal',explanation:'The next node on this branch is this terminal.'}
       :{label:'Continue',kind:'continue',explanation:'Another node follows on this branch.'};
   };

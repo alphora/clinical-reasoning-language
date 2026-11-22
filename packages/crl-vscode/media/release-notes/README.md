@@ -1,8 +1,14 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.59.
+Updates since CRL 6.4.41 through 6.4.60.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.60 — Review a handoff to another policy
+
+### Review the local route before a policy handoff
+
+A route that hands off to another policy can end at a reference node in Medical Validation\. Review its questions, flags and verdict without opening or running the other policy\. Repeated routes remain separate in the Decision Table\.
 
 ## 6.4.59 — Policy processing maintenance
 

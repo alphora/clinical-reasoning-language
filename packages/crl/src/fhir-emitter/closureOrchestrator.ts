@@ -1,5 +1,6 @@
 import { checkedArtifactUnion, assertCapturedClosure, activeDecisionSupport, ExternalBindingError, type ExternalBindingsV1, type SupportSubset, type SnapshotProvenance } from "../emit/externalBindings";
 import { publicationCaseFeatures } from "../emit/publicationInputs";
+import { decisionSpine } from '../ast/decisionSpine';
 import { publicationRetentionPlan } from "../emit/retentionPredicates";
 import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
 import { answerTerminologyResolver } from "../emit/answerDomain";
@@ -895,7 +896,9 @@ function applyInvariant3(resources: ReadonlyArray<EmittedResource>, droppedPaths
   ): void {
     for (const a of actions) {
       const dc = a.definitionCanonical;
-      if (typeof dc === "string" && !emittedUrls.has(dc)) {
+      // REFACTOR:grounded: explicit authored handoffs may remain external; ordinary missing targets still fail.
+      const localTerminal = source.sourceActions?.some(binding => binding.kind === 'canonical-terminal' && binding.actionId === a.id && binding.target === dc);
+      if (typeof dc === "string" && !emittedUrls.has(dc) && !localTerminal) {
         const context = downstreamContext(dc, droppedPaths);
         errors.push({
           type: "Validation",
@@ -1114,6 +1117,8 @@ export function emitFhirDefClosure(
   const errors: CRLError[] = [...prepared.publications.diagnostics, ...prepared.publications.warnings];
   const unmatched: UnmatchedReference[] = [];
   const resources: EmittedResource[] = [];
+  // REFACTOR:grounded: derive occurrence-ID mode once from this actual source closure.
+  const canonicalTerminalClosure = prepared.rawFhirClosure.some(entry => entry.ast.statements.some(statement => statement.type === 'Decision' && decisionSpine(statement).some(node => node.kind === 'action' && (node.node as import('../ast/types').ActionStatement).action.type === 'UseDecisionCanonical')));
   const gatheredPublications = new Map<string, PublicationDescriptor>(requiredPublications.map(d => [d.identity.key, d]));
   const external = prepared.external;
   const lookupManifest = external ? checkedArtifactUnion([
@@ -2019,6 +2024,7 @@ export function emitFhirDefClosure(
           return { ...slot, input: { name: descriptor.title, canonical: descriptor.profileUrl!, resourceType: descriptor.resourceType,
             presentationOwner: presentationCatalogs.get(descriptor.identity.sourceIdentity) } };
         }),
+        canonicalTerminalClosure,
       );
       if (decResult.resource) {
         Object.defineProperties(decResult.resource, { sourceDecision: { value: decision, configurable: true }, sourceConditions: { value: collectGuardDefines(decision), configurable: true } });

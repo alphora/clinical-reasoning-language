@@ -495,7 +495,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   context.subscriptions.push({dispose:()=>interactiveEditPanel.close()});
   let interactiveRouteCache:{result:InteractiveReviewContext['result'];version:number;routes:ReturnType<typeof nativeReviewRoutes>}|undefined;
   function interactiveRoutes(ctx:InteractiveReviewContext){
-    if(interactiveRouteCache?.result!==ctx.result||interactiveRouteCache.version!==indexVersion)interactiveRouteCache={result:ctx.result,version:indexVersion,routes:nativeReviewRoutes(ctx.result.nativeResult,ctx.prepared.planId,ctx.prepared.definitionOrigins,crlStructure)};
+    if(interactiveRouteCache?.result!==ctx.result||interactiveRouteCache.version!==indexVersion)interactiveRouteCache={result:ctx.result,version:indexVersion,routes:nativeReviewRoutes(ctx.result.nativeResult,ctx.prepared.planId,ctx.prepared.definitionOrigins,crlStructure,ctx.prepared.localReview)};
     return interactiveRouteCache.routes;
   }
   function invalidateInteractiveEdit():void{

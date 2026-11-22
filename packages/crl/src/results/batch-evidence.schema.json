@@ -81,6 +81,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "localReview": {
+      "$ref": "#/$defs/localReview"
     }
   },
   "required": [
@@ -376,6 +379,99 @@
           }
         }
       ]
+    },
+    "localReview": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "const": "local-canonical-terminals"
+        },
+        "sourceDefinitionClosureSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "executionDefinitionClosureSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "contains": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "canonical-terminal"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "items": {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "nodeId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "canonical-terminal",
+                  "local-decision"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "definitionCanonical": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string"
+              },
+              "library": {
+                "type": "string",
+                "minLength": 1
+              },
+              "decision": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "actionId",
+              "nodeId",
+              "kind",
+              "target",
+              "conditions",
+              "definitionCanonical",
+              "library",
+              "decision"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "sourceDefinitionClosureSha256",
+        "executionDefinitionClosureSha256",
+        "actions"
+      ],
+      "additionalProperties": false
     }
   },
   "allOf": [

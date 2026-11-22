@@ -2,7 +2,7 @@ import type { DefinitionPublicationOptions } from "@smile-digital-health/crl";
 import * as vscode from "vscode";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { InteractiveSession, nativeInteractiveRunner, prepareInteractivePolicy, type NativeApply } from "./interactiveQuestionnaire";
+import { InteractiveSession, nativeInteractiveRunner, prepareInteractivePolicy, withLocalCanonicalResults, type NativeApply } from "./interactiveQuestionnaire";
 import { interactiveQuestionnaireHtml } from "./interactiveQuestionnaireHtml";
 import { nextQuestionnaireColumn } from "./branchQuestionnairePanel";
 import { interactiveQuestionnaireDependencies } from "./interactiveQuestionnaireDependencies";
@@ -42,6 +42,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
   let candidate:InteractiveSession|undefined,cleanup:Promise<void>=Promise.resolve();
   let runner:ReturnType<typeof nativeInteractiveRunner>|undefined;
   const getRunner=()=>{if(!runner){const adapter=require(join(context.extensionPath,'dist','apply-session.js')) as {applySession:NativeApply};runner=nativeInteractiveRunner(adapter.applySession);}return runner;};
+  const newSession=(prepared:ReturnType<typeof prepareInteractivePolicy>)=>{const native=getRunner();return new InteractiveSession(prepared.definitions,prepared.planId,async(request,signal)=>withLocalCanonicalResults(await native(request,signal),prepared.planId,prepared.localReview));};
   const drain=()=>{const owned=[session,candidate].filter((s):s is InteractiveSession=>!!s);for(const s of owned)s.cancel();candidate=undefined;cleanup=Promise.all([cleanup,...owned.map(s=>s.cancelAndWait())]).then(()=>{});return cleanup;};
   const close = () => { reviewHooks?.invalidated?.(); refreshReview=undefined;refreshDefaults=undefined;markStale=undefined;++token;void drain();session = undefined; const old = current; current = undefined; owner = undefined; old?.dispose(); if(old)onOpenChanged(); };
   context.subscriptions.push({ dispose: close });
@@ -82,7 +83,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
           states = prepared.initialStates;
           selected = states[0];
           // Keep the prebuilt standalone adapter's asset paths; do not bundle another native runtime.
-          session = new InteractiveSession(prepared.definitions, prepared.planId, getRunner());
+          session = newSession(prepared);
           if (selected) session.reset(selected);
           post({ type: "initial", states: states.map(({ id, label }) => ({ id, label })), subject: selected?.subject,
             warnings: [...prepared.warnings,...(prepared.initialStateError?[prepared.initialStateError]:[])], initialStateError:prepared.initialStateError, defaults:defaultsState(), dependencies: interactiveQuestionnaireDependencies(prepared.definitions, prepared.planId) });
@@ -101,7 +102,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
             if(current!==panel || owner!==cel || token!==restartToken)return;
             states=prepared.initialStates;selected=states.find(s=>s.id===selectedId)??states[0];
             preparedPolicy=prepared;reviewContext=undefined;invalidate();
-            session=new InteractiveSession(prepared.definitions,prepared.planId,getRunner());if(selected)session.reset(selected);
+            session=newSession(prepared);if(selected)session.reset(selected);
             stale=false;++token;
             post({type:'initial',states:states.map(({id,label})=>({id,label})),selectedId:selected?.id,subject:selected?.subject,warnings:[...prepared.warnings,...(prepared.initialStateError?[prepared.initialStateError]:[])],initialStateError:prepared.initialStateError,defaults:defaultsState(),dependencies:interactiveQuestionnaireDependencies(prepared.definitions,prepared.planId)});
           }catch(error){if(token===restartToken)post({type:'restartError',message:String(error)});}finally{restartActive=false;busy=false;}
@@ -138,7 +139,7 @@ export function createInteractiveQuestionnairePanel(context: vscode.ExtensionCon
         if(message.type==='default' && !busy && preparedPolicy && options.defaults){
           const mine=token,previous=session;busy=true;
           // A distinct candidate owns Default's work; failed loads never replace the retained assessment.
-          const active=candidate=new InteractiveSession(preparedPolicy.definitions,preparedPolicy.planId,getRunner());
+          const active=candidate=newSession(preparedPolicy);
           try{
             const loaded=await options.defaults.load(cel);
             if(current!==panel||token!==mine||candidate!==active)return;

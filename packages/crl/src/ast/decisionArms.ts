@@ -86,6 +86,8 @@ function walkArmsActionStatementTransitive(
   callerLib: string,
 ): void {
   const action = stmt.action;
+  // REFACTOR:grounded: the local handoff is a terminal, never the foreign decision's disposition.
+  if (action.type === "UseDecisionCanonical") { arms.add(action.canonical); return; }
   if (action.type === "RecommendActivity") {
     const n = getRefName(action.activityName);
     if (n) arms.add(n);
@@ -138,5 +140,8 @@ function walkArmsActionStatement(stmt: ActionStatement, arms: Set<string>): void
   } else if (action.type === "UseDecision") {
     const n = getRefName(action.decisionName);
     if (n) arms.add(n);
+  } else {
+    // REFACTOR:grounded: direct static leaf inventory retains the authored canonical label.
+    arms.add(action.canonical);
   }
 }

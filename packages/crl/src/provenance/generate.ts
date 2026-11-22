@@ -112,6 +112,8 @@ function spineRelation(sn: SpineNode): CrlRelation {
 /** The action target name a spine action node points at (activity for RecommendActivity, decision for UseDecision). */
 function actionTargetName(sn: SpineNode): string | undefined {
   const action = (sn.node as ActionStatement).action;
+  // REFACTOR:grounded: local source attribution does not resolve a foreign declaration.
+  if (action.type === "UseDecisionCanonical") return action.canonical;
   return action.type === "RecommendActivity"
     ? getRefName(action.activityName)
     : getRefName(action.decisionName);

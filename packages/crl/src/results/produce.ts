@@ -236,7 +236,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   const prepared=await prepareNativeRuntime({...req,bounds:req.bounds??DEFAULT_BOUNDS});
   if(!prepared.ok)return prepared;
   const {environment,jarPath,java,spec}=prepared;
-  const closure = emitResultDefinitionClosure(req.crlPath, req.definitionOptions);
+  const closure = emitResultDefinitionClosure(req.crlPath, req.definitionOptions, suite.purpose);
   const two = closure.emitted;
   // ⚠ A partial definition closure makes the engine evaluate a different artifact from the one the CEL
   // oracle describes, so every downstream state would be measured against the wrong definitions.
@@ -274,7 +274,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     };
   }
   const planDefinitionId = String(roots[0].id);
-  evidence?.definitions(defs,cql,closure.definitionClosureSha256!,planDefinitionId,[req.crlPath,...suite.files.map(f=>f.path)]);
+  evidence?.definitions(defs,cql,closure.definitionClosureSha256!,planDefinitionId,[req.crlPath,...suite.files.map(f=>f.path)],closure.projection);
 
   preflightOutputs(req.outRoot, suite.purpose, inputs);
   const workerPids=new Set<number>();
@@ -291,7 +291,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
   evidence?.runtime({processInstanceId,...context,javaExe:java.javaExe,javaMajor:java.major,engineJarPath:jarPath,engineJarSha256:prepared.jarSha256,
     fingerprintSha256:runtime.sha256,bounds:spec.bounds,nativeMode:req.nativeMode??'worker'},runtimeSha256);
   if (previous && (previous.provenance.runtimeSha256 !== runtimeSha256 ||
-      previous.provenance.definitionClosureSha256 !== definitionClosureSha256)) {
+      previous.provenance.definitionClosureSha256 !== definitionClosureSha256 || JSON.stringify(previous.provenance.localReview) !== JSON.stringify(closure.projection))) {
     return { ok: false, reason: "Cannot retry: definitions or runtime changed. Run without retry." };
   }
   if (req.signal?.aborted || nativeQuarantined()) return { ok: false, reason: "Native production cancelled or cleanup unconfirmed." };
@@ -308,6 +308,7 @@ async function produceCandidate(req: ProduceRequest, suite: CelSuite, emission: 
     provenance: {
       crlVersion: req.crlVersion, producerJarSha256: prepared.jarSha256,
       inputClock: emission.clock, runtimeSha256, definitionClosureSha256,
+      ...(closure.projection ? { localReview: closure.projection } : {}),
     },
     cases: [],
   };

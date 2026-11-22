@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { retainInteractiveQuestionnaire } from "./interactiveQuestionnaireResponse";
 import { singletonAnswerBindings, prepareSingletonAnswers, adoptSingletonAnswers } from './interactiveQuestionnaireAnswers';
-import { displayDetermination, emitCrlBundle, resolveCelSuite } from "@smile-digital-health/crl";
+import { displayDetermination, emitCrlBundle, resolveCelSuite, localCanonicalHandoffs, type LocalCanonicalReviewProjection } from "@smile-digital-health/crl";
 import type { DefinitionPublicationOptions } from '@smile-digital-health/crl';
 import type { ApplySessionRequestV1, ApplySessionResult, ApplySessionOptions } from "@smile-digital-health/crl/session";
 
@@ -101,12 +101,12 @@ export function prepareInteractivePolicy(celPath: string, definitionOptions: Def
   let initialStates: InitialState[] = [], initialStateError: string | undefined;
   try { initialStates = discoverInitialStates(selected.suite.projectRoot); }
   catch(error) { if(!tolerateInitialStateError)throw error;initialStateError=error instanceof Error?error.message:String(error); }
-  const emitted = emitCrlBundle(selected.suite.policyPath, { ...definitionOptions, sourceOrigins: true });
+  const emitted = emitCrlBundle(selected.suite.policyPath, { ...definitionOptions, sourceOrigins: true, localReview: true });
   if (!emitted.success) throw new Error("Cannot prepare policy definitions: " + JSON.stringify(emitted.diagnostics));
   const roots = emitted.bundle.entry.map(e => e.resource).filter((r: Fhir) => r.resourceType === "PlanDefinition" &&
     r.type?.coding?.some((c: any) => c.code === "workflow-definition"));
   if (roots.length !== 1 || !roots[0].id) throw new Error("The policy must emit exactly one workflow-definition PlanDefinition.");
-  return { initialStates, initialStateError, definitions: emitted.bundle, definitionOrigins: emitted.definitionOrigins ?? [], planId: roots[0].id,
+  return { initialStates, initialStateError, definitions: emitted.bundle, definitionOrigins: emitted.definitionOrigins ?? [], planId: roots[0].id, ...(emitted.localReview ? { localReview: emitted.localReview } : {}),
     warnings: emitted.diagnostics.filter(d => d.severity === "warning").map(d => {
       const detail = d.detail as { message?: unknown; line?: unknown };
       return typeof detail?.message === "string" ? detail.message + (typeof detail.line === "number" ? ` (line ${detail.line})` : "") : JSON.stringify(d.detail);
@@ -114,6 +114,12 @@ export function prepareInteractivePolicy(celPath: string, definitionOptions: Def
 }
 
 export interface InteractiveResult { questionnaire?: Fhir; response?: Fhir; activities: string[]; warnings?: string[]; nativeData?: Fhir; nativeResult?: Fhir }
+// REFACTOR:grounded: append deliberate local handoffs after ordinary native activities, in the same review order.
+export function withLocalCanonicalResults(result: InteractiveResult, planId: string, projection?: LocalCanonicalReviewProjection): InteractiveResult {
+  if (!projection || !result.nativeResult) return result;
+  const handoffs = localCanonicalHandoffs(result.nativeResult, planId, projection);
+  return { ...result, activities: [...result.activities, ...handoffs.map(h => h.label)] };
+}
 /** Single ordered native traversal shared by displayed determinations and their review identity. */
 export function enumerateInteractiveNative(native:Fhir):{resources:Fhir[];outcomes:{ref:string;label:string}[]} {
   const resources: Fhir[] = [];

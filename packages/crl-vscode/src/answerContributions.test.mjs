@@ -43,6 +43,14 @@ test('preview follows only the actual immediate successor and preserves guarded 
  assert.equal(buildAnswerContributions(successor([]),concepts).get('w').find(r=>r.code==='a').label,'No next step');
  assert.equal(buildAnswerContributions(successor([terminal('a'),terminal('b')]),concepts).get('w').find(r=>r.code==='a').label,'Multiple next steps');
 });
+test('canonical terminal previews require no pending local action guard',()=>{
+ for(const guarded of [false,true]){
+  const handoff=n('handoff','action','https://example.org/PlanDefinition/parent',guarded?['c2']:[],[],{actionKind:'use-canonical-decision'});
+  const rows=buildAnswerContributions([{...tree[0],children:[n('w','when','Treatment1',['c1'],[handoff])]}],concepts).get('w');
+  assert.equal(rows.find(r=>r.code==='a').kind,guarded?'continue':'terminal');
+ }
+});
+
 test('grouping retains complete choices and exact coding identity and refuses unsupported interpretation',()=>{
  const groups=partitionAnswerChoices(options,first.conditionAnswers,'q');
  assert.deepEqual(groups.map(g=>[g.branch,g.choices.map(v=>v.code)]),[['left',['a','c']],['right',['b','d']]]);

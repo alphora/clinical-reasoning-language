@@ -426,7 +426,7 @@ function visitDecisionRefs(
     if (body.type === "ActionStatement") {
       const action = body.action;
       if (action.type === "RecommendActivity") visit(action.activityName);
-      else visit(action.decisionName);
+      else if (action.type === "UseDecision") visit(action.decisionName);
       if (body.guard) visit(body.guard.conceptName);
       return;
     }
@@ -435,7 +435,7 @@ function visitDecisionRefs(
       else {
         const action = stmt.action;
         if (action.type === "RecommendActivity") visit(action.activityName);
-        else visit(action.decisionName);
+        else if (action.type === "UseDecision") visit(action.decisionName);
         if (stmt.guard) visit(stmt.guard.conceptName);
       }
     }
@@ -449,17 +449,18 @@ function visitActivityRefs(activity: Activity, visit: (ref: ReferenceName) => vo
 }
 
 // #201 — visit ONLY the `use decision` refs of a decision (the `decisionName` of a
-// non-`RecommendActivity` action), so callers can build the use-decision edge set.
+// named UseDecision action), so callers can build the source delegation edge set.
+// REFACTOR:grounded: canonical references have no source declaration to traverse.
 function visitUseDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => void): void {
   function visitBranch(branch: BranchBlock): void {
     const body = branch.body;
     if (body.type === "ActionStatement") {
-      if (body.action.type !== "RecommendActivity") visit(body.action.decisionName);
+      if (body.action.type === "UseDecision") visit(body.action.decisionName);
       return;
     }
     for (const stmt of body.statements) {
       if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
-      else if (stmt.action.type !== "RecommendActivity") visit(stmt.action.decisionName);
+      else if (stmt.action.type === "UseDecision") visit(stmt.action.decisionName);
     }
   }
   for (const branch of decision.body.statements) visitBranch(branch);

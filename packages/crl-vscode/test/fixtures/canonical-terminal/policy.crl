@@ -1,0 +1,8 @@
+library "Canonical Local".
+concept "Ready": - shape is Record. - type is Observation. - value type is boolean. - code is `ready`. - shape reduction is most recent.
+concept "Other": - shape is Record. - type is Observation. - value type is boolean. - code is `other`. - shape reduction is most recent.
+decision "Root": all:
+- when "Ready" then use decision "Shared".
+- when "Other" then use decision "Shared".
+decision "Shared":
+- when "Ready" then use decision canonical `https://example.org/rx-smoke/PlanDefinition/rx-smoke`.

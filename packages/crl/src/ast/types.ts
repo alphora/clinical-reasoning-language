@@ -366,6 +366,13 @@ export interface UseDecision extends ASTNode {
   location: Location;
 }
 
+// REFACTOR:grounded: an external definition is a local terminal occurrence, not a named source decision.
+export interface UseDecisionCanonical extends ASTNode {
+  type: "UseDecisionCanonical";
+  canonical: string;
+  location: Location;
+}
+
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
 
 // Terminology node
@@ -1343,7 +1350,7 @@ export interface Location {
   end: { line: number; column: number };
 }
 
-export type Action = RecommendActivity | UseDecision;
+export type Action = RecommendActivity | UseDecision | UseDecisionCanonical;
 
 export type { ActivityType } from "../grammar/activityTypes";
 export type { ConceptType } from "../grammar/conceptTypes";

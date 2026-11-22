@@ -102,6 +102,8 @@ export interface ProducerManifest {
     /** CEL replay clock, separate from live JVM execution time. */
     inputClock?: string;
     runtimeSha256?: string;
+    /** MV local-handoff execution, distinct from execution of delivered definitions. */
+    localReview?: import('./localCanonicalReview').LocalCanonicalReviewProjection;
   };
   cases: ProducerCaseEntry[];
 }

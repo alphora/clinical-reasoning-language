@@ -44,6 +44,7 @@ import { UseSiteTypeValidator } from "./useSiteTypeValidator";
  *                                         kind
  */
 export type ValidationErrorKind =
+  | "canonical-decision-reference"
   | PresentationDiagnostic["kind"]
   | "empty-name"
   | "duplicate-name"
@@ -191,6 +192,11 @@ interface ValidationErrorBase {
 
 export interface EmptyNameError extends ValidationErrorBase {
   kind: "empty-name";
+}
+
+// REFACTOR:grounded: canonical syntax validation is independent of runtime package admission.
+export interface CanonicalDecisionReferenceError extends ValidationErrorBase {
+  kind: "canonical-decision-reference";
 }
 export interface DuplicateNameError extends ValidationErrorBase {
   kind: "duplicate-name";
@@ -654,6 +660,7 @@ export interface AnswerOptionsFinding extends ValidationErrorBase {
 }
 
 export type ValidationError =
+  | CanonicalDecisionReferenceError
   | PresentationDiagnostic
   | EmptyNameError
   | DuplicateNameError

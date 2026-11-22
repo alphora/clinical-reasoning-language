@@ -9,6 +9,7 @@ import { runOneCase } from '../runProducer';
 import { DEFAULT_BOUNDS } from '../spawn';
 import type { ProducerCaseInput } from '../caseInput';
 import type { OwnedProcessResult } from '../ownedProcess';
+import { emitResultDefinitionClosure } from '../definitionClosure';
 
 const control=vi.hoisted(()=>({failFile:'',partialFile:'',failRename:false}));
 vi.mock('node:fs',async original=>{
@@ -43,6 +44,22 @@ function writer(inputs=[input('a')],limits?:{artifactBytes:number;batchBytes:num
 }
 function repo(){const file=path.join(parent,'repository.json');writeFileSync(file,Buffer.from('{"resourceType":"Bundle","entry":[]}\n'));return file;}
 const evaluation=(id='a')=>({caseName:'Same name',sourceFile:id+'.cel',caseId:id,compartmentDir:'patient/'+id,state:'generated' as const});
+
+// @kit canonical-decision-terminal:projected-evidence-schema
+it('validates an actual projected batch index and rejects incomplete projection metadata',()=>{
+  writeFileSync(path.join(source,'package.json'),JSON.stringify({name:'schema-handoff',version:'1.0.0',description:'Synthetic',crl:{canonicalBase:'https://example.org/schema'}}));
+  const file=path.join(source,'policy.crl');
+  writeFileSync(file,'library "Schema".\nconcept "A": - shape is Record. - type is Observation. - value type is boolean. - code is `a`. - shape reduction is most recent.\ndecision "Root":\n- when "A" then use decision canonical `https://example.org/PlanDefinition/parent`.\n');
+  const closure=emitResultDefinitionClosure(file,{date:'2026-11-22'},'mv');
+  expect(closure.emitted.success).toBe(true);expect(closure.projection).toBeDefined();
+  const w=new BatchEvidenceWriter(validateEvidenceRoot(path.join(parent,'evidence'),[source,out]),{producerVersion:'test',suite:'mv',useCase:'prior-auth',inputClock:'2026-11-22T00:00:00Z'},[input('a')]);
+  w.definitions(closure.definitions,closure.cql,closure.definitionClosureSha256!,'schema-handoff',[file],closure.projection);
+  const index=JSON.parse(readFileSync(w.indexPath,'utf8'));
+  expect(index.localReview).toEqual(closure.projection);expect(validate(index).valid).toBe(true);
+  for(const mutate of [(p:any)=>delete p.executionDefinitionClosureSha256,(p:any)=>p.actions[0].kind='unknown',(p:any)=>delete p.actions[0].conditions,(p:any)=>p.mode='unknown',(p:any)=>p.actions=[]]){
+    const bad=structuredClone(index);mutate(bad.localReview);expect(validate(bad).valid).toBe(false);
+  }
+});
 
 // @kit produce-results:raw-same-call-evidence
 it('indexes exact same-call repository/native Task bytes with duplicate case-name disambiguation',()=>{

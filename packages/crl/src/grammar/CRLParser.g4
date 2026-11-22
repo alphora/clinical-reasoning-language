@@ -226,6 +226,7 @@ recommendStatement
 
 useStatement
     : USE_DECISION decisionReference
+    | USE_CANONICAL_DECISION BACKTICK_STRING
     ;
 
 // ============================

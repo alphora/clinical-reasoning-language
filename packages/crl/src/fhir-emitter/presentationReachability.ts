@@ -3,6 +3,7 @@ import type { EmittedResource } from "./types";
 import { PRESENTATION_CHOICE_GROUP_URL, type PresentationExtension } from "./presentationGroups";
 
 type Action = {
+  id?: string;
   condition?: unknown[];
   input?: { profile?: string[]; extension?: PresentationExtension[] }[];
   action?: Action[];
@@ -38,6 +39,15 @@ function merge(into: Summary, from: Summary, concurrent: boolean, site?: string)
  * Diagnostics identify defining/composing sites; shared callers do not repeat them.
  * As before, independent invocation contexts are not correlated by CQL truth. */
 export function checkPresentationReachability(resources: readonly EmittedResource[], droppedPaths: ReadonlySet<string> = new Set()): CRLError[] {
+  // REFACTOR:grounded: local handoffs contribute their own inputs, never foreign presentations.
+  const terminals = new Set<Action>();
+  for (const resource of resources) {
+    const visit = (actions: readonly Action[]) => { for (const action of actions) {
+      if (resource.sourceActions?.some(b => b.kind === 'canonical-terminal' && b.actionId === action.id && b.target === action.definitionCanonical)) terminals.add(action);
+      visit(action.action ?? []);
+    } };
+    visit((resource.resource as Plan).action ?? []);
+  }
   const plans = new Map(resources.filter(r => r.resourceType === "PlanDefinition")
     .map(r => r.resource as Plan).filter(p => p.url).map(p => [p.url!, p]));
   const profileNames = new Map(resources.filter(r => r.resourceType === "StructureDefinition")
@@ -55,7 +65,7 @@ export function checkPresentationReachability(resources: readonly EmittedResourc
     for (const [index, action] of actions.entries()) {
       const site = `${path}/${index}`, behavior = action.extension?.find(e => e.url === behaviorUrl);
       result.push(...edges(action.action ?? [], site, (behavior?.valueString ?? behavior?.valueCode)?.toLowerCase() === "any"));
-      const target = action.definitionCanonical?.split("|")[0];
+      const target = terminals.has(action) ? undefined : action.definitionCanonical?.split("|")[0];
       if (target && plans.has(target)) result.push({ target, site });
       if (first && !action.condition?.length) break;
     }
@@ -118,7 +128,7 @@ export function checkPresentationReachability(resources: readonly EmittedResourc
       merge(full, own, false);
       const behavior = action.extension?.find(e => e.url === behaviorUrl);
       merge(full, actionsSummary(action.action ?? [], site, (behavior?.valueString ?? behavior?.valueCode)?.toLowerCase() === "any"), true, site);
-      const target = action.definitionCanonical?.split("|")[0];
+      const target = terminals.has(action) ? undefined : action.definitionCanonical?.split("|")[0];
       if (target && plans.has(target)) merge(full, planSummary(target), true, site);
       else if (target?.includes("/PlanDefinition/") && !droppedPaths.has(`PlanDefinition/${target.split("/").at(-1)}.json`))
         merge(full, errorSummary(`PlanDefinition ${target} is unavailable for presentation verification at ${site}.`), false);

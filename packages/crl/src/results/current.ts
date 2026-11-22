@@ -7,9 +7,10 @@ import { buildProducerInputs } from './caseInput';
 import { readRetry, reusableCase, caseKey } from './retry';
 import { digest } from './runtimeFingerprint';
 import { suiteResultsManifestPath } from './manifest';
+import { type LocalCanonicalReviewProjection, validLocalCanonicalProjection } from './localCanonicalReview';
 
 /** Read-only, conservative freshness check. Missing/invalid output requests regeneration, never a load error. */
-export function nativeResultsCurrent(inputPath:string,definitionClosureSha256:string,planDefinitionId:string,crlVersion:string):boolean {
+export function nativeResultsCurrent(inputPath:string,definitionClosureSha256:string,planDefinitionId:string,crlVersion:string,localReview?:LocalCanonicalReviewProjection):boolean {
   try {
     const selected=resolveCelSuite(inputPath);if(!selected.ok)return false;
     const root=selected.suite.projectRoot;
@@ -18,7 +19,8 @@ export function nativeResultsCurrent(inputPath:string,definitionClosureSha256:st
       return m.schemaVersion===1 && m.celLibrary==='mv' && m.useCase==='prior-auth' && m.provenance?.crlVersion===crlVersion && Array.isArray(m.cases) && !m.cases.length;
     }
     const manifest=readRetry(root,'mv','prior-auth');
-    if(manifest.provenance.definitionClosureSha256!==definitionClosureSha256 || manifest.provenance.crlVersion!==crlVersion)return false;
+    if (localReview && (!validLocalCanonicalProjection(localReview) || localReview.sourceDefinitionClosureSha256 !== definitionClosureSha256)) return false;
+    if(manifest.provenance.definitionClosureSha256!==(localReview?.executionDefinitionClosureSha256 ?? definitionClosureSha256) || manifest.provenance.crlVersion!==crlVersion || JSON.stringify(manifest.provenance.localReview)!==JSON.stringify(localReview))return false;
     const emission=emitCelSuite(selected.suite,new Date(manifest.provenance.inputClock!));
     if(emission.result.diagnostics.some(d=>d.severity==='error'))return false;
     const built=buildProducerInputs(emission.result);if(built.diagnostics.length || built.inputs.length!==manifest.cases.length)return false;

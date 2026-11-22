@@ -4,7 +4,7 @@ import { join,resolve,relative,dirname,basename,isAbsolute,sep } from 'node:path
 import {createHash} from 'node:crypto';
 import { loadFlags,mvReviewStatus,mvFlagRevision,canonicalMvValue,qaEditFlagId,resolveImports,findProjectRoot,
   emitCrlTwoLane,writeTwoLane,definitionClosureDigest,resolveCelImports,resolveDefinedByTarget,tokenizeCEL,
-  resolveCelSuite,emitCelSuite,writeEmitResult,produceResults,nativeResultsCurrent,
+  resolveCelSuite,emitCelSuite,writeEmitResult,produceResults,nativeResultsCurrent,localCanonicalReview,
   type MvFlag,type QaEditRequest,type ProduceRequest,type ProduceOutcome } from '@smile-digital-health/crl';
 import { planPresentationEdit,planTerminologyEdit,planAnswerClassificationEdit } from '@smile-digital-health/crl/language-services';
 import { resolveWordingTarget } from './presentationProposal';
@@ -158,7 +158,8 @@ export async function runKeUpdates(input:KeUpdateInput,services:KeApplyServices)
         changedPaths:changes.map(u=>relative(root,u.path).replace(/\\/g,'/')),basis,
         refreshedFolders:['tests/results',...(cleared.length?['tests/data/fhir']:[])]};
     }
-    if(!changed().length && nativeResultsCurrent(root,digest,pd,services.crlVersion)){
+    const localReview=localCanonicalReview(emitted.fhir.resources,Object.fromEntries(emitted.cqlLibraries.map(c=>[c.outputFilename,c.cql]))).projection;
+    if(!changed().length && nativeResultsCurrent(root,digest,pd,services.crlVersion,localReview)){
       readEditTree(join(root,'tests/results'));cpSync(join(root,'tests/results'),join(stage,'tests/results'),{recursive:true});
       const manifestPath=join(stage,'tests/results/questionnaire-manifest-mv.json'),manifest=JSON.parse(readFileSync(manifestPath,'utf8'));
       retainStaticQuestionDescriptions(stage,emitted.fhir.resources.map(r=>r.resource),{manifest,manifestPath});

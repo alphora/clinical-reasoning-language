@@ -289,7 +289,8 @@ export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): S
   const leaves = new Set<string>();
   const walk = (nodes: readonly CrlStructureNode[]): void => {
     for (const n of nodes) {
-      if (n.kind === "action" && n.actionKind === "recommend-activity") leaves.add(n.nodeKey);
+      // REFACTOR:grounded: local canonical handoffs are verdict leaves; named delegation stays interior.
+      if (n.kind === "action" && (n.actionKind === "recommend-activity" || n.actionKind === 'use-canonical-decision')) leaves.add(n.nodeKey);
       walk(n.children);
     }
   };
@@ -547,10 +548,8 @@ function buildLaid(
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
     maxDepth = Math.max(maxDepth, depth);
     const structureChildren = n.children.map((c) => layoutNode(c, depth + (n.kind === "otherwise" ? 0 : 1)));
-    // when → gating concept = refKeys[0]; action → guard concept = refKeys[1] when present. refKeysOf emits exactly
-    // [target] or [target, guardConcept] for an action, so the guard is at index 1 (NOT "the last" — reading [1] makes an
-    // unexpected 3-element array fail loudly rather than silently mis-peeking). Either ref may be unresolved (refKeys are
-    // string-constructed, not index-resolved) → conceptFields drops the peek but keeps the node.
+    // A when's concept is refKeys[0]. Actions have [target, optional guard], except literal canonical terminals,
+    // which have only the optional local guard. Unresolved concept refs retain the node without a peek.
     // Only a `when` IS its concept (the box carries its border). An action's guard concept is no longer resolved here —
     // Todo 2 removed the guard peek + colors an action by its DETERMINATION target, not its guard — so resolving it would
     // be dead work (the guard stays visible in the crl pane).
@@ -584,9 +583,8 @@ function buildLaid(
     const conceptRef = n.kind === "when" && !guardOutline && n.refKeys.length === 1 ? n.refKeys[0] : undefined;
     const cf = conceptFields(conceptRef);
     const useDecision = n.kind === "action" && n.actionKind === "use-decision";
-    // #187 Todo 2b: a guarded action (`recommend X when <guard>` OR `use decision D when <guard>`) — resolve the guard
-    // concept (refKeys[1], present on ANY guarded action) for its "when …" tab.
-    const guardRef = n.kind === "action" && n.refKeys.length > 1 ? n.refKeys[1] : undefined;
+    // Canonical terminals have no foreign declaration key: their optional local guard is the first ref.
+    const guardRef = n.kind === "action" ? n.refKeys[n.actionKind === "use-canonical-decision" ? 0 : 1] : undefined;
     const gcf = guardRef !== undefined ? conceptFields(guardRef) : {};
     const guard =
       gcf.conceptKey !== undefined ? { conceptKey: gcf.conceptKey, conceptName: gcf.conceptName ?? "?", conceptLib: gcf.conceptLib ?? "", isSource: gcf.isSource ?? true } : undefined;

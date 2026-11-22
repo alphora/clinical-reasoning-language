@@ -235,6 +235,16 @@
           "description": "Policy checks can use questions with different answer sets while keeping each question's choices separate. Generated FHIR resources also preserve author contact details in the required structure."
         }
       ]
+    },
+    {
+      "version": "6.4.60",
+      "title": "Review a handoff to another policy",
+      "features": [
+        {
+          "title": "Review the local route before a policy handoff",
+          "description": "A route that hands off to another policy can end at a reference node in Medical Validation. Review its questions, flags and verdict without opening or running the other policy. Repeated routes remain separate in the Decision Table."
+        }
+      ]
     }
   ]
 }

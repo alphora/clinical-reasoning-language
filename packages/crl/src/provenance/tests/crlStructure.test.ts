@@ -105,6 +105,12 @@ function flatten(nodes: (CrlStructureNode | ViewNode)[], acc: Map<string, string
 }
 
 describe("buildCrlStructure — CRL-structure view-model (C2b-1)", () => {
+  it.each(['only when', 'unless'])('canonical action retains its local %s guard without a foreign declaration key', guard => {
+    const source = CRL.replace('recommend activity "Y" unless "G"', 'use decision canonical `https://example.org/PlanDefinition/parent` ' + guard + ' "G"');
+    const d = buildCrlStructure(graphFrom(source, CEL)).find(x => x.decision === 'D')!;
+    const action = d.children[1].children.find(x => x.actionKind === 'use-canonical-decision')!;
+    expect(action.refKeys).toEqual([nodeKey({kind:'concept',lib:'T',name:'G'})]);
+  });
   it("nodeKey parity: structure sub-node keys === index keys with a nodeId; roots === decision-decl keys", () => {
     const graph = graphFrom(CRL, CEL);
     const struct = buildCrlStructure(graph);

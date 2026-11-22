@@ -328,12 +328,21 @@ export interface UsageContext {
  * A single emitted FHIR resource. `relativePath` is appended under the
  * caller-provided `outDir` by the writer.
  */
+// REFACTOR:grounded: these bindings describe local source occurrences, not foreign definitions.
+export interface SourceActionBinding {
+  actionId: string;
+  nodeId: string;
+  kind: 'canonical-terminal' | 'local-decision';
+  target: string;
+  conditions: readonly Record<string, unknown>[];
+}
 export interface EmittedResource {
   /** Host-side source provenance; never copied into the emitted FHIR resource. */
   /** Host-only, non-enumerable provenance; do not copy wrappers with object spread to retain it. */
   readonly sourceLibraryName?: string;
   readonly sourceDecision?: import('../ast/types').Decision;
   readonly sourceConditions?: readonly import('../ast/guardDefines').SyntheticGuardDefine[];
+  readonly sourceActions?: readonly SourceActionBinding[];
   resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library" | "CodeSystem" | "StructureDefinition";
   relativePath: string;
   resource: Record<string, unknown>;

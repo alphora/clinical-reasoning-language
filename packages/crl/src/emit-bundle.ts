@@ -1,5 +1,6 @@
 import { emitCrlTwoLane } from "./emit-two-lane";
 import { buildEngineRepoBundle, cqlIndex, type RepoBundleResult } from "./results/repoBundle";
+import { localCanonicalReview, type LocalCanonicalReviewProjection } from './results/localCanonicalReview';
 
 export interface BundleDiagnostic {
   source: "emit" | "cql" | "fhir" | "bundle";
@@ -11,15 +12,16 @@ export interface DefinitionOrigin {
   canonical: string; version?: string; library: string; name: string; kind: NonNullable<import('./fhir-emitter/types').EmittedResource['sourceKind']>;
   decision?: import('./ast/types').Decision;
   conditions?: readonly import('./ast/guardDefines').SyntheticGuardDefine[];
+  actions?: readonly import('./fhir-emitter/types').SourceActionBinding[];
 }
 export type EmitCrlBundleResult =
-  | { success: true; bundle: RepoBundleResult["bundle"]; resourceCount: number; inlinedLibraries: string[]; diagnostics: BundleDiagnostic[]; definitionOrigins?: DefinitionOrigin[] }
+  | { success: true; bundle: RepoBundleResult["bundle"]; resourceCount: number; inlinedLibraries: string[]; diagnostics: BundleDiagnostic[]; definitionOrigins?: DefinitionOrigin[]; localReview?: LocalCanonicalReviewProjection }
   | { success: false; diagnostics: BundleDiagnostic[]; missingCql?: string[] };
 
 /** REFACTOR:grounded (#111): definitions-only collection using the native repository
  * composition. No patient data, static Questionnaire generation, or filesystem writes. */
-export function emitCrlBundle(filePath: string, options: NonNullable<Parameters<typeof emitCrlTwoLane>[1]> & { sourceOrigins?: boolean } = {}): EmitCrlBundleResult {
-  const { sourceOrigins, ...emitOptions } = options;
+export function emitCrlBundle(filePath: string, options: NonNullable<Parameters<typeof emitCrlTwoLane>[1]> & { sourceOrigins?: boolean; localReview?: true } = {}): EmitCrlBundleResult {
+  const { sourceOrigins, localReview, ...emitOptions } = options;
   const emitted = emitCrlTwoLane(filePath, emitOptions);
   const diagnostics: BundleDiagnostic[] = [
     ...emitted.hardErrors.map(detail => ({ source: "emit" as const, severity: "error" as const, detail })),
@@ -39,8 +41,10 @@ export function emitCrlBundle(filePath: string, options: NonNullable<Parameters<
       detail: { kind: "emit-failed", message: "The two-lane emitter refused this definition closure." } });
     return { success: false, diagnostics };
   }
+  // REFACTOR:grounded: explicit MV-only projection; ordinary bundle emission remains the delivery graph.
+  const review = localReview ? localCanonicalReview(emitted.fhir.resources, cqlIndex(emitted.cqlLibraries)) : undefined;
   const result = buildEngineRepoBundle({
-    definitions: emitted.fhir.resources.map(({ resource }) => {
+    definitions: (review?.definitions ?? emitted.fhir.resources.map(r => r.resource)).map(resource => {
       if (typeof resource.resourceType !== "string") throw new Error("Emitted definition is missing resourceType.");
       return { ...resource, resourceType: resource.resourceType };
     }),
@@ -55,7 +59,7 @@ export function emitCrlBundle(filePath: string, options: NonNullable<Parameters<
     r.sourceLibraryName && r.sourceName && r.sourceKind && typeof r.resource.url === 'string'
       ? [{ canonical: r.resource.url, ...(typeof r.resource.version === 'string' ? { version: r.resource.version } : {}),
           library: r.sourceLibraryName, name: r.sourceName, kind: r.sourceKind,
-          ...(r.sourceDecision ? { decision: r.sourceDecision, conditions: r.sourceConditions } : {}) }] : []);
-  return { success: true, bundle: result.bundle, resourceCount: result.bundle.entry.length, ...(sourceOrigins ? {definitionOrigins} : {}),
+          ...(r.sourceDecision ? { decision: r.sourceDecision, conditions: r.sourceConditions, ...(r.sourceActions?.length ? { actions: r.sourceActions } : {}) } : {}) }] : []);
+  return { success: true, bundle: result.bundle, resourceCount: result.bundle.entry.length, ...(sourceOrigins ? {definitionOrigins} : {}), ...(review?.projection ? { localReview: review.projection } : {}),
     inlinedLibraries: result.inlined, diagnostics };
 }

@@ -67,7 +67,7 @@ function graphOf(structure: readonly CrlDecisionStructure[]): Map<string, GraphN
   const graph = new Map<string, GraphNode>();
   const add = (node: CrlStructureNode, owner: string): void => {
     const delegation = node.kind === 'action' && node.actionKind === 'use-decision';
-    const recommendation = node.kind === 'action' && node.actionKind === 'recommend-activity';
+    const recommendation = node.kind === 'action' && (node.actionKind === 'recommend-activity' || node.actionKind === 'use-canonical-decision');
     graph.set(node.nodeKey, {
       key: node.nodeKey, owner, label: node.label, nodeId: node.nodeId, kind: node.kind,
       recommendation, delegation,

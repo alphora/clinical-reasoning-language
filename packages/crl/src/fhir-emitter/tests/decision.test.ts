@@ -164,6 +164,19 @@ function activity(name: string): Activity {
 
 /* ─── emitDecisionPlanDefinition — single-decision shape tests ───── */
 
+// REFACTOR:grounded: structural lowering replicates final runtime actions, preserving each source occurrence.
+describe('canonical terminal and caller IDs after compound lowering', () => {
+  it.each([false,true])('numbers final OR replicas, local delegation=%s', local => {
+    const action:Action = local ? useDec('Sub') : {type:'UseDecisionCanonical',canonical:'https://example.org/PlanDefinition/parent',location:LOC};
+    const d=decision('Top',[whenC(orC(refC('A'),refC('B')),leaf(action))]);
+    const result=emitDecisionPlanDefinition(d,'Lib',METADATA,RESOLVE_ALL,RESOLVE_ACT_OK,RESOLVE_DEC_OK,true,{clock:FIXED_CLOCK},undefined,()=>[],new Map(),undefined,()=>false,()=>undefined,undefined,[],true);
+    expect(result.errors).toEqual([]);
+    const bindings=result.resource!.sourceActions!;expect(bindings).toHaveLength(2);
+    expect(new Set(bindings.map(b=>b.actionId)).size).toBe(2);
+    expect(new Set(bindings.map(b=>b.nodeId)).size).toBe(1);
+    expect(bindings.every(b=>b.conditions.length>0&&b.actionId.length<=64)).toBe(true);
+  });
+});
 describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () => {
   it("emits Strategy profile + workflow-definition type when isRoot=true", () => {
     const d = decision("Top", [when("C", leaf(recommend("A")))]);

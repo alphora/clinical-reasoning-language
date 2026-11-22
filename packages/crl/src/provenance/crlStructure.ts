@@ -24,7 +24,7 @@ import { collectLibs, conceptDeclRef, decisionDeclRef, decisionSubNodeRef, lsLoc
 import { isStrictAncestor } from "./validators";
 
 export type CrlNodeKind = SpineNodeKind; // "when" | "otherwise" | "action"
-export type CrlActionKind = "recommend-activity" | "use-decision"; // matches the scenario VM's ActionKind vocabulary
+export type CrlActionKind = "recommend-activity" | "use-decision" | "use-canonical-decision";
 
 export interface CrlStructureNode {
   nodeKey: string;
@@ -64,11 +64,13 @@ function labelOf(kind: CrlNodeKind, node: WhenBlock | ActionStatement | { type: 
     return `when ${describeBranchCondition((node as WhenBlock).condition, getRefName)}`;
   if (kind === "otherwise") return "otherwise";
   const a = (node as ActionStatement).action;
+  // REFACTOR:grounded: expose the local canonical leaf without locating a foreign source.
+  if (a.type === "UseDecisionCanonical") return a.canonical;
   return getRefName(a.type === "RecommendActivity" ? a.activityName : a.decisionName);
 }
 
 function actionKindOf(node: ActionStatement): CrlActionKind {
-  return node.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
+  return node.action.type === "RecommendActivity" ? "recommend-activity" : node.action.type === "UseDecision" ? "use-decision" : "use-canonical-decision";
 }
 
 /** Build a referenced leaf's nodeKey — same lib/kind/name rule the indexer uses (qualified-ref lib via getRefLibrary,
@@ -150,6 +152,8 @@ function refKeysOf(
   if (kind === "otherwise") return [];
   const stmt = node as ActionStatement;
   const a = stmt.action;
+  // REFACTOR:grounded: no foreign declaration key; an authored local guard remains local.
+  if (a.type === "UseDecisionCanonical") return stmt.guard ? [refKey(stmt.guard.conceptName, "concept", decisionLib)] : [];
   const target =
     a.type === "RecommendActivity"
       ? refKey(a.activityName, "activity", decisionLib)

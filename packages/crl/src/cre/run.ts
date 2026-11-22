@@ -1693,6 +1693,8 @@ function evalBranchCondition(
 
 
 export function recName(action: ActionStatement["action"]): string {
+  // REFACTOR:grounded: the canonical labels the local handoff; no target is evaluated.
+  if (action.type === 'UseDecisionCanonical') return action.canonical;
   return action.type === "RecommendActivity"
     ? getRefName(action.activityName)
     : getRefName(action.decisionName);
@@ -1782,7 +1784,7 @@ function emitAction(
   guardInfo?: TraceNode["guard"],
 ): boolean {
   const source = spanOf(stmt.location, frame);
-  if (stmt.action.type === "RecommendActivity") {
+  if (stmt.action.type === "RecommendActivity" || stmt.action.type === 'UseDecisionCanonical') {
     const name = recName(stmt.action);
     ctx.produced.push({ recommendation: name, viaWhen, qualifier });
     into.push({

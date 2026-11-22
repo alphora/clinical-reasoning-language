@@ -68,7 +68,7 @@ import {
 // v7: unentered resolved Decision targets are deferred references, not copied subtrees.
 export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 7;
 
-type ActionKind = "recommend-activity" | "use-decision";
+type ActionKind = "recommend-activity" | "use-decision" | "use-canonical-decision";
 export type ConceptView = { name: string; libraryName?: string };
 /** A per-concept case answer (#187 Todo 2), projected from `CaseRun.conceptTruth`. `libraryName` is CONCRETE (never
  *  bare) so same-name concepts across libraries are distinct rows; a pane joins a displayed concept via
@@ -602,9 +602,9 @@ function buildActionVM(
   const t = traceIndex.get(nodeId);
   const evaluated = !!t;
   const actionRef =
-    stmt.action.type === "RecommendActivity" ? stmt.action.activityName : stmt.action.decisionName;
+    stmt.action.type === "RecommendActivity" ? stmt.action.activityName : stmt.action.type === "UseDecision" ? stmt.action.decisionName : stmt.action.canonical;
   const actionKind: ActionKind =
-    stmt.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
+    stmt.action.type === "RecommendActivity" ? "recommend-activity" : stmt.action.type === "UseDecision" ? "use-decision" : "use-canonical-decision";
   const guardedOut = t?.guardedOut === true;
 
   // REFACTOR:grounded: expand only actual delegation occurrences. Keep the original
@@ -646,7 +646,8 @@ function buildActionVM(
     ...(qualifier === "any" || qualifier === "all" ? { qualifier } : {}),
     // REFACTOR:grounded (#320, review 571): attempted work is not a valid production
     // when the case-wide error channel has invalidated the trace's action results.
-    produced: actionKind === "use-decision" ? false : evaluated && !guardedOut && !t?.invalidated,
+    // REFACTOR:grounded: a reached canonical leaf is only a local handoff, never a target outcome.
+    produced: actionKind !== "use-decision" && evaluated && !guardedOut && !t?.invalidated,
     ...(actionKind === "use-decision" ? { expanded } : {}),
     ...(deferred ? { deferred, reachableActivities } : {}),
     ...(targetSource ? { targetSource } : {}),

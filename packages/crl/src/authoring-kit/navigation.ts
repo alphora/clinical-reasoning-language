@@ -5,6 +5,7 @@ export type KitContent = Omit<AuthoringKit, "contentHash" | "navigation" | "audi
 
 /** Authored discovery terms, hashed with the kit. Retired spellings lead to current guidance. */
 const ALIASES: Record<string, string[]> = {
+  "canonical-decision-terminal": ["canonical terminal", "definitionCanonical", "external handoff", "use decision canonical", "supplemental terminal"],
   "uncertainty-guard-display": ["hide uncertainty", "uncertainty guard node", "U icon", "tree-uncertainty-guard", "uncertainty guard passes when", "passes when false", "show uncertainty check", "collapse uncertainty"],
   "patient-gender-projection": ["Patient.gender", "administrative gender", "gender source", "female", "male", "Patient demographics"],
   "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
@@ -43,6 +44,7 @@ const ALIASES: Record<string, string[]> = {
 // rule's contract. Artifact-to-rule prerequisites supply each example's context.
 // REFACTOR:grounded (#322): typed intake teaching is discoverable with its prerequisites.
 const RELATED: Record<string, string[]> = {
+  "canonical-decision-terminal": ["rule:branch-guards", "rule:cel-cases", "rule:verify-loop", "rule:produce-results"],
   "uncertainty-guard-display": ["rule:concept-presentation", "rule:selected-answer-aggregate", "rule:branch-guards", "artifact:uncertainty-reference.crl"],
   "patient-gender-projection": ["rule:concept-form", "rule:named-answer-options", "rule:publication-selection"],
   "request-code-sources": ["rule:concept-form", "rule:publication-selection"],
@@ -73,6 +75,8 @@ const RELATED: Record<string, string[]> = {
 
 /** Direct examples need their semantic guidance as well as runnable files/configuration. */
 const EXAMPLE_RULES: Record<string, string[]> = {
+  "canonical-terminal-source": ["canonical-decision-terminal"],
+  "canonical-terminal-cases": ["canonical-decision-terminal", "cel-cases"],
   "selected-answer-distinct-domains": ["selected-answer-aggregate", "named-answer-options", "publication-selection"],
   "datetime-answer": ["text-answers", "value-type", "concept-form"],
   "quantity-percent-upper-bound": ["text-answers", "publication-selection"],

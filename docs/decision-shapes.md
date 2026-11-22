@@ -1,5 +1,36 @@
 # Decision shapes — `first` / `any` / `all` / `otherwise`, branch guards, and `criterion`
 
+## Hand off to a separate policy
+
+Since CRL 6.4.60, an explicit canonical action ends a local route:
+
+```crl
+decision "Continue to parent":
+- when "Ready" then use decision canonical `https://example.org/PlanDefinition/parent`.
+```
+
+The referenced `Ready` must have a supported Boolean publication. The canonical must
+be an absolute URI, with an optional `|resource-version`. It is not a local declaration
+reference: CRL does not find or load the other artifact. Named `use decision "Local"`
+continues to resolve inside the emitted closure as before.
+
+MV reviews the reached handoff as a local terminal, including its distinct caller
+route, flags and verdict. It does not assert the parent's Met or Unmet outcome.
+Production FHIR keeps the literal `definitionCanonical`; packaging supplies or links
+the target. Direct production `$apply` without that target can fail.
+
+For local MV execution only, CRL makes a private copy omitting each explicitly bound
+canonical terminal's executable target. Local applicability remains intact. Evidence
+records both the source closure and actual execution closure hashes and exact source
+bindings. A present action without verified applicability is not a reached terminal.
+Regression and default definition emission keep ordinary production semantics.
+Selected Record per-action `only when`/`unless` guards remain unsupported; this feature
+does not extend their publication support. The authoring kit's canonical-terminal-source
+and canonical-terminal-cases examples provide the complete tested source, CEL and
+required package configuration.
+
+## Branch structure
+
 How to structure a CRL `decision`: when does a branch fire, how do multiple
 branches or actions combine, how to write a compound branch condition, how to
 name a reusable one, and how to write the catch-all. The grammar and validator

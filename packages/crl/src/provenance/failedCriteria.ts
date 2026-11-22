@@ -59,7 +59,8 @@ export interface FcViewNode {
     satisfied?: boolean;
     unknown?: true;
   };
-  action?: { actionKind: "recommend-activity" | "use-decision"; produced: boolean; deferred?: true; reachableActivities?: string[] };
+  // REFACTOR:grounded: the handoff is a local terminal for route proof, not a foreign disposition.
+  action?: { actionKind: "recommend-activity" | "use-decision" | "use-canonical-decision"; produced: boolean; deferred?: true; reachableActivities?: string[] };
   guardedOut?: boolean;
   children?: FcViewNode[];
 }
@@ -181,7 +182,7 @@ export function failedCriterionFrontier(sv: FcScenario): FailedCriterionNode[] {
       // Attribute only its demonstrated ancestor/guard blocker; never claim it produced.
       if (
         n.kind === "action" &&
-        ((n.action?.actionKind === "recommend-activity" && n.label === expectedBranch) ||
+        (((n.action?.actionKind === "recommend-activity" || n.action?.actionKind === 'use-canonical-decision') && n.label === expectedBranch) ||
           (n.action?.deferred === true && n.action.reachableActivities?.includes(expectedBranch)))
       ) {
         sites.push({ chain: nextChain, siblings: nextSiblings });

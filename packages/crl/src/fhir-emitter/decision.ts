@@ -1,4 +1,7 @@
 import { fhirContactDetails } from "./metadata";
+import { createHash } from "node:crypto";
+import { canonicalDecisionParts } from "../ast/canonicalDecision";
+import { decisionSpine } from '../ast/decisionSpine';
 import type { PresentationCatalog } from "../emit/presentation";
 import { choiceGroupExtension } from "./presentationGroups";
 /**
@@ -389,6 +392,8 @@ export function emitDecisionPlanDefinition(
   publicationGuardTarget: PublicationGuardTargetResolver = () => undefined,
   presentations?: PresentationCatalog,
   retentionSlots: readonly DecisionRetentionSlot[] = [],
+  // REFACTOR:grounded: only a closure with canonical handoffs needs caller occurrence IDs.
+  bindLocalCalls = false,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -415,6 +420,7 @@ export function emitDecisionPlanDefinition(
   // Emit each top-level branch (when/otherwise); collect surviving actions.
   const ctx: EmitCtx = {
     decisionName: decision.name,
+    bindLocalCalls,
     presentations,
     libraryName,
     canonicalBase: metadata.canonicalBase,
@@ -528,6 +534,11 @@ export function emitDecisionPlanDefinition(
       }) }] }] }));
   if (retention.length) rootActions = [...rootActions, ...retention];
 
+  // REFACTOR:grounded: structural lowering can clone a source occurrence into
+  // several actual actions. Number those final occurrences, never the template.
+  numberCanonicalActions(rootActions);
+  const sourceActions = bindSourceActions(rootActions, decision, ctx);
+
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = planDefinitionCanonicalUrl(metadata, decision.name, isRoot);
@@ -586,6 +597,7 @@ export function emitDecisionPlanDefinition(
       resource,
       sourceKind: "Decision",
       sourceName: decision.name,
+      ...(sourceActions.length ? { sourceActions } : {}),
       ...(decision.location ? { location: decision.location } : {}),
     },
     errors,
@@ -595,6 +607,7 @@ export function emitDecisionPlanDefinition(
 
 interface EmitCtx {
   decisionName: string;
+  bindLocalCalls: boolean;
   presentations?: PresentationCatalog;
   presentationCondition?: BranchCondition;
   libraryName: string;
@@ -1248,7 +1261,7 @@ function emitCompoundWhenBlock(
   if (bodyResult.kind === "suppressed") return bodyResult;
   const filled = bodyResult.actions[0]!; // body-less skeleton → exactly one action
   const bodyFields: Record<string, unknown> = {};
-  for (const k of ["definitionCanonical", "action", "extension"] as const) {
+  for (const k of ["id", "definitionCanonical", "action", "extension"] as const) {
     if (k in filled) bodyFields[k] = filled[k];
   }
 
@@ -1365,6 +1378,7 @@ function fillBranchBody(
       return { kind: "suppressed", reason: "unresolved-ref" };
     }
     action.definitionCanonical = leafResult;
+    setCanonicalActionId(action, body.action, ctx);
     return { kind: "emitted", actions: [action] };
   }
 
@@ -1531,6 +1545,7 @@ function emitBlockStatement(
     if (inputs) action.input = inputs;
   }
   action.definitionCanonical = leafResult;
+  setCanonicalActionId(action, stmt.action, ctx);
   return { kind: "emitted", actions: [action] };
 }
 
@@ -1541,6 +1556,12 @@ function emitBlockStatement(
  * side-effect). The caller decides what to do with null.
  */
 function emitLeafAction(action: Action, ctx: EmitCtx): string | null {
+  // REFACTOR:grounded: a local canonical occurrence emits the ordinary FHIR definitionCanonical.
+  if (action.type === "UseDecisionCanonical") {
+    if (canonicalDecisionParts(action.canonical)) return action.canonical;
+    ctx.errors.push({ type: "Validation", kind: "canonical-decision-reference", message: "Canonical decision requires an absolute URI, optionally followed by |version.", line: action.location.start.line, column: action.location.start.column });
+    return null;
+  }
   if (action.type === "RecommendActivity") {
     const ref = normalizeLocalRef(action.activityName, ctx.libraryName);
     const url = ctx.activityResolver(ref);
@@ -1572,8 +1593,54 @@ function emitLeafAction(action: Action, ctx: EmitCtx): string | null {
 }
 
 function actionTitle(action: Action): string {
+  if (action.type === "UseDecisionCanonical") return action.canonical;
   if (action.type === "RecommendActivity") return getRefName(action.activityName);
   return getRefName(action.decisionName);
+}
+
+/** REFACTOR:grounded: native action/resource linkage identifies a local call site, not a P clinical outcome. */
+function setCanonicalActionId(output: Record<string, unknown>, action: Action, ctx: EmitCtx): void {
+  if (action.type !== "UseDecisionCanonical" && !(action.type === 'UseDecision' && ctx.bindLocalCalls)) return;
+  output.id = actionIdPrefix(action, ctx) + '-0';
+}
+
+function actionIdPrefix(action: Action, ctx: EmitCtx): string {
+  const key = JSON.stringify([ctx.libraryName, ctx.decisionName, action.location.start.line, action.location.start.column, actionTitle(action)]);
+  return 'crl-ref-' + createHash('sha256').update(key).digest('hex').slice(0, 32);
+}
+
+// REFACTOR:grounded: join final (possibly replicated) FHIR actions to their exact local source path.
+function bindSourceActions(actions: Record<string, unknown>[], decision: Decision, ctx: EmitCtx): import('./types').SourceActionBinding[] {
+  const sources = new Map(decisionSpine(decision).flatMap(n => {
+    if (n.kind !== 'action') return [];
+    const action = (n.node as ActionStatement).action;
+    return action.type === 'UseDecisionCanonical' || (action.type === 'UseDecision' && ctx.bindLocalCalls)
+      ? [[actionIdPrefix(action, ctx), { nodeId: n.nodeId, kind: action.type === 'UseDecisionCanonical' ? 'canonical-terminal' as const : 'local-decision' as const }] as const] : [];
+  }));
+  const bindings: import('./types').SourceActionBinding[] = [];
+  const visit = (items: Record<string, unknown>[], inherited: Record<string, unknown>[] = []) => { for (const item of items) {
+    const conditions = [...inherited, ...(Array.isArray(item.condition) ? item.condition as Record<string, unknown>[] : [])];
+    const source = typeof item.id === 'string' ? sources.get(item.id.replace(/-\d+$/, '')) : undefined;
+    if (source && typeof item.id === 'string' && typeof item.definitionCanonical === 'string') bindings.push({ ...source, actionId: item.id, target: item.definitionCanonical, conditions });
+    if (Array.isArray(item.action)) visit(item.action as Record<string, unknown>[], conditions);
+  } };
+  visit(actions); return bindings;
+}
+
+function numberCanonicalActions(actions: Record<string, unknown>[]): void {
+  const counts = new Map<string, number>();
+  const visit = (items: Record<string, unknown>[]) => {
+    for (const action of items) {
+      if (typeof action.id === "string" && /^crl-ref-[a-f0-9]{32}-\d+$/.test(action.id)) {
+        const prefix = action.id.replace(/-\d+$/, "");
+        const ordinal = counts.get(prefix) ?? 0;
+        counts.set(prefix, ordinal + 1);
+        action.id = `${prefix}-${ordinal}`;
+      }
+      if (Array.isArray(action.action)) visit(action.action as Record<string, unknown>[]);
+    }
+  };
+  visit(actions);
 }
 
 /* ─── Dependency-graph walker + cycle detection ───────────────────── */

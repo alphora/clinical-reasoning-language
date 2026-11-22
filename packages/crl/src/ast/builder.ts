@@ -92,6 +92,7 @@ import {
   ActionGuardPolarity,
   RecommendActivity,
   UseDecision,
+  UseDecisionCanonical,
   Terminology,
   TerminologyValueset,
   TerminologySystem,
@@ -586,7 +587,7 @@ export class CRLAstBuilder
   visitActionStatement(ctx: ActionStatementContext): ActionStatement {
     const recStmt = ctx.recommendStatement?.();
     const useStmt = ctx.useStatement?.();
-    let action: RecommendActivity | UseDecision;
+    let action: RecommendActivity | UseDecision | UseDecisionCanonical;
     if (recStmt) {
       action = this.visitRecommendStatement(recStmt);
     } else if (useStmt) {
@@ -602,8 +603,10 @@ export class CRLAstBuilder
     return { type: "RecommendActivity" as const, activityName, location: getLocation(ctx) };
   }
 
-  visitUseStatement(ctx: UseStatementContext): UseDecision {
-    const decisionName = refFromRefContext(ctx.decisionReference());
+  // REFACTOR:grounded: retain the canonical as authored; no local name/parent resolution.
+  visitUseStatement(ctx: UseStatementContext): UseDecision | UseDecisionCanonical {
+    if (ctx.USE_CANONICAL_DECISION()) return { type: "UseDecisionCanonical", canonical: ctx.BACKTICK_STRING()!.text.slice(1, -1), location: getLocation(ctx) };
+    const decisionName = refFromRefContext(ctx.decisionReference()!);
     return { type: "UseDecision" as const, decisionName, location: getLocation(ctx) };
   }
 

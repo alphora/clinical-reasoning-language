@@ -24,7 +24,8 @@ export interface OccurrenceRef {
 /** Only these node kinds carry an occurrence flag: a `recommend activity` LEAF (the recommendation site) or a `when`
  *  CONDITION. An `otherwise` interior node, a `use decision` action, and the decision root are not occurrence targets. */
 export function isOccurrenceNode(node: CrlStructureNode): boolean {
-  return (node.kind === "action" && node.actionKind === "recommend-activity") || node.kind === "when";
+  // REFACTOR:grounded: canonical handoffs retain the same local occurrence flag controls as activity leaves.
+  return (node.kind === "action" && (node.actionKind === "recommend-activity" || node.actionKind === 'use-canonical-decision')) || node.kind === "when";
 }
 
 // A signature is stored in a `; key` field, so it must survive createFlag's field validation (no backtick/newline/`;`)
@@ -54,7 +55,7 @@ function signatureFor(node: CrlStructureNode, ancestors: readonly string[]): str
   // #224: a `when` uses its canonical guard `sigLabel` (structural, lib-qualified;
   // single-ref = `lib:Name`, byte-identical to `refSig(refKeys[0])`). Compound
   // guards keep operator + operand structure that a flat `refKeys[0]` would drop.
-  const own = node.kind === "when" ? (node.sigLabel ?? refSig(node.refKeys[0])) : refSig(node.refKeys[0]);
+  const own = node.kind === "when" ? (node.sigLabel ?? refSig(node.refKeys[0])) : node.actionKind === 'use-canonical-decision' ? sanitizeSig(`${node.lib}:canonical:${node.label}`) : refSig(node.refKeys[0]);
   if (node.kind === "when") return [...ancestors, own].join("/"); // a condition IS in its ancestor context
   return `${ancestors.length ? ancestors.join("/") : "(top)"}→${own}`; // a recommend-activity leaf: ancestors → activity
 }

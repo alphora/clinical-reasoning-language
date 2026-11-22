@@ -25,6 +25,7 @@ export interface BatchEvidenceIndex {
   schemaVersion: 1; operation: 'emit_results'; batchId: string; state: 'running' | 'finished'; complete: boolean;
   producerVersion: string; suite: string; useCase: string; inputClock: string;
   definitionClosureSha256?: string; runtimeSha256?: string; planDefinitionId?: string;
+  localReview?: import('./localCanonicalReview').LocalCanonicalReviewProjection;
   runtime?: Record<string, unknown>; limits: { artifactBytes: number; batchBytes: number }; files: Record<string, EvidenceFile>;
   cases: BatchEvidenceCase[]; errors: string[];
 }
@@ -104,9 +105,10 @@ export class BatchEvidenceWriter {
     writeFileSync(temporary, bytes, { flag: 'wx', mode: 0o600 }); renameSync(temporary, this.indexPath);
     this.totalBytes -= this.indexBytes; this.indexBytes = bytes.length; this.indexHash = hash(bytes);
   }
-  definitions(definitions: unknown[], cql: Record<string, string>, definitionClosureSha256: string, planDefinitionId: string, sourceFiles: string[]) {
+  definitions(definitions: unknown[], cql: Record<string, string>, definitionClosureSha256: string, planDefinitionId: string, sourceFiles: string[], localReview?: import('./localCanonicalReview').LocalCanonicalReviewProjection) {
     this.safe(() => {
       this.index.definitionClosureSha256 = definitionClosureSha256; this.index.planDefinitionId = planDefinitionId;
+      if (localReview) this.index.localReview = localReview;
       this.index.files.definitions = this.json('definitions.json', definitions);
       this.index.files.cql = this.json('cql.json', cql);
       this.index.files.sources = this.json('source-hashes.json', [...new Set(sourceFiles)].map(file => {

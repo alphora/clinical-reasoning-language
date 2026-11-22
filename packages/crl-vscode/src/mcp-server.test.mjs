@@ -181,8 +181,8 @@ check("authoring_kit full exports all 22 artifacts and determination guidance", 
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.view, "full");
     assert.equal(kit.complete, true);
-  assert.equal(kit.schemaVersion, "2.51");
-  assert.equal(kit.contentHash, "e96469532e1a4bc9922c78ab6f9fa1a9a7978172913d2a427bae3931208e9d31");
+  assert.equal(kit.schemaVersion, "2.52");
+  assert.equal(kit.contentHash, "0fd2f69ec781b3aa0c315fd1a60d55cbf01d8f554b2238e019b4cfb4c25be738");
     assert.equal(kit.fullContentHash, kit.contentHash);
     assert.equal(kit.referenceArtifacts.length, 24);
     assert.equal(kit.dispositionModel.categories.length, 3);

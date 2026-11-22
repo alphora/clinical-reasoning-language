@@ -4,6 +4,7 @@ import path from "node:path";
 import type { ProducerManifest, ProducerCaseEntry } from "./manifest";
 import { suiteResultsManifestPath } from "./manifest";
 import type { ProducerCaseInput } from "./caseInput";
+import { validLocalCanonicalProjection } from './localCanonicalReview';
 
 const fail = (why: string): never => { throw new Error("Cannot retry: " + why + ". Run once without retry to produce a compatible manifest."); };
 const hash = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
@@ -56,6 +57,7 @@ export function readRetry(root: string, purpose: "mv" | "regression", useCase: s
   try { m=JSON.parse(readFileSync(file,"utf8")); } catch { return fail("missing or unreadable manifest"); }
   if (!m || m.schemaVersion!==1 || m.celLibrary!==purpose || m.useCase!==useCase || !Array.isArray(m.cases) ||
       !timestamp(m.provenance?.inputClock) || !m.provenance.runtimeSha256 || !m.provenance.definitionClosureSha256) return fail("manifest lacks compatible provenance");
+  if (m.provenance.localReview !== undefined && (purpose !== 'mv' || !validLocalCanonicalProjection(m.provenance.localReview) || m.provenance.localReview.executionDefinitionClosureSha256 !== m.provenance.definitionClosureSha256)) return fail('invalid local review projection');
   const seen=new Set<string>();
   for (const c of m.cases) {
     if (!c || typeof c.caseName!=="string" || typeof c.sourceFile!=="string" || typeof c.compartmentDir!=="string" ||
