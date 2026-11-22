@@ -2,6 +2,6 @@
   "auditedRevision": "f963a7b3b1d228fdd72da3d532130e8d69cfd1db",
   "auditedSchemaVersion": "2.50",
   "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
-  "scope": "Schema2.50 unchanged-content maintenance through Codify-owned Nautilus log reader. Complete delta from613aa395 classified in coverage.md, including prior audit metadata. Primary configured qa output and bounded standalone package/watch repairs are read-only UI behavior; no authoring-kit content, language, emitter, native runtime or engine change. Historical release evidence remains tied to its actual source. Source, installed-artifact, producer adoption and staging acceptance are separate proof tiers.",
+  "scope": "Schema 2.50 unchanged-content maintenance through Codify-owned Nautilus log reader. Complete delta from613aa395 classified in coverage.md, including prior audit metadata. Primary configured qa output and bounded standalone package/watch repairs are read-only UI behavior; no authoring-kit content, language, emitter, native runtime or engine change. Historical release evidence remains tied to its actual source. Source, installed-artifact, producer adoption and staging acceptance are separate proof tiers.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
