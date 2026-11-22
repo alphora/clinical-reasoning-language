@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "1259ad5e1fb1ae9631d652a401a02643163fec06",
+  "auditedRevision": "15a5977fd1921db279cb8e6944dbb90f4d664e1c",
   "auditedSchemaVersion": "2.51",
   "auditedContentHash": "e96469532e1a4bc9922c78ab6f9fa1a9a7978172913d2a427bae3931208e9d31",
-  "scope": "Complete21-path interval from76167ee4 through1259ad5e classified in coverage ledger: FHIR R4 author contact representation, generic aggregate target-union admission with each operand own-domain interpretation/errors, shared synthetic teaching and discovery. Six contact variants and28 union cases individually dispositioned;93 focused/240kit/744emitter checks plus strict parser controls and12 genuinely new available-value native cases. Ordinary shared-domain output and40-resource closure retained. Separate final source/archive/package/production gates remain; no parent discovery or standalone-source production qualification claimed.",
+  "scope": "Complete21-path interval from76167ee4 through1259ad5e classified in coverage ledger: FHIR R4 author contact representation, generic aggregate target-union admission with each operand own-domain interpretation/errors, shared synthetic teaching and discovery. Six contact variants and28 union cases individually dispositioned;93 focused/240kit/744emitter checks plus strict parser controls and12 genuinely new available-value native cases. Ordinary shared-domain output and40-resource closure retained. Separate final source/archive/package/production gates remain; no parent discovery or standalone-source production qualification claimed. Subsequent four-path metadata/test interval1259ad5e..15a5977f reviewed: audit/ledger and two actual MCP schema/hash expectations corrected to2.51/e964. No product code or kit content changed; successful full core5913 checks retained, MCP and extension checks resumed explicitly.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

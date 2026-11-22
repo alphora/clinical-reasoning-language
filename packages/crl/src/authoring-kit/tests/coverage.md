@@ -3006,3 +3006,5 @@ Original frozen20/9 and224 reference artifacts remain untouched. Pipeline owns f
 ### Post-audit MCP identity pins (2026-11-22)
 
 Two actual MCP integration checks retained the old2.50/c90 identity in JavaScript: src/cli/tests/run-mcp-server.test.mjs and crl-vscode/src/mcp-server.test.mjs. Updated only expected schema/hash to reviewed2.51/e964; production/compiler/fixture/asserted kit contents unchanged. Not new author-facing behavior. Full core359suites5913PASS/33skip before the CLI MCP identity assertion failed; preserve that full log and successful core evidence. Re-run both actual MCP entry checks and the remaining full extension suite, without treating the failed wrapper invocation as a full pass. No engine/policy evaluation replay.
+
+Audit maintenance target `15a5977fd1921db279cb8e6944dbb90f4d664e1c`, baseline `1259ad5e1fb1ae9631d652a401a02643163fec06`: complete four-path interval contains audit.json, this ledger and the two JavaScript MCP test pins listed above. All classified as metadata/test-only; kit2.51 content e9646953 unchanged. This stamp is not final suite or deployment acceptance.
