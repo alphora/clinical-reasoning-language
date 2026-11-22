@@ -8,7 +8,7 @@ const ALIASES: Record<string, string[]> = {
   "uncertainty-guard-display": ["hide uncertainty", "uncertainty guard node", "U icon", "tree-uncertainty-guard", "uncertainty guard passes when", "passes when false", "show uncertainty check", "collapse uncertainty"],
   "patient-gender-projection": ["Patient.gender", "administrative gender", "gender source", "female", "male", "Patient demographics"],
   "request-code-sources": ["ServiceRequest code", "MedicationRequest", "source-only request", "requested service"],
-  "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers", "uncertainty check", "computed guard", "uncertain assume yes", "uncertain assume no"],
+  "selected-answer-aggregate": ["any of", "any available value of", "terminal uncertainty", "available answers", "uncertainty check", "computed guard", "distinct domains", "union domains", "different answer sets", "uncertain assume yes", "uncertain assume no"],
   "interactive-questionnaire": ["interactive testing", "request-bundle.json", "Start Continue Reset", "prune answers"],
   "native-apply-session": ["applySession", "crl-apply-session", "buildSessionResponse", "edits-only", "clear answer", "session API", "--serve", "reusable JVM", "warm JVM", "NDJSON", "createNativeWorkerPool", "runJob", "setWorkerLimit", "worker pool", "independent sessions"],
   "fhir-packaging": ["FHIR npm package", "emit_crl_bundle", "emitCrlBundle", "definitions-only Bundle", "CRMI package", "package_fhir", "crl-package-fhir", "ImplementationGuide", "package manifest", "packageId", "fhirDependencies"],
@@ -73,6 +73,7 @@ const RELATED: Record<string, string[]> = {
 
 /** Direct examples need their semantic guidance as well as runnable files/configuration. */
 const EXAMPLE_RULES: Record<string, string[]> = {
+  "selected-answer-distinct-domains": ["selected-answer-aggregate", "named-answer-options", "publication-selection"],
   "datetime-answer": ["text-answers", "value-type", "concept-form"],
   "quantity-percent-upper-bound": ["text-answers", "publication-selection"],
   "quantity-ms-lower-bound": ["text-answers", "publication-selection"],

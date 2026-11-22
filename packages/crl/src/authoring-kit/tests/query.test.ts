@@ -54,7 +54,8 @@ describe("one authoring kit: discovery and complete guidance", () => {
     expect(overview.index).toEqual(kit.navigation);
     expect(JSON.stringify(overview.introduction).length).toBeLessThan(7000);
     // Two shared numeric-threshold examples and their unit aliases extend the complete index by <1KB.
-    expect(JSON.stringify(overview).length).toBeLessThan(40000);
+    // The additional distinct-domain example and aliases keep the complete index under 41 KB.
+    expect(JSON.stringify(overview).length).toBeLessThan(41000);
     const fullSize = JSON.stringify(query({ view: "full" })).length;
     for (const id of ["rule:criterion", "rule:decision-composition"]) {
       expect(JSON.stringify(query({ view: "entry", id })).length, id).toBeLessThan(fullSize / 2);

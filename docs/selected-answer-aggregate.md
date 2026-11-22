@@ -11,7 +11,7 @@ concept "Route Answers Flagged":
 - shape reduction is most recent.
 ```
 
-Ordinary `any of` lists two or more distinct selected Record/Observation/CodeableConcept operands. `any available value of` accepts one or more. Each operand must declare a finite interpreted value domain. The finite predicate terminology must be contained in every operand's domain. The explicit validity anchor must resolve to a listed operand. Qualified references retain their declaring library's identity.
+Ordinary `any of` lists two or more distinct selected Record/Observation/CodeableConcept operands. `any available value of` accepts one or more. Each operand must declare a finite interpreted value domain. Every finite predicate code must belong to at least one operand's finite domain. Each selected input is still interpreted only against its own domain; target sets may span distinct systems and codes while the questions retain their original answer sets. A value recognized only by another operand is an error, including beside a positive sibling. Union-domain target admission requires CRL6.4.59 or later. The explicit validity anchor must resolve to a listed operand. Qualified references retain their declaring library's identity.
 
 Every selected operand is interpreted before reducing the result. Any member gives true; all selected, interpretable nonmembers give false; otherwise the result is null. A selected record without a value is unknown, as is a missing selected record. Selection errors, uninterpretable values and contradictory recognized codings remain errors even beside a true member.
 

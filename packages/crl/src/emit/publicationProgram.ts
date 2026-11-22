@@ -441,8 +441,10 @@ export function preparePublicationProgram(declarations: PublicationContext): Pub
         if (validityOperand < 0) return fail("Aggregate validity must name one of its resolved operands.", aggregate.validity.location, "publication-validity-operand-unsupported");
         const qualifying = finiteTerminology(library.sourceIdentity, aggregate.terminology.value, aggregate.terminology.location).codes;
         const domains = inputs.map(p => p.valueDomain!);
-        if (domains.some(domain => qualifying.some(code => !domain.some(d => publicationCodeKey(d) === publicationCodeKey(code)))))
-          return fail("Every qualifying code must belong to every operand domain.", aggregate.terminology.location, "publication-membership-domain-coverage");
+        // REFACTOR:grounded — admit targets across the union; interpretation still uses each input's own domain.
+        const domainKeys = new Set(domains.flatMap(domain => domain.map(publicationCodeKey)));
+        if (qualifying.some(code => !domainKeys.has(publicationCodeKey(code))))
+          return fail("Every qualifying code must belong to at least one operand domain.", aggregate.terminology.location, "publication-membership-domain-coverage");
         producer = Object.freeze({ kind: "anyMembership", availableValuesOnly: aggregate.availableValuesOnly,
           producerId: `crl:producer:v1:${encodeURIComponent(JSON.stringify([...portableTuple, [aggregate.availableValuesOnly ? "anyAvailableMembership" : "anyMembership", 0]]))}`,
           operands: Object.freeze(inputs.map(p => p.identity)), domains: Object.freeze(domains), qualifying: normalized(qualifying), validityOperand });
