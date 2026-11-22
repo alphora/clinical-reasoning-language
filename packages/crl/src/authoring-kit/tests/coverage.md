@@ -2945,3 +2945,59 @@ Baseline `07f0502870c48f7e6632a5c4798ff07163a7d52a`; reviewed content target `76
 The implementation validates the full combined inventory before selecting generated support, preserving ordinary emission, component captures, retained references, all CQL and supporting profiles/terminology. It adds no language syntax or authoring operation, so existing concept, publication and verification guidance remains sufficient. Prior audit/ledger changes are metadata only. Pending release notes/versions and SDK documentation clarify availability, independent P/S review/production use, optional package-time linking and MV terminal-only scope; no origin/discovery requirement.
 
 Meaningful RED reproduced the unused two-resource output; owning26 tests, core build and typecheck pass. Native1548 plan Refine1 (no-Decision component guard; the initial externally-bound helper example was unsupported), then0C0I0N. Native1549 code0C0I0N converged; external waived. Actual unpublished installed SDK candidate ba4d0aeac10ee576ad8af6d732a01d9787fe31c3bbcc199a0cb8fbe965a59280 invokes all four APIs and compiles public types. Actual40FHIR resources equal the old42 except precisely the unused supplemental EIU recommendation/AD; all13CQL and retained resources match, and referenced parent EIU remains. Original42-resource native20/9 remains reference evidence only. Pipeline owns the newly sealed/mapped/extracted archive20/9 and KELP owns baseline plus five refusal checks. Standalone source placeholders and distinct-domain production uncertainty remain explicit gaps, not behavior certified by this audit. No old native evaluations rerun. Final59 source suite, installed archives and deployed UI acceptance remain separate.
+
+
+## Contact metadata and union-domain aggregate maintenance (2026-11-22)
+
+Baseline `76167ee493107189c2565e664b321837c7402cb2`; target `1259ad5e1fb1ae9631d652a401a02643163fec06`. Complete interval: 21 paths:
+
+- `docs/selected-answer-aggregate.md`
+- `packages/crl/src/authoring-kit/aggregateDomainExample.ts`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/index.ts`
+- `packages/crl/src/authoring-kit/navigation.ts`
+- `packages/crl/src/authoring-kit/tests/authoring-kit.test.ts`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+- `packages/crl/src/authoring-kit/tests/query.test.ts`
+- `packages/crl/src/emit/publicationProgram.ts`
+- `packages/crl/src/emit/tests/publicationUnionDomains.test.ts`
+- `packages/crl/src/fhir-emitter/activity.ts`
+- `packages/crl/src/fhir-emitter/codeSystem.ts`
+- `packages/crl/src/fhir-emitter/decision.ts`
+- `packages/crl/src/fhir-emitter/library.ts`
+- `packages/crl/src/fhir-emitter/metadata.ts`
+- `packages/crl/src/fhir-emitter/namedAnswerSet.ts`
+- `packages/crl/src/fhir-emitter/recommendation.ts`
+- `packages/crl/src/fhir-emitter/structureDefinition.ts`
+- `packages/crl/src/fhir-emitter/tests/contactMetadata.test.ts`
+- `packages/crl/src/fhir-emitter/types.ts`
+- `packages/crl/src/fhir-emitter/valueSet.ts`
+
+
+| Changed scope | Disposition and owning evidence |
+|---|---|
+| Prior audit.json / coverage.md | Not author-facing: preceding bounded closure audit and ledger only. |
+| Eight FHIR emitters, metadata.ts helper and types.ts | Not author-facing language semantics: preserve normalized npm author points and publisher, emit FHIR R4 ContactDetail.telecom rather than malformed flattened ContactPoint. All ten assignments inspected. Existing package FHIR wrapper remains unchanged to avoid double-wrapping. |
+| contactMetadata.test.ts: named URL | Existing guidance sufficient: author string preserved, URL contact wrapped, six resource kinds plus owned AnswerOptions and ReferenceStubCodeSystem covered. |
+| Same: name + email + URL | Existing guidance sufficient: both contact points and publisher retained. |
+| Same: object name/email/URL | Existing guidance sufficient: object metadata normalization and emitted contact values retained. |
+| Same: email-only | Existing guidance sufficient: unknown publisher and supplied email retained. |
+| Same: Pipeline Integration Tests (synthetic) | Existing guidance sufficient: exact caller author preserved, no replacement URL or deletion to evade parser. |
+| Same: no author | Existing guidance sufficient: unknown publisher, contact omitted; original no-author output unaffected. |
+| publicationProgram.ts aggregate admission | Kit updated: selected-answer-aggregate now admits each target system/code from at least one operand domain; each input retains its own domain. Both ordinary and available forms use the same existing producer. Unary membership remains unchanged. |
+| publicationUnionDomains.test.ts nine value rows x both forms =18 | Kit updated: shared pure synthetic aggregateDomainSource supplies Request preferredA/nonpreferredB/nonpreferredC, Dose valid10/valid20/otherDose, distinct systems and union target. B/C/other yield true, both valid nonmembers false; missing is ignored only by available form, ordinary remains unknown where necessary. Ordered domain membership and authored anchor validity asserted. |
+| Same: clear x2 | Existing guidance sufficient: explicit valueless anchor retains its actual validity, available false versus ordinary unknown. |
+| Same: invalid input in both operand orders x2 forms =4 | Kit updated: own-domain errors survive a positive sibling, including after reversed source operand preparation. No union of question choices. |
+| Same: coding interpretation x2 | Existing guidance sufficient: wrong system errors, harmless foreign translation beside recognized coding ignored, conflicting recognized classifications error. |
+| Same: public emission/outside-union refusal x2 | Kit updated: both public forms emit separate original answer ValueSets, and a target absent from the complete union still fails publication-membership-domain-coverage. |
+| aggregateDomainExample.ts / index.ts / navigation.ts | Kit updated to2.51, hash e96469532e1a4bc9922c78ab6f9fa1a9a7978172913d2a427bae3931208e9d31. Canonical rule and version availability6.4.59 corrected; complete runnable synthetic example shares exact owning source. Distinct-domain aliases and owning-rule prerequisites added. |
+| authoring-kit.test.ts / query.test.ts | Not new language behavior: current schema/hash pins and complete bounded index. New complete example/aliases increases overview to40370bytes; bound41000 retains introduction/index completeness and relative-to-full limits. |
+| docs/selected-answer-aggregate.md | Kit updated: generic target union rule reconciled. Earlier worked shared-domain uncertainty example remains factually valid. |
+
+No tags removed. Added owning tag selected-answer-aggregate:union-domains; unchanged aggregate and unary owning tags retain their assertions. New contact cases are explicit metadata representation checks; no clinical doctrine is inferred. No source policy, Boolean producer, syntax, runtime engine, question choices, selection or retention contract changes.
+
+Evidence: contact meaningful RED5failed/1passed, GREEN71focused plus41emitter suites744PASS, core build/typecheck; native1551plan0 and1552code Accept1/Refine0/Reject0 then0findings. Actual installed SDK1dff3e0... preserves40FHIR/13CQL no-author parity and all four public API/types. Exact author-bearing copied inputs emit40wrapped contacts with unchanged13CQL; independently hashed pinned engine2ee7 strict R4 wholeBundle PASS while flattened-contact control FAILS. Parse-only, zero clinical evaluations for contact fix.
+
+Union evidence: source admission RED reproduced then93aggregate/unary focused checks PASS; kit240PASS; fresh final core build/typecheck PASS. Native1553plan0/1554code0. Installed SDK33b6085... actual12 NEW available-value cases PASS: B, C, Other, valid10, valid20, absent, valueless, harmless foreign translation, foreign-only value before and after a positive, wrong system and conflicting coding. Each raw artifact hash checked; error controls specifically require native-error and publication-uninterpretable-value or publication-ambiguous-coded-value, no actions, so timeout is not a passing error. Corrected harness recognizes retained supplied slots and checks absent questions are not gathered. Already successful raw B reused after checker correction; no evaluation rerun merely for evidence. No native proof of a new ordinary-form session or customer policy is claimed; ordinary source/producer behavior is tested and CQL helpers unchanged.
+
+Original frozen20/9 and224 reference artifacts remain untouched. Pipeline owns fresh actual extracted linked-package20/9 following unchanged-input re-emission and normal KELP packaging. Standalone supplemental source/production dependency handling (including current test placeholder), optional package composition and MV canonical-terminal admission remain separate unqualified work, not capabilities certified by these checks. Full source suite, final audited archives/install/MCP/UI/CI/publication remain release gates.

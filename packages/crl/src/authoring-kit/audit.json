@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "76167ee493107189c2565e664b321837c7402cb2",
-  "auditedSchemaVersion": "2.50",
-  "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
-  "scope": "Schema 2.50 unchanged-content maintenance through bounded external-decision support closure. Complete five-path interval from 07f050287 inspected: three compiler/test paths plus prior audit metadata. All seven additional parameterized cases individually classified in coverage.md. No CRL syntax, concept value, answer-domain, selection, question or ordinary no-bindings emission change. Corrected SDK output drops only unused generated recommendation/activity resources after complete validation; actual retained40FHIR/13CQL parity verified. Independent artifacts, optional package linking and ordinary MV canonical-terminal admission remain distinct responsibilities. Final installed release, mapped/extracted package and production acceptance are separate gates.",
+  "auditedRevision": "1259ad5e1fb1ae9631d652a401a02643163fec06",
+  "auditedSchemaVersion": "2.51",
+  "auditedContentHash": "e96469532e1a4bc9922c78ab6f9fa1a9a7978172913d2a427bae3931208e9d31",
+  "scope": "Complete21-path interval from76167ee4 through1259ad5e classified in coverage ledger: FHIR R4 author contact representation, generic aggregate target-union admission with each operand own-domain interpretation/errors, shared synthetic teaching and discovery. Six contact variants and28 union cases individually dispositioned;93 focused/240kit/744emitter checks plus strict parser controls and12 genuinely new available-value native cases. Ordinary shared-domain output and40-resource closure retained. Separate final source/archive/package/production gates remain; no parent discovery or standalone-source production qualification claimed.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
