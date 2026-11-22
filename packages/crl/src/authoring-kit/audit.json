@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "e06004cc63d5014bf8201fb21819ecd93ba7b529",
+  "auditedRevision": "1884b58c3c4feae542dfa2328ac1df8fbafaddbb",
   "auditedSchemaVersion": "2.50",
   "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
-  "scope": "Schema 2.50 unchanged-content maintenance through reviewed MV fix-log reader, read-only report opening, navigation/disclosure preservation and release notes. Complete 29-path delta from22ae27ac64d55aa0024e5c92ad8e32abb7bcebeb classified in coverage.md; no canonical kit, language or native runtime change. Source, archive, installed and retained native/Linux proof tiers remain separate.",
+  "scope": "Schema 2.50 unchanged-content maintenance through the corrected Nautilus log reader, configured MV location, standalone F5 support, stable policy tokens, filesystem availability refresh and theme-accent toolbar headings. Complete 22-path interval from e06004cc63d5014bf8201fb21819ecd93ba7b529 classified in coverage.md. No canonical kit, language, native runtime or engine change. Installed/archive/CI/publication and Pipeline producer adoption remain separate proof tiers.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }

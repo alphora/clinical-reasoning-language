@@ -2815,11 +2815,11 @@ Completed MV-reader maintenance binding: baseline 22ae27ac64d55aa0024e5c92ad8e32
 Inventory clarification: the29 committed paths are the complete delta from audited22ae through e06004, not merely the new changes after release55. The four manifest/lock paths already changed54-to55 in that interval; their later55-to56 changes remain pending version-only metadata. The audit path already changed2.49-to2.50 in the prior55 stamp. questionnaire-default.png was added by release55; mv-fix-log.png is the new release56 image. Exact Git comparison and these committed before/after identities independently verify all29paths; no working-tree addition is being counted as a committed path.
 
 
-Nautilus-log correction (operator requested): reader/UI guidance belongs to MV; configured medical-validation folder owns nautilus-log.md, and standalone F5 examples use the local medical-validation folder. Every-run producer coordination is owned by Pipeline. Button remains first in Actions, present histories glow gold, absence is ordinary information. Policy-scoped log tokens and filesystem availability refresh are UI mechanics, not authoring-kit language semantics. The Bleph sample log is explicitly synthetic and makes no run/evaluation/approval claim. Current correction qualification and final audit binding remain pending; release56 historical evidence does not qualify this later behavior.
+Nautilus-log correction (operator requested): reader/UI guidance belongs to MV; configured medical-validation folder owns nautilus-log.md, and standalone F5 examples use the local medical-validation folder. Every-run producer coordination is owned by Pipeline. Button remains first in Actions, present histories glow gold, absence is ordinary information. Policy-scoped log tokens and filesystem availability refresh are UI mechanics, not authoring-kit language semantics. The Bleph sample log is explicitly synthetic and makes no run/evaluation/approval claim. Correction qualification is recorded below; release56 historical evidence does not qualify this later behavior.
 
 ## Nautilus log correction maintenance for release 6.4.57
 
-Baseline e06004cc63d5014bf8201fb21819ecd93ba7b529; reviewed target binding follows the content commit. The complete delta includes the prior release56 audit/coverage stamp and lockstep version metadata, plus the reader/UI changes classified here. Canonical kit schema2.50 and contentHash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7 remain unchanged.
+Baseline e06004cc63d5014bf8201fb21819ecd93ba7b529; reviewed target 1884b58c3c4feae542dfa2328ac1df8fbafaddbb. The complete delta includes the prior release56 audit/coverage stamp and lockstep version metadata, plus the reader/UI changes classified here. Canonical kit schema2.50 and contentHash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7 remain unchanged.
 
 - Resolver and host cases: configured medical-validation/nautilus-log.md, standalone F5 local MV discovery, missing and malformed states, path safety, byte preservation, stable policy token through render-before-click, asynchronous retarget and explicit stale/busy notices. Not author-facing: filesystem/UI admission, with no authored language or native evaluation change.
 - New nautilusLogState cases: cached status, token identity, package/config repair, disposal, current artifact scope and containing-folder-only deletion/creation. Not author-facing: availability mechanics; directory-only regression demonstrably failed before the fix.
@@ -2828,3 +2828,32 @@ Baseline e06004cc63d5014bf8201fb21819ecd93ba7b529; reviewed target binding follo
 - Release catalog/README/nautilus-log.png, manifest/lock and audit metadata: reviewed notes, real synthetic screenshot and delivery identities; no language teaching changes. Existing ApplyDriver/ApplyWorker/engine and results runtime retain their independent proof tiers.
 
 Plan1534/code1535 record dispositions. External code review produced no assessment before turn-budget exhaustion; operator explicitly waived further external review. Native code follow-up and required source/archive/installed gates are recorded separately; no inherited release56 source pass qualifies this changed reader.
+
+Completed correction maintenance binding: target1884b58c3c4feae542dfa2328ac1df8fbafaddbb, unchanged schema2.50/contentHash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7. Native code round2 converged0C0I0N after accepted folder-event finding; external follow-up explicitly waived by operator. Five affected source suites51PASS/1Windows file-symlink privilege skip, complete-shell browser five widths PASS, initial fresh57core/extension build/typechecks PASS. The focused suites reused that just-built unchanged core while the complete npm suite ran independently; they did not claim a second fresh build. No @kit owning assertion/tag changed; the entire core delta is metadata/ledger. Full release suite, installed archives and publication remain separate required gates.
+
+Complete committed22-path interval inventory:
+
+- `docs/medical-validation-toolbar.md`
+- `docs/mv-fix-log.md`
+- `examples/bleph-medical-validation/README.md`
+- `examples/bleph-medical-validation/src/medical-validation/nautilus-log.md`
+- `package-lock.json`
+- `package.json`
+- `packages/crl-vscode/media/release-notes/README.md`
+- `packages/crl-vscode/media/release-notes/catalog.json`
+- `packages/crl-vscode/media/release-notes/nautilus-log.png`
+- `packages/crl-vscode/package.json`
+- `packages/crl-vscode/src/correspondenceCockpit.ts`
+- `packages/crl-vscode/src/mvReprocessLog.test.mjs`
+- `packages/crl-vscode/src/mvReprocessLog.ts`
+- `packages/crl-vscode/src/mvReprocessLogHost.test.mjs`
+- `packages/crl-vscode/src/mvTreeChrome.test.mjs`
+- `packages/crl-vscode/src/mvTreeChrome.ts`
+- `packages/crl-vscode/src/nautilusLogState.test.mjs`
+- `packages/crl-vscode/src/nautilusLogState.ts`
+- `packages/crl-vscode/test/mvTreeChrome.browser.cjs`
+- `packages/crl/package.json`
+- `packages/crl/src/authoring-kit/audit.json`
+- `packages/crl/src/authoring-kit/tests/coverage.md`
+
+Pending57 lockstep version/lock metadata is classified separately from this committed target; no implementation is being counted as an unstated audited SHA.
