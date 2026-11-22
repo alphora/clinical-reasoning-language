@@ -1,27 +1,27 @@
-# MV fix log
+# Nautilus log
 
-Medical Validation's Actions includes **MV fix log**. It opens the selected artifact's running agent report in a locked Markdown preview. The file also uses the existing exact-file editor read-only setting, so switching from preview to its source keeps that editor read-only. This may add the file to the workspace's `files.readonlyInclude` configuration; it does not change filesystem permissions or prevent an authoring process from appending the log. Unsaved editor changes or a matching `files.readonlyExclude` prevent opening it this way.
+**Nautilus log** is the first item in Medical Validation's Actions. It stays visible and glows gold when a log is present. Its tooltip also describes availability. Clicking it opens a locked, read-only Markdown preview. If no log exists, it explains that no Nautilus log has been delivered for the policy yet. Reading a log does not mark a flag Fixed or Approved, paint a verdict, change source, or qualify an evaluation.
 
-The report is an agent assessment. Reading it does not mark a flag Fixed or Approved, paint a human verdict, change the source, or qualify an evaluation. KELP's Re-process Notes remain separate operator instructions in the artifact issue journal.
+## File location and ownership
 
-## File contract
-
-Find the policy's `kelp.project.json` and require a managed artifact under that project's `artifacts/` directory, then the unique `project.structure.entities` row whose `key` is `qa`. The report is at:
+For a managed artifact, use the unique `project.structure.entities` row whose `key` is `medical-validation` in `kelp.project.json`:
 
 ```text
-<artifact>/<configured qa folder>/reprocess-log.md
+<artifact>/<configured medical-validation folder>/nautilus-log.md
 ```
 
-For a configuration with `key: "qa", folder: "tests"`, this is `tests/reprocess-log.md` relative to the artifact. The reader does not guess a `src/qa` folder or substitute a differently named entity. It inspects only this location mapping; it does not validate the full KELP graph or require mutation permissions, locks or an unpublished artifact.
+For `key: "medical-validation", folder: "src/medical-validation"`, the file is `src/medical-validation/nautilus-log.md` relative to the artifact. The reader follows that configured folder for this log only; it does not change other MV stores or project configuration. Missing or ambiguous mappings explain the limitation. No QA-folder fallback is used.
 
-The reader requires the `qa` row. A project whose `tests` folder belongs to a differently named entity remains valid but cannot use this reader yet; ask Pipeline to arrange the supported mapping with the project owner. The action explains this as information and does not change the configuration.
+Standalone local examples without a KELP project use `<policy src>/medical-validation/nautilus-log.md`. The Bleph F5 example includes a clearly marked synthetic log for testing the reader. Its entries are demonstration content, not evidence of executed authoring or evaluation.
 
-The log is artifact-wide. Entries identify their policy, run, baseline and current candidate so multiple policies or re-authoring runs remain distinguishable. Pipeline owns the content: save the same final MV-fix report section, append new entries while preserving history, and avoid duplicating an entry for a repeated no-change Finalize. Include the log in the normal QA delivery inventory and preserve it across output generation. Record actual Before/After, the source-based ruling, the selected flag or explicit clarification supporting the change, retained/retired review context and checks not run. An unimplemented request carries its actual reason. Do not invent execution evidence or human approval.
+Pipeline owns the producer. Every Nautilus run contributes an entry at the existing delivery boundary, preserving history and human MV records. Entries identify the policy, run, baseline and candidate; describe the requested work, actual changes or reason for nonimplementation, and checks actually run. They never invent execution evidence or human approval. Older policies need not be rerun merely to create a log. KELP's Re-process Notes remain separate operator instructions in the artifact issue journal. The log shares the medical-validation entity scope, so an explicit MV Save can include it. The producer must finish its writes and release any acquired MV lock before operator review; it must preserve human MV records. The reader never creates, migrates or edits a log, or acquires a KELP lock.
 
-The action looks up the current mapping and file when clicked, including after the first report arrives. A missing file or unsupported mapping explains the limitation without blocking MV. An unmanaged/debug workspace, including a debug policy outside an ancestor project's `artifacts/` directory or at that directory's root, reports that no managed-artifact mapping is available. An incomplete managed artifact package or invalid project configuration reports a warning with the specific delivery/configuration problem. A policy switch or a location change during opening cancels that open. The reader refuses linked report files/folders and paths escaping the artifact. Histories larger than 2 MiB explain the preview limit and remain unchanged. It never creates, modifies or regenerates the report.
+## Availability and read-only behavior
 
-Rendering uses VS Code's existing Markdown preview and its normal trust, link and image behavior. It is locked to this document rather than following other focused Markdown files. Each click resolves the current report location and issues the locked-preview command; native preview owns its reuse and refresh behavior. Preview availability is checked before adding a read-only setting. Later opening failures also report a warning.
+Policy-owned filesystem watchers refresh log availability after creation, deletion, project-mapping changes or artifact-package repair, without rebuilding the tree. A standalone example converted into a managed project after it was opened must be reopened to attach watchers to the new project mapping; clicking always resolves the current file location. Same-policy toolbar refreshes keep the log button's token valid; policy changes invalidate it. Stale-context and busy clicks explain their state instead of silently disappearing. The current mapping, policy identity and file are checked again when opening.
 
-Preview capability discovery has a ten-second limit and does not hold up source-document opens. A timed-out activation cannot later open a preview or write settings through this action.
+The reader refuses linked files/folders, nonregular entries and paths escaping the selected policy or managed artifact. An invalid project or incomplete managed artifact reports a warning. Histories larger than 2 MiB still light the button, but clicking explains the preview limit and leaves the history unchanged.
 
-After discovery, the actual preview command follows the existing serialized document-open behavior and has no separate timeout. A stalled VS Code open command can delay later source-document opens until it settles. The discovery limit is not a deadline for rendering the report.
+The exact file uses VS Code's editor read-only setting, including its source editor. This may add an exact-file entry to workspace `files.readonlyInclude`; it does not change filesystem permissions or stop the producer appending entries. Dirty editors or a matching `files.readonlyExclude` prevent the read-only open. Rendering uses the built-in Markdown preview with its normal trust/link/image behavior, locked to this document.
+
+Preview capability discovery has a ten-second limit outside the source-document open queue. After discovery, the actual preview uses the existing serialized read-only open queue and has no separate command timeout. A stalled viewer command can delay later opens; repeated log clicks say the log is still opening. This limit is not a claim that an unrelated viewer stall has been repaired.

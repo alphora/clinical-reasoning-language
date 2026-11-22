@@ -198,6 +198,23 @@
           "description": "Expanding a terminal path or setting a Verdict from FHIR Questionnaire keeps the tree where you left it, including after the review refresh. Focus still takes you to the selected question."
         }
       ]
+    },
+    {
+      "version": "6.4.57",
+      "title": "Find the Nautilus log in Medical Validation",
+      "features": [
+        {
+          "title": "Open the Nautilus log from Actions",
+          "description": "Nautilus log is the first action in Medical Validation. It glows gold when a log is available and explains when no log has been delivered yet. The log opens beside your review and stays read-only in the editor.",
+          "image": "nautilus-log.png",
+          "alt": "Medical Validation toolbar with a glowing Nautilus log button first in Actions and bold blue section headings.",
+          "caption": "Synthetic example; no patient information is shown."
+        },
+        {
+          "title": "Calmer review toolbar",
+          "description": "Status, Legend, Actions and Source documents use bold headings in the theme's accent color. Gold glow remains on attention indicators, making them easier to distinguish."
+        }
+      ]
     }
   ]
 }

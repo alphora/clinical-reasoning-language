@@ -5,6 +5,7 @@ import { createMvPaneLayout } from './mvPaneLayout';
 import { listSourceDocuments, resolveSourceDocument, showSourceDocuments, type SourceDocument } from './sourceDocuments';
 import { openReadonlySourceDocument, ReadonlyDocumentError } from './sourceDocumentOpener';
 import { resolveMvReprocessLog } from './mvReprocessLog';
+import { captureNautilusLog, refreshNautilusLog, hasNautilusLog, watchNautilusLog, type NautilusLogSnapshot } from './nautilusLogState';
 import { hasReviewEditHistory, renderMvTreeChrome, MV_TREE_CHROME_STYLE } from './mvTreeChrome';
 import { isDeepStrictEqual } from 'node:util';
 import {isAuthoringFlag} from './flagWorkflow';
@@ -710,6 +711,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const snapshotCapture = new SnapshotCapture();
   let sourceDocumentsBusy = false;
   let sourceDocumentsSnapshot: { cel: string; src: string; sourceIdentity?: string; token: string; documents: SourceDocument[] } | undefined;
+  let nautilusLogSnapshot: NautilusLogSnapshot | undefined;
   let mvFixLogBusy = false;
   let snapshotExporting = false; // command-level single-flight: guards the WHOLE export (capture → dialog → write), so a second toolbar click while the save dialog is open can't stack two dialogs
   // #224 ii.3 Slice 2: nodeKeys of single-criterion `when`s the user has EXPANDED (default: all collapsed). Ephemeral —
@@ -939,6 +941,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const views = new Map<Pane, PaneView>();
   let paneOrder: Pane[] = normalizePaneOrder(undefined, COCKPIT_PANE_SPEC); // user layout (configSection(mode).paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
+  let nautilusLogWatcher: { dispose(): void } | undefined;
   let flagsWatcher: vscode.FileSystemWatcher | undefined; // #212 S2 (I6): the `medical-validation/flags/` store is OUTSIDE the src-scoped watcher
   const flagChangeSummaries = new FlagChangeSummaryController();
   let flagSummaryWatcher: vscode.FileSystemWatcher | undefined;
@@ -1390,29 +1393,38 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     let sourceIdentity: string | undefined;
     try { if (src) sourceIdentity = realpathSync(src); } catch { /* A missing policy must not break the toolbar. */ }
     sourceDocumentsSnapshot = src && currentCel ? { cel: currentCel, src, sourceIdentity, token, documents: documents.documents } : undefined;
+    nautilusLogSnapshot = src && currentCel && sourceIdentity ? captureNautilusLog(nautilusLogSnapshot, currentCel, src, sourceIdentity) : undefined;
     const highlighting = `<div class="fc-toggle" title="Compare the selected test case with its expected result. A correctly expected Unmet result is a passing test."><span class="fc-toggle-label">Highlight:</span>`
       + `<button class="fc-toggle-btn${failedCriteriaMode === 'blocking' ? ' fc-active' : ''}" data-fc-mode="blocking" aria-pressed="${failedCriteriaMode === 'blocking'}" title="Highlight conditions or earlier matches that prevented the test's expected result">Expected-result blockers</button>`
       + `<button class="fc-toggle-btn${failedCriteriaMode === 'all' ? ' fc-active' : ''}" data-fc-mode="all" aria-pressed="${failedCriteriaMode === 'all'}" title="Highlight every evaluated false condition, including conditions on other branches">All unmet conditions</button></div>`;
     const explanation = diverterToggle.replace('Details:', 'Explain outcome:');
     const panels = `<div class="fc-toggle"><span class="fc-toggle-label">Show Panel:</span><button class="fc-toggle-btn${views.has('source') ? ' fc-active' : ''}" data-highlighted-source aria-pressed="${views.has('source')}">Highlighted Source</button></div>`;
-    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, panels, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, reprocessLog: !!sourceIdentity, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
+    return definitionStatus + renderMvTreeChrome({ status: progress, highlighting, explanation, panels, tools: reviewVerdictsBtn + exportBtn, questionnaires, legend: flowLegendChrome(mode), documents, documentToken: token, nautilusLog: { token: nautilusLogSnapshot?.token ?? '', present: hasNautilusLog(nautilusLogSnapshot?.report), message: !nautilusLogSnapshot ? 'Nautilus log availability is unknown for this selection.' : nautilusLogSnapshot.report.kind === 'unavailable' ? nautilusLogSnapshot.report.message : undefined }, history: !!src && hasReviewEditHistory(src), recovery: mvRecoveryAvailable || !!mvRecoveryBlock }) + banner;
   }
 
   /** Keep this action available before the first report arrives; resolve its current mapping on click. */
   async function openMvFixLog(token: unknown): Promise<void> {
-    const snapshot = sourceDocumentsSnapshot;
-    if (mvFixLogBusy || !snapshot?.sourceIdentity || mode !== 'medical-validation' || currentCel !== snapshot.cel || token !== snapshot.token) return;
+    const snapshot = nautilusLogSnapshot;
+    if (!snapshot || mode !== 'medical-validation' || currentCel !== snapshot.cel || token !== snapshot.token) {
+      void vscode.window.showInformationMessage('Open Nautilus log from the current Medical Validation tree.');
+      return;
+    }
+    if (mvFixLogBusy) { void vscode.window.showInformationMessage('The Nautilus log is still opening.'); return; }
     mvFixLogBusy = true;
     try {
       const validatePolicy = () => {
         if (mode !== 'medical-validation' || currentCel !== snapshot.cel ||
           findPolicySrc(snapshot.cel) !== snapshot.src || realpathSync(snapshot.src) !== snapshot.sourceIdentity)
-          throw new ReadonlyDocumentError('The selected policy changed. Open the MV fix log from the current tree.');
+          throw new ReadonlyDocumentError('The selected policy changed. Open Nautilus log from the current tree.');
       };
       validatePolicy();
       const report = resolveMvReprocessLog(snapshot.src);
+      if (nautilusLogSnapshot === snapshot && !isDeepStrictEqual(snapshot.report, report)) {
+        nautilusLogSnapshot = { ...snapshot, report };
+        renderTreeChrome();
+      }
       if (report.kind !== 'available') {
-        void (report.kind === 'missing' || report.reason === 'no-project' || report.reason === 'no-artifact' || report.reason === 'unmapped-qa' ? vscode.window.showInformationMessage(report.message) : vscode.window.showWarningMessage(report.message));
+        void (report.kind === 'missing' || report.reason === 'no-artifact' || report.reason === 'unmapped-mv' ? vscode.window.showInformationMessage(report.message) : vscode.window.showWarningMessage(report.message));
         return;
       }
       await openReadonlySourceDocument(report.filePath, () => {
@@ -1420,16 +1432,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         const current = resolveMvReprocessLog(snapshot.src);
         if (current.kind !== 'available') throw new ReadonlyDocumentError(current.message);
         if (current.artifactRoot !== report.artifactRoot || current.filePath !== report.filePath)
-          throw new ReadonlyDocumentError('The MV fix log location changed while opening. Open it again from the current tree.');
+          throw new ReadonlyDocumentError('The Nautilus log location changed while opening. Open it again from the current tree.');
       }, 'markdown-preview');
     } catch (error) {
-      void vscode.window.showWarningMessage(error instanceof ReadonlyDocumentError ? error.message : 'Could not open the MV fix log. Check that the policy and report are still available and Markdown preview is enabled.');
+      void vscode.window.showWarningMessage(error instanceof ReadonlyDocumentError ? error.message : 'Could not open the Nautilus log. Check that the policy and log are still available and Markdown preview is enabled.');
     } finally { mvFixLogBusy = false; }
   }
 
   async function openToolbarSourceDocument(token: unknown, index: unknown): Promise<void> {
     const snapshot = sourceDocumentsSnapshot;
-    if (!snapshot || mode !== 'medical-validation' || currentCel !== snapshot.cel || token !== snapshot.token || !Number.isSafeInteger(index) || (index as number) < 0) return;
+    if (!snapshot || mode !== 'medical-validation' || currentCel !== snapshot.cel || token !== snapshot.token) {
+      void vscode.window.showInformationMessage('Open the source document from the current Medical Validation tree.');
+      return;
+    }
+    if (!Number.isSafeInteger(index) || (index as number) < 0) return;
     const document = snapshot.documents[index as number];
     if (!document) return;
     try {
@@ -4267,6 +4283,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
   function resetToEmpty(message: string): void {
+    nautilusLogSnapshot = undefined;
     closeDecisionTable();
     clearTreeFocus();
     pinnedCards = undefined;
@@ -4329,6 +4346,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   function setupWatcher(): void {
+    nautilusLogWatcher?.dispose(); nautilusLogWatcher = undefined;
     watcher?.dispose();
     dependencyWatchers.forEach(w=>w.dispose());dependencyWatchers=[];dependencyWatchKey='';
     watcher = undefined;
@@ -4342,6 +4360,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     flagsDebounce = undefined;
     if (!currentCel) return;
     const src = findPolicySrc(currentCel);
+    if (src) {
+      const watchedCel = currentCel;
+      try { nautilusLogWatcher = watchNautilusLog(src, () => {
+        if (currentCel !== watchedCel || mode !== 'medical-validation') return;
+        const previous = nautilusLogSnapshot;
+        const next = previous ? refreshNautilusLog(previous) : undefined;
+        if (next !== previous || !previous) { nautilusLogSnapshot = next; renderTreeChrome(); }
+      }, vscode); } catch { console.warn('[crl] Live Nautilus log status is unavailable; reselect the policy to refresh it.'); }
+    }
     if (src) {
       const summaryCel = currentCel;
       flagSummaryWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(src,'medical-validation/change-summaries/*.json'));
@@ -4495,6 +4522,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     branchQuestionnaire.close();
     pinnedCards=undefined;
     mode = targetMode;
+    nautilusLogSnapshot = undefined;
     currentCel = celPath;
     interactiveQuestionnaire.policyChanged(currentCel);
     flagAnchor = undefined; // #210 Todo C: a retarget / mode switch drops the prior policy's flag anchor
@@ -6598,6 +6626,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         branchQuestionnaire.close();
         dependencyWatchers.forEach(w=>w.dispose());dependencyWatchers=[];dependencyWatchKey='';watcher?.dispose();
         flagsWatcher?.dispose();
+        nautilusLogWatcher?.dispose(); nautilusLogWatcher = undefined; nautilusLogSnapshot = undefined;
         flagSummaryWatcher?.dispose(); flagChangeSummaries.clear();
         if (summaryDebounce) clearTimeout(summaryDebounce);
         snapshotCapture.settleEmpty(); // #(tree-snapshot): a pending capture must not outlive the cockpit

@@ -3,7 +3,7 @@
 The tree header has two columns: **Status** above **Legend** on the left, with
 **Actions** on the right. Actions has room for the Highlight buttons together
 and the two questionnaire buttons together. Narrow panes scroll the header horizontally.
-Group headings use the gold text glow. The legend retains the tree's existing
+Group headings use bold text in the theme's textLink.foreground accent color, without glow. The Nautilus log button glows when a log is present, with a tooltip describing its availability. The legend retains the tree's existing
 colors and meanings.
 
 The legend shows Review, Condition, Navigation and Flags. Condition colors also
@@ -11,10 +11,10 @@ explain automatic group connector highlighting along a selected route. The **KE*
 badge identifies flags raised by the knowledge engineer; Open and Resolved describe
 flag status.
 
-Actions are ordered: review verdicts, snapshot export, highlighting, outcome
+Actions are ordered: **Nautilus log**, review verdicts, snapshot export, highlighting, outcome
 explanation, **Show Panel: Highlighted Source**, **Show Questionnaire:** with
 **CRL Questionnaire** and native **FHIR Questionnaire** controls, optional edit history/recovery,
-**MV fix log**, then source files under the
+then source files under the
 **Source documents** subgroup heading. A group with
 several documents has one named button per file. An empty group is disabled;
 incomplete discovery is disclosed rather than reported as empty.
@@ -63,9 +63,9 @@ or a changed policy/document identity prevent the open and produce an explanatio
 File paths are resolved and checked again after asynchronous configuration.
 Toolbar messages contain host-owned indices and tokens rather than file paths.
 
-**MV fix log** applies the same exact-file editor read-only safeguards to the
-artifact's configured QA report, then opens a locked Markdown preview. Its file
-contract and producer responsibilities are described in [MV fix log](mv-fix-log.md).
+**Nautilus log** applies the same exact-file editor read-only safeguards to the
+artifact's configured medical-validation log, then opens a locked Markdown preview. Its file
+contract and producer responsibilities are described in [Nautilus log](mv-fix-log.md).
 The action explains missing reports without changing review status.
 
 Read-only here is a VS Code editor default, not an operating-system permission

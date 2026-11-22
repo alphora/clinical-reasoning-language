@@ -6,12 +6,12 @@ import { renderMvTreeChrome, hasReviewEditHistory, MV_TREE_CHROME_STYLE } from '
 import { scopeNeedsRecovery, scopeHasRetainedLocks } from './mvEditRecovery.ts';
 
 const input = () => ({status:'Reviewed 0/11',highlighting:'Highlight controls',explanation:'Explain outcome',tools:'Tools',questionnaires:'Questionnaires',legend:'Legend entries',documents:{documents:[],complete:true,warnings:[]},documentToken:'owned-token',history:false,recovery:false});
-test('puts status above legend left and wider actions right, retaining gold emphasis', () => {
+test('puts status above legend left and wider actions right, with plain bold headings', () => {
   const html=renderMvTreeChrome(input());
   assert.match(html,/mv-toolbar-context[\s\S]*aria-label="Status"[\s\S]*aria-label="Legend"[\s\S]*aria-label="Actions"/);
   assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar\{display:grid;grid-template-columns:/);
   assert.match(MV_TREE_CHROME_STYLE,/overflow-x:auto/);
-  assert.match(MV_TREE_CHROME_STYLE,/\.mv-toolbar-heading\{[^}]*text-shadow:[^}]*#ffd54f/);
+  assert.doesNotMatch(MV_TREE_CHROME_STYLE,/\.mv-toolbar-heading\{[^}]*text-shadow:/);
   assert.doesNotMatch(html,/data-mv-edit-action/);
   assert.equal((html.match(/disabled/g)||[]).length,2);
   assert.match(html,/<h3[^>]*mv-toolbar-subheading[^>]*>Source documents<\/h3>[\s\S]*mv-document-buttons/);
@@ -45,11 +45,20 @@ test('history and recovery are independently conditional; history includes unrea
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
-test('MV fix log stays enabled before any report exists and carries only the escaped host token',()=>{
-  const x=input();assert.doesNotMatch(renderMvTreeChrome(x),/data-open-mv-fix-log/);
-  x.reprocessLog=true;x.documentToken='token<&"';const html=renderMvTreeChrome(x);
-  assert.match(html,/<button class="fc-toggle-btn" data-open-mv-fix-log data-log-token="token&lt;&amp;&quot;"[^>]*>MV fix log<\/button>/);
-  assert.doesNotMatch(html,/reprocess-log\.md|src\/qa|tests\//);
+test('Nautilus log stays enabled before any report exists and carries only the escaped host token',()=>{
+  const x=input();assert.match(renderMvTreeChrome(x),/data-open-mv-fix-log/);
+  x.nautilusLog={token:'token<&"',present:false};const html=renderMvTreeChrome(x);
+  assert.match(html,/<button class="fc-toggle-btn" data-open-mv-fix-log data-log-token="token&lt;&amp;&quot;"[^>]*>Nautilus log<\/button>/);
+  assert.doesNotMatch(html,/nautilus-log\.md|src\/qa|tests\//);
+});
+
+test('Nautilus log is the first Actions button and glows only when the log is available',()=>{
+  const x=input();x.nautilusLog={token:'owned',present:true};x.tools='<button>Review verdicts</button>';
+  let html=renderMvTreeChrome(x);
+  assert.match(html,/aria-label="Actions"[^]*?<button[^>]*mv-log-present[^>]*>Nautilus log<\/button>[^]*?Review verdicts/);
+  x.nautilusLog.present=false;html=renderMvTreeChrome(x);
+  assert.match(html,/<button[^>]*data-open-mv-fix-log[^>]*>Nautilus log<\/button>/);
+  assert.doesNotMatch(html,/<button[^>]*mv-log-present[^>]*>Nautilus log/);
 });
 test('recovery availability uses backend operation eligibility, including retained locks but excluding pre-existing locks', () => {
   const phases=['planning','locked','acquiring','scope-outcome-unknown','publishing','local-applied','save-failed','save-in-flight','save-outcome-unknown','saved','no-live-change'];

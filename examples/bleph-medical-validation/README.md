@@ -62,9 +62,14 @@ The first command checks CEL/bundle agreement; the second regenerates only the i
 - `src/cql/` and `src/fhir/`: matching generated CQL and FHIR definitions.
 - `tests/data/fhir/`: emitted MV patient data and its manifest.
 - `tests/interactive-questionnaire/`: answer-free interactive starter CEL, its generator, and request bundle.
+- `src/medical-validation/nautilus-log.md`: clearly marked synthetic log for the F5 viewer test; it records no actual Nautilus run, clinical evaluation or human approval.
 - `tests/results/`: 18 native Questionnaire/QuestionnaireResponse pairs and their manifest, generated from this source build with the pinned Quantity-capable normalized-cache engine. The manifest records actual tool/engine/input hashes. This is source-fixture evidence, not released or installed-artifact qualification.
 
 The full source remains available for reading; provenance identifies the portions represented by the executable example. The frozen suite at `packages/crl/test/acceptance/bleph` separately exercises engine behavior, including ServiceRequest sourcing and local/source selection.
+
+## Test the Nautilus log in F5
+
+Stop and restart **Run Bleph Medical Validation** after rebuilding the extension. **Nautilus log** is the first item in the tree's Actions and glows gold for the included sample. Clicking it opens the sample read-only. This local example does not need a KELP project. A missing log leaves the button unlit and explains that no log has been delivered; opening the viewer does not generate one.
 
 ## Maintain
 

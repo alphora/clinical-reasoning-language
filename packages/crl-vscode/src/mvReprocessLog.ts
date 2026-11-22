@@ -9,7 +9,7 @@ export type MvReprocessLog =
 export const MV_REPROCESS_LOG_MAX_BYTES = 2 * 1024 * 1024;
 
 const unavailable = (reason: string, message: string): MvReprocessLog => ({ kind: 'unavailable', reason, message });
-const missing = (folder = false): MvReprocessLog => ({ kind: 'missing', reason: folder ? 'no-report-folder' : 'no-report', message: folder ? 'The configured qa folder is not present yet. Check report delivery and the project mapping.' : 'No MV fix log has been delivered for this artifact yet.' });
+const missing = (folder = false): MvReprocessLog => ({ kind: 'missing', reason: folder ? 'no-report-folder' : 'no-report', message: 'No Nautilus log has been delivered for this policy yet.' });
 const inside = (root: string, file: string): boolean => {
   const rel = relative(root, file);
   return !isAbsolute(rel) && rel !== '..' && !rel.startsWith('..' + sep);
@@ -17,27 +17,34 @@ const inside = (root: string, file: string): boolean => {
 
 /** Read-only location lookup, not KELP graph/lock/permission validation. In particular, reading a
  * report must work on published artifacts without the mutation gates in parseKelpStatus.
- * Pipeline's agreed report contract is the configured entity key `qa`, not a guessed tests folder.
+ * Managed projects use the configured medical-validation entity. Standalone policy examples
+ * use their local medical-validation folder so the same read-only action works in F5.
  */
 export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
   try {
     const projectFile = findKelpProject(policySrc);
-    if (!projectFile) return unavailable('no-project', 'This policy has no KELP project configuration for an MV fix log.');
-    // Keep the managed artifacts boundary consistent with kelpEditScopes.kelpArtifactRoot.
-    const artifacts = join(dirname(projectFile), 'artifacts');
-    if (!relative(artifacts, policySrc) || !inside(artifacts, policySrc))
-      return unavailable('no-artifact', 'This policy is not in a managed KELP artifact; no MV fix log mapping is available.');
-    const project = JSON.parse(readFileSync(projectFile, 'utf8'));
-    const rows = project.project.structure.entities.filter((row: unknown) =>
-      row !== null && typeof row === 'object' && (row as { key?: unknown }).key === 'qa');
-    if (rows.length !== 1) return unavailable(rows.length ? 'ambiguous-qa' : 'unmapped-qa', 'The KELP project must configure one qa entity for its MV fix log.');
-    const folder: unknown = rows[0].folder;
+    let artifactRoot: string;
+    let folder: unknown;
+    if (!projectFile) {
+      artifactRoot = realpathSync(policySrc);
+      folder = 'medical-validation';
+    } else {
+      // Keep the managed artifacts boundary consistent with kelpEditScopes.kelpArtifactRoot.
+      const artifacts = join(dirname(projectFile), 'artifacts');
+      if (!relative(artifacts, policySrc) || !inside(artifacts, policySrc))
+        return unavailable('no-artifact', 'No Nautilus log has been delivered for this policy yet.');
+      const project = JSON.parse(readFileSync(projectFile, 'utf8'));
+      const rows = project.project.structure.entities.filter((row: unknown) =>
+        row !== null && typeof row === 'object' && (row as { key?: unknown }).key === 'medical-validation');
+      if (rows.length !== 1) return unavailable(rows.length ? 'ambiguous-mv' : 'unmapped-mv', 'The project must configure one medical-validation entity for its Nautilus log.');
+      folder = rows[0].folder;
+      artifactRoot = realpathSync(kelpArtifactRoot(policySrc, projectFile));
+    }
     if (typeof folder !== 'string' || !folder || isAbsolute(folder) || win32.isAbsolute(folder) ||
       /[\\:\x00-\x1f]/.test(folder) || folder.split('/').some(part => !part || part === '.' || part === '..'))
-      return unavailable('unsafe-folder', 'The configured qa folder is not a safe artifact-relative folder.');
-    const artifactRoot = realpathSync(kelpArtifactRoot(policySrc, projectFile));
+      return unavailable('unsafe-folder', 'The configured medical-validation folder is not a safe policy-relative folder.');
     if (!inside(artifactRoot, realpathSync(policySrc))) return unavailable('outside-artifact', 'The selected policy is outside its configured artifact.');
-    const parts = [...folder.split('/'), 'reprocess-log.md'];
+    const parts = [...folder.split('/'), 'nautilus-log.md'];
     let filePath = artifactRoot;
     for (let index = 0; index < parts.length; index++) {
       filePath = join(filePath, parts[index]);
@@ -49,19 +56,19 @@ export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
       }
       if (entry.isSymbolicLink() || (index === parts.length - 1 ? !entry.isFile() : !entry.isDirectory()))
         return index < parts.length - 1 && !entry.isSymbolicLink()
-          ? unavailable('not-a-folder', 'The configured qa folder contains an entry that is not a directory. Check report delivery and the project mapping.')
-          : unavailable('unsafe-file', 'The MV fix log must be a regular file inside its qa folder, without linked folders or files.');
+          ? unavailable('not-a-folder', 'The configured medical-validation folder contains an entry that is not a directory. Check log delivery and the project mapping.')
+          : unavailable('unsafe-file', 'The Nautilus log must be a regular file inside its medical-validation folder, without linked folders or files.');
       if (index === parts.length - 1 && entry.size > MV_REPROCESS_LOG_MAX_BYTES)
-        return unavailable('too-large', 'The MV fix log exceeds the 2 MiB preview limit; its history remains unchanged.');
+        return unavailable('too-large', 'The Nautilus log exceeds the 2 MiB preview limit; its history remains unchanged.');
     }
     filePath = realpathSync(filePath);
-    if (!inside(artifactRoot, filePath)) return unavailable('outside-artifact', 'The MV fix log is outside its configured artifact.');
+    if (!inside(artifactRoot, filePath)) return unavailable('outside-artifact', 'The Nautilus log is outside its configured artifact.');
     return { kind: 'available', filePath, artifactRoot };
   } catch (error) {
     if (error instanceof KelpEditError && error.code === 'artifact-layout')
       return unavailable('artifact-layout', 'This policy\'s managed KELP artifact package is incomplete; check artifact delivery.');
     if (error instanceof KelpEditError && error.code === 'invalid-project')
       return unavailable('invalid-project', 'The KELP project configuration is invalid or unreadable; check its format and file access.');
-    return unavailable('unreadable', 'The MV fix log location could not be read. Check the KELP project configuration and file access.');
+    return unavailable('unreadable', 'The Nautilus log location could not be read. Check the project configuration and file access.');
   }
 }

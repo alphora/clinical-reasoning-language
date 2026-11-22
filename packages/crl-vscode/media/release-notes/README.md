@@ -1,8 +1,22 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.56.
+Updates since CRL 6.4.41 through 6.4.57.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.57 — Find the Nautilus log in Medical Validation
+
+### Open the Nautilus log from Actions
+
+Nautilus log is the first action in Medical Validation\. It glows gold when a log is available and explains when no log has been delivered yet\. The log opens beside your review and stays read\-only in the editor\.
+
+![Medical Validation toolbar with a glowing Nautilus log button first in Actions and bold blue section headings\.](nautilus-log.png)
+
+Synthetic example; no patient information is shown\.
+
+### Calmer review toolbar
+
+Status, Legend, Actions and Source documents use bold headings in the theme's accent color\. Gold glow remains on attention indicators, making them easier to distinguish\.
 
 ## 6.4.56 — Read the fix report without losing your place
 

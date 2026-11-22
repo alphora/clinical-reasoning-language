@@ -29,7 +29,7 @@ export interface MvTreeChrome {
   legend: string;
   documents: SourceDocumentListing;
   documentToken: string;
-  reprocessLog?: boolean;
+  nautilusLog?: { token: string; present: boolean; message?: string };
   history: boolean;
   recovery: boolean;
 }
@@ -44,11 +44,11 @@ export function renderMvTreeChrome(input: MvTreeChrome): string {
   }).join(' ');
   const history = input.history ? '<button class="fc-toggle-btn" data-mv-edit-action="history">Edit history</button>' : '';
   const recovery = input.recovery ? '<button class="fc-toggle-btn mv-attention" data-mv-edit-action="recovery">Recover interrupted edit</button>' : '';
-  const report = input.reprocessLog ? `<div class="fc-toggle"><button class="fc-toggle-btn" data-open-mv-fix-log data-log-token="${escape(input.documentToken)}" title="Open the artifact's agent MV fix log read-only">MV fix log</button></div>` : '';
+  const reportStatus = input.nautilusLog?.message ?? (input.nautilusLog?.present ? 'Log available — open read-only' : 'No Nautilus log has been delivered for this policy yet.');
+  const report = `<div class="fc-toggle"><button class="fc-toggle-btn${input.nautilusLog?.present ? ' mv-log-present' : ''}" data-open-mv-fix-log data-log-token="${escape(input.nautilusLog?.token ?? '')}" title="${escape(reportStatus)}" aria-label="Nautilus log: ${escape(reportStatus)}">Nautilus log</button></div>`;
   const warning = !input.documents.complete ? `<div class="mv-toolbar-notice" role="status">${escape(input.documents.warnings.join(' '))}</div>` : '';
-  const actions = `${input.tools}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>${input.panels ?? ''}${input.questionnaires}`
+  const actions = `${report}${input.tools}<div class="mv-display-controls">${input.highlighting}${input.explanation}</div>${input.panels ?? ''}${input.questionnaires}`
     + (history || recovery ? `<div class="fc-toggle">${history}${recovery}</div>` : '')
-    + report
     + `<section aria-labelledby="mv-source-documents-heading"><h3 id="mv-source-documents-heading" class="mv-toolbar-heading mv-toolbar-subheading">Source documents</h3><div class="fc-toggle mv-document-buttons">${documents}</div></section>`;
   return `<div class="mv-toolbar"><div class="mv-toolbar-context">${group('Status', input.status + warning)}${group('Legend', input.legend)}</div>${group('Actions', actions)}</div>`;
 }
@@ -57,11 +57,12 @@ export const MV_TREE_CHROME_STYLE = `
 .mv-toolbar{display:grid;grid-template-columns:max-content minmax(510px,1fr);align-items:start;gap:18px;overflow-x:auto;padding:8px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--vscode-panel-border,#454545)}
 .mv-toolbar-context{display:flex;flex-direction:column;gap:18px;min-width:310px}
 .mv-toolbar-group{min-width:0;max-width:100%}
-.mv-toolbar-heading{font:600 13px var(--vscode-font-family,sans-serif);margin:0 0 9px;color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
+.mv-toolbar-heading{font:600 13px var(--vscode-font-family,sans-serif);margin:0 0 9px;color:var(--vscode-textLink-foreground,#3794ff)}
 .mv-toolbar-subheading{font-size:12px;margin-top:8px}
 .mv-toolbar .fc-toggle{flex-wrap:wrap;gap:5px;padding:0 0 7px}.mv-toolbar .fc-toggle-label{opacity:1;color:var(--vscode-descriptionForeground,#aaa)}
 .mv-toolbar .fc-toggle-btn{white-space:normal;overflow-wrap:anywhere;min-height:24px}.mv-toolbar .fc-toggle-btn:disabled{opacity:.5;cursor:default}
 .mv-toolbar .fc-toggle-btn:focus-visible{outline:1px solid var(--vscode-focusBorder,#007fd4);outline-offset:2px}
+.mv-toolbar .mv-log-present{color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
 .mv-toolbar .mv-questionnaires{display:block}.mv-questionnaire-buttons{display:inline-flex;gap:5px;vertical-align:middle}
 .mv-toolbar .fc-legend{display:flex;flex-direction:column;gap:8px;padding:0;max-width:none}.mv-toolbar .fc-legend-group{gap:7px;flex-wrap:nowrap;white-space:nowrap}
 .mv-toolbar .mv-progress{margin:0 0 7px}.mv-toolbar-notice{font-size:12px;overflow-wrap:anywhere}.mv-toolbar .mv-attention{color:var(--vscode-foreground,#fff);text-shadow:0 0 3px #ffd54f,0 0 7px #ffd54f}
