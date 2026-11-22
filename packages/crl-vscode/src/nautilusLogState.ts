@@ -40,7 +40,11 @@ export function watchNautilusLog(src: string, changed: () => void, api: Pick<typ
       // Folder deletion can emit only the folder event, without child-file events.
       patterns.push({ root: artifact, pattern: '**' });
     }
-  } else patterns.push({ root: src, pattern: '**' });
+  } else {
+    // Observe the bounded candidate parent even before its package is repaired. The reader
+    // still requires positive package ownership before opening anything outside src.
+    patterns.push({ root: basename(src) === 'src' ? dirname(src) : src, pattern: '**' });
+  }
   const watchers: { dispose(): void }[] = [];
   let disposed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;

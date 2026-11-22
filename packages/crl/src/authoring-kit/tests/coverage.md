@@ -2874,3 +2874,19 @@ Baseline `1884b58c3c4feae542dfa2328ac1df8fbafaddbb`; reviewed target `613aa3959e
 Focused RED24checks against prior helper; GREEN38PASS/1Windows file-symlink privilege skip. Native implementation review1539 converged0C0I0N; external expressly waived. Source full suite, actual archives, installed schema6 UI and publication are independent release gates, not established by these counts. Existing57 schema1 installed evidence did not qualify real HCSC schema6 and is not relabeled as a pass.
 
 Completed maintenance binding: target `613aa3959e68075d48ad92022ba738765e22fd94`, unchanged schema2.50/hash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7. Native1539 ledger follow-up0C0I0N; external waived. Audit binds reviewed source only; release execution and actual HCSC acceptance remain independent.
+
+
+## Codify-owned Nautilus log maintenance for release 6.4.58
+
+Baseline `613aa3959e68075d48ad92022ba738765e22fd94`; pending content target will be bound after code review/commit. Operator directs Nautilus/Codify ownership and read-only MV access. Pipeline selects the existing configured `qa` entity (`tests` in current HCSC/IEHP); Native confirms existing Codify admission, with no new lifecycle or permission mechanism. Kit schema2.50/content hash remain unchanged.
+
+- `mvReprocessLog.ts` and resolver tests: not author-facing language guidance. Primary unique qa mapping; MV/provenance decoys ignored; schema1/6/custom-folder coverage; malformed, duplicate, unsafe, linked and oversized cases. Standalone lookup uses an immediate src-parent package or selected package, never arbitrary ancestors. Existing private missing-mapping reasons retained for host information behavior. No new public SDK symbol.
+- `nautilusLogState.ts` and state tests: not author-facing; standalone watchers cover the owning package's tests folder outside src, including folder-only arrival/deletion. Managed artifact-wide watch and stable policy tokens remain.
+- `mvReprocessLogHost.test.mjs`: not author-facing; actual opener uses qa output and absent qa mapping is informational, with read-only and unchanged log/source/human flag byte checks, retarget/race and stale-context controls.
+- `docs/mv-fix-log.md`, toolbar documentation and example README: describe producer-owned log/read-only MV access. Removed derived MV-lock/Save delivery instructions. Pipeline owns every-run producer qualification; no historical evaluations rerun solely for logs. No CRL/CEL, flag workflow or clinical teaching changes.
+- Synthetic Bleph log moved byte-for-byte from src/medical-validation to tests; explicitly no actual run/evaluation/approval evidence. Human/F5 files preserved separately.
+- Release catalog/README: plain user-facing processing-history access. No language guidance, runtime, emitter or authoring-kit content change. Version metadata remains pending release-only scope.
+
+Initial focused owner run34PASS/1Windows file-symlink privilege skip; after correction, maintained pure filesystem reader/watch suites17PASS/1skip including missing/invalid/self-owned package repair. These source-only suites use a scratch config to avoid rebuilding dist during the full release suite; the normal full npm test remains independent. Prior release56/57 location descriptions above are historical evidence only; the Codify path in this section supersedes their current-location guidance.
+
+Native plan1542:0critical/1important/0nit, Accept1 (keep private reason tags and assert informational host notice); follow-up0/0/0 converged. Initial scratch commands failed at config/temporary-directory setup before executing tests and do not count as product RED evidence. Native code1543 converged after Accept3/Refine0/Reject0 (0critical/2important/1nit); restored dated historical evidence exactly, observed the bounded candidate parent for ownership repairs and corrected toolbar wording. Full source and installed final-location qualification remain separate gates.

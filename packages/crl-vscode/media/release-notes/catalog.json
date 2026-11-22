@@ -222,7 +222,7 @@
       "features": [
         {
           "title": "Read your policy processing history",
-          "description": "The Nautilus log now opens in workspaces using the current project configuration. Its button glows gold when a log is available, and the log opens read-only beside your review."
+          "description": "Read the Nautilus processing history delivered with your policy. Medical Validation finds the log in Codify output, lights its button when available, and opens it read-only beside your review."
         }
       ]
     }

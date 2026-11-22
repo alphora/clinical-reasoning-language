@@ -12,9 +12,9 @@ function fixture() {
   mkdirSync(dirname(cel),{recursive:true});mkdirSync(join(src,'crl'));writeFileSync(cel,'Synthetic');
   const packageFile=join(artifact,'package.json');writeFileSync(packageFile,'{}');
   const project=join(root,'kelp.project.json');
-  const config=folder=>writeFileSync(project,JSON.stringify({project:{schemaVersion:1,structure:{entities:[{key:'medical-validation',folder}]}}}));
-  config('src/medical-validation');
-  const report=(folder='src/medical-validation')=>{const file=join(artifact,folder,'nautilus-log.md');mkdirSync(dirname(file),{recursive:true});writeFileSync(file,'# Synthetic Nautilus log');return file;};
+  const config=folder=>writeFileSync(project,JSON.stringify({project:{schemaVersion:1,structure:{entities:[{key:'qa',folder}]}}}));
+  config('tests');
+  const report=(folder='tests')=>{const file=join(artifact,folder,'nautilus-log.md');mkdirSync(dirname(file),{recursive:true});writeFileSync(file,'# Synthetic Nautilus log');return file;};
   return {root,src,artifact,cel,project,packageFile,config,report,capture:()=>captureNautilusLog(undefined,cel,src,realpathSync(src)),close(){const rel=relative(temp,realpathSync(root));assert.ok(rel&&!isAbsolute(rel)&&!rel.startsWith('..'));rmSync(root,{recursive:true,force:true});}};
 }
 
@@ -52,23 +52,44 @@ test('watcher starts at existing project root before folder/package/config repai
     unlinkSync(f.packageFile);writeFileSync(f.project,'invalid');let state=f.capture(),refreshes=0;
     const fake=fakeWatcherApi(),watcher=watchNautilusLog(f.src,()=>{refreshes++;state=refreshNautilusLog(state);},fake.api);
     assert.equal(fake.pattern().base,f.root);assert(fake.patterns().some(p=>p.base===f.artifact&&p.pattern==='**'));assert(!fake.patterns().some(p=>p.base===f.root&&p.pattern.includes('**')));
-    f.config('src/medical-validation');fake.emit('change',f.project);writeFileSync(f.packageFile,'{}');fake.emit('create',f.packageFile);
+    f.config('tests');fake.emit('change',f.project);writeFileSync(f.packageFile,'{}');fake.emit('create',f.packageFile);
     vi.advanceTimersByTime(100);assert.equal(refreshes,1);assert.equal(hasNautilusLog(state.report),false);
     const file=f.report();fake.emit('create',file);vi.advanceTimersByTime(100);assert.equal(hasNautilusLog(state.report),true);
     unlinkSync(f.packageFile);fake.emit('delete',f.packageFile);vi.advanceTimersByTime(100);assert.equal(hasNautilusLog(state.report),false);
     writeFileSync(f.packageFile,'{}');fake.emit('create',f.packageFile);vi.advanceTimersByTime(100);assert.equal(hasNautilusLog(state.report),true);
-    const before=refreshes;fake.emit('change',join(f.root,'artifacts/other/src/medical-validation/nautilus-log.md'));vi.advanceTimersByTime(100);assert.equal(refreshes,before);
+    const before=refreshes;fake.emit('change',join(f.root,'artifacts/other/tests/nautilus-log.md'));vi.advanceTimersByTime(100);assert.equal(refreshes,before);
     fake.emit('delete',file);watcher.dispose();vi.advanceTimersByTime(100);fake.emit('create',file);vi.advanceTimersByTime(100);assert.equal(refreshes,before);assert.equal(fake.disposed(),true);
   }finally{vi.useRealTimers();f.close();}
 });
 
-test('standalone F5 policy reads its local MV log and absence is ordinary information',()=>{
+test('standalone F5 policy reads its owning package Codify log and absence is ordinary information',()=>{
   const f=fixture();try{
     unlinkSync(f.project);const missing=resolveMvReprocessLog(f.src);assert.equal(missing.kind,'missing');assert.equal(missing.message,'No Nautilus log has been delivered for this policy yet.');
     const file=f.report();assert.equal(resolveMvReprocessLog(f.src).filePath,realpathSync(file));
-    const fake=fakeWatcherApi(),watcher=watchNautilusLog(f.src,()=>{},fake.api);assert.equal(fake.pattern().base,f.src);watcher.dispose();
+    const fake=fakeWatcherApi(),watcher=watchNautilusLog(f.src,()=>{},fake.api);assert.equal(fake.pattern().base,realpathSync(f.artifact));watcher.dispose();
     assert.match(readFileSync(file,'utf8'),/Synthetic/);
   }finally{f.close();}
+});
+
+test('standalone parent package repairs and ownership changes refresh without reopening',()=>{
+  for(const initial of ['missing','invalid','self-owned']){
+    const f=fixture();vi.useFakeTimers();try{
+      unlinkSync(f.project);unlinkSync(f.packageFile);
+      if(initial==='invalid')writeFileSync(f.packageFile,'invalid');
+      if(initial==='self-owned'){
+        writeFileSync(join(f.src,'package.json'),'{}');f.report('src/tests');
+      }
+      let state=f.capture();const fake=fakeWatcherApi();
+      const watcher=watchNautilusLog(f.src,()=>state=refreshNautilusLog(state),fake.api);
+      assert.equal(fake.pattern().base,f.artifact);
+      assert.equal(hasNautilusLog(state.report),initial==='self-owned');
+      writeFileSync(f.packageFile,'{}');fake.emit(initial==='missing'?'create':'change',f.packageFile);
+      vi.advanceTimersByTime(100);assert.equal(hasNautilusLog(state.report),false,'preferred parent now owns the log');
+      const file=f.report();fake.emit('create',dirname(file));vi.advanceTimersByTime(100);
+      assert.equal(state.report.filePath,realpathSync(file));assert.equal(hasNautilusLog(state.report),true);
+      watcher.dispose();
+    }finally{vi.useRealTimers();f.close();}
+  }
 });
 
 

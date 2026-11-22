@@ -64,7 +64,7 @@ File paths are resolved and checked again after asynchronous configuration.
 Toolbar messages contain host-owned indices and tokens rather than file paths.
 
 **Nautilus log** applies the same exact-file editor read-only safeguards to the
-artifact's configured medical-validation log, then opens a locked Markdown preview. Its file
+artifact's configured Codify qa log, then opens a locked Markdown preview. Its file
 contract and producer responsibilities are described in [Nautilus log](mv-fix-log.md).
 The action explains missing reports without changing review status.
 
@@ -74,3 +74,5 @@ override, or an extension performing direct filesystem writes. Installed custom
 PDF/DOCX viewers require their own interaction verification; passing a text-editor
 check does not establish those viewers' enforcement. CRL does not change source
 contents, filesystem permissions, viewer associations, or the clinical runtime.
+
+The Nautilus log belongs to Codify output and opens read-only from the configured `qa` folder. See [Nautilus log](mv-fix-log.md) for the managed and standalone locations.

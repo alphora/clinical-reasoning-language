@@ -8,7 +8,7 @@ Managed environments provide KALM AI: What's New for the combined Release Notes.
 
 ### Read your policy processing history
 
-The Nautilus log now opens in workspaces using the current project configuration\. Its button glows gold when a log is available, and the log opens read\-only beside your review\.
+Read the Nautilus processing history delivered with your policy\. Medical Validation finds the log in Codify output, lights its button when available, and opens it read\-only beside your review\.
 
 ## 6.4.57 — Find the Nautilus log in Medical Validation
 

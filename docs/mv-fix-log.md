@@ -4,17 +4,21 @@
 
 ## File location and ownership
 
-For a managed artifact, use the unique `project.structure.entities` row whose `key` is `medical-validation` in `kelp.project.json`:
+The log is Nautilus/Codify output. Medical Validation only reads it. Codify is a workflow card grouping configured entities, not a literal directory.
+
+For a managed artifact, use the unique `project.structure.entities` row whose `key` is `qa` in `kelp.project.json`:
 
 ```text
-<artifact>/<configured medical-validation folder>/nautilus-log.md
+<artifact>/<configured qa folder>/nautilus-log.md
 ```
 
-For `key: "medical-validation", folder: "src/medical-validation"`, the file is `src/medical-validation/nautilus-log.md` relative to the artifact. The reader follows that configured folder for this log only; it does not change other MV stores or project configuration. Missing or ambiguous mappings explain the limitation. No QA-folder fallback is used.
+For `key: "qa", folder: "tests"`, the file is `tests/nautilus-log.md` relative to the artifact. This is the primary configured Codify output. Missing or ambiguous mappings explain the limitation. The reader does not search medical-validation, provenance or other folders, migrate an older log, or change project configuration.
 
-Standalone local examples without a KELP project use `<policy src>/medical-validation/nautilus-log.md`. The Bleph F5 example includes a clearly marked synthetic log for testing the reader. Its entries are demonstration content, not evidence of executed authoring or evaluation.
+Standalone examples without a KELP project use `<example package>/tests/nautilus-log.md`. The package must be the immediate parent of a selected `src` folder or the selected folder itself; arbitrary ancestors are not searched. The Bleph F5 example includes a clearly marked synthetic log there. Its entries are demonstration content, not evidence of executed authoring or evaluation.
 
-Pipeline owns the producer. Every Nautilus run contributes an entry at the existing delivery boundary, preserving history and human MV records. Entries identify the policy, run, baseline and candidate; describe the requested work, actual changes or reason for nonimplementation, and checks actually run. They never invent execution evidence or human approval. Older policies need not be rerun merely to create a log. KELP's Re-process Notes remain separate operator instructions in the artifact issue journal. The log shares the medical-validation entity scope, so an explicit MV Save can include it. The producer must finish its writes and release any acquired MV lock before operator review; it must preserve human MV records. The reader never creates, migrates or edits a log, or acquires a KELP lock.
+Pipeline owns the producer. Every Nautilus run contributes an entry at its Codify delivery boundary, preserving history. Entries identify the policy, run, baseline and candidate; describe the requested work, actual changes or reason for nonimplementation, and checks actually run. They never invent execution evidence or human approval. Older policies need not be rerun merely to create a log. KELP's Re-process Notes remain separate operator instructions in the artifact issue journal.
+
+The producer finishes the log before the normal Codify inspection and delivery snapshot. Existing Codify admission and delivery rules apply; this reader adds no lock, permission, Save or lifecycle mechanism. Human MV records are not log delivery targets. The reader never creates, migrates or edits a log, changes produced/status records, or acquires a KELP lock.
 
 ## Availability and read-only behavior
 

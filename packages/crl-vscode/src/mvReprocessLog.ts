@@ -1,5 +1,5 @@
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, sep, win32 } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, sep, win32 } from 'node:path';
 import { findKelpProject, kelpArtifactRoot, KelpEditError } from './kelpEditScopes';
 
 export type MvReprocessLog =
@@ -15,10 +15,26 @@ const inside = (root: string, file: string): boolean => {
   return !isAbsolute(rel) && rel !== '..' && !rel.startsWith('..' + sep);
 };
 
+/** Standalone examples own either their immediate src parent package or their own package.
+ * Never walk arbitrary ancestors and accidentally select the repository's package.
+ */
+function standaloneNautilusLogRoot(policySrc: string): string | undefined {
+  const candidates = basename(policySrc) === 'src' ? [dirname(policySrc), policySrc] : [policySrc];
+  for (const candidate of candidates) {
+    try {
+      const entry = lstatSync(join(candidate, 'package.json'));
+      if (!entry.isFile() || entry.isSymbolicLink()) continue;
+      const manifest: unknown = JSON.parse(readFileSync(join(candidate, 'package.json'), 'utf8'));
+      if (manifest && typeof manifest === 'object' && !Array.isArray(manifest)) return realpathSync(candidate);
+    } catch { /* A missing or invalid package is not positive standalone ownership. */ }
+  }
+  return undefined;
+}
+
 /** Read-only location lookup, not KELP graph/lock/permission validation. In particular, reading a
  * report must work on published artifacts without the mutation gates in parseKelpStatus.
- * Managed projects use the configured medical-validation entity. Standalone policy examples
- * use their local medical-validation folder so the same read-only action works in F5.
+ * Managed projects use the configured Codify qa entity. Standalone policy examples
+ * use tests in their positively identified package so the same read-only action works in F5.
  */
 export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
   try {
@@ -26,8 +42,10 @@ export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
     let artifactRoot: string;
     let folder: unknown;
     if (!projectFile) {
-      artifactRoot = realpathSync(policySrc);
-      folder = 'medical-validation';
+      const standaloneRoot = standaloneNautilusLogRoot(policySrc);
+      if (!standaloneRoot) return unavailable('no-artifact', 'No Nautilus log has been delivered for this policy yet.');
+      artifactRoot = standaloneRoot;
+      folder = 'tests';
     } else {
       // Keep the managed artifacts boundary consistent with kelpEditScopes.kelpArtifactRoot.
       const artifacts = join(dirname(projectFile), 'artifacts');
@@ -35,14 +53,15 @@ export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
         return unavailable('no-artifact', 'No Nautilus log has been delivered for this policy yet.');
       const project = JSON.parse(readFileSync(projectFile, 'utf8'));
       const rows = project.project.structure.entities.filter((row: unknown) =>
-        row !== null && typeof row === 'object' && (row as { key?: unknown }).key === 'medical-validation');
-      if (rows.length !== 1) return unavailable(rows.length ? 'ambiguous-mv' : 'unmapped-mv', 'The project must configure one medical-validation entity for its Nautilus log.');
+        row !== null && typeof row === 'object' && (row as { key?: unknown }).key === 'qa');
+      // Private legacy reason tags also control the host's informational missing-mapping notice.
+      if (rows.length !== 1) return unavailable(rows.length ? 'ambiguous-mv' : 'unmapped-mv', 'The project must configure one qa entity for its Codify-owned Nautilus log.');
       folder = rows[0].folder;
       artifactRoot = realpathSync(kelpArtifactRoot(policySrc, projectFile));
     }
     if (typeof folder !== 'string' || !folder || isAbsolute(folder) || win32.isAbsolute(folder) ||
       /[\\:\x00-\x1f]/.test(folder) || folder.split('/').some(part => !part || part === '.' || part === '..'))
-      return unavailable('unsafe-folder', 'The configured medical-validation folder is not a safe policy-relative folder.');
+      return unavailable('unsafe-folder', 'The configured qa folder is not a safe policy-relative folder.');
     if (!inside(artifactRoot, realpathSync(policySrc))) return unavailable('outside-artifact', 'The selected policy is outside its configured artifact.');
     const parts = [...folder.split('/'), 'nautilus-log.md'];
     let filePath = artifactRoot;
@@ -56,8 +75,8 @@ export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
       }
       if (entry.isSymbolicLink() || (index === parts.length - 1 ? !entry.isFile() : !entry.isDirectory()))
         return index < parts.length - 1 && !entry.isSymbolicLink()
-          ? unavailable('not-a-folder', 'The configured medical-validation folder contains an entry that is not a directory. Check log delivery and the project mapping.')
-          : unavailable('unsafe-file', 'The Nautilus log must be a regular file inside its medical-validation folder, without linked folders or files.');
+          ? unavailable('not-a-folder', 'The configured qa folder contains an entry that is not a directory. Check log delivery and the project mapping.')
+          : unavailable('unsafe-file', 'The Nautilus log must be a regular file inside its Codify output folder, without linked folders or files.');
       if (index === parts.length - 1 && entry.size > MV_REPROCESS_LOG_MAX_BYTES)
         return unavailable('too-large', 'The Nautilus log exceeds the 2 MiB preview limit; its history remains unchanged.');
     }
