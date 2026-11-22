@@ -2861,7 +2861,7 @@ Pending57 lockstep version/lock metadata is classified separately from this comm
 
 ## Schema-6 Nautilus log discovery maintenance for release 6.4.58
 
-Baseline `1884b58c3c4feae542dfa2328ac1df8fbafaddbb`; target is finalized by the separate audit metadata commit. Current kit schema2.50/hash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7 remain unchanged. All changed paths since the baseline inspected, including prior audit/coverage metadata and release57 lockstep versions. The new correction removes an accidental schema1-only project-discovery check; it does not change any authoring-kit claim, CRL/CEL semantics, emission, native runtime or human MV lifecycle.
+Baseline `1884b58c3c4feae542dfa2328ac1df8fbafaddbb`; reviewed target `613aa3959e68075d48ad92022ba738765e22fd94`. Current kit schema2.50/hash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7 remain unchanged. All changed paths since the baseline inspected, including prior audit/coverage metadata and release57 lockstep versions. The new correction removes an accidental schema1-only project-discovery check; it does not change any authoring-kit claim, CRL/CEL semantics, emission, native runtime or human MV lifecycle.
 
 - `packages/crl-vscode/src/kelpEditScopes.ts`: not author-facing; shape-limited filesystem discovery accepts a positive safe-integer project schema and wrapped entity array. KELP CLI still validates full supported schema/status/ownership before editing. No semantic support is inferred for an arbitrary future version.
 - `packages/crl-vscode/src/kelpEditScopes.test.mjs`: not author-facing; schema1/6/7 locator controls and malformed version/wrapper/entity shape refusals. Version7 establishes locator behavior only.
@@ -2872,3 +2872,5 @@ Baseline `1884b58c3c4feae542dfa2328ac1df8fbafaddbb`; target is finalized by the 
 - Prior audit.json/coverage.md interval: metadata-only unchanged-kit audit; no kit owning assertion, tag, fixture or canonical example changed.
 
 Focused RED24checks against prior helper; GREEN38PASS/1Windows file-symlink privilege skip. Native implementation review1539 converged0C0I0N; external expressly waived. Source full suite, actual archives, installed schema6 UI and publication are independent release gates, not established by these counts. Existing57 schema1 installed evidence did not qualify real HCSC schema6 and is not relabeled as a pass.
+
+Completed maintenance binding: target `613aa3959e68075d48ad92022ba738765e22fd94`, unchanged schema2.50/hash c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7. Native1539 ledger follow-up0C0I0N; external waived. Audit binds reviewed source only; release execution and actual HCSC acceptance remain independent.
