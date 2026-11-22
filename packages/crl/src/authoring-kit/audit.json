@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "f963a7b3b1d228fdd72da3d532130e8d69cfd1db",
+  "auditedRevision": "07f0502870c48f7e6632a5c4798ff07163a7d52a",
   "auditedSchemaVersion": "2.50",
   "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
-  "scope": "Schema 2.50 unchanged-content maintenance through Codify-owned Nautilus log reader. Complete delta from613aa395 classified in coverage.md, including prior audit metadata. Primary configured qa output and bounded standalone package/watch repairs are read-only UI behavior; no authoring-kit content, language, emitter, native runtime or engine change. Historical release evidence remains tied to its actual source. Source, installed-artifact, producer adoption and staging acceptance are separate proof tiers.",
+  "scope": "Schema 2.50 unchanged-content maintenance through bounded independent supplemental SDK assembly. Complete 15-path delta from f963a7b3 classified in coverage.md with all19 new parameterized cases. Original-context publication/profile/presentation semantics preserved; engineering-only same-process captures and explicit bindings add no CRL syntax or CLI/MCP/source CRE/CEL capability. Original entries and KELP packaging/MV navigation limitations explicit. Source/native evidence is separate from installed59 archives, mapped/extracted packages and deployed acceptance.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
