@@ -9,6 +9,8 @@ import {transformSync} from 'esbuild';
 import {COCKPIT_WEBVIEW_SCRIPT} from './correspondenceCockpit.ts';
 import {PaneRevealCoordinator} from './paneRevealCoordinator.ts';
 import {initialState,reduce} from './correspondenceEngine.ts';
+import {uncertaintyGuardCandidates,uncertaintyGuardExpanded} from './uncertaintyGuardDisplay.ts';
+import {projectFlowStructure} from './flowProjection.ts';
 import {installLformsReviewControls} from './lformsReviewControls.ts';
 import {browserExecutable,browserFixture} from '../test/browserHarness.mjs';
 
@@ -27,14 +29,17 @@ function delayedNavigationHost(){
   driveFailedCriteriaPeek:()=>failedOrigins.push(c.scrollSuppressPane),driveDiverters(){},driveLeafMarks(){},syncQuestionnaireDefaults(){},shouldRerenderQuestionnaire:()=>false,cockpitAgentBridge:{notifyChanged(){}},
   inspectedRoutes:()=>[{nodeKeys:['root','terminal']}],uncertaintyGuardCandidates:()=>new Map(),projectFlowStructure:()=>[],expandedUncertaintyGuards:new Set(),collapsedUncertaintyGuards:new Set(),forcedUncertaintyGuards:new Map(),
   unpinnedFocus:{token:'focus',options:[{caseId:'case',route:{terminalId:'route'}}],index:0},expandedGuardWhens:new Set(),expandTraversalCriteria:()=>new Set(['criterion']),crlStructure:[],conceptLayer:[],guardOutlines:new Map(),
-  buildDefExprResolver(){},answerOptionsForDisplay(){},answersFromTerminologyForDisplay(){},postTreeFocus(){},
+  buildDefExprResolver(){},answerOptionsForDisplay(){},answersFromTerminologyForDisplay(){},postTreeFocus(){},conceptNodesForRow:()=>[],
   renderPane:()=>{view.gen=coord.startRender('tree');view.indexVersion=c.indexVersion;view.acked=false;},
   toIndex:()=>({...index,version:c.indexVersion}),toCelNav:()=>[],model:{},scenarios:{},caseIdByName:{},duplicateScenarioNames:new Set()});
  vm.runInContext(transformSync(['highlightRows','postReveal','applyReveal','dispatch','selectTreeTraversal'].map(body).join('\n'),{loader:'ts',target:'es2022'}).code,c);
  const rebuild=root.body.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='rebuild');
  const selection=rebuild.body.statements.find(n=>ts.isExpressionStatement(n)&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(ast)==='dispatch'&&n.expression.arguments[0]?.getText(ast).includes('"setInputs"'));
  assertSelection(selection);
- return {c,view,messages,failedOrigins,refresh(preserve=true){c.preservePin=preserve;c.indexVersion++;coord.clearPending('tree');vm.runInContext(transformSync(selection.getText(ast),{loader:'ts'}).code,c);c.renderPane('tree');},flush(){view.acked=true;const target=coord.ready('tree',view.gen,c.indexVersion);if(target)c.postReveal('tree',target);return target;}};
+ const snapshot=rebuild.body.statements.find(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(ast)==='uncertaintyDisclosure'));
+ const restore=rebuild.body.statements.filter(n=>ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(ast)==='preserveUncertainty')||ts.isExpressionStatement(n)&&/^(expandedUncertaintyGuards|collapsedUncertaintyGuards|forcedUncertaintyGuards|indexVersion)\s*(=|\+=)/.test(n.getText(ast)));
+ if(restore.length<4)throw Error('Missing actual rebuild uncertainty reset/index statements');
+ return {c,view,messages,failedOrigins,refresh(preserve=true,nextStructure=c.crlStructure){c.preservePin=preserve;c.nextStructure=nextStructure;coord.clearPending('tree');vm.runInContext(transformSync(`(()=>{${snapshot?.getText(ast)||''} crlStructure=nextStructure;${restore.map(n=>n.getText(ast)).join('\n')}${selection.getText(ast)}})()`,{loader:'ts'}).code,c);c.renderPane('tree');},flush(){view.acked=true;const target=coord.ready('tree',view.gen,c.indexVersion);if(target)c.postReveal('tree',target);return target;}};
 }
 function assertSelection(node){if(!node)throw Error('Missing actual rebuild selection dispatch');}
 
@@ -47,6 +52,46 @@ it('same-policy sidecar refresh replays selection without root navigation while 
  expect(h.c.state.selection.routeId).toBeUndefined();
  h.c.dispatch({type:'select',selection:{primary:'cel',caseId:'case'}});expect(h.messages.at(-1).scrollTo).toBe('render-root');
  const fresh=delayedNavigationHost();fresh.refresh(false);fresh.flush();expect(fresh.messages.at(-1).scrollTo).toBe('render-root');
+});
+it('unchanged-structure refresh preserves Show and Hide choices through actual rebuild state resets and ACK',()=>{
+ const h=delayedNavigationHost();
+ const node=(nodeKey,kind,children=[],extra={})=>({nodeKey,nodeId:nodeKey,lib:'L',decision:'D',kind,label:nodeKey,refKeys:[],location:{},children,...extra});
+ const terminal=key=>node(key,'action',[],{refKeys:['activity'],actionKind:'recommend-activity'});
+ h.c.crlStructure=[{nodeKey:'D',lib:'L',decision:'D',location:{},children:[node('u','when',[terminal('met')],{uncertaintyGuard:{passWhen:true},refKeys:['guard']}),node('otherwise','otherwise',[terminal('unmet')])]}];
+ Object.assign(h.c,{uncertaintyGuardCandidates,uncertaintyGuardExpanded,projectFlowStructure,
+  reduce:(state,action)=>({...reduce(state,action),effects:[{pane:'tree',target:{kind:'crlNode',id:'u'}}]})});
+ h.view.anchors.u={scrollTo:'guard-anchor',segmentIds:['guard-anchor']};
+ expect(uncertaintyGuardCandidates(projectFlowStructure(h.c.crlStructure)).size).toBe(1);
+ h.c.expandedUncertaintyGuards.add('u');h.c.forcedUncertaintyGuards.set('u','case');
+ h.refresh();const first=h.flush();
+ expect(first.expandUncertainty).toBe(false);expect(first.preserveViewport).toBe(true);
+ expect(h.c.expandedUncertaintyGuards.has('u')).toBe(true);expect(h.c.forcedUncertaintyGuards.size).toBe(0);
+ expect(h.messages.at(-1).segmentIds).toContain('guard-anchor');expect(h.messages.at(-1).scrollTo).toBeUndefined();
+ h.c.expandedUncertaintyGuards.delete('u');h.c.collapsedUncertaintyGuards.add('u');h.refresh();h.flush();
+ expect(h.c.expandedUncertaintyGuards.has('u')).toBe(false);expect(h.c.collapsedUncertaintyGuards.has('u')).toBe(true);
+ h.c.applyReveal({pane:'tree',target:{kind:'crlNode',id:'u'}});h.flush();
+ expect(h.c.expandedUncertaintyGuards.has('u')).toBe(true);expect(h.c.collapsedUncertaintyGuards.has('u')).toBe(false);
+ h.refresh();h.flush();expect(h.c.expandedUncertaintyGuards.has('u')).toBe(true);expect(h.messages.at(-1).scrollTo).toBeUndefined();
+ const changed=structuredClone(h.c.crlStructure);changed[0].children[0].uncertaintyGuard.passWhen=false;
+ h.refresh(true,changed);h.flush();expect(h.c.expandedUncertaintyGuards.size).toBe(0);expect(h.c.collapsedUncertaintyGuards.size).toBe(0);
+ h.c.expandedUncertaintyGuards.add('u');h.refresh(false);expect(h.c.expandedUncertaintyGuards.size).toBe(0);
+ h.flush();expect(h.c.expandedUncertaintyGuards.has('u')).toBe(true);expect(h.view.acked).toBe(false);
+ h.flush();expect(h.messages.at(-1).scrollTo).toBe('guard-anchor');
+});
+it('overlapping preserving refreshes reject stale ACK while the latest reveal retains disclosure and pan',()=>{
+ const h=delayedNavigationHost();h.c.expandedUncertaintyGuards.add('u');
+ h.refresh();const staleGen=h.view.gen,staleIndex=h.c.indexVersion;
+ h.refresh();expect(h.c.coord.ready('tree',staleGen,staleIndex)).toBeUndefined();
+ const target=h.flush();expect(target.preserveViewport).toBe(true);expect(h.c.expandedUncertaintyGuards.has('u')).toBe(true);expect(h.messages.at(-1).scrollTo).toBeUndefined();
+});
+it('passive tree preservation leaves observable CRL and source reveal scrolling unchanged',()=>{
+ const h=delayedNavigationHost();
+ h.c.unitsForRow=()=>['u'];
+ for(const pane of ['crl','source']){
+  const v={...h.view,gen:h.c.coord.startRender(pane),acked:false,anchors:{u:{scrollTo:'other-pane-anchor',segmentIds:['other-pane-anchor']}}};h.c.views.set(pane,v);h.c.scrollSuppressPane='tree';
+  h.c.applyReveal({pane,target:{kind:'crlNode',id:'u'}},true);
+  const target=h.c.coord.ready(pane,v.gen,1);expect(target.preserveViewport).toBe(false);h.c.postReveal(pane,target);expect(h.messages.at(-1).scrollTo).toBe('other-pane-anchor');
+ }
 });
 it('actual replay preserves the viewport through immediate and queued coordinator delivery; direct reveals still navigate',()=>{
  const calls=[],view={gen:1,indexVersion:1,acked:true},coord=new PaneRevealCoordinator();coord.setPaneCapability('tree','renderable');coord.startRender('tree');coord.ready('tree',1,1);

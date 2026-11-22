@@ -16,8 +16,8 @@ const source=readFileSync(join(dirname(fileURLToPath(import.meta.url)),'correspo
 const parsed=ts.createSourceFile('cockpit.ts',source,ts.ScriptTarget.Latest,true);
 let fn;function visit(node){if(ts.isFunctionDeclaration(node)&&node.name?.text==='openMvFixLog')fn=node;ts.forEachChild(node,visit);}visit(parsed);assert.ok(fn);
 
-function fixture(){
-  const temp=realpathSync(tmpdir()),root=mkdtempSync(join(temp,'crl-mv-fix-host-')),artifact=join(root,'artifacts/policy'),src=join(artifact,'src');
+function fixture(layout='artifacts/policy'){
+  const temp=realpathSync(tmpdir()),root=mkdtempSync(join(temp,'crl-mv-fix-host-')),artifact=join(root,layout),src=join(artifact,'src');
   mkdirSync(join(src,'crl'),{recursive:true});mkdirSync(join(src,'cel'));writeFileSync(join(artifact,'package.json'),'{}');
   const cel=join(src,'cel/policy.cel');writeFileSync(cel,'Synthetic; no evaluation');
   const config=folder=>writeFileSync(join(root,'kelp.project.json'),JSON.stringify({project:{schemaVersion:1,structure:{entities:folder?[{key:'qa',folder,producer:'script'}]:[]}}}));config('tests');
@@ -134,6 +134,20 @@ test('standalone debug policies explain that the log mapping is unavailable with
   const f=fixture();try{
     unlinkSync(join(f.root,'kelp.project.json'));const h=host(f);await h.c.openMvFixLog('owned');
     assert.equal(h.messages.at(-1)[0],'info');assert.equal(h.calls.length,0);
+  }finally{f.close();}
+});
+test('a debug policy under an ancestor project but outside its managed artifacts reports information without writes',async()=>{
+  const f=fixture('examples/policy');try{
+    const h=host(f);
+    for(const folder of ['tests','../unsafe',null]){f.config(folder);await h.c.openMvFixLog('owned');
+      assert.equal(h.messages.at(-1)[0],'info');assert.match(h.messages.at(-1)[1],/not in a managed KELP artifact/);assert.equal(h.calls.length,0);}
+
+  }finally{f.close();}
+});
+
+test('incomplete managed artifact warns specifically without writes',async()=>{
+  const f=fixture();try{const h=host(f);unlinkSync(join(f.artifact,'package.json'));await h.c.openMvFixLog('owned');
+    assert.equal(h.messages.at(-1)[0],'warning');assert.match(h.messages.at(-1)[1],/incomplete; check artifact delivery/);assert.equal(h.calls.length,0);
   }finally{f.close();}
 });
 

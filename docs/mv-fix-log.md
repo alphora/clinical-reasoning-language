@@ -6,7 +6,7 @@ The report is an agent assessment. Reading it does not mark a flag Fixed or Appr
 
 ## File contract
 
-Find the artifact's `kelp.project.json`, then the unique `project.structure.entities` row whose `key` is `qa`. The report is at:
+Find the policy's `kelp.project.json` and require a managed artifact under that project's `artifacts/` directory, then the unique `project.structure.entities` row whose `key` is `qa`. The report is at:
 
 ```text
 <artifact>/<configured qa folder>/reprocess-log.md
@@ -18,7 +18,7 @@ The reader requires the `qa` row. A project whose `tests` folder belongs to a di
 
 The log is artifact-wide. Entries identify their policy, run, baseline and current candidate so multiple policies or re-authoring runs remain distinguishable. Pipeline owns the content: save the same final MV-fix report section, append new entries while preserving history, and avoid duplicating an entry for a repeated no-change Finalize. Include the log in the normal QA delivery inventory and preserve it across output generation. Record actual Before/After, the source-based ruling, the selected flag or explicit clarification supporting the change, retained/retired review context and checks not run. An unimplemented request carries its actual reason. Do not invent execution evidence or human approval.
 
-The action looks up the current mapping and file when clicked, including after the first report arrives. A missing file or unsupported mapping explains the limitation without blocking MV. An unmanaged/debug workspace reports that no project mapping is available. A policy switch or a location change during opening cancels that open. The reader refuses linked report files/folders and paths escaping the artifact. Histories larger than 2 MiB explain the preview limit and remain unchanged. It never creates, modifies or regenerates the report.
+The action looks up the current mapping and file when clicked, including after the first report arrives. A missing file or unsupported mapping explains the limitation without blocking MV. An unmanaged/debug workspace, including a debug policy outside an ancestor project's `artifacts/` directory or at that directory's root, reports that no managed-artifact mapping is available. An incomplete managed artifact package or invalid project configuration reports a warning with the specific delivery/configuration problem. A policy switch or a location change during opening cancels that open. The reader refuses linked report files/folders and paths escaping the artifact. Histories larger than 2 MiB explain the preview limit and remain unchanged. It never creates, modifies or regenerates the report.
 
 Rendering uses VS Code's existing Markdown preview and its normal trust, link and image behavior. It is locked to this document rather than following other focused Markdown files. Each click resolves the current report location and issues the locked-preview command; native preview owns its reuse and refresh behavior. Preview availability is checked before adding a read-only setting. Later opening failures also report a warning.
 

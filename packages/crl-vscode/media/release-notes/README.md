@@ -1,8 +1,22 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.55.
+Updates since CRL 6.4.41 through 6.4.56.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.56 — Read the fix report without losing your place
+
+### Open the MV fix log
+
+Choose MV fix log in Actions to read the running report of changes made after review\. Earlier entries remain visible\. The report opens read\-only; reading it does not approve a flag or change your verdict\.
+
+![Medical Validation Actions beside a read\-only MV fix log showing two appended synthetic comparison entries\.](mv-fix-log.png)
+
+Synthetic report with both the earlier comparison and its follow\-up visible\. No patient information is shown\.
+
+### Keep your place during review
+
+Expanding a terminal path or setting a Verdict from FHIR Questionnaire keeps the tree where you left it, including after the review refresh\. Focus still takes you to the selected question\.
 
 ## 6.4.55 — Review policy paths from the questionnaire
 

@@ -50,7 +50,7 @@ test('missing, duplicate, differently named and malformed mappings explain witho
     f.config([{ key: 'qa', folder: 'tests' }, { key: 'qa', folder: 'src/qa' }]);
     assert.equal(resolveMvReprocessLog(f.src).reason, 'ambiguous-qa');
     writeFileSync(join(f.root, 'kelp.project.json'), 'invalid');
-    const invalid = resolveMvReprocessLog(f.src); assert.equal(invalid.kind, 'unavailable'); assert.ok(!invalid.message.includes(f.root));
+    const invalid = resolveMvReprocessLog(f.src); assert.equal(invalid.reason, 'invalid-project'); assert.equal(invalid.kind, 'unavailable'); assert.ok(!invalid.message.includes(f.root));
     unlinkSync(join(f.root, 'kelp.project.json')); assert.equal(resolveMvReprocessLog(f.src).reason, 'no-project');
     assert.equal(resolveMvReprocessLog(join(f.src, 'gone')).kind, 'unavailable');
   } finally { f.close(); }
@@ -62,6 +62,15 @@ test('large histories have an explicit preview limitation rather than an unbound
     assert.equal(resolveMvReprocessLog(f.src).reason,'too-large');
     truncateSync(report,MV_REPROCESS_LOG_MAX_BYTES);
     assert.equal(resolveMvReprocessLog(f.src).kind,'available');
+  }finally{f.close();}
+});
+test('debug policies have no mapping while a managed artifact missing its package reports a delivery problem',()=>{
+  const f=fixture();try{
+    const debug=join(f.root,'examples/policy/src');mkdirSync(debug,{recursive:true});
+    assert.equal(resolveMvReprocessLog(debug).reason,'no-artifact');
+    assert.equal(resolveMvReprocessLog(join(f.root,'artifacts')).reason,'no-artifact');
+    for(const rows of [[],[{key:'qa',folder:'../unsafe'}]]){f.config(rows);assert.equal(resolveMvReprocessLog(debug).reason,'no-artifact');}
+    f.config([{key:'qa',folder:'tests'}]);unlinkSync(join(f.artifact,'package.json'));const broken=resolveMvReprocessLog(f.src);assert.equal(broken.reason,'artifact-layout');assert.match(broken.message,/incomplete; check artifact delivery/);
   }finally{f.close();}
 });
 

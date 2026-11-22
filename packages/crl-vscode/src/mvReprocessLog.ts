@@ -1,6 +1,6 @@
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, relative, sep, win32 } from 'node:path';
-import { findKelpProject, kelpArtifactRoot } from './kelpEditScopes';
+import { dirname, isAbsolute, join, relative, sep, win32 } from 'node:path';
+import { findKelpProject, kelpArtifactRoot, KelpEditError } from './kelpEditScopes';
 
 export type MvReprocessLog =
   | { kind: 'available'; filePath: string; artifactRoot: string }
@@ -23,6 +23,10 @@ export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
   try {
     const projectFile = findKelpProject(policySrc);
     if (!projectFile) return unavailable('no-project', 'This policy has no KELP project configuration for an MV fix log.');
+    // Keep the managed artifacts boundary consistent with kelpEditScopes.kelpArtifactRoot.
+    const artifacts = join(dirname(projectFile), 'artifacts');
+    if (!relative(artifacts, policySrc) || !inside(artifacts, policySrc))
+      return unavailable('no-artifact', 'This policy is not in a managed KELP artifact; no MV fix log mapping is available.');
     const project = JSON.parse(readFileSync(projectFile, 'utf8'));
     const rows = project.project.structure.entities.filter((row: unknown) =>
       row !== null && typeof row === 'object' && (row as { key?: unknown }).key === 'qa');
@@ -53,7 +57,11 @@ export function resolveMvReprocessLog(policySrc: string): MvReprocessLog {
     filePath = realpathSync(filePath);
     if (!inside(artifactRoot, filePath)) return unavailable('outside-artifact', 'The MV fix log is outside its configured artifact.');
     return { kind: 'available', filePath, artifactRoot };
-  } catch {
+  } catch (error) {
+    if (error instanceof KelpEditError && error.code === 'artifact-layout')
+      return unavailable('artifact-layout', 'This policy\'s managed KELP artifact package is incomplete; check artifact delivery.');
+    if (error instanceof KelpEditError && error.code === 'invalid-project')
+      return unavailable('invalid-project', 'The KELP project configuration is invalid or unreadable; check its format and file access.');
     return unavailable('unreadable', 'The MV fix log location could not be read. Check the KELP project configuration and file access.');
   }
 }

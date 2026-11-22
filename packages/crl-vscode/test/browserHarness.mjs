@@ -19,11 +19,11 @@ export async function browserFixture(html) {
   const runnerArgs = process.platform === 'linux' && process.env.GITHUB_ACTIONS === 'true' ? ['--no-sandbox'] : [];
   const child = spawn(browserExecutable, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     ...runnerArgs, '--remote-debugging-port=0', '--user-data-dir=' + join(root, 'profile'), pathToFileURL(file).href], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-  let stderr = '', spawnError, exited;
+  let stderr = '', spawnError, exited, lastStartupError;
   child.stderr.on('data', value => { stderr += value; }); child.on('error', error => { spawnError = error; });
   child.on('close', (code, signal) => { exited = { code, signal }; });
   const diagnostics = () => 'executable: ' + browserExecutable + '\n' + (stderr.length <= 3500 ? stderr
-    : stderr.slice(0, 2500) + '\n...[stderr truncated]...\n' + stderr.slice(-1000));
+    : stderr.slice(0, 2500) + '\n...[stderr truncated]...\n' + stderr.slice(-1000)) + (lastStartupError ? '\nLast startup probe: ' + lastStartupError : '');
   const sockets = new Set();
   const until = async (fn, label, timeoutMs = 15000) => {
     const startedAt = Date.now(), end = startedAt + timeoutMs;
@@ -38,7 +38,14 @@ export async function browserFixture(html) {
   try {
     const port = await until(() => /DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)/.exec(stderr)?.[1], 'owned debug port', 45000);
     if (process.env.GITHUB_ACTIONS === 'true') console.log('Test browser ready: ' + browserExecutable + ' in ' + (Date.now() - startedAt) + 'ms');
-    const target = await until(async () => (await (await fetch('http://127.0.0.1:' + port + '/json')).json()).find(t => t.type === 'page'), 'page');
+    const target = await until(async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:' + port + '/json', { signal: AbortSignal.timeout(1000) });
+        if (!response.ok) { lastStartupError = 'Target discovery HTTP ' + response.status; return false; }
+        return (await response.json()).find(t => t.type === 'page');
+      } catch (error) { lastStartupError = String(error); return false; }
+    }, 'page');
+    lastStartupError = undefined;
     const socket = new WebSocket(target.webSocketDebuggerUrl); sockets.add(socket);
     await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
     let next = 0; const pending = new Map();
@@ -55,7 +62,14 @@ export async function browserFixture(html) {
       const result = await rpc('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
       if (result.exceptionDetails) throw Error(JSON.stringify(result.exceptionDetails)); return result.result.value;
     };
-    await until(() => evaluate('document.readyState === "complete"'), 'loaded fixture');
+    await until(async () => {
+      try { return await evaluate(`location.href === ${JSON.stringify(pathToFileURL(file).href)} && document.readyState === "complete"`); }
+      catch (error) {
+        if (/execution context was destroyed|cannot find (?:default execution )?context|inspected target navigated|session with given id not found/i.test(String(error))) { lastStartupError = String(error); return false; }
+        throw Error(String(error) + '\n' + diagnostics(), { cause: error });
+      }
+    }, 'loaded fixture');
+    lastStartupError = undefined;
     return { evaluate, rpc, until, async close() {
       try { await rpc('Browser.close'); } catch {} finally {
         for (const socket of sockets) socket.close();

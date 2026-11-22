@@ -1,6 +1,6 @@
 {
   "baselineVersion": "6.4.41",
-  "deployedBaselineVersion": "6.4.48",
+  "deployedBaselineVersion": "6.4.54",
   "releases": [
     {
       "version": "6.4.46",
@@ -179,6 +179,23 @@
         {
           "title": "Review percentage and timing thresholds",
           "description": "Measurement questions can use percentages, such as LVEF, and milliseconds, such as QRS or PR duration. Policies can compare those values with an inclusive at-least or at-most threshold while keeping the measurement unit explicit."
+        }
+      ]
+    },
+    {
+      "version": "6.4.56",
+      "title": "Read the fix report without losing your place",
+      "features": [
+        {
+          "title": "Open the MV fix log",
+          "description": "Choose MV fix log in Actions to read the running report of changes made after review. Earlier entries remain visible. The report opens read-only; reading it does not approve a flag or change your verdict.",
+          "image": "mv-fix-log.png",
+          "alt": "Medical Validation Actions beside a read-only MV fix log showing two appended synthetic comparison entries.",
+          "caption": "Synthetic report with both the earlier comparison and its follow-up visible. No patient information is shown."
+        },
+        {
+          "title": "Keep your place during review",
+          "description": "Expanding a terminal path or setting a Verdict from FHIR Questionnaire keeps the tree where you left it, including after the review refresh. Focus still takes you to the selected question."
         }
       ]
     }

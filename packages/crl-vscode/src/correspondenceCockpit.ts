@@ -1124,7 +1124,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function applyReveal(e: Effect, replay = false): void {
     const v = views.get(e.pane);
     if (!v) return;
-    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay, preserveViewport:replay || e.pane === scrollSuppressPane }, indexVersion);
+    coord.queueReveal(e.pane, { ...e.target, expandUncertainty: !replay, preserveViewport:e.pane === 'tree' && (replay || e.pane === scrollSuppressPane) }, indexVersion);
     // Steady-state flush ONLY when the pane's CURRENT render is acked AND is for the current index. During a rebuild
     // the global indexVersion has advanced past the still-acked old render, so this is skipped and the reveal waits for
     // the new render's ack (avoiding a flush against the about-to-be-replaced DOM that would also drop the new reveal).
@@ -1412,7 +1412,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       validatePolicy();
       const report = resolveMvReprocessLog(snapshot.src);
       if (report.kind !== 'available') {
-        void (report.kind === 'missing' || report.reason === 'no-project' || report.reason === 'unmapped-qa' ? vscode.window.showInformationMessage(report.message) : vscode.window.showWarningMessage(report.message));
+        void (report.kind === 'missing' || report.reason === 'no-project' || report.reason === 'no-artifact' || report.reason === 'unmapped-qa' ? vscode.window.showInformationMessage(report.message) : vscode.window.showWarningMessage(report.message));
         return;
       }
       await openReadonlySourceDocument(report.filePath, () => {
@@ -4122,6 +4122,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // ── (re)build the model from the active .cel ──
   function rebuild(preservePin = false): void {
     if (!currentCel) return;
+    const uncertaintyDisclosure = preservePin ? { structure: JSON.stringify(crlStructure), expanded: expandedUncertaintyGuards, collapsed: collapsedUncertaintyGuards } : undefined;
     const preserved=preservePin?pinnedCards:undefined;
     if(preservePin)for(const v of views.values())v.preserveNextTreeViewport=true;
     const d = discoverProvenance(currentCel);
@@ -4174,7 +4175,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       resetToEmpty(`Failed to build CRL/CEL model: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
-    expandedUncertaintyGuards = new Set(); collapsedUncertaintyGuards = new Set(); forcedUncertaintyGuards = new Map();
+    // Retain current disclosure only for the same structure; case/flag evidence is always recomputed.
+    const preserveUncertainty = uncertaintyDisclosure?.structure === JSON.stringify(crlStructure);
+    expandedUncertaintyGuards = preserveUncertainty ? uncertaintyDisclosure!.expanded : new Set();
+    collapsedUncertaintyGuards = preserveUncertainty ? uncertaintyDisclosure!.collapsed : new Set();
+    forcedUncertaintyGuards = new Map();
     indexVersion += 1;
     lastClicked = undefined;
     // #173 T3: the runtime-ref → CRL-row-nodeKey join (pure, off crlStructure). A prior peek's gap list is stale now.
