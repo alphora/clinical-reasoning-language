@@ -1,6 +1,6 @@
 {
   "baselineVersion": "6.4.41",
-  "deployedBaselineVersion": "6.4.54",
+  "deployedBaselineVersion": "6.4.58",
   "releases": [
     {
       "version": "6.4.46",
@@ -223,6 +223,16 @@
         {
           "title": "Read your policy processing history",
           "description": "Read the Nautilus processing history delivered with your policy. Medical Validation finds the log in Codify output, lights its button when available, and opens it read-only beside your review."
+        }
+      ]
+    },
+    {
+      "version": "6.4.59",
+      "title": "Policy processing maintenance",
+      "features": [
+        {
+          "title": "More flexible policy checks",
+          "description": "Policy checks can use questions with different answer sets while keeping each question's choices separate. Generated FHIR resources also preserve author contact details in the required structure."
         }
       ]
     }

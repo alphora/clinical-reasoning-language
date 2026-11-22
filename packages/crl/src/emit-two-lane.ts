@@ -4,7 +4,7 @@ import type { emitCQLImports } from "./imports/emit";
 import { emitDefinitionLanesFromPath } from "./fhir-emitter/closureOrchestrator";
 import { ExternalBindingError, type ExternalBindingsV1, type SnapshotProvenance, type SupportSubset } from "./emit/externalBindings";
 
-/** Unreleased v1 definition-assembly option. CRE/CEL do not consume external bindings. */
+/** SDK v1 definition-assembly option (6.4.59). CRE/CEL do not consume external bindings. */
 export interface EmitCrlTwoLaneOptions {
   date?: string;
   capability?: Capability;

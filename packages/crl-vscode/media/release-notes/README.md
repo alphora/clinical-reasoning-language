@@ -1,8 +1,14 @@
 # CRL Release Notes
 
-Updates since CRL 6.4.41 through 6.4.58.
+Updates since CRL 6.4.41 through 6.4.59.
 
 Managed environments provide KALM AI: What's New for the combined Release Notes.
+
+## 6.4.59 — Policy processing maintenance
+
+### More flexible policy checks
+
+Policy checks can use questions with different answer sets while keeping each question's choices separate\. Generated FHIR resources also preserve author contact details in the required structure\.
 
 ## 6.4.58 — Open the Nautilus log in managed projects
 

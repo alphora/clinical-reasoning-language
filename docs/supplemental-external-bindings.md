@@ -1,8 +1,8 @@
-# Independent supplemental definition assembly (unreleased)
+# Independent supplemental definition assembly
 
-This is a bounded SDK prototype on `codex/supplemental-external-bindings`, absent
-from CRL 6.4.58. It assembles definitions from independently authored parent and
-supplement packages in one process. It introduces no CRL syntax or CLI/MCP option.
+CRL 6.4.59 adds a bounded SDK interface, absent from CRL 6.4.58. It assembles
+definitions from independently authored parent and supplement packages in one
+process. It introduces no CRL syntax or CLI/MCP option.
 Source-side CRE/CEL evaluation with these bindings is unsupported.
 
 The supplement owns a selected Boolean Observation publication that the parent
@@ -78,9 +78,18 @@ closure invariants. There is no exemption for a foreign canonical base. Differen
 bases are not categorically forbidden, but actual catalog/resource collisions still
 fail and neither side is rewritten to hide them.
 
-The assembled result retains original entry canonicals. It does not implement
-KELP's proposed simultaneous mapping of the parent entry to its link identity and
-the supplemental entry to the public parent identity. KELP owns that package step;
-Pipeline leads its integration. This API is neither a second packager nor an MV
-canonical-terminal navigation implementation. Successful emission, native behavior,
-KELP package qualification and deployed UI acceptance are separate checks.
+For complete externally bound decision assemblies, the validated returned inventory
+omits unused generated recommendation PlanDefinitions and their unreferenced
+generated activities. Referenced support and CQL remain unchanged. Ordinary emission
+without external bindings and support-only component inventories retain their
+existing behavior. This does not qualify independently packaged source placeholders.
+
+The assembled result retains original entry canonicals. Parent `<artifact-id>` and
+supplemental `<artifact-id>-supp-<inc>` remain distinct authored artifacts, with
+independent MV cases, verdicts, review order and potential production use. Linking
+is optional at package time. KELP maps the parent entry to `<artifact-id>-link` and
+the supplemental entry to `<artifact-id>`, using the actual canonical namespace
+and version. Pipeline leads that integration. MV needs only ordinary canonical
+reference terminal admission; it has no parent/supplemental discovery role.
+Successful emission, native behavior, package qualification and deployed UI
+acceptance remain separate checks.
