@@ -23,7 +23,7 @@ function fixture(layout='artifacts/policy'){
   const temp=realpathSync(tmpdir()),root=mkdtempSync(join(temp,'crl-mv-fix-host-')),artifact=join(root,layout),src=join(artifact,'src');
   mkdirSync(join(src,'crl'),{recursive:true});mkdirSync(join(src,'cel'));writeFileSync(join(artifact,'package.json'),'{}');
   const cel=join(src,'cel/policy.cel');writeFileSync(cel,'Synthetic; no evaluation');
-  const config=folder=>writeFileSync(join(root,'kelp.project.json'),JSON.stringify({project:{schemaVersion:1,structure:{entities:folder?[{key:'medical-validation',folder,producer:'script'}]:[]}}}));config('src/medical-validation');
+  const config=folder=>writeFileSync(join(root,'kelp.project.json'),JSON.stringify({project:{schemaVersion:6,requiresKelp:'>=0.14.25',artifactBranchPrefix:'artifact/',ui:{},tracking:{},packaging:{},structure:{entities:folder?[{key:'medical-validation',folder,producer:'script'}]:[]}}}));config('src/medical-validation');
   const file=(path,text)=>{const p=join(artifact,path);mkdirSync(dirname(p),{recursive:true});writeFileSync(p,text);return p;};
   const flag=file('src/medical-validation/flags/keep.json','{"status":"open"}');
   return {root,artifact,src,cel,config,file,flag,close(){const rel=relative(temp,realpathSync(root));assert.ok(rel&&!isAbsolute(rel)&&!rel.startsWith('..'));rmSync(root,{recursive:true,force:true});}};

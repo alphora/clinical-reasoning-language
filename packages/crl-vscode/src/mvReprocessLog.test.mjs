@@ -4,12 +4,12 @@ import { join, dirname, relative, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resolveMvReprocessLog, MV_REPROCESS_LOG_MAX_BYTES } from './mvReprocessLog.ts';
 
-function fixture(folder = 'src/medical-validation') {
+function fixture(folder = 'src/medical-validation', schemaVersion = 6) {
   const temp = realpathSync(tmpdir()), root = mkdtempSync(join(temp, 'crl-mv-fix-log-'));
   const artifact = join(root, 'artifacts', 'neutral-policy'), src = join(artifact, 'src');
   mkdirSync(join(src, 'crl'), { recursive: true }); mkdirSync(join(src, 'cel'));
   writeFileSync(join(artifact, 'package.json'), '{}');
-  const config = rows => writeFileSync(join(root, 'kelp.project.json'), JSON.stringify({ project: { schemaVersion: 1, structure: { entities: rows } } }));
+  const config = rows => writeFileSync(join(root, 'kelp.project.json'), JSON.stringify({ project: { schemaVersion, requiresKelp: '>=0.14.25', remote: {}, artifactBranchPrefix: 'artifact/', structure: { entities: rows }, ui: {}, tracking: {}, packaging: {} } }));
   config([{ key: 'medical-validation', folder, producer: 'script', needs: ['cel', 'cql', 'fhir'] }]);
   const report = (text = '# Nautilus log\n\nSynthetic agent report.\n') => {
     const file = join(artifact, folder, 'nautilus-log.md'); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, text); return file;
@@ -20,9 +20,9 @@ function fixture(folder = 'src/medical-validation') {
   } };
 }
 
-test('reads the configured MV folder, not a hard-coded src/qa or nearest nested package', () => {
+test.each([1, 6])('reads a wrapped schema-%s project with the configured MV folder', schemaVersion => {
   for (const folder of ['src/medical-validation', 'review/mv']) {
-    const f = fixture(folder); try {
+    const f = fixture(folder, schemaVersion); try {
       const report = f.report(); writeFileSync(join(f.src, 'package.json'), '{}');
       assert.deepEqual(resolveMvReprocessLog(f.src), { kind: 'available', artifactRoot: realpathSync(f.artifact), filePath: realpathSync(report) });
       assert.equal(readFileSync(report, 'utf8'), '# Nautilus log\n\nSynthetic agent report.\n');

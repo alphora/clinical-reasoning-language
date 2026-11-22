@@ -40,11 +40,14 @@ export function findKelpProject(start: string): string | undefined {
       try { raw = JSON.parse(readFileSync(file, 'utf8')); } catch (error) {
         throw new KelpEditError('invalid-project', `Cannot read managed KELP configuration: ${String(error)}`);
       }
-      if (!object(raw) || !object(raw.project) || raw.project.schemaVersion !== 1 ||
+      if (!object(raw) || !object(raw.project) || !Number.isSafeInteger(raw.project.schemaVersion) ||
+        (raw.project.schemaVersion as number) < 1 ||
         !object(raw.project.structure) || !Array.isArray(raw.project.structure.entities)) {
         throw new KelpEditError('invalid-project', `Invalid managed KELP configuration: ${file}`);
       }
-      return file; // CLI status validates the complete current schema, not an invented local substitute.
+      // Discovery reads only this stable mapping shape. It does not certify schema support:
+      // the installed KELP CLI validates the full configuration/status before every edit.
+      return file;
     }
     const parent = dirname(dir); if (parent === dir) return undefined; dir = parent;
   }

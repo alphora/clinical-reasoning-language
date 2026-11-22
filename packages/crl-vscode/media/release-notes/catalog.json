@@ -215,6 +215,16 @@
           "description": "Status, Legend, Actions and Source documents use bold headings in the theme's accent color. Gold glow remains on attention indicators, making them easier to distinguish."
         }
       ]
+    },
+    {
+      "version": "6.4.58",
+      "title": "Open the Nautilus log in managed projects",
+      "features": [
+        {
+          "title": "Read your policy processing history",
+          "description": "The Nautilus log now opens in workspaces using the current project configuration. Its button glows gold when a log is available, and the log opens read-only beside your review."
+        }
+      ]
     }
   ]
 }

@@ -78,6 +78,17 @@ test('nested managed discovery does not become standalone on malformed configura
   const nested=join(root,'artifacts','policy');mkdirSync(nested,{recursive:true});
   const cfg=join(root,'kelp.project.json');writeFileSync(cfg,JSON.stringify({project:{schemaVersion:1,structure:{entities:[]}}}));
   assert.equal(findKelpProject(nested),cfg);
+  for (const schemaVersion of [6, 7]) {
+   writeFileSync(cfg,JSON.stringify({project:{schemaVersion,structure:{entities:[]}}}));
+   assert.equal(findKelpProject(nested),cfg);
+  }
+  for (const schemaVersion of [0,-1,1.5,'6',null]) {
+   writeFileSync(cfg,JSON.stringify({project:{schemaVersion,structure:{entities:[]}}}));
+   assert.throws(()=>findKelpProject(nested),/managed KELP/);
+  }
+  for (const raw of [{schemaVersion:6,structure:{entities:[]}},{project:{schemaVersion:6}},{project:{schemaVersion:6,structure:{entities:{}}}}]) {
+   writeFileSync(cfg,JSON.stringify(raw));assert.throws(()=>findKelpProject(nested),/managed KELP/);
+  }
   writeFileSync(cfg,'invalid');assert.throws(()=>findKelpProject(nested),/managed KELP/);
   assert.equal(resolveKelpEntry({}),undefined);
   assert.throws(()=>resolveKelpEntry({setting:'kelp.cmd'}),/absolute JavaScript/);
