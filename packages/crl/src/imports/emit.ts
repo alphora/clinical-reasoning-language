@@ -481,7 +481,17 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
       errors: [...prepared.publications.diagnostics],
     };
   }
-  const rawEmitClosure = prepared.rawCqlClosure;
+  const externalScopes = prepared.external ? buildLibraryScopes(graph.resolvedLibraries, graph.localLibraries,
+    graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() }) : undefined;
+  // A validated external decision/publication replaces its compilation-only include.
+  // Prune only those routed source edges in the emitted view; original AST/scopes stay intact.
+  const rawEmitClosure = externalScopes ? prepared.rawCqlClosure.map(entry => ({ ...entry, ast: { ...entry.ast,
+    includes: entry.ast.includes.filter(include => {
+      const scope = externalScopes.get(entry.filePath);
+      const target = scope && lookupKnownLibrary(scope, include.name);
+      return !target || !prepared.external!.excludedSources.has(target.filePath);
+    }),
+  } })) : prepared.rawCqlClosure;
   const lowerErrors: CRLError[] = [];
   const domainIdFor = (entry: RegistryEntry): string | undefined => localDomainResolver.domainIdFor(entry);
   const disambiguatedBaseFor = (entry: RegistryEntry): string | undefined =>
@@ -499,12 +509,12 @@ export function emitCQLImportsFromPrepared(prepared: PreparedPublicationContext)
     return localDomainIdFor(domain, entry.ast.library.name, false);
   };
   // Filled from actual split/rename plans before consumers emit. Lowering needs only raw admission.
-  const renderedSourceByLibrary = new Map<string, string>();
-  const publicationTargets = new Map<string, { readonly libraryName: string; readonly define: string }>();
+  const renderedSourceByLibrary = new Map<string, string>(prepared.external?.support.cql.map(c => [c.value.libraryName, c.value.filePath] as const));
+  const publicationTargets = new Map<string, { readonly libraryName: string; readonly define: string }>(prepared.external?.targets);
   const publicationScopeFor = (entry: RegistryEntry): PublicationEmitScope => {
     // A rendered qualifier is routing metadata, never a grant of package visibility.
     // Admit foreign source identities only through this owner's original include scope.
-    const visibleSources = new Set([entry.filePath]);
+    const visibleSources = new Set([entry.filePath, ...(prepared.external?.visibleSources.get(entry.filePath) ?? [])]);
     for (const descriptor of prepared.publications.descriptors) {
       const hit = prepared.publications.lookup(entry.filePath, {
         type: "QualifiedReference", libraryName: descriptor.identity.libraryName,

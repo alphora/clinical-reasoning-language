@@ -1,3 +1,4 @@
+import { checkedArtifactUnion, assertCapturedClosure, ExternalBindingError, type ExternalBindingsV1, type SupportSubset, type SnapshotProvenance } from "../emit/externalBindings";
 import { publicationCaseFeatures } from "../emit/publicationInputs";
 import { publicationRetentionPlan } from "../emit/retentionPredicates";
 import { applyPlanExpressionInvariant } from "./planExpressionInvariant";
@@ -135,6 +136,7 @@ const CQL_FOLD_EXCLUDED_KINDS: ReadonlySet<string> = new Set([
 ]);
 
 export interface FhirDefClosureEmitResult {
+  externalAssembly?: { inventory: SupportSubset; provenance: readonly SnapshotProvenance[]; canonicalBases: readonly string[] };
   success: boolean;
   resources: EmittedResource[];
   errors: CRLError[];
@@ -1106,12 +1108,20 @@ export function emitFhirDefClosure(
     canonicalBase: metadata.canonicalBase, policyId: metadata.name,
   }),
   publicationTargets: ReadonlyMap<string, { libraryName: string; define: string }> = new Map(),
+  requiredPublications: readonly PublicationDescriptor[] = [],
 ): FhirDefClosureEmitResult {
   // REFACTOR:grounded (#320): the FHIR and CQL lanes consume this identical raw admission.
   const errors: CRLError[] = [...prepared.publications.diagnostics, ...prepared.publications.warnings];
   const unmatched: UnmatchedReference[] = [];
   const resources: EmittedResource[] = [];
-  const gatheredPublications = new Map<string, PublicationDescriptor>();
+  const gatheredPublications = new Map<string, PublicationDescriptor>(requiredPublications.map(d => [d.identity.key, d]));
+  const external = prepared.external;
+  const lookupManifest = external ? checkedArtifactUnion([
+    { resources: [], cql: cqlByLibrary.map(value => ({ value, origins: [] })) }, external.support,
+  ]).cql.map(item => item.value) : cqlByLibrary;
+  const canonicalForLibrary = (name: string): string =>
+    external?.canonicalByLibrary.get(name) ?? libraryCanonicalUrl(metadata, name);
+
 
   // Group the manifest by SOURCE library name so each source can emit one FHIR
   // Library per manifest entry. A source absent from the manifest (e.g. the
@@ -1136,7 +1146,7 @@ export function emitFhirDefClosure(
   // (slice-4c review: a global set would accept a Library cross-wired to another
   // source's emitted CQL file). Empty manifest → invariant is a no-op.
   const expectedFilenameByLibrary = new Map<string, string>(
-    cqlByLibrary.map((e) => [e.libraryName, e.outputFilename] as const),
+    lookupManifest.map((e) => [e.libraryName, e.outputFilename] as const),
   );
 
   // `executable` is not supported: emit produces design-time forms (text/cql
@@ -1220,7 +1230,10 @@ export function emitFhirDefClosure(
       return { libraryName, filePath, isPrimarySeed, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
     });
 
-  const presentationCatalogs = new Map(libraries.map((lib) => [lib.filePath, createPresentationCatalog(lib.ast, lib.filePath)]));
+  const presentationOwners = new Map(libraries.map(lib => [lib.filePath, { ast: lib.ast, filePath: lib.filePath }]));
+  for (const owner of prepared.declarations.getLibraries()) if (external?.support.cql.some(c => c.value.filePath === owner.sourceIdentity))
+    presentationOwners.set(owner.sourceIdentity, { ast: owner.ast, filePath: owner.sourceIdentity });
+  const presentationCatalogs = new Map([...presentationOwners].map(([identity, lib]) => [identity, createPresentationCatalog(lib.ast, lib.filePath)]));
 
   // Build the index ONCE (O(N) over closure).
   const index = buildAllLibrariesIndex(libraries);
@@ -1254,6 +1267,8 @@ export function emitFhirDefClosure(
       classification.rootKeys,
       metadata,
     );
+    const resolveDecision = (ref: ReferenceName): string | null =>
+      external?.decision(lib.filePath, ref) ?? sourceLibResolvers.decisionResolver(ref);
 
     // (1) ValueSets. The author ValueSets are emitted ONCE per source (their
     // slug + url are keyed on the SOURCE name, unchanged). They are the
@@ -1501,7 +1516,7 @@ export function emitFhirDefClosure(
         });
       }
       const cqlFileName = only ? `../../cql/${only.outputFilename}` : lib.cqlFileName;
-      const dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
+      const dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : []), ...(external?.visibleSources.has(lib.filePath) ? only?.includes ?? [] : []).flatMap(name => external?.canonicalByLibrary.has(name) ? [canonicalForLibrary(name)] : [])];
       // #227 — a single-entry source is the per-CRL Root; its id/url/name are the
       // unified `S` the CQL lane stamped as `only.libraryName` (`identityForEntry`).
       // This subsumes the #198 `code is` sibling case: each sibling now carries its
@@ -1526,6 +1541,11 @@ export function emitFhirDefClosure(
           e.libraryName,
           libraryCanonicalUrl(metadata, identityForEntry(e)),
         );
+      }
+      for (const [name, canonical] of external?.visibleSources.has(lib.filePath) ? external.canonicalByLibrary : []) {
+        const existing = siblingCanonicals.get(name);
+        if (existing && existing !== canonical) throw new ExternalBindingError("external-binding-library-conflict", "External Library identity collides with local manifest: " + name);
+        siblingCanonicals.set(name, canonical);
       }
       for (const entry of manifestEntries) {
         const cqlFileName = `../../cql/${entry.outputFilename}`;
@@ -1860,7 +1880,7 @@ export function emitFhirDefClosure(
       // REFACTOR:grounded (#320): preserve the admitted descriptor and resolve its actual CQL binding.
       const lookup = raw.shapeReduction === undefined ? undefined : prepared.publications.lookup(lib.filePath, name);
       const target = lookup?.kind === "publication" ? publicationTargets.get(lookup.descriptor.identity.key) : undefined;
-      const targetEntry = target === undefined ? undefined : cqlByLibrary.find((entry) => entry.libraryName === target.libraryName);
+      const targetEntry = target === undefined ? undefined : lookupManifest.find((entry) => entry.libraryName === target.libraryName);
       const publication = lookup?.kind === "publication" && target !== undefined && targetEntry !== undefined
         ? { descriptor: lookup.descriptor, target: { librarySuffix: identityForEntry(targetEntry), define: target.define, resultKind: "record" as const } }
         : undefined;
@@ -1910,7 +1930,7 @@ export function emitFhirDefClosure(
         const group = presentationOwner?.groupFor(descriptor.title);
         const groupFields = group === undefined ? undefined : (() => {
           const target = publicationTargets.get(descriptor.identity.key);
-          const entry = target && cqlByLibrary.find(candidate => candidate.libraryName === target.libraryName);
+          const entry = target && lookupManifest.find(candidate => candidate.libraryName === target.libraryName);
           if (!entry) {
             errors.push({ type: "Validation", kind: "presentation-group-invalid", message: `Choice group "${group.name}" lacks its emitted owning Library.` });
             return undefined;
@@ -1925,7 +1945,7 @@ export function emitFhirDefClosure(
             for (const dependency of publicationCaseFeatures(prepared.publications, descriptor.identity.sourceIdentity, name, "definitions")) gatheredPublications.set(dependency.identity.key, dependency);
             return [{ name, profile: hit.descriptor.profileUrl }];
           });
-          return { ...group, members, id: JSON.stringify([libraryCanonicalUrl(metadata, entry.libraryName), metadata.version ?? null, group.name]) };
+          return { ...group, members, id: JSON.stringify([canonicalForLibrary(entry.libraryName), external?.support.resources.find(r => r.value.resourceType === "Library" && r.value.resource.name === entry.libraryName)?.value.resource.version ?? metadata.version ?? null, group.name]) };
         })();
         return [{ name: descriptor.title, canonical: descriptor.profileUrl, resourceType: descriptor.resourceType, presentationOwner,
           ...(groupFields === undefined ? {} : { presentationGroup: groupFields }) }];
@@ -1971,7 +1991,7 @@ export function emitFhirDefClosure(
         metadata,
         sourceLibResolvers.conceptResolver,
         sourceLibResolvers.activityResolver,
-        sourceLibResolvers.decisionResolver,
+        resolveDecision,
         isRoot,
         resolvedOpts,
         libraryReferenceSuffix,
@@ -1989,8 +2009,8 @@ export function emitFhirDefClosure(
           const hit = prepared.publications.lookup(lib.filePath, ref);
           if (hit.kind !== "publication" || !supportsPublicationGuard(hit.descriptor)) return undefined;
           const target = publicationTargets.get(hit.descriptor.identity.key);
-          const entry = target && cqlByLibrary.find((candidate) => candidate.libraryName === target.libraryName);
-          return target && entry ? { ...target, canonical: libraryCanonicalUrl(metadata, identityForEntry(entry)) } : undefined;
+          const entry = target && lookupManifest.find((candidate) => candidate.libraryName === target.libraryName);
+          return target && entry ? { ...target, canonical: canonicalForLibrary(identityForEntry(entry)) } : undefined;
         },
         presentations,
         publicationRetentionPlan(prepared.publications, lib.filePath, lib.ast, decision).map(slot => {
@@ -2173,8 +2193,14 @@ export function emitFhirDefClosure(
   // Profiles gathered through a producer belong to the operand's raw owner, even when that
   // library has no decisions. Canonical, coding, answer set and public target are prepared data.
   for (const descriptor of gatheredPublications.values()) {
+    // Imported profiles are immutable actual provider resources.
+    if (external?.borrowedIdentityKeys.has(descriptor.identity.key)) {
+      if (!descriptor.profileUrl || !external.support.resources.some(r => r.value.resourceType === "StructureDefinition" && r.value.resource.url === descriptor.profileUrl))
+        errors.push({ type: "Validation", kind: "publication-binding-missing", message: "Captured external answer has no actual provider profile." });
+      continue;
+    }
     const target = publicationTargets.get(descriptor.identity.key);
-    const entry = target === undefined ? undefined : cqlByLibrary.find((candidate) => candidate.libraryName === target.libraryName);
+    const entry = target === undefined ? undefined : lookupManifest.find((candidate) => candidate.libraryName === target.libraryName);
     if (!hasLocalPublicationContribution(descriptor) || descriptor.profileUrl === undefined || target === undefined || entry === undefined) {
       errors.push({ type: "Validation", kind: "publication-binding-missing", message: `Publication "${descriptor.identity.libraryName}"."${descriptor.title}" lacks its prepared local profile or emitted public Record target.` });
       continue;
@@ -2252,14 +2278,23 @@ export function emitFhirDefClosure(
     type: "Validation", kind: error.code, message: error.message,
   })));
 
-  // Closure invariants — locked sequence per plan v3.2 (+ slice 4 Inv 0).
+  // Checked union precedes collision invariants: never drop/select conflicting content.
+  const checkedInventory = external ? checkedArtifactUnion([
+    { resources: resources.map(value => ({ value, origins: [] })), cql: cqlByLibrary.map(value => ({ value, origins: [] })) },
+    external.support,
+  ]) : undefined;
+  if (checkedInventory) resources.splice(0, resources.length, ...checkedInventory.resources.map(item => item.value));
+  const canonicalBases = [...new Set([metadata.canonicalBase, ...(external?.canonicalBases ?? [])])];
+  if (checkedInventory) assertCapturedClosure(checkedInventory, canonicalBases);
+
+  // Closure invariants over the checked combined inventory.
   // Inv 0: url uniqueness across the FULL emitted set (before Inv 1 drops on
   // relativePath) so a same-url collision is reported even if the two colliders'
   // relativePaths somehow differ.
   errors.push(...applyUrlUniquenessInvariant(resources));
   const inv1 = applyInvariant1(resources);
   errors.push(...inv1.errors);
-  const inv2errors = applyInvariant2(inv1.surviving, inv1.droppedPaths, metadata);
+  const inv2errors = canonicalBases.flatMap(canonicalBase => applyInvariant2(inv1.surviving, inv1.droppedPaths, { ...metadata, canonicalBase }));
   const inv3errors = applyInvariant3(inv1.surviving, inv1.droppedPaths);
   // Inv 4 (slice 4c) — Library content-url ↔ emitted-CQL-file integrity. Runs
   // over the post-Inv-1 surviving set, consuming the manifest's outputFilename
@@ -2278,14 +2313,14 @@ export function emitFhirDefClosure(
   // the EXPLICIT `isSharedCatalog` flag — their id/name/header already agree and they
   // are not manifest-identity-controlled.
   const enforcedIdentities = new Set<string>(
-    cqlByLibrary.filter((e) => !e.isSharedCatalog).map((e) => e.libraryName),
+    lookupManifest.filter((e) => !e.isSharedCatalog).map((e) => e.libraryName),
   );
-  const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, enforcedIdentities);
+  const inv6errors = canonicalBases.flatMap(canonicalBase => applyLibraryIdentityInvariant(inv1.surviving, { ...metadata, canonicalBase }, enforcedIdentities));
   // Inv 2(d) — case-feature cpg-featureExpression DEFINE integrity: the referenced define must exist in the
   // referenced library's emitted CQL (the general backstop for the #189 2d dangle class). No-op when the
   // manifest carries no CQL (`cqlByLibrary: []`, graph-only unit callers), like Inv 4.
-  errors.push(...applyPlanExpressionInvariant(inv1.surviving, cqlByLibrary));
-  const inv2dErrors = applyFeatureExpressionDefineInvariant(inv1.surviving, cqlByLibrary);
+  errors.push(...applyPlanExpressionInvariant(inv1.surviving, lookupManifest));
+  const inv2dErrors = applyFeatureExpressionDefineInvariant(inv1.surviving, lookupManifest);
   errors.push(...inv2errors, ...inv2dErrors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
@@ -2299,6 +2334,8 @@ export function emitFhirDefClosure(
     resources: errors.some((e) => e.kind === "presentation-overlap" && isFhirDefError(e)) ? [] : inv1.surviving,
     errors,
     unmatched,
+    ...(external && checkedInventory ? { externalAssembly: { inventory: checkedInventory,
+      provenance: external.provenance, canonicalBases } } : {}),
   };
 }
 
@@ -2316,7 +2353,8 @@ export function emitFhirDefFromPath(rootPath: string, opts: EmitOptions = {}): F
 export function emitDefinitionLanesFromPath(
   rootPath: string, opts: EmitOptions = {}, overlays?: ReadonlyMap<string, string>,
   includeCqlOnMetadataFailure = true,
-): { fhir: FhirDefFromPathResult; cql?: EmitImportsResult } {
+  externalBindings?: ExternalBindingsV1,
+): { fhir: FhirDefFromPathResult; cql?: EmitImportsResult; externalAssembly?: FhirDefClosureEmitResult["externalAssembly"] } {
   if (overlays?.size) {
     const projectRoot = findProjectRoot(resolve(rootPath));
     if (!projectRoot) throw new Error('Candidate emission requires an owning package.json project.');
@@ -2339,6 +2377,24 @@ export function emitDefinitionLanesFromPath(
       importDiagnostics: graph.diagnostics, metadataErrors }, cql };
   }
 
+  const prepared = preparePublicationContext(graph, {
+    canonicalBase: metadata.canonicalBase,
+    policyId: metadata.name,
+    ...(externalBindings ? { externalBindings } : {}),
+  });
+  return emitDefinitionLanesFromPrepared(prepared, opts);
+}
+
+/** Internal shared execution seam. A narrowed view retains its original graph and identities. */
+export function emitDefinitionLanesFromPrepared(
+  prepared: PreparedPublicationContext, opts: EmitOptions = {},
+  requiredPublications: readonly PublicationDescriptor[] = [],
+): ReturnType<typeof emitDefinitionLanesFromPath> {
+  const { graph } = prepared;
+  const captured = graph.packageSnapshot ? normalizeEmissionMetadata(graph.packageSnapshot) : undefined;
+  const metadataErrors = captured?.fhir.errors ?? [];
+  const metadata = captured?.fhir.metadata;
+  if (!metadata) throw new Error("Prepared definition emission requires valid original metadata.");
   // Slice 4c (E) — run the CQL lane FIRST to obtain the split-manifest, then
   // thread it into the FHIR closure so the FHIR lane materializes one Library
   // per emitted CQL library (consuming the split decision, never re-deriving the
@@ -2362,10 +2418,6 @@ export function emitDefinitionLanesFromPath(
   // allowlist of 3 split kinds silently DROPPED `emit-codesystem-url-conflict`, so
   // MCP `emit_crl_fhir` could report success while the CQL lane failed.
   // The combined path returns this same CQL result to every definition caller.
-  const prepared = preparePublicationContext(graph, {
-    canonicalBase: metadata.canonicalBase,
-    policyId: metadata.name,
-  });
   const cqlImports = emitCQLImportsFromPrepared(prepared);
   // Fold kind-LESS `type:"Exception"` throws too (panel R2 Fable [important]): this predicate exists to
   // skip EXCLUDED KINDS (the FHIR lane surfaces those itself), NOT to skip Exceptions. A kind-less throw
@@ -2394,6 +2446,7 @@ export function emitDefinitionLanesFromPath(
     cqlImports.suppressedActivityBindings ?? [],
     prepared,
     cqlImports.publicationTargets,
+    requiredPublications,
   );
   // Round-5 gpt55 [important]: fold importDiagnostics + metadataErrors
   // into success. Otherwise MCP can return success:true with fatal
@@ -2428,7 +2481,9 @@ export function emitDefinitionLanesFromPath(
     metadataErrors.length === 0 &&
     importErrors.length === 0 &&
     dispositionEmitErrors.length === 0;
-  return { cql: cqlImports, fhir: {
+  const finalCql = closureResult.externalAssembly?.inventory.cql.map(item => item.value);
+  return { cql: finalCql ? { ...cqlImports, cqlByLibrary: [...finalCql] } : cqlImports,
+    ...(closureResult.externalAssembly ? { externalAssembly: closureResult.externalAssembly } : {}), fhir: {
     ...closureResult,
     errors,
     success,

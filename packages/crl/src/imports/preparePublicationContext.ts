@@ -15,6 +15,7 @@ import { preparePublicationProgram, type PublicationProgram } from "../emit/publ
 import { computeCqlEmitClosure, computeFhirEmitClosure } from "./computeEmitClosure";
 import { buildLibraryScopes, lookupKnownLibrary } from "./scopes";
 import type { RegistryEntry, ResolvedGraph } from "./types";
+import { bindExternalPublications, type ExternalBindingsV1, type ResolvedExternalBindings } from "../emit/externalBindings";
 
 // REFACTOR:grounded (#320, plan 557) — one raw declaration context for both emit lanes.
 // Preparation preserves their different closure memberships and admits publications from raw
@@ -22,6 +23,7 @@ import type { RegistryEntry, ResolvedGraph } from "./types";
 // becoming runtime CQL includes: classification consumes prepared finite code tables.
 
 export interface PreparePublicationContextOptions {
+  readonly externalBindings?: ExternalBindingsV1;
   readonly canonicalBase?: string;
   readonly policyId?: string;
   /** Caller-supplied owning package metadata, keyed by the graph's canonical source identity. */
@@ -29,6 +31,7 @@ export interface PreparePublicationContextOptions {
 }
 
 export interface PreparedPublicationContext {
+  readonly external?: ResolvedExternalBindings;
   /** Original graph, including import diagnostics. Preparation is not import validation. */
   readonly graph: ResolvedGraph;
   readonly rawCqlClosure: readonly RegistryEntry[];
@@ -170,16 +173,19 @@ export function preparePublicationContext(
     },
   });
 
+  const original = preparePublicationProgram(declarations);
+  const external = options.externalBindings === undefined ? undefined : bindExternalPublications(graph, declarations, original, options.externalBindings);
   return Object.freeze({
     graph,
-    rawCqlClosure,
-    rawFhirClosure,
+    rawCqlClosure: external ? Object.freeze(computeCqlEmitClosure(graph, external.excludedSources)) : rawCqlClosure,
+    rawFhirClosure: external ? Object.freeze(computeFhirEmitClosure(graph, external.excludedSources)) : rawFhirClosure,
     ...(canonicalBase === undefined ? {} : { canonicalBase }),
     ...(policyId === undefined ? {} : { policyId }),
     primarySeedPaths: Object.freeze([...primarySeedPaths]),
     localCodePaths: Object.freeze([...localCodePaths]),
     localDomainResolver,
-    declarations,
-    publications: preparePublicationProgram(declarations),
+    declarations: external?.publications.declarations ?? declarations,
+    publications: external?.publications ?? original,
+    ...(external ? { external } : {}),
   });
 }

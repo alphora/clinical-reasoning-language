@@ -71,14 +71,35 @@ export type EmitClosureRefCollector = (
 export function expandClosureViaRefs(
   graph: ResolvedGraph,
   collectRefs: EmitClosureRefCollector,
+  excludedSources: ReadonlySet<string> = new Set(),
 ): RegistryEntry[] {
   const registry = graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() };
   const scopes = buildLibraryScopes(graph.resolvedLibraries, graph.localLibraries, registry);
+  const originallyAdmitted = new Map(graph.resolvedLibraries.map(entry => [entry.filePath, entry]));
 
   const emitClosure: RegistryEntry[] = [];
   const emitClosurePaths = new Set<string>();
   const visited = new Set<string>();
-  const queue: RegistryEntry[] = [...graph.resolvedLibraries];
+  let seeds = graph.resolvedLibraries;
+  if (excludedSources.size) {
+    const seedByPath = new Map(seeds.map(entry => [entry.filePath, entry]));
+    const reachable = new Set<string>();
+    const visitSeed = (entry: RegistryEntry): void => {
+      if (excludedSources.has(entry.filePath) || reachable.has(entry.filePath)) return;
+      reachable.add(entry.filePath);
+      const scope = scopes.get(entry.filePath);
+      if (!scope) return;
+      for (const include of entry.ast.includes) {
+        const target = lookupKnownLibrary(scope, include.name);
+        const child = target && seedByPath.get(target.filePath);
+        if (child) visitSeed(child);
+      }
+    };
+    const root = seedByPath.get(graph.rootPath);
+    if (root) visitSeed(root);
+    seeds = seeds.filter(entry => reachable.has(entry.filePath));
+  }
+  const queue: RegistryEntry[] = [...seeds];
 
   for (const e of queue) {
     if (!emitClosurePaths.has(e.filePath)) {
@@ -98,11 +119,15 @@ export function expandClosureViaRefs(
     for (const libName of crossLibs) {
       const target = lookupKnownLibrary(scope, libName);
       if (!target) continue; // unknown — already diagnosed elsewhere
-      if (target.origin === "package") continue; // packages stay outside the emit set
+      if (excludedSources.has(target.filePath)) continue;
+      // Pruning an external stub may remove an original package seed, while an active
+      // sibling still explicitly consumes it. Restore only originally admitted packages
+      // through that owner's actual include gate; registry presence grants nothing.
+      if (target.origin === "package" && !(excludedSources.size && originallyAdmitted.has(target.filePath) && scope.explicitIncludes.has(libName))) continue;
       if (emitClosurePaths.has(target.filePath)) continue;
       const siblingEntry =
         graph.localLibraries.find((e) => e.filePath === target.filePath) ??
-        graph.resolvedLibraries.find((e) => e.filePath === target.filePath);
+        originallyAdmitted.get(target.filePath);
       if (!siblingEntry) continue;
       emitClosurePaths.add(siblingEntry.filePath);
       emitClosure.push(siblingEntry);
@@ -249,13 +274,13 @@ export function collectFhirDefEmitRefs(entry: RegistryEntry, scope: LibraryScope
 }
 
 /** Convenience: full CQL emit closure with the standard CQL collector. */
-export function computeCqlEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
-  return expandClosureViaRefs(graph, collectCqlEmitRefs);
+export function computeCqlEmitClosure(graph: ResolvedGraph, excludedSources?: ReadonlySet<string>): RegistryEntry[] {
+  return expandClosureViaRefs(graph, collectCqlEmitRefs, excludedSources);
 }
 
 /** Convenience: full FHIR-def emit closure with the FHIR-def collector. */
-export function computeFhirEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
-  return expandClosureViaRefs(graph, collectFhirDefEmitRefs);
+export function computeFhirEmitClosure(graph: ResolvedGraph, excludedSources?: ReadonlySet<string>): RegistryEntry[] {
+  return expandClosureViaRefs(graph, collectFhirDefEmitRefs, excludedSources);
 }
 
 /* ─── ref-walker helpers (Concept / Decision / Activity) ─────────── */

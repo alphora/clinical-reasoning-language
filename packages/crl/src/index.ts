@@ -379,10 +379,12 @@ export type {
 // SINGLE composition + write path behind both `crl-emit --target fhir-def` and
 // the `emit_crl` MCP `out` directory (#237/T2).
 export { emitCrlTwoLane } from "./emit-two-lane";
+export { captureExternalSupport, captureExternalDecision, createExternalBindings } from "./emit/externalBindings";
+export type { ExternalBindingsV1, ExternalPublicationBinding, ExternalDecisionBinding, ProviderSupportSnapshot, ProviderDecisionSnapshot, SupportSubset, SnapshotProvenance, SelectedBooleanExport } from "./emit/externalBindings";
 export { emitCrlBundle } from "./emit-bundle";
 export { emitResultDefinitionClosure, definitionClosureDigest, type DefinitionPublicationOptions } from './results/definitionClosure';
 export type { EmitCrlBundleResult, BundleDiagnostic, DefinitionOrigin } from "./emit-bundle";
-export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary } from "./emit-two-lane";
+export type { EmitCrlTwoLaneResult, TwoLaneCqlLibrary, EmitCrlTwoLaneOptions } from "./emit-two-lane";
 export { writeTwoLane, EmitWriteError } from "./emit-writers";
 export { resolveEmitOutput, laneOffset, LANE_PRODUCES, type EmitLane, type EmitOutput } from "./emit-layout";
 export type { TwoLaneWritten } from "./emit-writers";

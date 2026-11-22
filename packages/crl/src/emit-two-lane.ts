@@ -2,6 +2,15 @@ import { emitFhirDefFromPath, isFhirDefError, isFhirDefWarning, type Capability 
 import type { emitCQLImports } from "./imports/emit";
 
 import { emitDefinitionLanesFromPath } from "./fhir-emitter/closureOrchestrator";
+import { ExternalBindingError, type ExternalBindingsV1, type SnapshotProvenance, type SupportSubset } from "./emit/externalBindings";
+
+/** Unreleased v1 definition-assembly option. CRE/CEL do not consume external bindings. */
+export interface EmitCrlTwoLaneOptions {
+  date?: string;
+  capability?: Capability;
+  sourceOverlays?: ReadonlyMap<string, string>;
+  externalBindings?: ExternalBindingsV1;
+}
 
 /** One emitted CQL library file (name + source) — a caller writes it to `<out>/cql/`. */
 export interface TwoLaneCqlLibrary {
@@ -10,6 +19,7 @@ export interface TwoLaneCqlLibrary {
 }
 
 export interface EmitCrlTwoLaneResult {
+  externalAssembly?: { provenance: readonly SnapshotProvenance[]; canonicalBases: readonly string[]; inventory: SupportSubset; sourceEvaluation: "unsupported" };
   /** True iff BOTH lanes are free of hard errors AND no CQL filename collides. */
   success: boolean;
   /** The FHIR-Definition lane result (resources, unmatched, diagnostics, metadataErrors). */
@@ -46,13 +56,26 @@ export interface EmitCrlTwoLaneResult {
  */
 export function emitCrlTwoLane(
   filePath: string,
-  opts: { date?: string; capability?: Capability; sourceOverlays?: ReadonlyMap<string, string> } = {},
+  opts: EmitCrlTwoLaneOptions = {},
 ): EmitCrlTwoLaneResult {
   // REFACTOR:grounded (Medical Review): one candidate graph supplies both lanes.
-  const lanes = emitDefinitionLanesFromPath(filePath, {
+  let lanes: ReturnType<typeof emitDefinitionLanesFromPath>;
+  try { lanes = emitDefinitionLanesFromPath(filePath, {
     ...(opts.date !== undefined ? { date: opts.date } : {}),
     ...(opts.capability !== undefined ? { capability: opts.capability } : {}),
-  }, opts.sourceOverlays);
+  }, opts.sourceOverlays, true, opts.externalBindings); }
+  catch (error) {
+    if (!(error instanceof ExternalBindingError)) throw error;
+    const diagnostic = { type: "Validation" as const, kind: error.kind, message: error.message };
+    return { success: false, fhir: { success: false, resources: [], errors: [diagnostic], unmatched: [], importDiagnostics: [], metadataErrors: [] },
+      cql: { success: false, graph: { rootPath: filePath, resolvedLibraries: [], localLibraries: [], namespace: { concepts: new Map(), terminologies: new Map(), decisions: new Map(), activities: new Map(), parameters: new Map() }, diagnostics: [] }, importDiagnostics: [], cqlByLibrary: [], errors: [diagnostic] },
+      cqlLibraries: [], fhirHardErrors: [diagnostic], hardErrors: [diagnostic], warnings: [], filenameCollisions: [] };
+  }
+  return definitionLanesResult(lanes);
+}
+
+/** Internal aggregation shared with original-context support capture; not an SDK entry point. */
+export function definitionLanesResult(lanes: ReturnType<typeof emitDefinitionLanesFromPath>): EmitCrlTwoLaneResult {
   const { fhir } = lanes;
   const cql = lanes.cql!;
 
@@ -92,5 +115,6 @@ export function emitCrlTwoLane(
     cql.success &&
     filenameCollisions.length === 0 &&
     fhir.unmatched.length === 0;
-  return { success, fhir, cql, cqlLibraries, fhirHardErrors, hardErrors, warnings, filenameCollisions };
+  return { success, fhir, cql, cqlLibraries, fhirHardErrors, hardErrors, warnings, filenameCollisions,
+    ...(lanes.externalAssembly ? { externalAssembly: { ...lanes.externalAssembly, sourceEvaluation: "unsupported" as const } } : {}) };
 }
