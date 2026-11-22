@@ -1,7 +1,7 @@
 {
-  "auditedRevision": "07f0502870c48f7e6632a5c4798ff07163a7d52a",
+  "auditedRevision": "76167ee493107189c2565e664b321837c7402cb2",
   "auditedSchemaVersion": "2.50",
   "auditedContentHash": "c90d52d86246393795d3eed939d430274882c488de4eb9182bc9841d0e930ca7",
-  "scope": "Schema 2.50 unchanged-content maintenance through bounded independent supplemental SDK assembly. Complete 15-path delta from f963a7b3 classified in coverage.md with all19 new parameterized cases. Original-context publication/profile/presentation semantics preserved; engineering-only same-process captures and explicit bindings add no CRL syntax or CLI/MCP/source CRE/CEL capability. Original entries and KELP packaging/MV navigation limitations explicit. Source/native evidence is separate from installed59 archives, mapped/extracted packages and deployed acceptance.",
+  "scope": "Schema 2.50 unchanged-content maintenance through bounded external-decision support closure. Complete five-path interval from 07f050287 inspected: three compiler/test paths plus prior audit metadata. All seven additional parameterized cases individually classified in coverage.md. No CRL syntax, concept value, answer-domain, selection, question or ordinary no-bindings emission change. Corrected SDK output drops only unused generated recommendation/activity resources after complete validation; actual retained40FHIR/13CQL parity verified. Independent artifacts, optional package linking and ordinary MV canonical-terminal admission remain distinct responsibilities. Final installed release, mapped/extracted package and production acceptance are separate gates.",
   "evidence": "packages/crl/src/authoring-kit/tests/coverage.md"
 }
